@@ -1,0 +1,38 @@
+{
+  "status": "complete",
+  "project_type": "brownfield",
+  "current_section": "complete",
+  "current_question": 0,
+  "completed_sections": ["product", "guidelines", "tech_stack", "workflow", "styleguides"],
+  "answers": {
+    "project_name": "FIAP AIOps Challenge",
+    "description": "An ML platform to anticipate incident volume and OLA breach risk for Locaweb operations",
+    "problem": "Reactive incident management — ops team reacts instead of anticipating",
+    "users": "FIAP evaluators + Locaweb stakeholders",
+    "goals": ["Forecast incident volume (D+1, D+7)", "Identify OLA breach risk", "Deliver explainable insights"],
+    "tone": "Friendly and approachable",
+    "principles": ["Data quality and rigor", "User safety and reliability", "Innovation"],
+    "languages": ["Python 3.12+", "TypeScript", "SQL"],
+    "frontend": "Nuxt (config interface only, dataviz separate)",
+    "backend": "No API framework — workers, PySpark, Airflow",
+    "database": "PostgreSQL",
+    "infra": "Cloud-agnostic, K8s or Docker preferred",
+    "tdd": "Moderate",
+    "commits": "Conventional Commits",
+    "review": "Required for all changes",
+    "checkpoints": "At track completion only"
+  },
+  "files_created": [
+    "conductor/index.md",
+    "conductor/product.md",
+    "conductor/product-guidelines.md",
+    "conductor/tech-stack.md",
+    "conductor/workflow.md",
+    "conductor/tracks.md",
+    "conductor/code_styleguides/python.md",
+    "conductor/code_styleguides/typescript.md",
+    "conductor/code_styleguides/sql.md"
+  ],
+  "started_at": "2026-03-21T00:00:00Z",
+  "last_updated": "2026-03-21T00:00:00Z"
+}

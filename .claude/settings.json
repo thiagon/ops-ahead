@@ -1,0 +1,10 @@
+{
+  "enabledPlugins": {
+    "machine-learning-ops@claude-code-workflows": true,
+    "data-engineering@claude-code-workflows": true,
+    "business-analytics@claude-code-workflows": true,
+    "data-validation-suite@claude-code-workflows": true,
+    "incident-response@claude-code-workflows": true,
+    "conductor@claude-code-workflows": true
+  }
+}
