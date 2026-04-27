@@ -47,7 +47,7 @@ A operação hoje é **reativa**: age depois que o incidente já ocorreu. Com ba
 
 ## Proposta de Solução
 
-A solução é composta por três camadas que trabalham juntas: ingestão e processamento dos dados, inteligência preditiva, e interface de decisão.
+A solução é composta por quatro camadas que trabalham juntas: ingestão e processamento dos dados, inteligência preditiva clássica, agente LLM de triagem e interface de decisão. ML clássico entrega o sinal estatístico (rápido, barato, calibrado); o agente LLM enriquece o alerta com contexto e produz uma recomendação de ação. Cada camada faz o que faz melhor.
 
 ### Camada 1 — Pipeline de Dados
 
@@ -57,17 +57,60 @@ A solução é composta por três camadas que trabalham juntas: ingestão e proc
 
 ### Camada 2 — Modelos Preditivos
 
-Três modelos complementares, cada um respondendo uma pergunta diferente:
+Três modelos complementares, cada um com técnica escolhida em função da pergunta que responde:
 
-| Modelo                     | Pergunta que responde                                              | Saída                                                                                                               |
-| -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| **Previsão de volume**     | Quantos incidentes teremos amanhã (D+1) e na próxima semana (D+7)? | Volume projetado por prioridade e por grupo                                                                         |
-| **Risco de breach de OLA** | Qual a probabilidade de estourar o prazo de resolução?             | Score de risco por incidente aberto e projeção de breaches acumulados vs. meta anual                                |
-| **Detecção de rajada**     | Este IC está em trajetória de falha grave?                         | Alerta antecipado quando o padrão de incidentes automáticos ("Sem Intervenção") em um IC indica degradação iminente |
+| Modelo                     | Pergunta                          | Técnica                                                                                                                                                                                                                                                                                                                                            | Saída                                                                                       |
+| -------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Previsão de volume**     | Quantos incidentes em D+1 e D+7?  | **Baseline:** SARIMA / Prophet com regressores de calendário (feriado, dia útil, turno). **Modelo principal:** gradient boosting (LightGBM) com features de lag (1, 7, 14 dias), médias móveis, indicadores de sazonalidade e codificação de prioridade/grupo. Avaliação separada por prioridade para evitar que P3 mascare o sinal de P1/P2.       | Volume previsto por prioridade e grupo, com intervalo de confiança                          |
+| **Risco de breach de OLA** | Qual a probabilidade de estourar? | Classificação binária com **LightGBM/XGBoost**, treinada apenas em incidentes elegíveis ao KPI (P1–P3, sem incidente pai, sem "Sem Intervenção"). **Calibração** via isotonic regression para que a probabilidade tenha leitura direta. **Explicabilidade** com SHAP por incidente. Treino com class weighting para o desbalanceamento (1% breach). | Score 0–1 por incidente aberto + top features que pressionam o risco                        |
+| **Detecção de rajada**     | Este IC está em trajetória ruim?  | Detecção de anomalia **por IC** em janela móvel: contagem de "Sem Intervenção" em janelas de 15min / 1h / 6h, comparada via **z-score robusto** sobre baseline histórico + **CUSUM** para detectar mudança de regime. Limiar dinâmico por IC (não global), evitando alarmes em ICs naturalmente ruidosos.                                          | Alerta antecipado quando o padrão excede o limiar — com lead-time medido em minutos antes do P2 |
 
-### Camada 3 — Interface de Decisão
+### Metodologia
 
-- **Painel operacional (N1/N2):** visão em tempo real dos alertas de rajada e dos incidentes com maior risco de breach, orientando onde a equipe deve atuar primeiro.
+A entrega ML é avaliada com o mesmo rigor que a operação avaliaria em produção:
+
+- **Split temporal sem leakage:** treino em meses anteriores, validação em janela recente, teste em hold-out final. Nada de validação cruzada aleatória — em série temporal isso vaza informação do futuro.
+- **Métricas por modelo:**
+  - Volume: MAPE, MAE e cobertura do intervalo de previsão.
+  - Risco de breach: AUC-ROC, AUC-PR, Brier score (calibração) e **recall@top-k** (dos k incidentes mais arriscados que o modelo aponta, quantos breachariam de fato).
+  - Rajada: **precision** dos alertas e **lead-time** médio (quantos minutos antes do P2 o alerta dispara, com qual taxa de falso positivo).
+- **Re-treino e monitoramento:** retreino periódico, monitoramento de _drift_ via PSI nas features mais relevantes; alarme se a calibração do modelo de breach degradar.
+- **Avaliação do agente LLM:** _blind review_ por analista N2 sênior em conjunto histórico de alertas — métricas de **concordância** com ação real, **tempo médio de triagem** (com vs. sem agente) e **taxa de alucinação** (saídas que referenciam ICs/grupos inexistentes, monitorada continuamente).
+- **Princípio de implementação:** abordagem open-source e cloud-agnostic, sem dependência de serviço proprietário. Detalhes de stack, orquestração e infraestrutura ficam para a **Sprint 2 (Arquitetura)** — esta sprint trata da ideação da solução e das técnicas escolhidas.
+
+### Camada 3 — Agente LLM de Triagem e Decisão
+
+ML clássico responde "qual o risco?" com um número. Mas o operador não age a partir de um número — age a partir de **contexto**. Esta camada usa um agente LLM com _tool calling_ para transformar cada alerta em uma recomendação acionável.
+
+**Como funciona:**
+
+Para cada alerta gerado pela Camada 2 (rajada ou breach iminente), o agente:
+
+1. **Recebe o sinal cru** — score de risco, features SHAP, IC envolvido, grupo designado.
+2. **Busca contexto via ferramentas** que o próprio agente decide invocar:
+   - `get_recent_incidents(IC, janela)` — incidentes recentes no mesmo IC.
+   - `get_group_load(grupo)` — carga atual e capacidade restante do grupo.
+   - `find_similar_resolved(IC, prioridade)` — RAG sobre base histórica para encontrar incidentes parecidos já resolvidos e _como_ foram resolvidos.
+   - `get_ola_window(prioridade, aberto_em)` — quanto tempo resta até o breach.
+3. **Reavalia criticidade** combinando o score estatístico com o contexto recuperado (ex.: alerta de rajada perde criticidade se o grupo está ocioso e o IC já tem histórico de auto-recuperação em 5min — ganha criticidade se é horário de pico e o grupo está saturado).
+4. **Gera um TL;DR de decisão** — saída estruturada (JSON) com schema fixo:
+   - Criticidade reavaliada (1–5) e justificativa em uma frase.
+   - **Ação recomendada** ("escalar para N2 agora", "monitorar próximos 15min", "abrir change preventivo no IC X").
+   - **Quem deve atuar** (qual grupo / nível).
+   - **Janela de ação** (em minutos, baseada no OLA restante).
+   - Links para os 2–3 incidentes similares que mais informaram a recomendação.
+
+**Técnicas e guardrails:**
+
+- **LLM com function calling** (modelo de fronteira — Claude ou GPT — escolhido por confiabilidade em saída estruturada).
+- **RAG** sobre o histórico de incidentes resolvidos, com _embeddings_ por descrição + filtros estruturados (IC, prioridade, grupo).
+- **Structured outputs** com JSON Schema validado — se o LLM produzir saída inválida, fallback para o alerta cru.
+- **Guardrails operacionais:** o agente _recomenda_, não age. Toda saída é auditada, registrada e mostrada com a fonte do contexto que usou — o N1/N2 mantém a decisão final.
+- **Avaliação:** _blind review_ por analista N2 sênior comparando recomendação do agente vs. ação real tomada em incidentes históricos; métrica de concordância e tempo economizado de triagem.
+
+### Camada 4 — Interface de Decisão
+
+- **Painel operacional (N1/N2):** fila priorizada onde cada item é o **TL;DR do agente** — criticidade, ação recomendada, janela e contexto. Score estatístico e features SHAP ficam disponíveis em _drill-down_, mas a leitura primária é o resumo executivo.
 - **Painel tático (gestores):** projeção de volume D+1 e D+7, acompanhamento de breaches acumulados vs. meta anual, e indicadores de carga por equipe para apoiar decisões de escala e alocação.
 - **Relatórios de tendência:** análise de padrões por IC, categoria e prioridade ao longo do tempo — identificando componentes em degradação e sazonalidades recorrentes.
 
@@ -110,9 +153,11 @@ A solução é cloud-agnostic, aplicável independentemente do provedor de infra
 | **BigPanda**           | Correlação cross-domain           | Correlaciona eventos em tempo real, mas não projeta tendências |
 | **Dynatrace Davis AI** | Root cause analysis automático    | Explica o que aconteceu, não antecipa o que vai acontecer      |
 
-**Nossos diferenciais:**
+**Nossos diferenciais — ancorados nas técnicas escolhidas:**
 
-- **Previsão temporal** (D+1 e D+7): as soluções acima são reativas ou em tempo real — nenhuma projeta volume futuro de incidentes com janela de antecedência.
-- **Detecção de rajada como sinal preditivo**: uso de padrões de aceleração de incidentes automáticos como indicador antecedente de falhas graves, algo que ferramentas de correlação não exploram.
-- **Projeção de risco de breach de OLA**: não apenas monitorar se o OLA foi violado, mas estimar a probabilidade de violação antes que o prazo estoure — permitindo ação preventiva.
-- **Explicabilidade orientada à decisão**: além de prever, o modelo explica quais fatores estão pressionando a operação, apoiando decisões concretas de alocação e priorização.
+- **"Sem Intervenção" como sinal, não como ruído.** As ferramentas concorrentes filtram ou agrupam esses eventos. Nós usamos a _aceleração_ deles em janela móvel por IC como variável de entrada para o modelo de breach **e** como gatilho do detector de rajada (z-score robusto + CUSUM). É o uso ativo dos 80 mil eventos anuais que hoje são descartados.
+- **Horizonte multi-janela (D+1 + D+7).** Previsão curta para escala diária e média para planejamento semanal — entregues no mesmo painel, com intervalos de confiança. Concorrentes operam em tempo real; nós operamos com antecedência.
+- **Score calibrado por incidente aberto, não só agregado.** O modelo de breach retorna probabilidade calibrada (isotonic) **para cada chamado em aberto**, com SHAP indicando o porquê (idade vs. limite OLA, carga atual do grupo, frequência recente do IC). Permite ação concreta: "quais 10 chamados eu olho primeiro?".
+- **Validação temporal honesta.** Split por tempo, sem vazamento — métricas reportadas (MAPE, recall@top-k, lead-time) refletem o que o modelo entrega em produção, não otimismo de validação aleatória. É o que diferencia um POC de uma solução operável.
+- **Explicabilidade no vocabulário do operador.** Features são desenhadas para serem lidas pelo N1/N2 (idade do chamado, carga do grupo, frequência do IC) — não black-box. O analista entende _por que_ aquele incidente subiu no ranking de risco.
+- **Híbrido ML + Agente LLM, não LLM puro nem ML puro.** A maioria dos concorrentes para no score estatístico ou no dashboard. Nós entregamos **recomendação acionável**: o LLM com _tool calling_ busca contexto (incidentes similares via RAG, carga do grupo, OLA restante) e gera um TL;DR estruturado — "ação X, em Y minutos, por causa de Z". Não é chatbot decorativo: é triagem assistida com saída JSON validada e guardrails. ML clássico não faz isso; LLM sozinho não tem o sinal calibrado para começar.
