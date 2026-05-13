@@ -6,6 +6,15 @@
     "data-validation-suite@claude-code-workflows": true,
     "incident-response@claude-code-workflows": true,
     "conductor@claude-code-workflows": true,
-    "web-scripting@claude-code-workflows": true
+    "frontend-design@claude-plugins-official": true,
+    "c4-architecture@claude-code-workflows": true,
+    "playground@claude-plugins-official": true,
+    "huggingface-skills@claude-plugins-official": true,
+    "datarobot-agent-skills@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "session-report@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "github@claude-plugins-official": true
   }
 }
