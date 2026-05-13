@@ -5,6 +5,7 @@
     "business-analytics@claude-code-workflows": true,
     "data-validation-suite@claude-code-workflows": true,
     "incident-response@claude-code-workflows": true,
-    "conductor@claude-code-workflows": true
+    "conductor@claude-code-workflows": true,
+    "web-scripting@claude-code-workflows": true
   }
 }
