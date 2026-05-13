@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Pitch SPRINT 2 — Ops Ahead · Arquitetura</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<style>
+		:root {
+			--bg-main: #0B0F19;
+			--bg-tile: #161F33;
+			--bg-tile-2: #1E2A47;
+			--accent-red: #F9203E;
+			--accent-red-soft: rgba(249, 32, 62, 0.12);
+			--text-light: #F8FAFC;
+			--text-muted: #94A3B8;
+			--text-dim: #64748B;
+			--border-color: #2A3B5C;
+			--green: #10B981;
+			--amber: #F59E0B;
+			--blue: #3B82F6;
+			--purple: #8B5CF6;
+		}
+
+		* { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+		body {
+			background-color: #e2e8f0;
+			display: grid;
+			gap: 40px;
+			place-items: center;
+			padding: 40px 0;
+			min-height: 100vh;
+			font-family: 'Inter', sans-serif;
+		}
+
+		.slide-container {
+			background-color: var(--bg-main);
+			width: 1280px;
+			height: 720px;
+			padding: 50px 60px;
+			position: relative;
+			color: var(--text-light);
+			border-radius: 8px;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+		}
+
+		.slide-container::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 6px;
+			background: linear-gradient(90deg, var(--accent-red) 0%, var(--accent-red) 30%, transparent 30%);
+			z-index: 10;
+		}
+
+		h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; font-weight: 700; color: var(--text-light); }
+		p, li, td, th, span { font-family: 'Inter', sans-serif; color: var(--text-muted); }
+		code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+		.slide-title {
+			font-size: 32px;
+			margin-bottom: 24px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			color: var(--text-light);
+			display: flex;
+			align-items: center;
+			width: 100%;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 14px;
+		}
+
+		.slide-title .red-slash { color: var(--accent-red); margin-right: 14px; font-weight: 900; }
+
+		.content-area { display: flex; flex-direction: column; flex-grow: 1; width: 100%; justify-content: center; }
+
+		.brand-footer {
+			position: absolute;
+			bottom: 22px;
+			right: 40px;
+			font-family: 'Poppins', sans-serif;
+			font-weight: 700;
+			font-size: 16px;
+			color: var(--text-light);
+		}
+		.brand-footer span { color: var(--accent-red); font-weight: 900; margin-right: 5px; }
+
+		.slide-number {
+			position: absolute;
+			bottom: 22px;
+			left: 40px;
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 11px;
+			color: var(--text-dim);
+			letter-spacing: 2px;
+		}
+
+		/* ---------- CAPA ---------- */
+		.title-layout { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+		.title-layout h1 { font-size: 96px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 2px; }
+		.title-layout .subtitle { font-size: 28px; color: var(--text-light); font-weight: 600; }
+		.tagline { font-size: 22px; color: var(--accent-red); font-style: italic; letter-spacing: 1px; margin-top: 18px; }
+
+		/* ---------- EQUIPE ---------- */
+		.team-grid { display: flex; justify-content: space-between; gap: 18px; width: 100%; }
+		.team-member {
+			flex: 1; display: flex; flex-direction: column; align-items: center;
+			background: var(--bg-tile); padding: 22px 14px; border-radius: 12px;
+			border-top: 4px solid var(--accent-red);
+		}
+		.team-member .photo {
+			width: 100px; height: 100px; border-radius: 50%; object-fit: cover;
+			border: 3px solid var(--border-color); margin-bottom: 14px; background: var(--bg-main);
+		}
+		.team-member h3 { font-size: 16px; text-align: center; margin-bottom: 4px; line-height: 1.3; }
+		.team-member p { font-size: 13px; color: var(--accent-red); font-weight: 600; }
+
+		/* ---------- CENÁRIO LOCAWEB ---------- */
+		.highlight-numbers-layout { display: flex; align-items: stretch; gap: 36px; width: 100%; }
+		.highlight-numbers-layout > div:first-child {
+			flex: 0 0 35%; text-align: center; background-color: var(--bg-tile);
+			padding: 36px 28px; border-radius: 16px;
+			border-bottom: 4px solid var(--accent-red);
+			display: flex; flex-direction: column; justify-content: center;
+		}
+		.highlight-numbers-layout .number {
+			font-size: 120px; font-weight: 900; color: var(--accent-red);
+			line-height: 1; font-family: 'Poppins', sans-serif;
+		}
+		.highlight-numbers-layout .number-label {
+			font-size: 16px; font-weight: 600; color: var(--text-light);
+			margin-top: 16px; text-transform: uppercase;
+		}
+		.data-tiles { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		.data-tile { background: var(--bg-tile); border-radius: 10px; border-left: 3px solid var(--accent-red); padding: 18px 20px; }
+		.data-tile .data-num { font-family: 'Poppins', sans-serif; font-size: 36px; font-weight: 900; color: var(--accent-red); line-height: 1; }
+		.data-tile .data-label { color: var(--text-light); font-weight: 600; font-size: 14px; margin-top: 8px; }
+		.data-tile .data-desc { color: var(--text-muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+
+		/* ---------- PROBLEMA ---------- */
+		.two-column { display: flex; width: 100%; gap: 50px; align-items: stretch; }
+		.two-column > div { flex: 1; }
+		.feature-block { margin-bottom: 26px; }
+		.feature-block:last-child { margin-bottom: 0; }
+		.feature-block h3 { font-size: 20px; color: var(--text-light); margin-bottom: 8px; display: flex; align-items: center; }
+		.feature-block h3 i { color: var(--accent-red); margin-right: 14px; font-size: 22px; }
+		.feature-block p { font-size: 15px; color: var(--text-muted); line-height: 1.5; }
+
+		/* ---------- PÚBLICO-ALVO ---------- */
+		.persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; width: 100%; }
+		.persona-card {
+			background: var(--bg-tile); border-radius: 14px;
+			border-top: 4px solid var(--accent-red);
+			padding: 22px 24px;
+			display: flex; flex-direction: column; align-items: flex-start;
+		}
+		.persona-card .persona-icon {
+			width: 56px; height: 56px; border-radius: 50%;
+			background: rgba(249, 32, 62, 0.12);
+			display: flex; align-items: center; justify-content: center;
+			color: var(--accent-red); font-size: 24px; margin-bottom: 14px;
+		}
+		.persona-card .persona-tier {
+			font-family: 'Poppins', sans-serif; font-size: 11px; letter-spacing: 2px;
+			color: var(--accent-red); text-transform: uppercase; font-weight: 700; margin-bottom: 6px;
+		}
+		.persona-card h3 { font-size: 18px; color: var(--text-light); margin-bottom: 10px; line-height: 1.25; }
+		.persona-card p { font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+		.persona-card.new {
+			border-top-color: var(--green);
+		}
+		.persona-card.new .persona-tier { color: var(--green); }
+		.persona-card.new .persona-icon { background: rgba(16, 185, 129, 0.12); color: var(--green); }
+		.persona-card .new-badge {
+			margin-left: 8px; background: var(--green); color: var(--bg-main);
+			font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+			text-transform: uppercase; letter-spacing: 1px; font-family: 'Poppins', sans-serif;
+		}
+
+		/* ---------- PROPOSTA DE SOLUÇÃO ---------- */
+		.tiled-content { display: flex; gap: 16px; width: 100%; align-items: stretch; }
+		.tile { flex: 1; background-color: var(--bg-tile); border-radius: 12px; padding: 22px; border-top: 4px solid var(--accent-red); display: flex; flex-direction: column; }
+		.tile .icon { font-size: 30px; color: var(--accent-red); margin-bottom: 12px; }
+		.tile h3 { color: var(--text-light); font-size: 16px; margin-bottom: 8px; }
+		.tile p { color: var(--text-muted); font-size: 12.5px; line-height: 1.5; }
+		.tile .tech-row {
+			margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color);
+			font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+			color: var(--accent-red); letter-spacing: 0.5px; line-height: 1.5;
+		}
+
+		.solution-update {
+			margin-top: 16px; padding: 11px 18px;
+			background: var(--accent-red-soft);
+			border: 1px solid rgba(249, 32, 62, 0.3);
+			border-radius: 8px;
+			font-size: 12px; color: var(--text-light); line-height: 1.5;
+			text-align: center;
+		}
+		.solution-update strong { color: var(--accent-red); }
+
+		/* ---------- RECAP / INSIGHT NOVO ---------- */
+		.recap-grid {
+			display: grid; grid-template-columns: 130px 1fr 1fr;
+			gap: 0; background: var(--bg-tile);
+			border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color);
+		}
+		.recap-grid > div { padding: 11px 16px; border-bottom: 1px solid var(--border-color); font-size: 12px; line-height: 1.45; color: var(--text-muted); }
+		.recap-grid .head {
+			background: rgba(0, 0, 0, 0.35);
+			font-family: 'Poppins', sans-serif; font-size: 11px;
+			text-transform: uppercase; letter-spacing: 1.5px;
+			color: var(--accent-red); font-weight: 700;
+		}
+		.recap-grid .topic {
+			background: rgba(0, 0, 0, 0.2);
+			font-family: 'Poppins', sans-serif;
+			color: var(--text-light); font-weight: 600;
+			font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+		}
+		.recap-grid > div:nth-last-child(-n+3) { border-bottom: none; }
+		.recap-grid strong { color: var(--text-light); }
+
+		.insight-box {
+			margin-top: 14px; padding: 12px 18px;
+			background: var(--accent-red-soft);
+			border: 1px solid rgba(249, 32, 62, 0.4);
+			border-radius: 10px;
+			display: flex; gap: 12px; align-items: flex-start;
+		}
+		.insight-box i { color: var(--accent-red); font-size: 18px; margin-top: 2px; }
+		.insight-box p { font-size: 12.5px; color: var(--text-light); line-height: 1.5; }
+		.insight-box strong { color: var(--accent-red); }
+		.insight-box code { color: var(--accent-red); font-size: 11px; }
+
+		/* ---------- ARQUITETURA VISÃO GERAL ---------- */
+		.arch-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; height: 100%; }
+		.arch-stack { display: flex; flex-direction: column; gap: 8px; }
+		.arch-layer {
+			background: var(--bg-tile); border-radius: 10px; padding: 12px 16px;
+			border-left: 4px solid var(--accent-red); position: relative;
+		}
+		.arch-layer .layer-tag {
+			font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent-red);
+			letter-spacing: 1.5px; margin-bottom: 4px; text-transform: uppercase;
+		}
+		.arch-layer h4 { font-size: 14px; color: var(--text-light); margin-bottom: 4px; }
+		.arch-layer p { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; line-height: 1.4; }
+		.arch-arrow { text-align: center; color: var(--accent-red); font-size: 14px; margin: -2px 0; }
+		.arch-sources {
+			text-align: center; margin-top: 10px; padding: 8px;
+			background: rgba(0, 0, 0, 0.3); border-radius: 6px;
+			font-size: 11px; color: var(--text-muted);
+		}
+		.arch-sources strong { color: var(--text-light); }
+
+		.principles-list { display: flex; flex-direction: column; gap: 7px; }
+		.principle-item {
+			background: var(--bg-tile); border-radius: 6px;
+			padding: 8px 12px; display: flex; gap: 10px; align-items: flex-start;
+			border-left: 2px solid var(--accent-red);
+		}
+		.principle-item .num {
+			font-family: 'Poppins', sans-serif; font-weight: 900;
+			color: var(--accent-red); font-size: 16px;
+			flex: 0 0 22px; line-height: 1.4;
+		}
+		.principle-item .body { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+		.principle-item .body strong { color: var(--text-light); }
+		.principle-item .body code { font-size: 10px; color: var(--accent-red); }
+		.principles-title {
+			font-size: 14px; text-transform: uppercase; letter-spacing: 2px;
+			color: var(--text-light); margin-bottom: 10px; font-family: 'Poppins', sans-serif;
+		}
+		.principles-title .accent { color: var(--accent-red); }
+
+		/* ---------- TABELAS PADRÃO ---------- */
+		.locaweb-table {
+			width: 100%; border-collapse: collapse;
+			background-color: var(--bg-tile);
+			border: 1px solid var(--border-color);
+			border-radius: 8px; overflow: hidden;
+		}
+		.locaweb-table th {
+			background: rgba(0, 0, 0, 0.35); color: var(--accent-red);
+			padding: 11px 14px; text-align: left; font-size: 11px;
+			text-transform: uppercase; letter-spacing: 1.5px;
+			border-bottom: 2px solid var(--border-color); font-family: 'Poppins', sans-serif;
+		}
+		.locaweb-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); line-height: 1.45; vertical-align: top; }
+		.locaweb-table tr:last-child td { border-bottom: none; }
+		.locaweb-table td strong, .locaweb-table td b { color: var(--text-light); }
+		.locaweb-table td code { color: var(--accent-red); font-size: 11px; }
+
+		.callout {
+			margin-top: 14px; padding: 12px 18px;
+			background: var(--bg-tile-2); border-radius: 8px;
+			border-left: 3px solid var(--amber);
+		}
+		.callout h4 { color: var(--amber); font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+		.callout ul { list-style: none; padding-left: 0; }
+		.callout li { font-size: 11.5px; color: var(--text-muted); line-height: 1.55; margin-bottom: 3px; }
+		.callout li::before { content: '▸ '; color: var(--amber); font-weight: 700; }
+		.callout li strong, .callout li b { color: var(--text-light); }
+
+		/* ---------- MODELOS CARDS ---------- */
+		.models-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+		.model-card {
+			background: var(--bg-tile); border-radius: 12px; padding: 18px;
+			border-top: 3px solid var(--accent-red);
+			display: flex; flex-direction: column;
+		}
+		.model-card .model-icon {
+			width: 36px; height: 36px; border-radius: 8px;
+			background: var(--accent-red-soft); color: var(--accent-red);
+			display: flex; align-items: center; justify-content: center;
+			font-size: 16px; margin-bottom: 10px;
+		}
+		.model-card h4 { font-size: 14px; color: var(--text-light); margin-bottom: 4px; }
+		.model-card .algo {
+			font-family: 'JetBrains Mono', monospace; font-size: 10px;
+			color: var(--accent-red); margin-bottom: 10px; letter-spacing: 0.5px;
+		}
+		.model-card .why { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; flex-grow: 1; }
+		.model-card .metric { padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+		.model-card .metric span { color: var(--text-dim); margin-right: 6px; }
+		.model-card .metric strong { color: var(--text-light); font-weight: 600; }
+
+		.ops-stack {
+			background: var(--bg-tile-2); border-radius: 8px;
+			padding: 12px 18px; border-left: 3px solid var(--green);
+		}
+		.ops-stack h4 { color: var(--green); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+		.ops-stack ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+		.ops-stack li { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+		.ops-stack li strong { color: var(--text-light); }
+		.ops-stack li code { color: var(--accent-red); font-size: 10px; }
+
+		/* ---------- AGENTE ---------- */
+		.tool-pills {
+			margin-top: 14px; padding: 12px 18px;
+			background: var(--bg-tile-2); border-radius: 8px;
+			border-left: 3px solid var(--accent-red);
+		}
+		.tool-pills h4 { font-size: 11px; color: var(--accent-red); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+		.tool-pills .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+		.tool-pills code {
+			font-size: 11px; color: var(--text-light);
+			background: var(--bg-main); padding: 4px 10px;
+			border-radius: 999px; border: 1px solid var(--border-color);
+		}
+		.tool-pills code.new { border-color: var(--accent-red); color: var(--accent-red); }
+
+		/* ---------- INTERFACES ---------- */
+		.principle-banner {
+			background: var(--bg-tile-2); border-left: 3px solid var(--accent-red);
+			border-radius: 0 8px 8px 0; padding: 12px 18px; margin-top: 14px;
+		}
+		.principle-banner p { font-size: 13px; color: var(--text-light); line-height: 1.5; }
+		.principle-banner strong { color: var(--accent-red); }
+
+		.iface-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+		.iface-col { background: var(--bg-tile); border-radius: 10px; padding: 14px 16px; border-top: 3px solid var(--accent-red); }
+		.iface-col .icon {
+			width: 32px; height: 32px; border-radius: 8px;
+			background: var(--accent-red-soft); color: var(--accent-red);
+			display: flex; align-items: center; justify-content: center;
+			font-size: 14px; margin-bottom: 8px;
+		}
+		.iface-col .label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1.5px; margin-bottom: 4px; }
+		.iface-col h4 { font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
+		.iface-col p { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+		/* ---------- INFRA STRIP ---------- */
+		.infra-strip {
+			background: var(--bg-tile-2); border-radius: 8px;
+			padding: 12px 18px; display: grid; grid-template-columns: 1fr 1fr 1fr;
+			gap: 10px 22px;
+		}
+		.infra-strip .infra-item { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+		.infra-strip .infra-item strong { color: var(--text-light); font-family: 'Poppins', sans-serif; }
+		.infra-strip .infra-item i { color: var(--accent-red); margin-right: 6px; width: 14px; }
+
+		/* ---------- TIMELINE ---------- */
+		.timeline { display: flex; flex-direction: column; gap: 6px; }
+		.timeline-row {
+			display: grid; grid-template-columns: 70px 1fr 240px;
+			gap: 14px; align-items: center;
+			padding: 9px 14px; background: var(--bg-tile);
+			border-radius: 6px; border-left: 3px solid var(--accent-red);
+		}
+		.timeline-row .t { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--accent-red); }
+		.timeline-row .ev { font-size: 12px; color: var(--text-light); line-height: 1.4; }
+		.timeline-row .comp { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); text-align: right; }
+
+		.sli-banner {
+			margin-top: 12px; padding: 10px 18px;
+			background: linear-gradient(90deg, var(--accent-red-soft), transparent);
+			border-radius: 8px; border: 1px solid rgba(249, 32, 62, 0.4);
+			text-align: center;
+		}
+		.sli-banner strong { color: var(--accent-red); font-family: 'Poppins', sans-serif; font-weight: 700; }
+
+		/* ---------- WIREFRAMES ---------- */
+		.wf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+		.wf-card { background: var(--bg-tile); border-radius: 12px; padding: 18px 22px; border-top: 3px solid var(--accent-red); }
+		.wf-card .wf-num { font-family: 'Poppins', sans-serif; font-size: 11px; color: var(--accent-red); letter-spacing: 1.5px; margin-bottom: 6px; text-transform: uppercase; }
+		.wf-card h4 { font-size: 15px; color: var(--text-light); margin-bottom: 8px; line-height: 1.3; }
+		.wf-card .meaning-label { font-family: 'Poppins', sans-serif; font-size: 10px; color: var(--accent-red); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+		.wf-card p { font-size: 11.5px; color: var(--text-muted); line-height: 1.55; }
+		.wf-card p strong { color: var(--text-light); }
+
+		/* ---------- SCRUM ---------- */
+		.scrum-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+		.scrum-box { background: var(--bg-tile); border-radius: 12px; padding: 18px 22px; border-top: 3px solid var(--accent-red); }
+		.scrum-box h3 {
+			font-size: 13px; color: var(--text-light); margin-bottom: 12px;
+			text-transform: uppercase; letter-spacing: 2px;
+			display: flex; align-items: center; gap: 8px;
+		}
+		.scrum-box h3 i { color: var(--accent-red); font-size: 14px; }
+		.scrum-box ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+		.scrum-box li { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+		.scrum-box li strong { color: var(--text-light); }
+		.scrum-box .row {
+			display: flex; justify-content: space-between;
+			padding: 4px 0; border-bottom: 1px dashed var(--border-color);
+			font-size: 12px;
+		}
+		.scrum-box .row:last-child { border-bottom: none; }
+		.scrum-box .row .key { color: var(--text-light); font-weight: 500; }
+		.scrum-box .row .val { color: var(--accent-red); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+		/* ---------- CRONOGRAMA + RISCOS ---------- */
+		.cron-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 18px; }
+		.col-section { display: flex; flex-direction: column; gap: 12px; }
+		.section-label {
+			font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+			color: var(--text-light); font-family: 'Poppins', sans-serif;
+			margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+		}
+		.section-label i { color: var(--accent-red); }
+		.macro-cron { display: flex; flex-direction: column; gap: 5px; }
+		.macro-row {
+			display: grid; grid-template-columns: 70px 1fr 70px;
+			gap: 12px; align-items: center;
+			padding: 8px 12px; background: var(--bg-tile);
+			border-radius: 6px; font-size: 11.5px;
+			border-left: 3px solid var(--border-color);
+		}
+		.macro-row.active { border-left-color: var(--accent-red); background: var(--accent-red-soft); }
+		.macro-row.done { border-left-color: var(--green); }
+		.macro-row .sname { font-family: 'Poppins', sans-serif; color: var(--text-light); font-weight: 600; }
+		.macro-row .sdesc { color: var(--text-muted); font-size: 11px; }
+		.macro-row .sdate { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent-red); text-align: right; }
+		.macro-row.done .sdate { color: var(--green); }
+		.macro-row.planned .sdate { color: var(--text-dim); }
+
+		.weekly-table td, .weekly-table th { font-size: 11px; padding: 7px 10px; }
+		.risk-table td, .risk-table th { font-size: 10.5px; padding: 6px 9px; }
+		.risk-prob, .risk-impact {
+			display: inline-block; padding: 2px 8px; border-radius: 999px;
+			font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+		}
+		.risk-prob.alta, .risk-impact.alta { background: rgba(249, 32, 62, 0.2); color: var(--accent-red); }
+		.risk-prob.media, .risk-impact.media { background: rgba(245, 158, 11, 0.2); color: var(--amber); }
+		.risk-prob.baixa, .risk-impact.baixa { background: rgba(16, 185, 129, 0.2); color: var(--green); }
+
+		/* ---------- FECHAMENTO ---------- */
+		.closing-headline {
+			font-family: 'Poppins', sans-serif; font-size: 38px; font-weight: 900;
+			color: var(--text-light); line-height: 1.15; margin-bottom: 18px;
+		}
+		.closing-headline .accent { color: var(--accent-red); }
+		.closing-lead {
+			font-size: 15px; color: var(--text-muted); line-height: 1.6;
+			margin-bottom: 22px; max-width: 850px;
+		}
+		.closing-lead strong { color: var(--text-light); }
+
+		.defense-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+		.defense-card {
+			background: var(--bg-tile); border-radius: 8px;
+			padding: 12px 16px; border-left: 3px solid var(--accent-red);
+			display: flex; gap: 12px; align-items: flex-start;
+		}
+		.defense-card i { color: var(--accent-red); font-size: 18px; margin-top: 2px; }
+		.defense-card div p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+		.defense-card div strong { color: var(--text-light); display: block; font-size: 13px; margin-bottom: 2px; }
+
+		.next-steps {
+			background: var(--bg-tile-2); border-radius: 8px;
+			padding: 12px 18px; border-left: 3px solid var(--green);
+		}
+		.next-steps h4 { font-size: 11px; color: var(--green); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+		.next-steps ol { list-style: none; counter-reset: ns; display: flex; gap: 24px; }
+		.next-steps li {
+			counter-increment: ns; font-size: 12px; color: var(--text-muted);
+			padding-left: 22px; position: relative; line-height: 1.4; flex: 1;
+		}
+		.next-steps li::before {
+			content: counter(ns); position: absolute; left: 0; top: 0;
+			width: 16px; height: 16px; background: var(--green); color: var(--bg-main);
+			border-radius: 50%; text-align: center; font-size: 10px; font-weight: 700;
+			line-height: 16px; font-family: 'Poppins', sans-serif;
+		}
+
+		.thanks-line {
+			margin-top: 18px; text-align: center;
+			font-size: 13px; color: var(--text-dim);
+			font-style: italic; letter-spacing: 1px;
+		}
+		.thanks-line strong { color: var(--accent-red); font-style: normal; font-family: 'Poppins', sans-serif; }
+	</style>
+</head>
+
+<body>
+
+	<!-- SLIDE 1: CAPA -->
+	<div class="slide-container" id="slide1">
+		<div class="title-layout">
+			<p style="font-size:22px; color: var(--text-muted); letter-spacing: 4px; margin-bottom: 28px;">FIAP + locaweb</p>
+			<h1 style="color: var(--accent-red);">// OPS AHEAD</h1>
+			<p class="subtitle">Operação à frente, visão antecipada.</p>
+			<p class="tagline">"Veja o incidente antes que ele aconteça"</p>
+			<p style="font-size: 18px; color: var(--text-muted); letter-spacing: 4px; text-transform: uppercase; margin-top: 50px;">CHALLENGE LOCAWEB 2026</p>
+		</div>
+	</div>
+
+	<!-- SLIDE 2: EQUIPE -->
+	<div class="slide-container" id="slide2">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> EQUIPE OPS AHEAD
+		</h2>
+		<div class="content-area">
+			<p style="font-size: 16px; color: var(--text-muted); margin-bottom: 30px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 500;">SPRINT 2: ARQUITETURA E DESENHO DA SOLUÇÃO</p>
+			<div class="team-grid">
+				<div class="team-member"><img class="photo" src="assets/team/gustavo.png" alt="Gustavo Rodrigues Neves"><h3>Gustavo<br>Rodrigues Neves</h3><p>RM561572</p></div>
+				<div class="team-member"><img class="photo" src="assets/team/joao.png" alt="João Gabriel Rodrigues Porto"><h3>João Gabriel<br>Rodrigues Porto</h3><p>RM565092</p></div>
+				<div class="team-member"><img class="photo" src="assets/team/raphael.png" alt="Raphael Carlos da Silva Moraes"><h3>Raphael Carlos<br>da Silva Moraes</h3><p>RM564098</p></div>
+				<div class="team-member"><img class="photo" src="assets/team/samuel.png" alt="Samuel Calebe Gusman"><h3>Samuel Calebe<br>Gusman</h3><p>RM562124</p></div>
+				<div class="team-member"><img class="photo" src="assets/team/thiago.png" alt="Thiago Nunes Pereira"><h3>Thiago Nunes<br>Pereira</h3><p>RM565900</p></div>
+			</div>
+		</div>
+		<div class="slide-number">02 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 3: O CENÁRIO LOCAWEB -->
+	<div class="slide-container" id="slide3">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> O CENÁRIO LOCAWEB
+		</h2>
+		<div class="content-area">
+			<div class="highlight-numbers-layout">
+				<div>
+					<div class="number">1/3</div>
+					<div class="number-label">DO TRÁFEGO DA<br>INTERNET BRASILEIRA</div>
+					<p style="font-size: 13px; color: var(--text-muted); margin-top: 18px; line-height: 1.5;">
+						3,4 milhões de caixas de e-mail · 500 mil sites hospedados · BOPE 24×7</p>
+				</div>
+				<div class="data-tiles">
+					<div class="data-tile">
+						<div class="data-num">65,6%</div>
+						<div class="data-label">"Sem Intervenção"</div>
+						<div class="data-desc">Auto-healing resolve, mas o sinal preditivo é descartado</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">75,7%</div>
+						<div class="data-label">Concentrados no Team14 (N1)</div>
+						<div class="data-desc">Gargalo operacional claro</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">248</div>
+						<div class="data-label">Breaches de OLA / ano</div>
+						<div class="data-desc">Apenas 1% do volume KPI — mas pressionam o bônus</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">18%</div>
+						<div class="data-label">Incidentes &lt; 60 segundos</div>
+						<div class="data-desc">Ruído competindo com sinal real</div>
+					</div>
+				</div>
+			</div>
+			<p style="font-size: 13px; color: var(--text-muted); margin-top: 20px; text-align: center;">
+				Análise de <strong style="color: var(--text-light);">122.543 incidentes</strong> do ITSM. P1/P2 ≤ 4h · margem ≈ 36 breaches P2/ano para 100% da meta.</p>
+		</div>
+		<div class="slide-number">03 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 4: O PROBLEMA -->
+	<div class="slide-container" id="slide4">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> O PROBLEMA OPERACIONAL
+		</h2>
+		<div class="content-area">
+			<p style="font-size: 17px; color: var(--text-muted); margin-bottom: 22px;">Hoje a operação é <strong style="color: var(--accent-red);">reativa</strong> — age depois que o incidente já ocorreu.</p>
+			<div class="two-column">
+				<div style="display: flex; flex-direction: column; justify-content: space-between;">
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-clock-rotate-left"></i> Picos não antecipados</h3>
+						<p>Volume varia ~30% entre dias úteis e fins de semana, mas sazonalidade não alimenta nenhuma previsão de escala.</p>
+					</div>
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-bolt"></i> Sinais preditivos desperdiçados</h3>
+						<p>80 mil "Sem Intervenção" anuais são descartadas do KPI, mas suas rajadas em um IC são o principal indicador de P2 iminente. Ninguém monitora.</p>
+					</div>
+				</div>
+				<div style="display: flex; flex-direction: column; justify-content: space-between;">
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-eye-slash"></i> Risco de OLA invisível</h3>
+						<p>Os 248 breaches/ano pressionam diretamente o bônus, mas a equipe só descobre a violação depois que o prazo estourou.</p>
+					</div>
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-database"></i> Concentração sem resposta</h3>
+						<p>Team14 absorve 75,7% dos incidentes; 3 servidores concentram ~11% do volume. Sem mecanismo para redistribuir antes da sobrecarga.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">04 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 5: PÚBLICO-ALVO -->
+	<div class="slide-container" id="slide5">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> PÚBLICO-ALVO
+		</h2>
+		<div class="content-area">
+			<div class="persona-grid">
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-headset"></i></div>
+					<div class="persona-tier">Público primário</div>
+					<h3>Equipe BOPE (N1 / N2 / N3)</h3>
+					<p>Sabe dos picos antes deles acontecerem e recebe os chamados em risco já priorizados na fila — menos pressão no plantão 24×7.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-server"></i></div>
+					<div class="persona-tier">Público técnico</div>
+					<h3>Time SRE / Plataforma</h3>
+					<p>Mantém pipeline e agente em pé no dia-a-dia. Cuida de deploy, retreino dos modelos e do custo do LLM em produção.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-chart-line"></i></div>
+					<div class="persona-tier">Público secundário</div>
+					<h3>Gestores Operacionais e Diretoria</h3>
+					<p>Decide escala da próxima semana com base em projeção, não em achismo. Acompanha as metas de OLA antes do mês fechar.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-globe"></i></div>
+					<div class="persona-tier">Público indireto</div>
+					<h3>Clientes Locaweb</h3>
+					<p>Menos tempo fora do ar e mais estabilidade na infra que sustenta a operação deles.</p>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">05 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 6: PROPOSTA DE SOLUÇÃO -->
+	<div class="slide-container" id="slide6">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> PROPOSTA DE SOLUÇÃO
+		</h2>
+		<div class="content-area">
+			<p style="font-size: 16px; margin-bottom: 20px; line-height: 1.5; color: var(--text-muted);">
+				Quatro camadas integradas, <strong style="color: var(--text-light);">open-source e cloud-agnostic</strong>, que transformam o sinal estatístico em <strong style="color: var(--text-light);">decisão acionável</strong>.</p>
+			<div class="tiled-content">
+				<div class="tile">
+					<div class="icon"><i class="fa-solid fa-filter"></i></div>
+					<h3>1. Pipeline de Dados</h3>
+					<p>Ingestão contínua do ITSM. Features temporais (lags, médias móveis), frequência por IC e filtro de ruído.</p>
+					<div class="tech-row">Kafka · MinIO/Iceberg · ClickHouse · dbt · Argo</div>
+				</div>
+				<div class="tile">
+					<div class="icon"><i class="fa-solid fa-brain"></i></div>
+					<h3>2. Modelos Preditivos</h3>
+					<p>Previsão de volume D+1/D+7, score de risco de breach por chamado em aberto e detecção de rajada por IC.</p>
+					<div class="tech-row">LightGBM · Prophet · z-score+CUSUM · MLflow · Feast</div>
+				</div>
+				<div class="tile">
+					<div class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+					<h3>3. Copiloto IA Agêntica</h3>
+					<p>No alerta, um <strong style="color: var(--text-light);">agente LLM</strong> reavalia criticidade, busca contexto e entrega ao operador um <strong style="color: var(--text-light);">TL;DR de decisão</strong>.</p>
+					<div class="tech-row">LangGraph · LiteLLM · Claude · pgvector · Pydantic</div>
+				</div>
+				<div class="tile">
+					<div class="icon"><i class="fa-solid fa-display"></i></div>
+					<h3>4. Interface de Decisão</h3>
+					<p>Operador age <strong style="color: var(--text-light);">onde já vive</strong> (Slack/OpsGenie). Painel agregado para N1/N2 e tático para gestores.</p>
+					<div class="tech-row">gateway (TS+Fastify) · ui (Next.js) · Grafana</div>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">06 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 7: ARQUITETURA - VISÃO GERAL -->
+	<div class="slide-container" id="slide7">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> ARQUITETURA EM 4 CAMADAS + 7 PRINCÍPIOS
+		</h2>
+		<div class="content-area">
+			<div class="arch-layout">
+				<div class="arch-stack">
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 4 // DECISÃO</div>
+						<h4>Onde o operador age</h4>
+						<p>gateway (TS) · ui (Next.js) · Grafana</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 3 // AGENTE LLM</div>
+						<h4>Quem reformata o sinal em ação</h4>
+						<p>agent (Python+LangGraph) · RAG · guardrails</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 2 // INTELIGÊNCIA</div>
+						<h4>Onde os modelos pontuam</h4>
+						<p>model-serving · burst-detector</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 1 // DADOS</div>
+						<h4>Onde tudo é capturado</h4>
+						<p>Kafka · MinIO · ClickHouse</p>
+					</div>
+					<div class="arch-sources">
+						<i class="fa-solid fa-arrow-up" style="color: var(--accent-red); margin-right: 6px;"></i>
+						Fontes: <strong>ITSM</strong> · <strong>Status Page</strong> · <strong>Prometheus</strong>
+					</div>
+				</div>
+
+				<div>
+					<div class="principles-title"><span class="accent">7</span> princípios que guiaram cada escolha</div>
+					<div class="principles-list">
+						<div class="principle-item"><span class="num">1</span><div class="body"><strong>Contratos antes de componentes.</strong> Trocar Prophet por NeuralProphet ou Claude por GPT não quebra nada além daquele componente.</div></div>
+						<div class="principle-item"><span class="num">2</span><div class="body"><strong>K8s-nativo.</strong> Toda a stack se descreve com 4 primitivas: <code>Deployment</code>, <code>StatefulSet</code>, <code>CronJob</code>, <code>Job</code>.</div></div>
+						<div class="principle-item"><span class="num">3</span><div class="body"><strong>Estado fora dos serviços.</strong> Deployments stateless escalam via HPA; estado em Postgres/MinIO/ClickHouse/Kafka/Redis.</div></div>
+						<div class="principle-item"><span class="num">4</span><div class="body"><strong>Volume de produção.</strong> ClickHouse + Kafka + Argo desde o desenho — centenas de milhares de eventos/dia, 24×7.</div></div>
+						<div class="principle-item"><span class="num">5</span><div class="body"><strong>Observabilidade dia 1.</strong> Prometheus, Grafana, Loki, Tempo, Langfuse para LLM.</div></div>
+						<div class="principle-item"><span class="num">6</span><div class="body"><strong>Cloud-agnostic.</strong> Roda em qualquer K8s 1.28+ (on-prem Locaweb, EKS/GKE/AKS, híbrido).</div></div>
+						<div class="principle-item"><span class="num">7</span><div class="body"><strong>Stack poliglota.</strong> Camada externa em TS (<code>gateway</code>, <code>ui</code>); core de ML em Python (<code>model-serving</code>, <code>agent</code>, <code>burst-detector</code>).</div></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">07 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 8: CAMADA 1 - DADOS -->
+	<div class="slide-container" id="slide8">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 1 — DADOS
+		</h2>
+		<div class="content-area">
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 22%;">Componente</th>
+						<th style="width: 24%;">Tecnologia</th>
+						<th style="width: 18%;">Primitiva K8s</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr><td><strong>Barramento de eventos</strong></td><td>Apache Kafka (Strimzi)</td><td><code>StatefulSet</code></td><td>Stream near-real-time para Camadas 2 e 3</td></tr>
+					<tr><td><strong>Ingestão batch</strong></td><td>Airbyte + scripts Python</td><td><code>CronJob</code> + <code>Deployment</code></td><td>Bootstrap histórico + fontes sem webhook</td></tr>
+					<tr><td><strong>Lake</strong></td><td>MinIO + Apache Iceberg</td><td><code>StatefulSet</code></td><td>Parquet particionado + time travel auditável</td></tr>
+					<tr><td><strong>Warehouse analítico</strong></td><td>ClickHouse (Altinity)</td><td><code>StatefulSet</code></td><td>Analítica em escala — bilhões de linhas em segundos</td></tr>
+					<tr><td><strong>Transformação</strong></td><td>dbt-core (<code>dbt-clickhouse</code> / <code>dbt-trino</code>)</td><td><code>Job</code> (via Argo)</td><td>staging → intermediate → marts, SQL versionado</td></tr>
+					<tr><td><strong>Orquestração</strong></td><td>Argo Workflows</td><td>CRDs nativos K8s</td><td>DAGs como YAML — extensão do K8s, não sistema paralelo</td></tr>
+					<tr><td><strong>Qualidade</strong></td><td>Great Expectations</td><td><code>Job</code></td><td>Bloqueia DAG antes de contaminar warehouse</td></tr>
+				</tbody>
+			</table>
+			<div class="callout">
+				<h4><i class="fa-solid fa-circle-question" style="margin-right: 4px;"></i> Por que não Postgres / Airflow / fila simples?</h4>
+				<ul>
+					<li><strong>ClickHouse &gt; Postgres/DuckDB</strong> — regime operacional é centenas de milhares de eventos/dia.</li>
+					<li><strong>Argo &gt; Airflow/Prefect</strong> — extensão do K8s (mesma operação que o resto da stack: kubectl + GitOps + Prometheus).</li>
+					<li><strong>Kafka &gt; fila simples</strong> — fluxo é streaming por natureza, exige replay e desacoplamento entre camadas.</li>
+				</ul>
+			</div>
+		</div>
+		<div class="slide-number">08 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 9: CAMADA 2 - INTELIGÊNCIA -->
+	<div class="slide-container" id="slide9">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 2 — INTELIGÊNCIA (ML)
+		</h2>
+		<div class="content-area">
+			<div class="models-grid">
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-chart-line"></i></div>
+					<h4>Volume D+1 / D+7</h4>
+					<div class="algo">LightGBM (lags 1·7·14d, Fourier) + Prophet baseline</div>
+					<p class="why">LightGBM captura features heterogêneas; Prophet faz <strong style="color: var(--text-light);">sanity-check de sazonalidade</strong>. Ensemble por média ponderada.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>MAPE · IC 80% · MAE</strong></div>
+				</div>
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+					<h4>Risco de breach</h4>
+					<div class="algo">LightGBM binário + isotonic + SHAP</div>
+					<p class="why">Boosting captura interações não-lineares; isotonic corrige distorção de <code style="color: var(--accent-red);">class_weight</code> em 1% de positivos.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>AUC-PR · Brier · recall@top-k/h</strong></div>
+				</div>
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-bolt"></i></div>
+					<h4>Detecção de rajada</h4>
+					<div class="algo">z-score robusto (mediana+MAD) + CUSUM por IC</div>
+					<p class="why">Sem treino — <strong style="color: var(--text-light);">zero overfit</strong>, atualiza online, limiar adaptativo evita falso positivo em ICs ruidosos.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Precision · lead-time · FP/IC</strong></div>
+				</div>
+			</div>
+
+			<div class="ops-stack">
+				<h4><i class="fa-solid fa-gears" style="margin-right: 4px;"></i> Stack de operação dos modelos</h4>
+				<ul>
+					<li><strong>MLflow</strong> — tracking + registry (<code>staging → production</code> via API)</li>
+					<li><strong>Feast</strong> — feature store (mesma definição em batch e online)</li>
+					<li><strong><code>model-serving</code></strong> (FastAPI + BentoML) — <code>/predict/volume</code>, <code>/predict/breach</code></li>
+					<li><strong><code>burst-detector</code></strong> — worker Kafka, estado por IC em Redis</li>
+					<li><strong>Evidently AI</strong> — drift via PSI/KS → métrica Prometheus → alerta Grafana</li>
+				</ul>
+			</div>
+		</div>
+		<div class="slide-number">09 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 10: CAMADA 3 - AGENTE LLM -->
+	<div class="slide-container" id="slide10">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 3 — AGENTE LLM
+		</h2>
+		<div class="content-area">
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 24%;">Componente</th>
+						<th style="width: 30%;">Tecnologia</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr><td><strong>Serviço (<code>agent</code>)</strong></td><td>FastAPI + LangGraph</td><td>API HTTP que orquestra o agente como grafo de estados</td></tr>
+					<tr><td><strong>Gateway LLM</strong></td><td>LiteLLM (Deployment)</td><td>LLM-agnostic — proxy único entre o agente e qualquer provider</td></tr>
+					<tr><td><strong>Modelo default</strong></td><td>Claude Sonnet 4.6</td><td>Default em produção, com fallback para GPT-4.1 se o provider cair</td></tr>
+					<tr><td><strong>RAG</strong></td><td>pgvector (Postgres) + sentence-transformers PT-BR</td><td>Embeddings + filtros estruturados na <strong>mesma query SQL</strong></td></tr>
+					<tr><td><strong>Validação</strong></td><td>Pydantic + JSON Schema</td><td>Saída inválida → retry → fallback <code>agent_failed=true</code></td></tr>
+					<tr><td><strong>Auditoria</strong></td><td>Tabela <code>agent_calls</code> + Langfuse</td><td>Cada chamada do agente fica gravada e rastreável</td></tr>
+				</tbody>
+			</table>
+
+			<div class="tool-pills">
+				<h4><i class="fa-solid fa-toolbox" style="margin-right: 4px;"></i> 6 ferramentas (function calling) disponíveis ao agente</h4>
+				<div class="pills">
+					<code>get_recent_incidents</code>
+					<code>get_group_load</code>
+					<code>find_similar_resolved</code>
+					<code>get_ola_window</code>
+					<code class="new">detect_backbone_pattern <i class="fa-solid fa-star" style="font-size: 9px; margin-left: 2px;"></i></code>
+					<code>get_breach_score</code>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">10 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 11: CAMADA 4 - INTERFACES -->
+	<div class="slide-container" id="slide11">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 4 — INTERFACES (WEBHOOK-FIRST)
+		</h2>
+		<div class="content-area">
+			<div class="iface-cols">
+				<div class="iface-col">
+					<div class="icon"><i class="fa-brands fa-slack"></i></div>
+					<div class="label">Onde o operador age</div>
+					<h4>Slack / OpsGenie</h4>
+					<p>Block Kit interativo com Ack & Aplicar, Ignorar, Escalar. Fan-out feito pelo <code>gateway</code>.</p>
+				</div>
+				<div class="iface-col">
+					<div class="icon"><i class="fa-solid fa-display"></i></div>
+					<div class="label">Onde consulta panorama</div>
+					<h4>ui (Next.js)</h4>
+					<p>Fila priorizada, drill-down SHAP, chat com agente. Auditabilidade total da decisão.</p>
+				</div>
+				<div class="iface-col">
+					<div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+					<div class="label">Onde gestor vê tendência</div>
+					<h4>Grafana</h4>
+					<p>Read-only — D+1/D+7, breaches vs. meta, carga por equipe. Adoção zero-fricção.</p>
+				</div>
+			</div>
+
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 22%;">Componente</th>
+						<th style="width: 26%;">Tecnologia</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr><td><strong><code>gateway</code></strong></td><td>TS + Fastify</td><td>Recebe e dispara webhooks do ITSM, manda alertas pro Slack/OpsGenie e expõe a API REST pública</td></tr>
+					<tr><td><strong><code>ui</code></strong></td><td>Next.js</td><td>Painel para o N1/N2 — fila priorizada e drill-down dos chamados em risco</td></tr>
+					<tr><td><strong>Painel tático</strong></td><td>Grafana (ClickHouse + Postgres)</td><td>Projeção D+1/D+7, breaches vs. meta, carga por equipe</td></tr>
+					<tr><td><strong>Autenticação</strong></td><td>Keycloak</td><td>SSO AD/LDAP</td></tr>
+				</tbody>
+			</table>
+
+			<div class="principle-banner">
+				<p><strong>Princípio:</strong> o operador não vai abandonar Slack/OpsGenie/ServiceNow. A interação real acontece <strong>nos canais que ele já usa</strong>. O painel é visão consolidada e auditoria, não centro de operação.</p>
+			</div>
+		</div>
+		<div class="slide-number">11 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 12: INFRA K8S -->
+	<div class="slide-container" id="slide12">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> INFRAESTRUTURA — TUDO K8S, 4 PRIMITIVAS
+		</h2>
+		<div class="content-area">
+			<table class="locaweb-table" style="margin-bottom: 14px;">
+				<thead>
+					<tr>
+						<th style="width: 24%;">Tipo de carga</th>
+						<th style="width: 28%;">Primitiva</th>
+						<th>Exemplos</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr><td><strong>Serviço de longa duração com tráfego</strong></td><td><code>Deployment</code> + <code>Service</code> + <code>Ingress</code></td><td><code>gateway</code> (TS+Fastify), <code>ui</code> (Next.js), <code>model-serving</code>, <code>agent</code>, Grafana, MLflow, LiteLLM, Langfuse</td></tr>
+					<tr><td><strong>Serviço com estado persistente</strong></td><td><code>StatefulSet</code> + <code>PVC</code></td><td>Postgres (pgvector), MinIO, ClickHouse, Kafka, Redis</td></tr>
+					<tr><td><strong>Tarefa agendada</strong></td><td><code>CronJob</code></td><td>Ingestão diária, retreino semanal, snapshot Feast, backup</td></tr>
+					<tr><td><strong>Tarefa pontual</strong></td><td><code>Job</code> (via Argo)</td><td><code>dbt run</code>, inferência batch, backfill</td></tr>
+					<tr><td><strong>Coleta em todos os nós</strong></td><td><code>DaemonSet</code></td><td>Promtail (Loki), node-exporter</td></tr>
+				</tbody>
+			</table>
+
+			<div class="infra-strip">
+				<div class="infra-item"><i class="fa-solid fa-code-branch"></i><strong>GitOps</strong> — ArgoCD (rollback = <code>git revert</code>)</div>
+				<div class="infra-item"><i class="fa-solid fa-network-wired"></i><strong>Service mesh</strong> — Linkerd (mTLS automático)</div>
+				<div class="infra-item"><i class="fa-solid fa-eye"></i><strong>Observabilidade</strong> — Prometheus + Loki + Tempo</div>
+				<div class="infra-item"><i class="fa-solid fa-key"></i><strong>Secrets</strong> — External Secrets + Vault</div>
+				<div class="infra-item"><i class="fa-solid fa-cloud-arrow-up"></i><strong>Backup</strong> — Velero (RTO &lt; 4h · RPO &lt; 24h)</div>
+				<div class="infra-item"><i class="fa-solid fa-shield"></i><strong>Segregação</strong> — Namespace + NetworkPolicy</div>
+			</div>
+		</div>
+		<div class="slide-number">12 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 13: FLUXO E2E -->
+	<div class="slide-container" id="slide13">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> FLUXO END-TO-END DE UM ALERTA
+		</h2>
+		<div class="content-area">
+			<div class="timeline">
+				<div class="timeline-row"><div class="t">T+0s</div><div class="ev">Webhook do ITSM Locaweb chega</div><div class="comp">gateway → Kafka <code>incidents.raw</code></div></div>
+				<div class="timeline-row"><div class="t">T+5s</div><div class="ev">Stream processa, qualidade valida e materializa</div><div class="comp">Argo · GE · MinIO/Iceberg · ClickHouse</div></div>
+				<div class="timeline-row"><div class="t">T+10s</div><div class="ev">Detector de rajada avalia janela móvel do IC</div><div class="comp">burst-detector (Kafka) + Redis</div></div>
+				<div class="timeline-row"><div class="t">T+46s</div><div class="ev">Modelo de breach pontua → score 0,78 + SHAP top-5</div><div class="comp">model-serving <code>/predict/breach</code></div></div>
+				<div class="timeline-row"><div class="t">T+47s</div><div class="ev">Agente é invocado, chama tools relevantes</div><div class="comp">agent · find_similar_resolved + 2 tools</div></div>
+				<div class="timeline-row"><div class="t">T+50s</div><div class="ev">Agente emite JSON validado (Pydantic OK)</div><div class="comp">Postgres <code>recommendations</code> + Kafka</div></div>
+				<div class="timeline-row"><div class="t">T+51s</div><div class="ev">Operador é notificado em Slack/OpsGenie</div><div class="comp">gateway fan-out + ui live</div></div>
+				<div class="timeline-row"><div class="t">T+?</div><div class="ev">Operador age — clique alimenta avaliação</div><div class="comp">gateway <code>/actions/callback</code> → Kafka</div></div>
+			</div>
+
+			<div class="sli-banner">
+				<strong>SLI alvo:</strong> &lt; 60s entre incidente aberto e recomendação na tela. <span style="color: var(--text-muted);">Monitorado em Grafana.</span>
+			</div>
+		</div>
+		<div class="slide-number">13 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 14: PROTÓTIPOS -->
+	<div class="slide-container" id="slide14">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> PROTÓTIPOS DA SOLUÇÃO
+		</h2>
+		<div class="content-area">
+			<div class="wf-grid">
+				<div class="wf-card">
+					<div class="wf-num">14.1 — Interface primária</div>
+					<h4><i class="fa-brands fa-slack" style="color: var(--accent-red); margin-right: 6px;"></i> Recomendação no Slack/OpsGenie</h4>
+					<div class="meaning-label">Significado</div>
+					<p>O operador interage <strong>onde já vive</strong>. Block Kit do Slack com <strong>Ack & Aplicar</strong>, <strong>Ignorar</strong>, <strong>Escalar</strong>, <strong>Ver no painel</strong>. Mesmo conteúdo vai para OpsGenie como alert estruturado. <strong>Nenhum operador precisa abrir o painel para agir.</strong></p>
+				</div>
+				<div class="wf-card">
+					<div class="wf-num">14.2 — Painel agregado N1/N2</div>
+					<h4><i class="fa-solid fa-display" style="color: var(--accent-red); margin-right: 6px;"></i> ui (Next.js)</h4>
+					<div class="meaning-label">Significado</div>
+					<p>Fila ordenada por urgência <strong>reavaliada pelo agente</strong>, não pelo score puro. Cada item é o TL;DR — leitura primária em <strong>5 segundos</strong>. Drill-down (SHAP, janela móvel, log do agente) a um clique. Chat com o agente para perguntar "por que essa recomendação?".</p>
+				</div>
+				<div class="wf-card">
+					<div class="wf-num">14.3 — Painel tático</div>
+					<h4><i class="fa-solid fa-chart-line" style="color: var(--accent-red); margin-right: 6px;"></i> Grafana (gestores)</h4>
+					<div class="meaning-label">Significado</div>
+					<p>Decisão de escala da próxima semana, identificação de ICs candidatos a <strong>manutenção preventiva</strong>, justificativa quantitativa de pedidos de capacidade. Read-only, sem botões. Grafana é o que a Locaweb já usa em infra — <strong>adoção zero-fricção</strong>.</p>
+				</div>
+				<div class="wf-card">
+					<div class="wf-num">14.4 — Drill-down auditável</div>
+					<h4><i class="fa-solid fa-magnifying-glass" style="color: var(--accent-red); margin-right: 6px;"></i> "Por que o agente disse isso?"</h4>
+					<div class="meaning-label">Significado</div>
+					<p>Auditabilidade total — N2 sênior pode contestar ou confirmar; o feedback alimenta a <strong>avaliação contínua do agente</strong>. Mostra SHAP top-5, ferramentas chamadas com argumentos/resultados, janela móvel do IC.</p>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">14 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 15: SCRUM -->
+	<div class="slide-container" id="slide15">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> GERENCIAMENTO DO PROJETO — SCRUM
+		</h2>
+		<div class="content-area">
+			<div class="scrum-grid">
+				<div class="scrum-box">
+					<h3><i class="fa-solid fa-users"></i> Time</h3>
+					<ul>
+						<li><strong>Product Owner</strong><br><span style="font-size: 11px;">Thiago Nunes (interface FIAP/Locaweb)</span></li>
+						<li><strong>Scrum Master</strong><br><span style="font-size: 11px;">Rotativo por sprint</span></li>
+						<li><strong>Dev Team</strong><br><span style="font-size: 11px;">Gustavo Neves · João Porto · Raphael Moraes · Samuel Gusman · Thiago Nunes</span></li>
+					</ul>
+				</div>
+
+				<div class="scrum-box">
+					<h3><i class="fa-solid fa-clock"></i> Cadência</h3>
+					<div class="row"><span class="key">Daily</span><span class="val">3×/sem · 15min</span></div>
+					<div class="row"><span class="key">Sprint Planning</span><span class="val">1h</span></div>
+					<div class="row"><span class="key">Sprint Review + Retro</span><span class="val">1h</span></div>
+					<div class="row"><span class="key">Refinement</span><span class="val">30min</span></div>
+				</div>
+
+				<div class="scrum-box">
+					<h3><i class="fa-solid fa-toolbox"></i> Ferramentas</h3>
+					<ul>
+						<li><strong>Board</strong> — GitHub Projects (kanban: Backlog → To Do → In Progress → Review → Done)</li>
+						<li><strong>Repositório</strong> — GitHub, branches <code style="font-size: 10px; color: var(--accent-red);">feat/*</code>, PR review obrigatório</li>
+						<li><strong>Documentação</strong> — <code style="font-size: 10px; color: var(--accent-red);">docs/sprint-XX/</code> por sprint</li>
+						<li><strong>Comunicação</strong> — WhatsApp (sync curto) + GitHub Issues (assíncrono e rastreável)</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<div class="slide-number">15 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 16: FECHAMENTO -->
+	<div class="slide-container" id="slide16">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> FINALIZAÇÃO
+		</h2>
+		<div class="content-area" style="justify-content: center; align-items: center; text-align: center;">
+			<div class="closing-headline" style="font-size: 56px; text-align: center;">Da ideia ao <span class="accent">projeto executável.</span></div>
+			<p class="closing-lead" style="font-size: 18px; text-align: center; max-width: 900px; margin: 0 auto 40px;">O BOPE deixa de apagar incêndio para ver o incidente antes dele acontecer.</p>
+
+			<p class="thanks-line" style="font-size: 16px;"><strong>Obrigado!</strong> — Equipe Super Datados · FIAP Enterprise Challenge 2026 · Locaweb</p>
+		</div>
+		<div class="slide-number">16 / 16</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+</body>
+
+</html>
