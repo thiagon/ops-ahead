@@ -952,30 +952,48 @@
 		.wf-card {
 			background: var(--bg-tile);
 			border-radius: 12px;
-			padding: 18px 22px;
+			padding: 16px 18px;
 			border-top: 3px solid var(--accent-red);
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
 		}
 
 		.wf-card h4 {
-			font-size: 15px;
+			font-size: 14px;
 			color: var(--text-light);
-			margin-bottom: 8px;
 			line-height: 1.3;
 		}
 
-		.wf-card .meaning-label {
-			font-family: 'Poppins', sans-serif;
-			font-size: 10px;
-			color: var(--accent-red);
-			letter-spacing: 1px;
-			text-transform: uppercase;
-			margin-bottom: 4px;
+		.wf-card .wf-body {
+			display: flex;
+			gap: 12px;
+			flex: 1;
+			align-items: stretch;
+		}
+
+		.wf-card .wf-thumb {
+			flex: 0 0 52%;
+			border-radius: 8px;
+			overflow: hidden;
+			background: var(--bg-main);
+			align-self: stretch;
+			min-height: 0;
+		}
+
+		.wf-card .wf-thumb img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
 		}
 
 		.wf-card p {
-			font-size: 11.5px;
+			font-size: 11px;
 			color: var(--text-muted);
-			line-height: 1.55;
+			line-height: 1.5;
+			flex: 1;
+			margin: 0;
 		}
 
 		.wf-card p strong {
@@ -985,9 +1003,9 @@
 		/* ---------- SCRUMBAN ---------- */
 		.agile-layout {
 			display: grid;
-			grid-template-columns: 42% 1fr;
+			grid-template-columns: 35% 1fr;
 			gap: 30px;
-			height: 100%;
+			align-items: stretch;
 		}
 
 		.scrum-box {
@@ -1037,27 +1055,16 @@
 		}
 
 		.board-placeholder {
-			background: var(--bg-tile);
 			border-radius: 12px;
-			border: 2px dashed var(--border-color);
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			height: 100%;
 			position: relative;
 			overflow: hidden;
 		}
 
 		.board-placeholder img {
-			position: absolute;
-			top: 0;
-			left: 0;
 			width: 100%;
-			height: 100%;
-			object-fit: cover;
-			z-index: 1;
-			border-radius: 10px;
+			height: auto;
+			display: block;
+			border-radius: 12px;
 		}
 
 		.board-placeholder .msg {
@@ -1249,7 +1256,8 @@
 					<div class="persona-icon"><i class="fa-solid fa-headset"></i></div>
 					<div class="persona-tier">Público primário</div>
 					<h3>Equipe BOPE</h3>
-					<p>Sabe dos picos antes deles acontecerem e recebe os chamados em risco já priorizados na fila, com menos pressão
+					<p>Sabe dos picos antes deles acontecerem e recebe os chamados em risco já priorizados na fila, com menos
+						pressão
 						no plantão 24×7.</p>
 				</div>
 				<div class="persona-card">
@@ -1284,7 +1292,8 @@
 		<div class="content-area">
 			<p style="font-size: 16px; margin-bottom: 20px; line-height: 1.5; color: var(--text-muted);">
 				Quatro camadas integradas, <strong style="color: var(--text-light);">open-source e cloud-agnostic</strong>, que
-				pegam o sinal estatístico e entregam pro operador uma <strong style="color: var(--text-light);">recomendação clara</strong>.</p>
+				pegam o sinal estatístico e entregam pro operador uma <strong style="color: var(--text-light);">recomendação
+					clara</strong>.</p>
 			<div class="tiled-content">
 				<div class="tile">
 					<div class="icon"><i class="fa-solid fa-filter"></i></div>
@@ -1310,7 +1319,7 @@
 					<h3>4. Interface de Decisão</h3>
 					<p>Operador age <strong style="color: var(--text-light);">onde já vive</strong>. Painel agregado para N1/N2 e
 						tático para gestores.</p>
-					<div class="tech-row">TS+Fastify · Next.js · Grafana</div>
+					<div class="tech-row">Fastify · Next.js · Grafana</div>
 				</div>
 			</div>
 		</div>
@@ -1362,14 +1371,16 @@
 						</div>
 						<div class="principle-item"><span class="num">2</span>
 							<div class="body"><strong>K8s-nativo.</strong> Toda a stack se descreve com 4 primitivas:
-								<code>Deployment</code>, <code>StatefulSet</code>, <code>CronJob</code>, <code>Job</code>.</div>
+								<code>Deployment</code>, <code>StatefulSet</code>, <code>CronJob</code>, <code>Job</code>.
+							</div>
 						</div>
 						<div class="principle-item"><span class="num">3</span>
 							<div class="body"><strong>Estado fora dos serviços.</strong> Deployments stateless escalam via HPA; estado
 								em Postgres/MinIO/ClickHouse/Kafka/Redis.</div>
 						</div>
 						<div class="principle-item"><span class="num">4</span>
-							<div class="body"><strong>Volume de produção.</strong> ClickHouse + Kafka + Argo desde o desenho, prontos para
+							<div class="body"><strong>Volume de produção.</strong> ClickHouse + Kafka + Argo desde o desenho, prontos
+								para
 								centenas de milhares de eventos/dia, 24×7.</div>
 						</div>
 						<div class="principle-item"><span class="num">5</span>
@@ -1499,10 +1510,12 @@
 				<ul>
 					<li><strong>MLflow</strong> para tracking e registry.</li>
 					<li><strong>Feast</strong> como feature store.</li>
-					<li><strong><code>model-serving</code></strong> expondo <code>/predict/volume</code> e <code>/predict/breach</code>.
+					<li><strong><code>model-serving</code></strong> expondo <code>/predict/volume</code> e
+						<code>/predict/breach</code>.
 					</li>
 					<li><strong><code>burst-detector</code></strong>, um worker Kafka com estado por IC no Redis.</li>
-					<li><strong>Evidently AI</strong> mede drift via PSI/KS, exporta métrica para o Prometheus e alerta no Grafana.</li>
+					<li><strong>Evidently AI</strong> mede drift via PSI/KS, exporta métrica para o Prometheus e alerta no
+						Grafana.</li>
 				</ul>
 			</div>
 		</div>
@@ -1594,7 +1607,8 @@
 					<div class="icon"><i class="fa-solid fa-chart-line"></i></div>
 					<div class="label">Onde o gestor vê tendência</div>
 					<h4>Grafana</h4>
-					<p>Apenas leitura. Mostra D+1/D+7, breaches contra a meta e carga por equipe. O time já usa Grafana no dia a dia, então não precisa aprender ferramenta nova.</p>
+					<p>Apenas leitura. Mostra D+1/D+7, breaches contra a meta e carga por equipe. O time já usa Grafana no dia a
+						dia, então não precisa aprender ferramenta nova.</p>
 				</div>
 			</div>
 
@@ -1631,8 +1645,10 @@
 			</table>
 
 			<div class="principle-banner">
-				<p><strong>Princípio:</strong> o operador não vai largar Slack, OpsGenie e ServiceNow para abrir nosso painel. O trabalho dele continua acontecendo
-					<strong>nos canais que ele já usa</strong>. Nosso painel serve como visão consolidada e auditoria, não como centro de operação.
+				<p><strong>Princípio:</strong> o operador não vai largar Slack, OpsGenie e ServiceNow para abrir nosso painel. O
+					trabalho dele continua acontecendo
+					<strong>nos canais que ele já usa</strong>. Nosso painel serve como visão consolidada e auditoria, não como
+					centro de operação.
 				</p>
 			</div>
 		</div>
@@ -1749,32 +1765,37 @@
 				<div class="wf-card">
 					<h4><i class="fa-brands fa-slack" style="color: var(--accent-red); margin-right: 6px;"></i> Recomendação no
 						Slack/OpsGenie</h4>
-					<div class="meaning-label">Significado</div>
-					<p>O operador interage <strong>onde já vive</strong>. Block Kit do Slack com <strong>Ack & Aplicar</strong>,
-						<strong>Ignorar</strong>, <strong>Escalar</strong>, <strong>Ver no painel</strong>. Mesmo conteúdo vai para
-						OpsGenie como alert estruturado. <strong>Nenhum operador precisa abrir o painel para agir.</strong></p>
+					<div class="wf-body">
+						<p>Operador age <strong>onde já vive</strong>. Block Kit com <strong>Ack &amp; Aplicar</strong>,
+							<strong>Ignorar</strong>, <strong>Escalar</strong>, <strong>Ver no painel</strong>. Mesmo conteúdo cai no
+							OpsGenie. <strong>Não precisa abrir o painel para agir.</strong></p>
+						<div class="wf-thumb"><img src="assets/mock-slack.png" alt="Mock Slack/OpsGenie"></div>
+					</div>
 				</div>
 				<div class="wf-card">
 					<h4><i class="fa-solid fa-display" style="color: var(--accent-red); margin-right: 6px;"></i> Painel UI</h4>
-					<div class="meaning-label">Significado</div>
-					<p>Fila ordenada por urgência <strong>reavaliada pelo copiloto</strong>, não pelo score puro. Cada item é o
-						TL;DR, dá para entender o caso em <strong>5 segundos</strong>. Drill-down a um clique e chat com o copiloto para
-						perguntar "por que essa recomendação?".</p>
+					<div class="wf-body">
+						<p>Fila ordenada por urgência <strong>reavaliada pelo copiloto</strong>, não pelo score puro. Cada item é o
+							TL;DR — caso entendido em <strong>5 segundos</strong>. Drill-down a um clique.</p>
+						<div class="wf-thumb"><img src="assets/mock-painel.png" alt="Mock Painel UI"></div>
+					</div>
 				</div>
 				<div class="wf-card">
 					<h4><i class="fa-solid fa-chart-line" style="color: var(--accent-red); margin-right: 6px;"></i> Grafana</h4>
-					<div class="meaning-label">Significado</div>
-					<p>Ajuda a decidir a escala da próxima semana, apontar ICs candidatos a <strong>manutenção
-							preventiva</strong> e sustentar com dados qualquer pedido de capacidade. É só leitura, sem botões. Grafana é
-						o que a Locaweb já usa na infra, ninguém precisa aprender ferramenta nova.</p>
+					<div class="wf-body">
+						<p>Apoia decisão de escala, aponta ICs candidatos a <strong>manutenção preventiva</strong> e sustenta pedidos
+							de capacidade. Só leitura. <strong>Adoção zero-fricção</strong> — Locaweb já usa.</p>
+						<div class="wf-thumb"><img src="assets/mock-grafana.png" alt="Mock Grafana"></div>
+					</div>
 				</div>
 				<div class="wf-card">
 					<h4><i class="fa-solid fa-magnifying-glass" style="color: var(--accent-red); margin-right: 6px;"></i> "Por que
 						o copiloto disse isso?"</h4>
-					<div class="meaning-label">Significado</div>
-					<p>Tudo auditável. O N2 sênior pode contestar ou confirmar e o feedback alimenta a <strong>avaliação
-							contínua do copiloto</strong>. Mostra SHAP top-5, ferramentas chamadas com argumentos/resultados, janela
-						móvel do IC.</p>
+					<div class="wf-body">
+						<p>Auditabilidade total. N2 sênior contesta ou confirma; o feedback alimenta a <strong>avaliação contínua</strong>.
+							Mostra SHAP top-5 e tools chamadas com argumentos/resultados.</p>
+						<div class="wf-thumb"><img src="assets/mock-explain.png" alt="Mock Drill-down"></div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -1815,16 +1836,9 @@
 				</div>
 
 				<!-- Coluna Imagem (Board) -->
-				<div style="display: flex; flex-direction: column; height: 100%;">
+				<div style="display: flex; flex-direction: column;">
 					<div class="board-placeholder">
-						<div class="msg">
-							<i class="fa-brands fa-github"
-								style="font-size: 40px; color: var(--text-dim); margin-bottom: 14px; display: block;"></i>
-							<p style="color: var(--text-muted); font-size: 14px;">Cole aqui o print do<br><strong
-									style="color: var(--text-light);">GitHub Projects Board</strong></p>
-						</div>
-						<!-- Insira o link da imagem no src="" abaixo -->
-						<img src="" alt="">
+						<img src="assets/project.png" alt="GitHub Projects Board">
 					</div>
 				</div>
 			</div>
