@@ -153,7 +153,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 **Tasks:**
 - [x] Mapear as personas: BOPE (N1/N2/N3), gestores operacionais, clientes Locaweb
 - [x] Pra cada nível, escrever "como se beneficia" em 1 frase
-- [x] Montar a tabela pro `ideacao.md`
+- [x] Montar a tabela pro `sprint-1-ideation.md`
 
 #### Desenhar a proposta de solução
 **Responsável:** Time inteiro
@@ -400,7 +400,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 #### Roteiro da apresentação Sprint 2
 **Responsável:** João Porto
 **Status:** Done
-**Descrição:** transformar o `arquitetura.md` em roteiro de slides cobrindo o que o brief pede. Pra fechar todas as exigências (problema, público, proposta, arquitetura, descrição, protótipos, gestão ágil, finalização) vão sair uns 15–16 slides.
+**Descrição:** transformar o `sprint-2-architecture.md` em roteiro de slides cobrindo o que o brief pede. Pra fechar todas as exigências (problema, público, proposta, arquitetura, descrição, protótipos, gestão ágil, finalização) vão sair uns 15–16 slides.
 **Tasks:**
 - [x] Slide 1–2: Capa + equipe
 - [x] Slide 3–4: Cenário + problema operacional

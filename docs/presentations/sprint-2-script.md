@@ -1,9 +1,9 @@
 # **Roteiro de Apresentação — SPRINT 2: Arquitetura, Desenho e Protótipos Iniciais (Locaweb Challenge 2026)**
 
-> **Fonte de conteúdo:** `docs/sprint-02/arquitetura.md`
-> **Brief obrigatório:** `docs/sprints/03-sprint-2-arquitetura.md`
+> **Fonte de conteúdo:** `docs/sprints/sprint-2-architecture.md`
+> **Brief obrigatório:** `docs/briefings/02-sprint-2-architecture.md`
 > **Itens exigidos pelo brief:** (1) problema/público/proposta atualizados, (2) arquitetura + desenho inicial, (3) descrição da arquitetura, (4) protótipos com significado, (5) gerenciamento ágil, (6) finalização.
-> **Padrão visual:** mesmo template da Sprint 1 (`docs/apresentacoes/sprint-1.html`) — paleta `#0B0F19 / #F9203E`, fontes Poppins/Inter/JetBrains Mono, slides 1280×720, footer "FIAP + locaweb".
+> **Padrão visual:** mesmo template da Sprint 1 (`docs/presentations/sprint-1.html`) — paleta `#0B0F19 / #F9203E`, fontes Poppins/Inter/JetBrains Mono, slides 1280×720, footer "FIAP + locaweb".
 
 ---
 
@@ -270,7 +270,7 @@ _(Dica visual: três scrum-boxes lado a lado — Time · Cadência · Ferramenta
 **Ferramentas**
 - **Board** — GitHub Projects (kanban: Backlog → To Do → In Progress → Review → Done)
 - **Repositório** — GitHub, branches `feat/*`, PR review obrigatório
-- **Documentação** — `docs/sprint-XX/` por sprint
+- **Documentação** — `docs/sprints/sprint-N-*.md` por sprint
 - **Comunicação** — WhatsApp (sync curto) + GitHub Issues (assíncrono e rastreável)
 
 ## **SLIDE 16: Finalização**

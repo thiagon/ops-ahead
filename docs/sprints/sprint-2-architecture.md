@@ -435,8 +435,8 @@ Os protótipos abaixo são **wireframes lo-fi** (a serem materializados em Figma
 
 | Sprint | Período | Entregável | Status |
 |--------|---------|------------|--------|
-| **Sprint 1 — Ideação** | até 27/04/2026 | `ideacao.md` + `sprint-1.html` + PPTX | ✅ Concluída |
-| **Sprint 2 — Arquitetura** | até 24/05/2026 | `arquitetura.md` + `sprint-2.html` + PPTX | 🟡 Em curso |
+| **Sprint 1 — Ideação** | até 27/04/2026 | `sprint-1-ideation.md` + `sprint-1.html` + PPTX | ✅ Concluída |
+| **Sprint 2 — Arquitetura** | até 24/05/2026 | `sprint-2-architecture.md` + `sprint-2.html` + PPTX | 🟡 Em curso |
 | **Sprint 3 — MVP** | até 23/08/2026 | Pipeline funcional + 1º modelo + UI mínima | ⬜ Planejada |
 | **Sprint 4 — Final** | até 08/09/2026 | Solução completa + apresentação final | ⬜ Planejada |
 
