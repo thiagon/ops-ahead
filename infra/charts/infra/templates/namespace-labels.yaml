@@ -1,9 +1,0 @@
-{{- range list "data" "ml" "agent" "ui" }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ . }}
-  labels:
-    ops-ahead/monitor: "true"
-{{- end }}

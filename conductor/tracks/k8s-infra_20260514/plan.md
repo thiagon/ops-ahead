@@ -3,7 +3,7 @@
 **Track ID:** k8s-infra_20260514
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-05-14
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 

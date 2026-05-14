@@ -1,0 +1,12 @@
+dependencies:
+- name: strimzi-kafka-operator
+  repository: https://strimzi.io/charts/
+  version: 0.43.0
+- name: altinity-clickhouse-operator
+  repository: https://docs.altinity.com/clickhouse-operator/
+  version: 0.23.7
+- name: argo-workflows
+  repository: https://argoproj.github.io/argo-helm
+  version: 0.41.9
+digest: sha256:6628b680e3c556d6379b1c56d727596409edf5cbff4864ed2642af8727a78b75
+generated: "2026-05-14T14:50:19.431040077-03:00"

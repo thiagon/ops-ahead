@@ -1,0 +1,15 @@
+dependencies:
+- name: argo-cd
+  repository: https://argoproj.github.io/argo-helm
+  version: 6.11.1
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 59.1.0
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.6.4
+- name: promtail
+  repository: https://grafana.github.io/helm-charts
+  version: 6.16.4
+digest: sha256:543109c343dde4c50f2dcd276eb192dc88013464431fefe2a809d686d5e67e2e
+generated: "2026-05-14T17:42:32.954621115-03:00"
