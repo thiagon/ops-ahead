@@ -13,3 +13,6 @@ ui:
   port: 80
   ingress:
     host: ui.ops-ahead.local
+
+networkPolicy:
+  enabled: false

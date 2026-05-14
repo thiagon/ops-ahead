@@ -45,3 +45,6 @@ argo-workflows:
   server:
     authModes:
       - client   # no auth in dev
+
+networkPolicy:
+  enabled: true

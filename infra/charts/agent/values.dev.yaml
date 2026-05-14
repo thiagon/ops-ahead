@@ -12,3 +12,6 @@ agent-postgres:
 
 litellm:
   replicas: 1
+
+networkPolicy:
+  enabled: true

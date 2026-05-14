@@ -2,25 +2,25 @@
   "id": "k8s-infra_20260514",
   "title": "Infra K8s Base",
   "type": "chore",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-05-14T00:00:00Z",
-  "updated": "2026-05-14T12:30:00Z",
-  "current_phase": 2,
-  "current_task": "2.1",
+  "updated": "2026-05-14T20:00:00Z",
+  "current_phase": 5,
+  "current_task": "5.3",
   "github_issue": 36,
-  "github_issue_url": "https://github.com/thiagon/ops-ahead/issues/36",
   "github_pr": 37,
-  "github_pr_url": "https://github.com/thiagon/ops-ahead/pull/37",
-  "milestone": 3,
   "phases": {
     "total": 5,
-    "completed": 1
+    "completed": 5
   },
   "tasks": {
     "total": 21,
-    "completed": 5
+    "completed": 21
   },
   "commits": [
-    "a4f5a7f: chore(data): add ns:data helm chart — kafka, minio, clickhouse, argo-workflows"
+    "a4f5a7f: chore(data): add ns:data helm chart — kafka, minio, clickhouse, argo-workflows",
+    "b1d622e: chore(ml,agent): add ns:ml and ns:agent helm charts",
+    "c51b92d: chore(ui,infra): add ns:ui and ns:infra helm charts",
+    "phase5: chore(infra): NetworkPolicy, ingresses, dev-up/down scripts, clean install validated"
   ]
 }

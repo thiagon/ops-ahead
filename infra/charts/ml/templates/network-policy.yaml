@@ -1,0 +1,31 @@
+{{- if .Values.networkPolicy.enabled }}
+# ns:ml — accepts from ns:agent and ns:ui (API port only); infra for metrics
+# Direct access to ClickHouse in ns:data is governed by ns:data policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-default
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agent
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ui
+      ports:
+        - port: 5000   # MLflow API only
+        - port: 80
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
+{{- end }}

@@ -51,3 +51,6 @@ litellm:
   image: ghcr.io/berriai/litellm:main-stable
   defaultModel: claude-sonnet-4-6
   fallbackModel: gpt-4.1
+
+networkPolicy:
+  enabled: false

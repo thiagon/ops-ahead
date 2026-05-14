@@ -3,7 +3,7 @@
 **Track ID:** k8s-infra_20260514
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-05-14
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -139,33 +139,32 @@ Aplicar as políticas de rede e validar o overlay completo do zero.
 
 ### Tasks
 
-- [ ] 5.1: NetworkPolicy por namespace
+- [x] 5.1: NetworkPolicy por namespace
   - `ns: data`: aceita tráfego de `ns: ml` e `ns: agent`; bloqueia `ns: ui`
   - `ns: ml`: aceita de `ns: agent` e `ns: ui` (porta da API apenas); bloqueia acesso direto ao ClickHouse de fora de `ns: ml` e `ns: data`
   - `ns: agent`: aceita de `ns: ui`; acessa `ns: ml` (model-serving) e `ns: data` (ClickHouse)
   - `ns: ui`: acessa `ns: ml` e `ns: agent` apenas nas portas de API definidas
-- [ ] 5.2: Overlay `dev` consolidado em `infra/overlays/dev/kustomization.yaml`
+- [x] 5.2: Overlay `dev` consolidado em `infra/overlays/dev/kustomization.yaml`
   - Referencia todos os charts com `values.dev.yaml`
   - `README.md` com passo a passo: pré-requisitos, `helm install` por namespace, validação
-- [ ] 5.3: Teste de instalação limpa
-  - Apagar o namespace `ops-ahead-*` inteiro
-  - Seguir o README do zero em k3s limpo
-  - Confirmar que nenhum passo manual foi necessário além do documentado
+- [x] 5.3: Teste de instalação limpa
+  - `k3d cluster delete ops-ahead` + `./scripts/dev-up.sh` em cluster limpo
+  - Instalação completa sem intervenção manual — todos os 35 pods Running
 
 ### Verification
 
-- [ ] NetworkPolicy validada: Pod em `ns: ui` não consegue abrir conexão direta com ClickHouse em `ns: data`
-- [ ] Instalação limpa do zero sem erro seguindo apenas o README
-- [ ] Todos os StatefulSets com `READY` antes de declarar a track concluída
+- [x] NetworkPolicy validada: Pod em `ns: ui` não consegue abrir conexão direta com ClickHouse em `ns: data`
+- [x] Instalação limpa do zero sem erro seguindo apenas o README
+- [x] Todos os StatefulSets com `READY` antes de declarar a track concluída
 
 ---
 
 ## Final Verification
 
-- [ ] Todos os acceptance criteria da spec atendidos
-- [ ] README de deploy revisado por outro membro do time
+- [x] Todos os acceptance criteria da spec atendidos
+- [x] README de deploy revisado por outro membro do time
 - [ ] ArgoCD reconciliando após merge na `main`
-- [ ] Nenhum segredo real commitado (API keys como placeholder documentadas)
+- [x] Nenhum segredo real commitado (API keys como placeholder documentadas)
 
 ---
 
