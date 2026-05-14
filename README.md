@@ -11,8 +11,8 @@ Sistema de AIOps para predição e explicação de padrões de incidentes de TI 
 - [Visão geral](#visão-geral)
 - [Arquitetura](#arquitetura)
 - [Estrutura do repositório](#estrutura-do-repositório)
-- [Setup local — dados e modelos](#setup-local--dados-e-modelos)
-- [Setup local — infraestrutura K8s](#setup-local--infraestrutura-k8s)
+- [Infraestrutura local (K8s)](#infraestrutura-local-k8s)
+- [Análise de dados (Python)](#análise-de-dados-python)
 - [Sprints](#sprints)
 
 ---
@@ -25,33 +25,33 @@ O Ops Ahead é um sistema AIOps modular em quatro camadas:
 Dados → Modelos → Copiloto IA → Interfaces
 ```
 
-| Camada | Função |
-|--------|--------|
-| **Dados** | Ingestão de incidentes via Kafka, armazenamento no MinIO (Iceberg) e ClickHouse |
-| **Modelos** | Forecasting de volume (D+1/D+7), scoring de risco OLA, MLflow para tracking |
-| **Copiloto IA** | Agente LLM com ferramentas para recomendações e ações (LiteLLM + pgvector) |
-| **Interfaces** | Gateway + UI web para operadores |
+| Camada | Componentes |
+|--------|-------------|
+| **Dados** | Kafka (Strimzi), MinIO + Iceberg, ClickHouse (Altinity), Argo Workflows |
+| **Modelos** | MLflow tracking, Postgres, Redis |
+| **Copiloto IA** | LiteLLM proxy (Claude Sonnet 4.6 + GPT-4.1), Postgres + pgvector |
+| **Interfaces** | Gateway + UI (nginx stubs, substituídos nas Sprints 3/4) |
+| **Plataforma** | ArgoCD, Prometheus, Grafana, Loki + Promtail |
 
 ---
 
 ## Arquitetura
 
 ```
-ns: data          ns: ml            ns: agent         ns: ui
-┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐
-│  Kafka   │─────▶│  MLflow  │◀────▶│ LiteLLM  │◀────▶│ Gateway  │
-│  MinIO   │      │  Redis   │      │ Postgres  │      │    UI    │
-│ClickHouse│      │ Postgres │      │ pgvector  │      └──────────┘
-│  Argo WF │      └──────────┘      └──────────┘
-└──────────┘
-
-ns: infra
-┌──────────────────────────────────────────┐
-│  ArgoCD  │  Prometheus  │  Loki  │ Grafana │
-└──────────────────────────────────────────┘
+                        ┌─────────────────────┐
+                        │  Traefik (porta 80)  │  ← único ponto de entrada
+                        └──────────┬──────────┘
+               ┌──────────┬────────┼────────┬──────────┐
+            ns:ui       ns:agent  ns:ml   ns:data    ns:infra
+         ┌────────┐   ┌────────┐ ┌──────┐ ┌───────┐ ┌───────┐
+         │Gateway │   │LiteLLM │ │MLflow│ │Kafka  │ │ArgoCD │
+         │  UI    │   │Postgres│ │Redis │ │MinIO  │ │Prome. │
+         └────────┘   │pgvector│ │Post. │ │Click. │ │Grafana│
+                      └────────┘ └──────┘ │ArgoWF │ │Loki   │
+                                          └───────┘ └───────┘
 ```
 
-Toda a stack roda em Kubernetes, gerenciada via **Helm charts por namespace** com overlay `dev` (1 réplica, sem TLS, recursos reduzidos) e overlay `prod` (HPA, TLS, Vault).
+Toda a stack roda em Kubernetes (k3s via k3d), gerenciada via Helm charts por namespace. NetworkPolicy isola os namespaces: `ns:ui` não acessa `ns:data` diretamente.
 
 ---
 
@@ -65,34 +65,95 @@ docs/
   sprints/                  # requisitos por sprint
 infra/
   charts/
-    data/                   # Kafka (Strimzi), MinIO, ClickHouse (Altinity), Argo Workflows
+    data/                   # Kafka, MinIO, ClickHouse, Argo Workflows
     ml/                     # MLflow + Postgres, Redis
-    agent/                  # Postgres + pgvector, LiteLLM proxy
-    ui/                     # gateway (stub), ui (stub)
-    infra/                  # ArgoCD, Prometheus, Loki, Grafana
+    agent/                  # Postgres + pgvector, LiteLLM
+    ui/                     # gateway e ui (stubs nginx)
+    infra/                  # ArgoCD, Prometheus, Grafana
   overlays/
-    dev/                    # kustomization com values.dev.yaml por chart
-    prod/                   # kustomization de produção
+    dev/                    # ingresses.yaml (subdomínios *.ops-ahead.local)
+    prod/                   # overlay de produção
 scripts/
+  dev-setup.sh              # prepara a máquina (rodar uma vez)
+  dev-up.sh                 # sobe o ambiente
+  dev-down.sh               # derruba o ambiente
   prepare_dataset.py        # pipeline Excel → CSV
+Makefile                    # atalhos: make setup / up / down
 ```
 
 ---
 
-## Setup local — dados e modelos
+## Infraestrutura local (K8s)
 
-**Pré-requisito:** Python 3.12+
+**Único pré-requisito:** Docker instalado e rodando.
+
+### Primeira vez na máquina
 
 ```bash
-# instalar dependências
-uv sync
+make setup
+```
 
-# dataset já processado em assets/incidents.csv
-# para reprocessar a partir do Excel original:
+Instala kubectl, Helm e k3d em `~/.local/bin`, adiciona os repositórios Helm e configura os subdomínios em `/etc/hosts`. Se não tiver permissão de escrita no `/etc/hosts`, o script imprime as entradas para adicionar manualmente.
+
+### Subir o ambiente
+
+```bash
+make up
+```
+
+Cria o cluster k3d (se não existir), baixa as dependências dos charts e instala todos os namespaces em ordem. Equivalente ao `docker compose up`.
+
+### Derrubar o ambiente
+
+```bash
+make down
+```
+
+### Serviços disponíveis
+
+Após `make up`, todos os serviços ficam acessíveis via porta 80 em subdomínios locais:
+
+| Serviço | URL | Credenciais |
+|---------|-----|-------------|
+| ArgoCD | http://argocd.ops-ahead.local | — |
+| Grafana | http://grafana.ops-ahead.local | admin / ops-ahead-dev |
+| Prometheus | http://prometheus.ops-ahead.local | — |
+| MLflow | http://mlflow.ops-ahead.local | — |
+| MinIO | http://minio.ops-ahead.local | minioadmin / minioadmin |
+| Argo Workflows | http://argo-workflows.ops-ahead.local | — |
+| LiteLLM | http://litellm.ops-ahead.local | — |
+| Gateway | http://gateway.ops-ahead.local | — |
+| UI | http://ui.ops-ahead.local | — |
+
+> Para expor externamente durante testes: `ngrok http 80`
+
+### Configurar API keys (LiteLLM)
+
+O LiteLLM sobe com chaves placeholder. Para usar modelos reais:
+
+```bash
+kubectl edit secret litellm-api-keys -n agent
+# substituir os valores base64 de ANTHROPIC_API_KEY e OPENAI_API_KEY
+kubectl rollout restart deployment/litellm -n agent
+```
+
+---
+
+## Análise de dados (Python)
+
+**Pré-requisito:** Python 3.12+, gerenciado com `uv`
+
+```bash
+uv sync
+```
+
+O dataset já está processado em `assets/incidents.csv`. Para reprocessar a partir do Excel original:
+
+```bash
 python scripts/prepare_dataset.py
 ```
 
-**Campos principais do dataset:**
+**Campos principais:**
 
 | Campo | Descrição |
 |-------|-----------|
@@ -102,138 +163,7 @@ python scripts/prepare_dataset.py
 | `entrou_kpi` | 1 se contado no KPI |
 | `kpi_violado` | 1 se OLA foi violado |
 
-**Regras de OLA:** P1/P2 ≤ 4h · P3 ≤ 12h · P4 ≤ 24h · P5 ≤ 96h
-
----
-
-## Setup local — infraestrutura K8s
-
-### Pré-requisitos
-
-| Ferramenta | Versão testada | Finalidade |
-|-----------|---------------|-----------|
-| Docker Engine | 28.x | base para os containers do cluster |
-| kubectl | v1.36+ | gerenciar o cluster |
-| Helm | v3.20+ | instalar os charts |
-| k3d | v5.8+ | criar cluster k3s local dentro do Docker |
-
-> **Espaço em disco:** reserve ao menos **30 GB livres** antes de iniciar. As imagens dos operators (Strimzi, Altinity, Argo) somam ~8 GB no primeiro pull.
-
-### 1. Instalar as ferramentas (uma vez)
-
-```bash
-# kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl && mv kubectl ~/.local/bin/
-
-# Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
-  | HELM_INSTALL_DIR=$HOME/.local/bin USE_SUDO=false bash
-
-# k3d
-curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \
-  | K3D_INSTALL_DIR=$HOME/.local/bin USE_SUDO=false bash
-
-# adicionar ~/.local/bin ao PATH (colocar também no ~/.bashrc ou ~/.zshrc)
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### 2. Criar o cluster local
-
-```bash
-k3d cluster create ops-ahead --agents 1 --wait
-kubectl cluster-info   # confirmar que está rodando
-kubectl get nodes      # deve mostrar server-0 e agent-0 Ready
-```
-
-### 3. Adicionar os repositórios Helm
-
-```bash
-helm repo add strimzi  https://strimzi.io/charts/
-helm repo add altinity https://docs.altinity.com/clickhouse-operator/
-helm repo add argo     https://argoproj.github.io/argo-helm
-helm repo add bitnami  https://charts.bitnami.com/bitnami
-helm repo add grafana  https://grafana.github.io/helm-charts
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-```
-
-### 4. Baixar dependências de cada chart
-
-```bash
-helm dependency build ./infra/charts/data
-helm dependency build ./infra/charts/ml
-helm dependency build ./infra/charts/agent
-helm dependency build ./infra/charts/infra
-```
-
-### 5. Instalar os namespaces em ordem
-
-Sempre instale na ordem abaixo — cada namespace depende do anterior.
-
-```bash
-# 1. data — Kafka, MinIO, ClickHouse, Argo Workflows
-helm install ops-ahead-data ./infra/charts/data \
-  -n data --create-namespace \
-  -f infra/charts/data/values.dev.yaml
-
-# 2. ml — MLflow + Postgres, Redis
-helm install ops-ahead-ml ./infra/charts/ml \
-  -n ml --create-namespace \
-  -f infra/charts/ml/values.dev.yaml
-
-# 3. agent — Postgres + pgvector, LiteLLM
-helm install ops-ahead-agent ./infra/charts/agent \
-  -n agent --create-namespace \
-  -f infra/charts/agent/values.dev.yaml
-
-# 4. ui — stubs de gateway e ui
-helm install ops-ahead-ui ./infra/charts/ui \
-  -n ui --create-namespace \
-  -f infra/charts/ui/values.dev.yaml
-
-# 5. infra — ArgoCD, Prometheus, Loki, Grafana
-helm install ops-ahead-infra ./infra/charts/infra \
-  -n infra --create-namespace \
-  -f infra/charts/infra/values.dev.yaml
-```
-
-### 6. Verificar saúde
-
-```bash
-# aguardar todos os pods ficarem Ready
-kubectl wait --for=condition=Ready pod --all -n data    --timeout=300s
-kubectl wait --for=condition=Ready pod --all -n ml      --timeout=300s
-kubectl wait --for=condition=Ready pod --all -n agent   --timeout=300s
-kubectl wait --for=condition=Ready pod --all -n ui      --timeout=300s
-kubectl wait --for=condition=Ready pod --all -n infra   --timeout=300s
-
-# Kafka — tópicos criados pelo Strimzi operator
-kubectl get kafkatopics -n data
-
-# MinIO — acessar console
-kubectl port-forward svc/minio 9001:9001 -n data
-# abrir http://localhost:9001 | usuário: minioadmin | senha: minioadmin
-
-# ClickHouse — testar query
-kubectl exec -it -n data \
-  $(kubectl get pod -n data -l clickhouse.altinity.com/cluster=ops-ahead -o name | head -1) \
-  -- clickhouse-client --query "SELECT 1"
-
-# Argo Workflows — acessar UI
-kubectl port-forward svc/ops-ahead-data-argo-workflows-server 2746:2746 -n data
-# abrir http://localhost:2746
-
-# MLflow
-kubectl port-forward svc/mlflow 5000:5000 -n ml
-# abrir http://localhost:5000
-```
-
-### Remover o cluster
-
-```bash
-k3d cluster delete ops-ahead
-```
+**Regras de OLA:** somente P1–P3 são medidos · P1/P2 ≤ 4h · P3 ≤ 12h · P4 ≤ 24h · P5 ≤ 96h
 
 ---
 
