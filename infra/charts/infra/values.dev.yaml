@@ -6,6 +6,12 @@ loki:
 promtail:
   enabled: false
 
+argo-cd:
+  configs:
+    secret:
+      argocdServerAdminPassword: "$2b$10$jZtODvAvDeVS0lOxMZLX1OGDkdErQgJtrXgHZEFkwEBe7F7XmBWdy"
+      argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"
+
 kube-prometheus-stack:
   prometheus:
     prometheusSpec:
