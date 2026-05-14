@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Mocks Slide 14</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<style>
+		:root {
+			--bg-main: #0B0F19;
+			--bg-tile: #161F33;
+			--bg-tile-2: #1E2A47;
+			--accent-red: #F9203E;
+			--text-light: #F8FAFC;
+			--text-muted: #94A3B8;
+			--text-dim: #64748B;
+			--border-color: #2A3B5C;
+			--green: #10B981;
+			--amber: #F59E0B;
+			--blue: #3B82F6;
+			--purple: #8B5CF6;
+		}
+
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+
+		body {
+			background: #0B0F19;
+			padding: 24px;
+			font-family: 'Inter', sans-serif;
+			color: var(--text-light);
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 24px;
+		}
+
+		.mock {
+			background: var(--bg-tile);
+			border-radius: 12px;
+			padding: 18px;
+			width: 600px;
+			height: 320px;
+			overflow: hidden;
+			position: relative;
+		}
+
+		/* ============ 1. SLACK ============ */
+		.slack-msg {
+			background: #1A1D29;
+			border-left: 3px solid var(--accent-red);
+			border-radius: 4px;
+			padding: 14px 16px;
+		}
+		.slack-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+		.slack-avatar {
+			width: 28px; height: 28px; border-radius: 4px;
+			background: linear-gradient(135deg, var(--accent-red), #B91C3C);
+			display: flex; align-items: center; justify-content: center;
+			font-size: 12px; font-weight: 900; color: white;
+		}
+		.slack-name { font-size: 14px; font-weight: 700; color: var(--text-light); }
+		.slack-bot { font-size: 10px; padding: 2px 6px; background: var(--bg-main); color: var(--text-muted); border-radius: 3px; font-weight: 600; }
+		.slack-time { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+		.slack-title { font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
+		.slack-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+		.slack-meta .k { color: var(--text-dim); }
+		.slack-meta .v { color: var(--text-light); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+		.slack-rec { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; margin: 8px 0 10px; }
+		.slack-rec strong { color: var(--text-light); }
+		.slack-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+		.slack-btn {
+			padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 600;
+			border: 1px solid var(--border-color); background: transparent; color: var(--text-light);
+		}
+		.slack-btn.primary { background: var(--green); border-color: var(--green); color: white; }
+		.slack-btn.warn { background: transparent; border-color: var(--amber); color: var(--amber); }
+		.slack-context {
+			margin-top: 10px; font-size: 10px; color: var(--text-dim);
+			display: flex; align-items: center; gap: 6px;
+		}
+
+		/* ============ 2. PAINEL UI ============ */
+		.ui-head {
+			display: flex; align-items: center; justify-content: space-between;
+			padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+			margin-bottom: 10px;
+		}
+		.ui-tabs { display: flex; gap: 14px; font-size: 12px; }
+		.ui-tab { color: var(--text-dim); padding-bottom: 4px; }
+		.ui-tab.active { color: var(--text-light); border-bottom: 2px solid var(--accent-red); font-weight: 600; }
+		.ui-count { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+		.ui-list { display: flex; flex-direction: column; gap: 6px; }
+		.ui-item {
+			display: grid; grid-template-columns: 6px 1fr auto auto; gap: 10px; align-items: center;
+			padding: 9px 12px; background: var(--bg-main); border-radius: 6px; font-size: 11.5px;
+		}
+		.ui-item .bar { width: 4px; height: 28px; border-radius: 2px; }
+		.ui-item.crit .bar { background: var(--accent-red); }
+		.ui-item.high .bar { background: var(--amber); }
+		.ui-item.med .bar { background: var(--blue); }
+		.ui-item .title { color: var(--text-light); font-weight: 600; }
+		.ui-item .sub { color: var(--text-muted); font-size: 10.5px; }
+		.ui-item .score {
+			font-family: 'JetBrains Mono', monospace; font-size: 11px;
+			background: rgba(249, 32, 62, 0.15); color: var(--accent-red);
+			padding: 3px 8px; border-radius: 4px; font-weight: 700;
+		}
+		.ui-item .eta { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+		/* ============ 3. GRAFANA ============ */
+		.grafana-head {
+			display: flex; justify-content: space-between; align-items: center;
+			padding-bottom: 8px; margin-bottom: 12px;
+		}
+		.grafana-title { font-size: 13px; font-weight: 600; color: var(--text-light); }
+		.grafana-pill { font-size: 10px; padding: 3px 8px; background: var(--bg-main); color: var(--text-muted); border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+		.grafana-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+		.gf-stat { background: var(--bg-main); border-radius: 6px; padding: 10px; }
+		.gf-stat .label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+		.gf-stat .num { font-size: 22px; font-weight: 800; font-family: 'Poppins', sans-serif; line-height: 1; }
+		.gf-stat .delta { font-size: 10px; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+		.gf-stat.ok .num { color: var(--green); }
+		.gf-stat.warn .num { color: var(--amber); }
+		.gf-stat.bad .num { color: var(--accent-red); }
+		.gf-chart {
+			background: var(--bg-main); border-radius: 6px; padding: 8px;
+			height: 140px; position: relative;
+		}
+		.gf-chart svg { width: 100%; height: 100%; }
+
+		/* ============ 4. EXPLAIN ============ */
+		.exp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+		.exp-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(249, 32, 62, 0.15); color: var(--accent-red); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+		.exp-title { font-size: 12px; color: var(--text-muted); }
+		.exp-title strong { color: var(--text-light); }
+		.exp-section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-red); font-weight: 700; margin-bottom: 6px; }
+		.exp-shap { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+		.shap-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; font-size: 10.5px; }
+		.shap-feat { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+		.shap-bar-wrap { height: 10px; background: var(--bg-main); border-radius: 2px; overflow: hidden; }
+		.shap-bar { height: 100%; background: var(--accent-red); border-radius: 2px; }
+		.shap-bar.neg { background: var(--blue); }
+		.shap-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-light); text-align: right; }
+		.exp-tools { display: flex; flex-direction: column; gap: 4px; }
+		.tool-row { display: flex; align-items: center; gap: 8px; font-size: 10.5px; padding: 4px 8px; background: var(--bg-main); border-radius: 4px; }
+		.tool-name { color: var(--text-light); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; }
+		.tool-args { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 9.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.tool-check { color: var(--green); font-size: 11px; }
+	</style>
+</head>
+
+<body>
+
+	<!-- 1. SLACK -->
+	<div class="mock" id="m-slack">
+		<div class="slack-msg">
+			<div class="slack-header">
+				<div class="slack-avatar">OA</div>
+				<div class="slack-name">ops-ahead</div>
+				<div class="slack-bot">APP</div>
+				<div class="slack-time">14:32</div>
+			</div>
+			<div class="slack-title">Risco de OLA — INC8653993 (IC00067)</div>
+			<div class="slack-meta">
+				<span><span class="k">Score</span> <span class="v">0.78</span></span>
+				<span><span class="k">P2</span> <span class="v">lhvp</span></span>
+				<span><span class="k">ETA breach</span> <span class="v">~38min</span></span>
+			</div>
+			<div class="slack-rec">
+				<strong>Servidor inacessível.</strong> Padrão similar a 7 ICs do <strong>cat73/lhvp</strong> resolvidos em
+				22min mediana pelo <strong>Team14</strong>. Sugestão: aplicar runbook de reinício + escalar se p95 &gt; 2min.
+			</div>
+			<div class="slack-buttons">
+				<button class="slack-btn primary"><i class="fa-solid fa-check"></i> Ack &amp; Aplicar</button>
+				<button class="slack-btn">Ignorar</button>
+				<button class="slack-btn warn">Escalar</button>
+				<button class="slack-btn">Ver no painel</button>
+			</div>
+			<div class="slack-context">
+				<i class="fa-solid fa-circle-info"></i> Mesmo conteúdo enviado em paralelo ao OpsGenie
+			</div>
+		</div>
+	</div>
+
+	<!-- 2. PAINEL UI -->
+	<div class="mock" id="m-painel">
+		<div class="ui-head">
+			<div class="ui-tabs">
+				<div class="ui-tab active">Fila ativa</div>
+				<div class="ui-tab">Em ação</div>
+				<div class="ui-tab">Histórico</div>
+			</div>
+			<div class="ui-count">12 itens · TL;DR 5s</div>
+		</div>
+		<div class="ui-list">
+			<div class="ui-item crit">
+				<div class="bar"></div>
+				<div>
+					<div class="title">INC8653993 · IC00067 — Servidor inacessível</div>
+					<div class="sub">lhvp · cat73 · Team14 · similar a 7 ICs resolvidos</div>
+				</div>
+				<div class="score">0.78</div>
+				<div class="eta">38min</div>
+			</div>
+			<div class="ui-item crit">
+				<div class="bar"></div>
+				<div>
+					<div class="title">INC8653899 · IC00083 — Pool xpl_lw-ssl sem backends</div>
+					<div class="sub">lssl · cat102 · Team14 · runbook RB-pool-restart</div>
+				</div>
+				<div class="score">0.84</div>
+				<div class="eta">52min</div>
+			</div>
+			<div class="ui-item high">
+				<div class="bar"></div>
+				<div>
+					<div class="title">INC8651840 · IC00342 — vps52474 fora</div>
+					<div class="sub">lvps · cat74 · Team14 · monitorar 15min</div>
+				</div>
+				<div class="score">0.66</div>
+				<div class="eta">1h12</div>
+			</div>
+			<div class="ui-item med">
+				<div class="bar"></div>
+				<div>
+					<div class="title">INC8652876 · IC00246 — Erro em alterar senhas</div>
+					<div class="sub">lrev · cat94 · Team05 · sem padrão de rajada</div>
+				</div>
+				<div class="score">0.22</div>
+				<div class="eta">—</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 3. GRAFANA -->
+	<div class="mock" id="m-grafana">
+		<div class="grafana-head">
+			<div class="grafana-title"><i class="fa-solid fa-chart-line" style="color: var(--accent-red); margin-right: 6px;"></i> Painel tático — Team14 / lhvp · lhco · lsin</div>
+			<div class="grafana-pill">last 7d · auto-refresh 30s</div>
+		</div>
+		<div class="grafana-stats">
+			<div class="gf-stat ok">
+				<div class="label">ICs no KPI (P1–P3)</div>
+				<div class="num">25.6k</div>
+				<div class="delta" style="color: var(--green);">universo medido</div>
+			</div>
+			<div class="gf-stat warn">
+				<div class="label">P2 — top produto</div>
+				<div class="num">lhco</div>
+				<div class="delta" style="color: var(--amber);">1.082 ICs / 7d</div>
+			</div>
+			<div class="gf-stat bad">
+				<div class="label">ICs candidatos prev.</div>
+				<div class="num">7</div>
+				<div class="delta" style="color: var(--text-dim);">cat73 + cat85</div>
+			</div>
+		</div>
+		<div class="gf-chart">
+			<svg viewBox="0 0 580 120" preserveAspectRatio="none">
+				<defs>
+					<linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+						<stop offset="0%" stop-color="#F9203E" stop-opacity="0.45"/>
+						<stop offset="100%" stop-color="#F9203E" stop-opacity="0"/>
+					</linearGradient>
+					<linearGradient id="g2" x1="0" x2="0" y1="0" y2="1">
+						<stop offset="0%" stop-color="#10B981" stop-opacity="0.30"/>
+						<stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+					</linearGradient>
+				</defs>
+				<!-- grid -->
+				<line x1="0" y1="30" x2="580" y2="30" stroke="#2A3B5C" stroke-dasharray="2 4" stroke-width="0.5"/>
+				<line x1="0" y1="60" x2="580" y2="60" stroke="#2A3B5C" stroke-dasharray="2 4" stroke-width="0.5"/>
+				<line x1="0" y1="90" x2="580" y2="90" stroke="#2A3B5C" stroke-dasharray="2 4" stroke-width="0.5"/>
+				<!-- previsão area -->
+				<path d="M0,80 C40,72 80,68 120,55 C160,42 200,48 240,38 C280,28 320,40 360,32 C400,24 440,36 480,28 C520,22 560,30 580,28 L580,120 L0,120 Z" fill="url(#g1)"/>
+				<!-- previsão line -->
+				<path d="M0,80 C40,72 80,68 120,55 C160,42 200,48 240,38 C280,28 320,40 360,32 C400,24 440,36 480,28 C520,22 560,30 580,28" stroke="#F9203E" stroke-width="2" fill="none"/>
+				<!-- real area -->
+				<path d="M0,90 C40,85 80,82 120,78 C160,74 200,75 240,68 C280,60 320,65 360,58 C400,52 440,60 480,55 L580,120 L0,120 Z" fill="url(#g2)"/>
+				<!-- real line -->
+				<path d="M0,90 C40,85 80,82 120,78 C160,74 200,75 240,68 C280,60 320,65 360,58 C400,52 440,60 480,55" stroke="#10B981" stroke-width="2" fill="none"/>
+				<line x1="480" y1="0" x2="480" y2="120" stroke="#94A3B8" stroke-dasharray="3 3" stroke-width="0.6"/>
+				<text x="486" y="14" fill="#94A3B8" font-size="9" font-family="JetBrains Mono">hoje</text>
+			</svg>
+		</div>
+	</div>
+
+	<!-- 4. EXPLAIN -->
+	<div class="mock" id="m-explain">
+		<div class="exp-head">
+			<div class="exp-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+			<div class="exp-title">Por que essa recomendação? <strong>INC8653993</strong></div>
+		</div>
+
+		<div class="exp-section-label">SHAP top-5</div>
+		<div class="exp-shap">
+			<div class="shap-row">
+				<div class="shap-feat">produto=lhvp</div>
+				<div class="shap-bar-wrap"><div class="shap-bar" style="width: 92%;"></div></div>
+				<div class="shap-val">+0.31</div>
+			</div>
+			<div class="shap-row">
+				<div class="shap-feat">categoria=cat73</div>
+				<div class="shap-bar-wrap"><div class="shap-bar" style="width: 70%;"></div></div>
+				<div class="shap-val">+0.22</div>
+			</div>
+			<div class="shap-row">
+				<div class="shap-feat">prioridade=P2</div>
+				<div class="shap-bar-wrap"><div class="shap-bar" style="width: 55%;"></div></div>
+				<div class="shap-val">+0.17</div>
+			</div>
+			<div class="shap-row">
+				<div class="shap-feat">grupo=Team14</div>
+				<div class="shap-bar-wrap"><div class="shap-bar neg" style="width: 28%;"></div></div>
+				<div class="shap-val">−0.08</div>
+			</div>
+			<div class="shap-row">
+				<div class="shap-feat">tem_pai=false</div>
+				<div class="shap-bar-wrap"><div class="shap-bar neg" style="width: 18%;"></div></div>
+				<div class="shap-val">−0.05</div>
+			</div>
+		</div>
+
+		<div class="exp-section-label">Ferramentas chamadas</div>
+		<div class="exp-tools">
+			<div class="tool-row">
+				<span class="tool-check"><i class="fa-solid fa-circle-check"></i></span>
+				<span class="tool-name">find_similar_resolved</span>
+				<span class="tool-args">{ produto: "lhvp", cat: "cat73", k: 5 } → 7 hits</span>
+			</div>
+			<div class="tool-row">
+				<span class="tool-check"><i class="fa-solid fa-circle-check"></i></span>
+				<span class="tool-name">ic_state</span>
+				<span class="tool-args">{ id: "IC00067" } → ping=ko, load=0.82</span>
+			</div>
+		</div>
+	</div>
+
+</body>
+
+</html>

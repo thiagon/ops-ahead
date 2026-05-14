@@ -651,6 +651,23 @@
 			color: var(--text-light);
 		}
 
+		.callout.callout-green {
+			border-left-color: var(--green);
+		}
+
+		.callout.callout-green h4 {
+			color: var(--green);
+		}
+
+		.callout.callout-green li::before {
+			color: var(--green);
+		}
+
+		.callout.callout-green li code {
+			color: var(--green);
+		}
+
+
 		/* ---------- MODELOS CARDS ---------- */
 		.models-grid {
 			display: grid;
@@ -1203,7 +1220,8 @@
 				</div>
 			</div>
 			<p style="font-size: 13px; color: var(--text-muted); margin-top: 20px; text-align: center;">
-				Análise de <strong style="color: var(--text-light);">122.543 incidentes</strong> do ITSM. P1/P2 ≤ 4h · margem ≈
+				Análise de <strong style="color: var(--text-light);">mais de 122 mil incidentes</strong> do ITSM. P1/P2 ≤ 4h ·
+				margem ≈
 				36 breaches P2/ano para 100% da meta.</p>
 		</div>
 	</div>
@@ -1304,8 +1322,9 @@
 				<div class="tile">
 					<div class="icon"><i class="fa-solid fa-brain"></i></div>
 					<h3>2. Modelos Preditivos</h3>
-					<p>Previsão de volume D+1/D+7, score de risco de breach por chamado em aberto e detecção de rajada por IC.</p>
-					<div class="tech-row">LightGBM · Prophet · z-score+CUSUM · MLflow · Feast</div>
+					<p>Volume D+1/D+7, risco de breach por chamado, rajada por IC, projeção mensal dos 4 KPIs do PPR e detector de
+						evento externo.</p>
+					<div class="tech-row">LightGBM · Prophet · Monte Carlo · Isolation Forest · MLflow</div>
 				</div>
 				<div class="tile">
 					<div class="icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
@@ -1459,16 +1478,33 @@
 					</tr>
 				</tbody>
 			</table>
-			<div class="callout">
-				<h4><i class="fa-solid fa-circle-question" style="margin-right: 4px;"></i> Por que não Postgres / Airflow / fila
-					simples?</h4>
-				<ul>
-					<li><strong>ClickHouse &gt; Postgres/DuckDB:</strong> o regime operacional já parte de centenas de milhares de
-						eventos por dia.</li>
-					<li><strong>Argo &gt; Airflow/Prefect:</strong> roda como extensão do próprio K8s.</li>
-					<li><strong>Kafka &gt; fila simples:</strong> o fluxo é streaming por natureza e exige replay e desacoplamento
-						entre camadas.</li>
-				</ul>
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;">
+				<div class="callout" style="margin-top: 0;">
+					<h4><i class="fa-solid fa-circle-question" style="margin-right: 4px;"></i> Por que não Postgres / Airflow /
+						fila
+						simples?</h4>
+					<ul>
+						<li><strong>ClickHouse &gt; Postgres/DuckDB:</strong> o regime operacional já parte de centenas de milhares
+							de
+							eventos por dia.</li>
+						<li><strong>Argo &gt; Airflow/Prefect:</strong> roda como extensão do próprio K8s.</li>
+						<li><strong>Kafka &gt; fila simples:</strong> o fluxo é streaming por natureza e exige replay e
+							desacoplamento
+							entre camadas.</li>
+					</ul>
+				</div>
+				<div class="callout callout-green" style="margin-top: 0;">
+					<h4><i class="fa-solid fa-database" style="margin-right: 4px;"></i> Marts essenciais (dbt sobre ClickHouse)
+					</h4>
+					<ul>
+						<li><code>incidents_by_ic</code> · agregados por IC e janela</li>
+						<li><code>p4_sequences_by_ci</code> · precursor de P2</li>
+						<li><code>first_touch_duration</code> · tempo no primeiro grupo</li>
+						<li><code>priority_changes_log</code> · histórico de recategorização</li>
+						<li><code>daily_anomaly_features</code> · base do detector externo</li>
+						<li><code>kpi_monthly_state</code> · estado do mês para projeção</li>
+					</ul>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -1479,43 +1515,64 @@
 			<span class="red-slash">//</span> CAMADA 2 — INTELIGÊNCIA
 		</h2>
 		<div class="content-area">
-			<div class="models-grid">
-				<div class="model-card">
+			<div class="models-grid" style="gap: 12px;">
+				<div class="model-card" style="padding: 14px;">
 					<div class="model-icon"><i class="fa-solid fa-chart-line"></i></div>
 					<h4>Volume D+1 / D+7</h4>
 					<div class="algo">LightGBM + Prophet baseline</div>
-					<p class="why">LightGBM captura features heterogêneas; Prophet faz <strong
-							style="color: var(--text-light);">sanity-check de sazonalidade</strong>. Ensemble por média ponderada.</p>
+					<p class="why">LightGBM captura features heterogêneas. Prophet roda em paralelo como <strong
+							style="color: var(--text-light);">sanity-check de sazonalidade</strong>.</p>
 					<div class="metric"><span>MÉTRICAS</span><strong>MAPE · IC 80% · MAE</strong></div>
 				</div>
-				<div class="model-card">
+				<div class="model-card" style="padding: 14px;">
 					<div class="model-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
 					<h4>Risco de breach</h4>
 					<div class="algo">LightGBM binário + isotonic + SHAP</div>
-					<p class="why">Boosting captura interações não-lineares; isotonic corrige distorção em 1% de positivos.</p>
+					<p class="why">Boosting captura interações não-lineares. Isotonic corrige a distorção do 1% de positivos.</p>
 					<div class="metric"><span>MÉTRICAS</span><strong>AUC-PR · Brier · recall@top-k/h</strong></div>
 				</div>
-				<div class="model-card">
+				<div class="model-card" style="padding: 14px;">
 					<div class="model-icon"><i class="fa-solid fa-bolt"></i></div>
 					<h4>Detecção de rajada</h4>
 					<div class="algo">z-score robusto + CUSUM por IC</div>
-					<p class="why">Não precisa de treino, atualiza online e o
-						limiar adaptativo evita falso positivo em ICs ruidosos.</p>
+					<p class="why">Sem treino, atualiza online. Limiar adaptativo por IC evita falso positivo em ICs barulhentos.
+					</p>
 					<div class="metric"><span>MÉTRICAS</span><strong>Precision · lead-time · FP/IC</strong></div>
 				</div>
 			</div>
 
+			<div class="models-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-percent"></i></div>
+					<h4>Projeção mensal dos 4 KPIs do PPR</h4>
+					<div class="algo">Monte Carlo (volume previsto × taxa de breach)</div>
+					<p class="why">O gestor não pergunta "vai estourar este chamado". Pergunta "vou fechar o mês na meta".
+						Simulamos os dias restantes e devolvemos a probabilidade de fechar dentro de cada KPI (volume P2/P3 e OLA
+						P2/P3).</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Cobertura IC 80% · erro fim do mês</strong></div>
+				</div>
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+					<h4>Detector de evento externo</h4>
+					<div class="algo">Isolation Forest sobre features diárias</div>
+					<p class="why">AWS fora, CrowdStrike e registro.br entram no dataset como pico inexplicável. O detector marca
+						o dia, exclui do treino dos outros modelos e avisa o operador para olhar fora da Locaweb antes de agir.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Recall em outliers · FP em dias normais</strong></div>
+				</div>
+			</div>
+
 			<div class="ops-stack">
-				<h4><i class="fa-solid fa-gears" style="margin-right: 4px;"></i> Stack de operação dos modelos</h4>
+				<h4><i class="fa-solid fa-layer-group" style="margin-right: 4px;"></i> Features de domínio que entram nos
+					modelos</h4>
 				<ul>
-					<li><strong>MLflow</strong> para tracking e registry.</li>
-					<li><strong>Feast</strong> como feature store.</li>
-					<li><strong><code>model-serving</code></strong> expondo <code>/predict/volume</code> e
-						<code>/predict/breach</code>.
+					<li><strong>Sequência de P4 no mesmo IC.</strong> Threshold escalando (70% → 85% → 92%) é precursor de P2.
 					</li>
-					<li><strong><code>burst-detector</code></strong>, um worker Kafka com estado por IC no Redis.</li>
-					<li><strong>Evidently AI</strong> mede drift via PSI/KS, exporta métrica para o Prometheus e alerta no
-						Grafana.</li>
+					<li><strong>Tempo no primeiro grupo vs. OLA.</strong> N1 pode cozinhar até 25% do OLA. Acima disso já era pra
+						ter escalado.</li>
+					<li><strong>Histórico de recategorização.</strong> P3 que vira P2 mantém a prioridade anterior como contexto.
+					</li>
+					<li><strong>Flag de abertura manual.</strong> Suporte abriu porque o monitoramento falhou. Aponta gap na
+						observabilidade.</li>
 				</ul>
 			</div>
 		</div>
@@ -1554,7 +1611,7 @@
 					<tr>
 						<td><strong>RAG</strong></td>
 						<td>pgvector + sentence-transformers PT-BR</td>
-						<td>Embeddings + filtros estruturados na <strong>mesma query SQL</strong></td>
+						<td>Embeddings + filtros estruturados na mesma query SQL</td>
 					</tr>
 					<tr>
 						<td><strong>Validação</strong></td>
@@ -1570,15 +1627,17 @@
 			</table>
 
 			<div class="tool-pills">
-				<h4><i class="fa-solid fa-toolbox" style="margin-right: 4px;"></i> 6 ferramentas disponíveis ao copiloto</h4>
+				<h4><i class="fa-solid fa-toolbox" style="margin-right: 4px;"></i> 9 ferramentas disponíveis ao copiloto</h4>
 				<div class="pills">
 					<code>get_recent_incidents</code>
 					<code>get_group_load</code>
 					<code>find_similar_resolved</code>
 					<code>get_ola_window</code>
-					<code
-						class="new">detect_backbone_pattern <i class="fa-solid fa-star" style="font-size: 9px; margin-left: 2px;"></i></code>
+					<code>detect_backbone_pattern</code>
 					<code>get_breach_score</code>
+					<code>detect_p4_escalation</code>
+					<code>detect_external_event</code>
+					<code>get_kpi_projection</code>
 				</div>
 			</div>
 		</div>
@@ -1647,7 +1706,7 @@
 			<div class="principle-banner">
 				<p><strong>Princípio:</strong> o operador não vai largar Slack, OpsGenie e ServiceNow para abrir nosso painel. O
 					trabalho dele continua acontecendo
-					<strong>nos canais que ele já usa</strong>. Nosso painel serve como visão consolidada e auditoria, não como
+					nos canais que ele já usa. Nosso painel serve como visão consolidada e auditoria, não como
 					centro de operação.
 				</p>
 			</div>
@@ -1748,6 +1807,19 @@
 				</div>
 			</div>
 
+			<div
+				style="margin-top: 12px; padding: 10px 16px; background: var(--bg-tile-2); border-radius: 8px; border-left: 3px solid var(--amber); font-size: 11.5px; line-height: 1.55; color: var(--text-muted);">
+				<strong
+					style="color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Ramificações do
+					fluxo:</strong>
+				<strong style="color: var(--text-light);">recategorização</strong> — model-serving compara prioridade no Redis e
+				dispara re-inferência ·
+				<strong style="color: var(--text-light);">evento externo</strong> — copiloto troca "ESCALAR" por "INVESTIGAR
+				causa externa" ·
+				<strong style="color: var(--text-light);">P4 escalonando</strong> — sinal de precursor entra como linha extra no
+				alerta.
+			</div>
+
 			<div class="sli-banner">
 				<strong>SLI alvo:</strong> &lt; 60s entre incidente aberto e recomendação na tela. <span
 					style="color: var(--text-muted);">Monitorado em Grafana.</span>
@@ -1767,8 +1839,10 @@
 						Slack/OpsGenie</h4>
 					<div class="wf-body">
 						<p>Operador age <strong>onde já vive</strong>. Block Kit com <strong>Ack &amp; Aplicar</strong>,
-							<strong>Ignorar</strong>, <strong>Escalar</strong>, <strong>Ver no painel</strong>. Mesmo conteúdo cai no
-							OpsGenie. <strong>Não precisa abrir o painel para agir.</strong></p>
+							<strong>Ignorar</strong>, <strong>Escalar</strong>. Mesmo conteúdo cai no OpsGenie. Quando o detector
+							flagra
+							<strong>evento externo</strong>, o card muda os botões para investigar antes da ação padrão.
+						</p>
 						<div class="wf-thumb"><img src="assets/mock-slack.png" alt="Mock Slack/OpsGenie"></div>
 					</div>
 				</div>
@@ -1783,8 +1857,10 @@
 				<div class="wf-card">
 					<h4><i class="fa-solid fa-chart-line" style="color: var(--accent-red); margin-right: 6px;"></i> Grafana</h4>
 					<div class="wf-body">
-						<p>Apoia decisão de escala, aponta ICs candidatos a <strong>manutenção preventiva</strong> e sustenta pedidos
-							de capacidade. Só leitura. <strong>Adoção zero-fricção</strong> — Locaweb já usa.</p>
+						<p>Os <strong>4 KPIs do PPR</strong> projetados separadamente (volume P2/P3 e OLA P2/P3) e a probabilidade
+							conjunta de fechar o mês. Apoia decisão de escala e sustenta pedido de capacidade. Só leitura.
+							<strong>Adoção zero-fricção</strong> — Locaweb já usa.
+						</p>
 						<div class="wf-thumb"><img src="assets/mock-grafana.png" alt="Mock Grafana"></div>
 					</div>
 				</div>
@@ -1792,8 +1868,10 @@
 					<h4><i class="fa-solid fa-magnifying-glass" style="color: var(--accent-red); margin-right: 6px;"></i> "Por que
 						o copiloto disse isso?"</h4>
 					<div class="wf-body">
-						<p>Auditabilidade total. N2 sênior contesta ou confirma; o feedback alimenta a <strong>avaliação contínua</strong>.
-							Mostra SHAP top-5 e tools chamadas com argumentos/resultados.</p>
+						<p>Auditabilidade total. SHAP top-5, tools chamadas com argumentos e resultados, sequência de P4 no IC,
+							projeção
+							de KPI consultada. N2 sênior contesta ou confirma e o feedback alimenta a <strong>avaliação
+								contínua</strong>.</p>
 						<div class="wf-thumb"><img src="assets/mock-explain.png" alt="Mock Drill-down"></div>
 					</div>
 				</div>
