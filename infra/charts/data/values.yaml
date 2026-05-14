@@ -41,8 +41,8 @@ minio:
     size: 50Gi
   bucket: ops-ahead-lake
   credentials:
-    rootUser: minioadmin
-    rootPassword: minioadmin
+    rootUser: PLACEHOLDER
+    rootPassword: PLACEHOLDER
 
 # ─── ClickHouse (Altinity Operator) ──────────────────────────────────────────
 clickhouse:
