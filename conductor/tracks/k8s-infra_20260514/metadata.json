@@ -2,18 +2,23 @@
   "id": "k8s-infra_20260514",
   "title": "Infra K8s Base",
   "type": "chore",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-05-14T00:00:00Z",
-  "updated": "2026-05-14T00:00:00Z",
+  "updated": "2026-05-14T12:30:00Z",
+  "current_phase": 2,
+  "current_task": "2.1",
   "github_issue": 36,
   "github_issue_url": "https://github.com/thiagon/ops-ahead/issues/36",
+  "github_pr": 37,
+  "github_pr_url": "https://github.com/thiagon/ops-ahead/pull/37",
   "milestone": 3,
   "phases": {
     "total": 5,
-    "completed": 0
+    "completed": 1
   },
   "tasks": {
     "total": 21,
-    "completed": 0
-  }
+    "completed": 5
+  },
+  "commits": []
 }

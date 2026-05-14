@@ -17,21 +17,21 @@ Montar o esqueleto de diretórios e provisionar os componentes de maior complexi
 
 ### Tasks
 
-- [ ] 1.1: Criar estrutura de diretórios: `infra/charts/`, `infra/overlays/dev/`, `infra/overlays/prod/`
-- [ ] 1.2: Chart `ns: data` — Kafka via Strimzi Operator
+- [x] 1.1: Criar estrutura de diretórios: `infra/charts/`, `infra/overlays/dev/`, `infra/overlays/prod/`
+- [x] 1.2: Chart `ns: data` — Kafka via Strimzi Operator
   - Instalar CRDs do Strimzi
   - `Kafka` CR com 1 broker (dev) / 3 brokers (prod)
   - `KafkaTopic` CRDs: `incidents.raw`, `incidents.scored`, `alerts.burst`, `recommendations`, `actions.taken`
   - `values.dev.yaml`: 1 broker, retenção 1h, storage 2Gi
-- [ ] 1.3: Chart `ns: data` — MinIO + Iceberg
+- [x] 1.3: Chart `ns: data` — MinIO + Iceberg
   - MinIO StatefulSet modo standalone (dev) / distribuído (prod)
   - Bucket inicial `ops-ahead-lake` criado via Job de bootstrap
   - `values.dev.yaml`: 1 réplica, storage 5Gi
-- [ ] 1.4: Chart `ns: data` — ClickHouse via Altinity Operator
+- [x] 1.4: Chart `ns: data` — ClickHouse via Altinity Operator
   - Instalar CRDs do Altinity
   - `ClickHouseInstallation` CR com 1 shard, 1 réplica (dev)
   - `values.dev.yaml`: storage 5Gi, sem réplicas de backup
-- [ ] 1.5: Chart `ns: data` — Argo Workflows
+- [x] 1.5: Chart `ns: data` — Argo Workflows
   - Controller + Server como Deployments
   - ServiceAccount com permissões para criar Pods no namespace
   - `values.dev.yaml`: sem autenticação (dev), 1 réplica

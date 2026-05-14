@@ -1,0 +1,45 @@
+{{- if .Values.clickhouse.operatorEnabled }}
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: ops-ahead
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ops-ahead-data.labels" . | nindent 4 }}
+spec:
+  configuration:
+    clusters:
+      - name: ops-ahead
+        layout:
+          shardsCount: {{ .Values.clickhouse.cluster.shards }}
+          replicasCount: {{ .Values.clickhouse.cluster.replicas }}
+    settings:
+      max_connections: "100"
+      max_concurrent_queries: "50"
+      keep_alive_timeout: "3"
+  templates:
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.clickhouse.cluster.storage.size }}
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:24.3-alpine
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 512Mi
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+              volumeMounts:
+                - name: data-volume
+                  mountPath: /var/lib/clickhouse
+{{- end }}

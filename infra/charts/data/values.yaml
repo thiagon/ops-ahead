@@ -1,0 +1,68 @@
+# ─── Kafka (Strimzi Operator) ─────────────────────────────────────────────────
+kafka:
+  enabled: true
+  cluster:
+    replicas: 3
+    storage:
+      size: 20Gi
+    retention:
+      ms: "604800000"   # 7 days
+  zookeeper:
+    replicas: 3
+    storage:
+      size: 5Gi
+
+kafkaTopics:
+  - name: incidents.raw
+    partitions: 3
+    replicas: 2
+  - name: incidents.scored
+    partitions: 3
+    replicas: 2
+  - name: alerts.burst
+    partitions: 3
+    replicas: 2
+  - name: recommendations
+    partitions: 3
+    replicas: 2
+  - name: actions.taken
+    partitions: 3
+    replicas: 2
+
+strimzi-kafka-operator:
+  replicas: 1
+  watchNamespaces: []
+
+# ─── MinIO ────────────────────────────────────────────────────────────────────
+minio:
+  mode: distributed
+  replicas: 4
+  storage:
+    size: 50Gi
+  bucket: ops-ahead-lake
+  credentials:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+
+# ─── ClickHouse (Altinity Operator) ──────────────────────────────────────────
+clickhouse:
+  operatorEnabled: true
+  cluster:
+    shards: 1
+    replicas: 2
+    storage:
+      size: 50Gi
+
+altinity-clickhouse-operator: {}
+
+# ─── Argo Workflows ──────────────────────────────────────────────────────────
+argoWorkflows:
+  enabled: true
+
+argo-workflows:
+  controller:
+    replicas: 1
+  server:
+    replicas: 1
+    authModes:
+      - server
