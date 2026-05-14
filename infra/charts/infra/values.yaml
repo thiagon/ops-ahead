@@ -43,7 +43,6 @@ kube-prometheus-stack:
       replicas: 1
   grafana:
     enabled: true
-    adminPassword: ops-ahead-dev
     persistence:
       enabled: false
     additionalDataSources:
@@ -69,6 +68,19 @@ loki:
     replicas: 0
   write:
     replicas: 0
+
+# ─── Vault ────────────────────────────────────────────────────────────────────
+vault:
+  enabled: true
+  injector:
+    enabled: true
+  server:
+    dev:
+      enabled: false
+    standalone:
+      enabled: true
+    ha:
+      enabled: false
 
 # ─── Promtail (DaemonSet) ─────────────────────────────────────────────────────
 promtail:

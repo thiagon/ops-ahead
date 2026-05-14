@@ -5,6 +5,27 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: vault
+  namespace: infra
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: vault.ops-ahead.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ops-ahead-infra-vault
+                port:
+                  number: 8200
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
   name: argocd
   namespace: infra
   annotations:

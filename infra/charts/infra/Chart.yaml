@@ -21,3 +21,7 @@ dependencies:
     version: "6.16.4"
     repository: "https://grafana.github.io/helm-charts"
     condition: promtail.enabled
+  - name: vault
+    version: "0.32.0"
+    repository: "https://helm.releases.hashicorp.com"
+    condition: vault.enabled

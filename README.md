@@ -117,11 +117,12 @@ Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomín
 
 | Serviço | URL | Credenciais |
 |---------|-----|-------------|
-| ArgoCD | http://argocd.ops-ahead.localtest.me | — |
-| Grafana | http://grafana.ops-ahead.localtest.me | admin / ops-ahead-dev |
+| Vault | http://vault.ops-ahead.localtest.me | token: `VAULT_TOKEN` do .env |
+| ArgoCD | http://argocd.ops-ahead.localtest.me | `DEV_USER` / `DEV_PASSWORD` |
+| Grafana | http://grafana.ops-ahead.localtest.me | `DEV_USER` / `DEV_PASSWORD` |
+| MinIO | http://minio.ops-ahead.localtest.me | `DEV_USER` / `DEV_PASSWORD` |
 | Prometheus | http://prometheus.ops-ahead.localtest.me | — |
 | MLflow | http://mlflow.ops-ahead.localtest.me | — |
-| MinIO | http://minio.ops-ahead.localtest.me | minioadmin / minioadmin |
 | Argo Workflows | http://argo-workflows.ops-ahead.localtest.me | — |
 | LiteLLM | http://litellm.ops-ahead.localtest.me | — |
 | Gateway | http://gateway.ops-ahead.localtest.me | — |

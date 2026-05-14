@@ -14,6 +14,18 @@ info()  { echo -e "${GREEN}▶${NC} $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
+# ─── Credenciais do .env ──────────────────────────────────────────────────────
+ENV_FILE="$ROOT_DIR/.env"
+[ -f "$ENV_FILE" ] || error ".env não encontrado em $ROOT_DIR — copie .env.example e preencha"
+set -a; source "$ENV_FILE"; set +a
+
+: "${DEV_USER:?'DEV_USER não definido no .env'}"
+: "${DEV_PASSWORD:?'DEV_PASSWORD não definido no .env'}"
+: "${VAULT_TOKEN:?'VAULT_TOKEN não definido no .env'}"
+
+# ArgoCD exige bcrypt da senha
+ARGOCD_HASH=$(python3 -c "import bcrypt; print(bcrypt.hashpw('${DEV_PASSWORD}'.encode(), bcrypt.gensalt(rounds=10)).decode())")
+
 # ─── Pré-condições ────────────────────────────────────────────────────────────
 docker info > /dev/null 2>&1        || error "Docker não está rodando."
 command -v kubectl > /dev/null 2>&1 || error "kubectl não encontrado — rode: make setup"
@@ -48,16 +60,57 @@ done
 step "Instalando / atualizando charts"
 OPTS="--wait --timeout 8m"
 
-helm upgrade --install ops-ahead-data  ./infra/charts/data  -n data  --create-namespace -f infra/charts/data/values.dev.yaml  $OPTS
+helm upgrade --install ops-ahead-data ./infra/charts/data -n data --create-namespace \
+  -f infra/charts/data/values.dev.yaml \
+  --set "minio.credentials.rootUser=${DEV_USER}" \
+  --set "minio.credentials.rootPassword=${DEV_PASSWORD}" \
+  $OPTS
 info "ns:data"
+
 helm upgrade --install ops-ahead-ml    ./infra/charts/ml    -n ml    --create-namespace -f infra/charts/ml/values.dev.yaml    $OPTS
 info "ns:ml"
 helm upgrade --install ops-ahead-agent ./infra/charts/agent -n agent --create-namespace -f infra/charts/agent/values.dev.yaml $OPTS
 info "ns:agent"
 helm upgrade --install ops-ahead-ui    ./infra/charts/ui    -n ui    --create-namespace -f infra/charts/ui/values.dev.yaml    $OPTS
 info "ns:ui"
-helm upgrade --install ops-ahead-infra ./infra/charts/infra -n infra --create-namespace -f infra/charts/infra/values.dev.yaml $OPTS
+
+helm upgrade --install ops-ahead-infra ./infra/charts/infra -n infra --create-namespace \
+  -f infra/charts/infra/values.dev.yaml \
+  --set "argo-cd.configs.secret.argocdServerAdminPassword=${ARGOCD_HASH}" \
+  --set "argo-cd.configs.secret.argocdServerAdminPasswordMtime=2026-01-01T00:00:00Z" \
+  --set "argo-cd.configs.secret.argocdServerAdminUsername=${DEV_USER}" \
+  --set "kube-prometheus-stack.grafana.adminUser=${DEV_USER}" \
+  --set "kube-prometheus-stack.grafana.adminPassword=${DEV_PASSWORD}" \
+  --set "vault.server.dev.devRootToken=${VAULT_TOKEN}" \
+  $OPTS
 info "ns:infra"
+
+# ─── Bootstrap Vault ──────────────────────────────────────────────────────────
+step "Bootstrap Vault"
+kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
+  --for=condition=Ready --timeout=120s > /dev/null
+
+VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
+  -o jsonpath='{.items[0].metadata.name}')
+
+# KV v2 já habilitado por padrão no dev mode — escreve credenciais
+kubectl exec -n infra "$VAULT_POD" -- \
+  env VAULT_TOKEN="${VAULT_TOKEN}" \
+  vault kv put secret/ops-ahead \
+    user="${DEV_USER}" \
+    password="${DEV_PASSWORD}" > /dev/null
+
+# Habilita autenticação Kubernetes para injeção futura nos pods
+kubectl exec -n infra "$VAULT_POD" -- \
+  env VAULT_TOKEN="${VAULT_TOKEN}" \
+  vault auth enable kubernetes 2>/dev/null || true
+
+kubectl exec -n infra "$VAULT_POD" -- \
+  env VAULT_TOKEN="${VAULT_TOKEN}" \
+  vault write auth/kubernetes/config \
+    kubernetes_host="https://kubernetes.default.svc" > /dev/null
+
+info "secret/ops-ahead escrito — Vault pronto"
 
 helm upgrade --install ops-ahead-loki grafana/loki -n infra \
   --set deploymentMode=SingleBinary \
@@ -85,11 +138,12 @@ kubectl apply -f infra/overlays/dev/ingresses.yaml > /dev/null
 
 step "Pronto"
 echo ""
-echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me"
-echo "  Grafana         →  http://grafana.ops-ahead.localtest.me       admin / ops-ahead-dev"
+echo "  Vault           →  http://vault.ops-ahead.localtest.me        token: ${VAULT_TOKEN}"
+echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       ${DEV_USER} / ${DEV_PASSWORD}"
+echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      ${DEV_USER} / ${DEV_PASSWORD}"
+echo "  MinIO           →  http://minio.ops-ahead.localtest.me        ${DEV_USER} / ${DEV_PASSWORD}"
 echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
 echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
-echo "  MinIO           →  http://minio.ops-ahead.localtest.me          minioadmin / minioadmin"
 echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
 echo "  LiteLLM         →  http://litellm.ops-ahead.localtest.me"
 echo "  Gateway         →  http://gateway.ops-ahead.localtest.me"

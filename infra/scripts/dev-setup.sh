@@ -57,6 +57,7 @@ helm repo add argo                 https://argoproj.github.io/argo-helm         
 helm repo add bitnami              https://charts.bitnami.com/bitnami                 2>/dev/null || true
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
 helm repo add grafana              https://grafana.github.io/helm-charts              2>/dev/null || true
+helm repo add hashicorp            https://helm.releases.hashicorp.com                2>/dev/null || true
 helm repo update > /dev/null
 info "OK"
 

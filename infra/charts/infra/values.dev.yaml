@@ -6,11 +6,30 @@ loki:
 promtail:
   enabled: false
 
-argo-cd:
-  configs:
-    secret:
-      argocdServerAdminPassword: "$2b$10$jZtODvAvDeVS0lOxMZLX1OGDkdErQgJtrXgHZEFkwEBe7F7XmBWdy"
-      argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"
+vault:
+  ui:
+    enabled: true
+  server:
+    dev:
+      enabled: true      # in-memory, auto-unsealed — só para dev
+      devRootToken: "PLACEHOLDER"  # sobrescrito via --set no dev-up.sh
+    standalone:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  injector:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
 
 kube-prometheus-stack:
   prometheus:
