@@ -4,7 +4,7 @@ gateway:
   image: nginx:alpine
   port: 80
   ingress:
-    host: gateway.ops-ahead.local
+    host: gateway.ops-ahead.localtest.me
 
 # ─── UI stub ──────────────────────────────────────────────────────────────────
 ui:
@@ -12,7 +12,7 @@ ui:
   image: nginx:alpine
   port: 80
   ingress:
-    host: ui.ops-ahead.local
+    host: ui.ops-ahead.localtest.me
 
 networkPolicy:
   enabled: false

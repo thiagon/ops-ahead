@@ -1,5 +1,5 @@
 # Traefik Ingress resources — dev overlay
-# All services accessible via *.ops-ahead.local (add to /etc/hosts → 127.0.0.1)
+# All services accessible via *.ops-ahead.localtest.me (add to /etc/hosts → 127.0.0.1)
 # Single entry point: port 80 on the k3d loadbalancer
 ---
 apiVersion: networking.k8s.io/v1
@@ -12,7 +12,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: argocd.ops-ahead.local
+    - host: argocd.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -33,7 +33,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: grafana.ops-ahead.local
+    - host: grafana.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -54,7 +54,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: prometheus.ops-ahead.local
+    - host: prometheus.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -75,7 +75,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: mlflow.ops-ahead.local
+    - host: mlflow.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -96,7 +96,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: minio.ops-ahead.local
+    - host: minio.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -117,7 +117,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: argo-workflows.ops-ahead.local
+    - host: argo-workflows.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -138,7 +138,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: litellm.ops-ahead.local
+    - host: litellm.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -159,7 +159,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: gateway.ops-ahead.local
+    - host: gateway.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -180,7 +180,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ui.ops-ahead.local
+    - host: ui.ops-ahead.localtest.me
       http:
         paths:
           - path: /
