@@ -19,3 +19,6 @@ wheels/
 *.pptx
 *.ppt
 *.pdf
+
+# Helm dependency archives (baixados por helm dependency build)
+infra/charts/*/charts/*.tgz
