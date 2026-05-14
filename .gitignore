@@ -14,3 +14,8 @@ wheels/
 
 # sensitive files
 .env
+
+# presentation files
+*.pptx
+*.ppt
+*.pdf
