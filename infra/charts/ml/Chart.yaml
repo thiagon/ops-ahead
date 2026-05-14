@@ -6,11 +6,7 @@ version: 0.1.0
 appVersion: "1.0.0"
 dependencies:
   - name: postgresql
-    version: "15.5.17"
+    version: "18.6.6"
     repository: "https://charts.bitnami.com/bitnami"
     alias: mlflow-postgres
     condition: mlflow.postgres.enabled
-  - name: redis
-    version: "19.6.2"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: redis.enabled

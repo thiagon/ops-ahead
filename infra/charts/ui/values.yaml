@@ -1,0 +1,15 @@
+# ─── Gateway stub ─────────────────────────────────────────────────────────────
+gateway:
+  replicas: 1
+  image: nginx:alpine
+  port: 80
+  ingress:
+    host: gateway.ops-ahead.local
+
+# ─── UI stub ──────────────────────────────────────────────────────────────────
+ui:
+  replicas: 1
+  image: nginx:alpine
+  port: 80
+  ingress:
+    host: ui.ops-ahead.local

@@ -52,18 +52,18 @@ Provisionar os componentes de estado para modelos e copiloto.
 
 ### Tasks
 
-- [ ] 2.1: Chart `ns: ml` — MLflow + Postgres
+- [x] 2.1: Chart `ns: ml` — MLflow + Postgres
   - Postgres StatefulSet (backend do MLflow)
   - MLflow Deployment apontando para o Postgres
   - `values.dev.yaml`: Postgres storage 2Gi, 1 réplica
-- [ ] 2.2: Chart `ns: ml` — Redis
+- [x] 2.2: Chart `ns: ml` — Redis
   - Redis StatefulSet modo standalone (dev)
   - `values.dev.yaml`: storage 1Gi, sem autenticação (dev)
-- [ ] 2.3: Chart `ns: agent` — Postgres + pgvector
+- [x] 2.3: Chart `ns: agent` — Postgres + pgvector
   - Postgres StatefulSet com extensão pgvector habilitada
   - Tabelas iniciais criadas via Job de migration: `agent_calls`, `recommendations`, `actions`
   - `values.dev.yaml`: storage 2Gi
-- [ ] 2.4: Chart `ns: agent` — LiteLLM proxy
+- [x] 2.4: Chart `ns: agent` — LiteLLM proxy
   - Deployment com ConfigMap para modelo default (Claude Sonnet 4.6) e fallback (GPT-4.1)
   - Secret para API keys (valor placeholder no dev — documentar como preencher)
   - `values.dev.yaml`: 1 réplica, sem HPA
@@ -85,11 +85,11 @@ Provisionar os Deployments de aplicação como stubs — imagem mínima que resp
 
 ### Tasks
 
-- [ ] 3.1: Chart `ns: ui` — gateway (stub)
+- [x] 3.1: Chart `ns: ui` — gateway (stub)
   - Deployment com imagem `nginx:alpine` respondendo em `/health`
   - Service + Ingress configurados (sem TLS no dev)
   - `values.dev.yaml`: 1 réplica
-- [ ] 3.2: Chart `ns: ui` — ui (stub)
+- [x] 3.2: Chart `ns: ui` — ui (stub)
   - Deployment com imagem `nginx:alpine` respondendo em `/health`
   - Service + Ingress configurados
   - `values.dev.yaml`: 1 réplica
@@ -107,19 +107,19 @@ Provisionar ArgoCD (GitOps), Prometheus, Loki e Grafana.
 
 ### Tasks
 
-- [ ] 4.1: Chart `ns: infra` — ArgoCD
+- [x] 4.1: Chart `ns: infra` — ArgoCD
   - Instalar via Helm chart oficial
   - `Application` CRD apontando para `infra/overlays/dev` na branch `main`
   - `values.dev.yaml`: 1 réplica por componente, sem SSO
-- [ ] 4.2: Chart `ns: infra` — Prometheus + kube-prometheus-stack
+- [x] 4.2: Chart `ns: infra` — Prometheus + kube-prometheus-stack
   - Prometheus StatefulSet + Alertmanager
   - ServiceMonitor para todos os namespaces do Ops Ahead
   - `values.dev.yaml`: retenção 24h, storage 2Gi
-- [ ] 4.3: Chart `ns: infra` — Loki + Promtail
+- [x] 4.3: Chart `ns: infra` — Loki + Promtail
   - Loki StatefulSet (modo single-binary no dev)
   - Promtail DaemonSet coletando logs de todos os Pods
   - `values.dev.yaml`: storage 2Gi
-- [ ] 4.4: Chart `ns: infra` — Grafana
+- [x] 4.4: Chart `ns: infra` — Grafana
   - Deployment com datasources pré-configurados (Prometheus + Loki)
   - Dashboard de infra básico (CPU, memória, status dos Pods por namespace)
   - `values.dev.yaml`: 1 réplica, sem autenticação (dev)

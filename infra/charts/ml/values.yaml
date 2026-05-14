@@ -1,0 +1,34 @@
+# ─── MLflow ───────────────────────────────────────────────────────────────────
+mlflow:
+  image: ghcr.io/mlflow/mlflow:v2.13.0
+  replicas: 1
+  artifactRoot: s3://ops-ahead-lake/mlflow
+  minio:
+    endpoint: http://minio.data.svc.cluster.local:9000
+    accessKey: minioadmin
+    secretKey: minioadmin
+
+# ─── Postgres (bitnami — backend do MLflow) ──────────────────────────────────
+mlflow-postgres:
+  enabled: true
+  auth:
+    username: mlflow
+    password: mlflow
+    database: mlflow
+  primary:
+    persistence:
+      size: 10Gi
+
+# ─── Redis ───────────────────────────────────────────────────────────────────
+redis:
+  enabled: true
+  master:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

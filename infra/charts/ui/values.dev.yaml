@@ -1,0 +1,5 @@
+gateway:
+  replicas: 1
+
+ui:
+  replicas: 1

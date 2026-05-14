@@ -1,0 +1,26 @@
+{{- if .Values.argocd.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ops-ahead-dev
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ops-ahead-infra.labels" . | nindent 4 }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.argocd.app.repoURL }}
+    targetRevision: {{ .Values.argocd.app.targetRevision }}
+    path: {{ .Values.argocd.app.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Release.Namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

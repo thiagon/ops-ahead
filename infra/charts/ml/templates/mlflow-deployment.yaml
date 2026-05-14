@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-tracking
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: mlflow
+    {{- include "ops-ahead-ml.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mlflow.replicas }}
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until nc -z {{ include "ops-ahead-ml.postgresHost" . }} 5432; do
+                echo "Waiting for Postgres..."; sleep 3
+              done
+      containers:
+        - name: mlflow
+          image: {{ .Values.mlflow.image }}
+          command:
+            - /bin/bash
+            - -c
+            - >-
+              pip install --quiet psycopg2-binary boto3 &&
+              mlflow server
+              --backend-store-uri postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "ops-ahead-ml.postgresHost" . }}:5432/$(POSTGRES_DB)
+              --artifacts-destination {{ .Values.mlflow.artifactRoot }}
+              --host 0.0.0.0
+              --port 5000
+          env:
+            - name: POSTGRES_USER
+              value: {{ index .Values "mlflow-postgres" "auth" "username" | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ index .Values "mlflow-postgres" "auth" "password" | quote }}
+            - name: POSTGRES_DB
+              value: {{ index .Values "mlflow-postgres" "auth" "database" | quote }}
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: {{ .Values.mlflow.minio.endpoint | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.mlflow.minio.accessKey | quote }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.mlflow.minio.secretKey | quote }}
+          ports:
+            - containerPort: 5000
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 20

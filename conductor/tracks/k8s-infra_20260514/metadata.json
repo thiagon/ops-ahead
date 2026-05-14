@@ -20,5 +20,7 @@
     "total": 21,
     "completed": 5
   },
-  "commits": []
+  "commits": [
+    "a4f5a7f: chore(data): add ns:data helm chart — kafka, minio, clickhouse, argo-workflows"
+  ]
 }
