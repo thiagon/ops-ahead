@@ -4,10 +4,10 @@ SHELL := /bin/bash
 .PHONY: setup up down
 
 setup:
-	bash scripts/dev-setup.sh
+	bash infra/scripts/dev-setup.sh
 
 up:
-	bash scripts/dev-up.sh
+	bash infra/scripts/dev-up.sh
 
 down:
-	bash scripts/dev-down.sh
+	bash infra/scripts/dev-down.sh

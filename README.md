@@ -71,12 +71,14 @@ infra/
     ui/                     # gateway e ui (stubs nginx)
     infra/                  # ArgoCD, Prometheus, Grafana
   overlays/
-    dev/                    # ingresses.yaml (subdomínios *.ops-ahead.local)
+    dev/                    # ingresses.yaml (subdomínios *.ops-ahead.localtest.me)
     prod/                   # overlay de produção
+infra/
+  scripts/
+    dev-setup.sh            # prepara a máquina (rodar uma vez)
+    dev-up.sh               # sobe o ambiente
+    dev-down.sh             # derruba o ambiente
 scripts/
-  dev-setup.sh              # prepara a máquina (rodar uma vez)
-  dev-up.sh                 # sobe o ambiente
-  dev-down.sh               # derruba o ambiente
   prepare_dataset.py        # pipeline Excel → CSV
 Makefile                    # atalhos: make setup / up / down
 ```
@@ -93,7 +95,7 @@ Makefile                    # atalhos: make setup / up / down
 make setup
 ```
 
-Instala kubectl, Helm e k3d em `~/.local/bin`, adiciona os repositórios Helm e configura os subdomínios em `/etc/hosts`. Se não tiver permissão de escrita no `/etc/hosts`, o script imprime as entradas para adicionar manualmente.
+Instala kubectl, Helm e k3d em `~/.local/bin` e adiciona os repositórios Helm. Não toca em nenhuma configuração do sistema.
 
 ### Subir o ambiente
 
@@ -111,19 +113,19 @@ make down
 
 ### Serviços disponíveis
 
-Após `make up`, todos os serviços ficam acessíveis via porta 80 em subdomínios locais:
+Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomínios usam `*.localtest.me`, um wildcard DNS público que resolve para `127.0.0.1` — não é preciso instalar nada nem abrir nenhum arquivo do sistema:
 
 | Serviço | URL | Credenciais |
 |---------|-----|-------------|
-| ArgoCD | http://argocd.ops-ahead.local | — |
-| Grafana | http://grafana.ops-ahead.local | admin / ops-ahead-dev |
-| Prometheus | http://prometheus.ops-ahead.local | — |
-| MLflow | http://mlflow.ops-ahead.local | — |
-| MinIO | http://minio.ops-ahead.local | minioadmin / minioadmin |
-| Argo Workflows | http://argo-workflows.ops-ahead.local | — |
-| LiteLLM | http://litellm.ops-ahead.local | — |
-| Gateway | http://gateway.ops-ahead.local | — |
-| UI | http://ui.ops-ahead.local | — |
+| ArgoCD | http://argocd.ops-ahead.localtest.me | — |
+| Grafana | http://grafana.ops-ahead.localtest.me | admin / ops-ahead-dev |
+| Prometheus | http://prometheus.ops-ahead.localtest.me | — |
+| MLflow | http://mlflow.ops-ahead.localtest.me | — |
+| MinIO | http://minio.ops-ahead.localtest.me | minioadmin / minioadmin |
+| Argo Workflows | http://argo-workflows.ops-ahead.localtest.me | — |
+| LiteLLM | http://litellm.ops-ahead.localtest.me | — |
+| Gateway | http://gateway.ops-ahead.localtest.me | — |
+| UI | http://ui.ops-ahead.localtest.me | — |
 
 > Para expor externamente durante testes: `ngrok http 80`
 

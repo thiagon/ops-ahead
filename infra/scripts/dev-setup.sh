@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
 # dev-setup.sh — preparar a máquina (rodar uma vez)
-# Instala kubectl / helm / k3d, cria o cluster e configura /etc/hosts.
+# Instala kubectl / helm / k3d e adiciona os repositórios Helm.
 # Requisito: Docker instalado e rodando
 # =============================================================================
 set -euo pipefail
 
-DOMAIN="ops-ahead.local"
 LOCAL_BIN="$HOME/.local/bin"
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 info()  { echo -e "${GREEN}▶${NC} $*"; }
-warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
@@ -62,30 +60,4 @@ helm repo add grafana              https://grafana.github.io/helm-charts        
 helm repo update > /dev/null
 info "OK"
 
-# ─── /etc/hosts ───────────────────────────────────────────────────────────────
-step "/etc/hosts"
-SUBDOMAINS=(argocd grafana prometheus mlflow minio argo-workflows litellm gateway ui)
-
-MISSING=()
-for sub in "${SUBDOMAINS[@]}"; do
-  grep -q "${sub}.${DOMAIN}" /etc/hosts 2>/dev/null || MISSING+=("${sub}.${DOMAIN}")
-done
-
-if [ ${#MISSING[@]} -eq 0 ]; then
-  info "Já configurado"
-else
-  ENTRIES=$(printf "127.0.0.1 %s\n" "${MISSING[@]}")
-  if [ -w /etc/hosts ]; then
-    echo "$ENTRIES" >> /etc/hosts
-    info "Atualizado"
-  else
-    warn "Adicione manualmente ao /etc/hosts (ou rode com sudo):"
-    echo ""
-    echo "$ENTRIES"
-    echo ""
-    warn "Linux/Mac:  echo '$ENTRIES' | sudo tee -a /etc/hosts"
-    warn "Windows:    C:\\Windows\\System32\\drivers\\etc\\hosts"
-  fi
-fi
-
-step "Pronto — rode: ./scripts/dev-up.sh para subir o ambiente"
+step "Pronto — rode: make up"

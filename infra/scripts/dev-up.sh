@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
 # =============================================================================
-# dev-up.sh — subir os serviços (equivalente a docker compose up)
-# Pré-requisito: ./scripts/dev-setup.sh já executado
+# dev-up.sh — subir o ambiente (equivalente a docker compose up)
+# Pré-requisito: make setup já executado
 # =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 export PATH="$HOME/.local/bin:$PATH"
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 info()  { echo -e "${GREEN}▶${NC} $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
 # ─── Pré-condições ────────────────────────────────────────────────────────────
-docker info > /dev/null 2>&1          || error "Docker não está rodando."
-command -v kubectl > /dev/null 2>&1   || error "kubectl não encontrado — rode dev-setup.sh primeiro."
-command -v helm    > /dev/null 2>&1   || error "helm não encontrado — rode dev-setup.sh primeiro."
-command -v k3d     > /dev/null 2>&1   || error "k3d não encontrado — rode dev-setup.sh primeiro."
+docker info > /dev/null 2>&1        || error "Docker não está rodando."
+command -v kubectl > /dev/null 2>&1 || error "kubectl não encontrado — rode: make setup"
+command -v helm    > /dev/null 2>&1 || error "helm não encontrado — rode: make setup"
+command -v k3d     > /dev/null 2>&1 || error "k3d não encontrado — rode: make setup"
+
 cd "$ROOT_DIR"
 
 # ─── Cluster ──────────────────────────────────────────────────────────────────
@@ -84,13 +85,13 @@ kubectl apply -f infra/overlays/dev/ingresses.yaml > /dev/null
 
 step "Pronto"
 echo ""
-echo "  ArgoCD          →  http://argocd.ops-ahead.local"
-echo "  Grafana         →  http://grafana.ops-ahead.local       admin / ops-ahead-dev"
-echo "  Prometheus      →  http://prometheus.ops-ahead.local"
-echo "  MLflow          →  http://mlflow.ops-ahead.local"
-echo "  MinIO           →  http://minio.ops-ahead.local          minioadmin / minioadmin"
-echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.local"
-echo "  LiteLLM         →  http://litellm.ops-ahead.local"
-echo "  Gateway         →  http://gateway.ops-ahead.local"
-echo "  UI              →  http://ui.ops-ahead.local"
+echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me"
+echo "  Grafana         →  http://grafana.ops-ahead.localtest.me       admin / ops-ahead-dev"
+echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
+echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
+echo "  MinIO           →  http://minio.ops-ahead.localtest.me          minioadmin / minioadmin"
+echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
+echo "  LiteLLM         →  http://litellm.ops-ahead.localtest.me"
+echo "  Gateway         →  http://gateway.ops-ahead.localtest.me"
+echo "  UI              →  http://ui.ops-ahead.localtest.me"
 echo ""
