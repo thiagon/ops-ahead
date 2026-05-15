@@ -19,7 +19,6 @@ ENV_FILE="$ROOT_DIR/.env"
 [ -f "$ENV_FILE" ] || error ".env não encontrado em $ROOT_DIR — copie .env.example e preencha"
 set -a; source "$ENV_FILE"; set +a
 
-: "${DEV_USER:?'DEV_USER não definido no .env'}"
 : "${DEV_PASSWORD:?'DEV_PASSWORD não definido no .env'}"
 : "${VAULT_TOKEN:?'VAULT_TOKEN não definido no .env'}"
 
@@ -62,7 +61,7 @@ OPTS="--wait --timeout 8m"
 
 helm upgrade --install ops-ahead-data ./infra/charts/data -n data --create-namespace \
   -f infra/charts/data/values.dev.yaml \
-  --set "minio.credentials.rootUser=${DEV_USER}" \
+  --set "minio.credentials.rootUser=admin" \
   --set "minio.credentials.rootPassword=${DEV_PASSWORD}" \
   $OPTS
 info "ns:data"
@@ -78,8 +77,6 @@ helm upgrade --install ops-ahead-infra ./infra/charts/infra -n infra --create-na
   -f infra/charts/infra/values.dev.yaml \
   --set "argo-cd.configs.secret.argocdServerAdminPassword=${ARGOCD_HASH}" \
   --set "argo-cd.configs.secret.argocdServerAdminPasswordMtime=2026-01-01T00:00:00Z" \
-  --set "argo-cd.configs.secret.argocdServerAdminUsername=${DEV_USER}" \
-  --set "kube-prometheus-stack.grafana.adminUser=${DEV_USER}" \
   --set "kube-prometheus-stack.grafana.adminPassword=${DEV_PASSWORD}" \
   --set "vault.server.dev.devRootToken=${VAULT_TOKEN}" \
   $OPTS
@@ -97,7 +94,7 @@ VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
 kubectl exec -n infra "$VAULT_POD" -- \
   env VAULT_TOKEN="${VAULT_TOKEN}" \
   vault kv put secret/ops-ahead \
-    user="${DEV_USER}" \
+    user="admin" \
     password="${DEV_PASSWORD}" > /dev/null
 
 # Habilita autenticação Kubernetes para injeção futura nos pods
@@ -139,9 +136,9 @@ kubectl apply -f infra/overlays/dev/ingresses.yaml > /dev/null
 step "Pronto"
 echo ""
 echo "  Vault           →  http://vault.ops-ahead.localtest.me        token: ${VAULT_TOKEN}"
-echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       ${DEV_USER} / ${DEV_PASSWORD}"
-echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      ${DEV_USER} / ${DEV_PASSWORD}"
-echo "  MinIO           →  http://minio.ops-ahead.localtest.me        ${DEV_USER} / ${DEV_PASSWORD}"
+echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       admin / ${DEV_PASSWORD}"
+echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      admin / ${DEV_PASSWORD}"
+echo "  MinIO           →  http://minio.ops-ahead.localtest.me        admin / ${DEV_PASSWORD}"
 echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
 echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
 echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
