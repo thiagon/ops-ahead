@@ -32,10 +32,3 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-  ignoreDifferences:
-    - group: ""
-      kind: Secret
-      name: mlflow-credentials
-      namespace: ml
-      jsonPointers:
-        - /data

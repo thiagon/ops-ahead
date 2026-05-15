@@ -19,17 +19,32 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # Acesso a data (MinIO, Kafka, ClickHouse) e ml (MLflow)
+    # data: MinIO S3 (9000), Kafka plaintext/TLS (9092/9093), ClickHouse HTTP (8123)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: data
+      ports:
+        - port: 9000
+        - port: 9092
+        - port: 9093
+        - port: 8123
+    # ml: MLflow API (5000), Redis (6379), Postgres (5432)
+    - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ml
+      ports:
+        - port: 5000
+        - port: 6379
+        - port: 5432
     # Pods do mesmo namespace
     - to:
         - podSelector: {}
+    # External LLM APIs (Anthropic, OpenAI) — HTTPS only
+    - ports:
+        - protocol: TCP
+          port: 443
   ingress:
     - from:
         - podSelector: {}

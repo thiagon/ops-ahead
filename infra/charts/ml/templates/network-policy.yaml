@@ -19,10 +19,17 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # data: MinIO S3 (9000), Kafka plaintext/TLS (9092/9093), ClickHouse HTTP (8123)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: data
+      ports:
+        - port: 9000
+        - port: 9092
+        - port: 9093
+        - port: 8123
+    # Mesmo namespace: Postgres (5432), Redis (6379)
     - to:
         - podSelector: {}
   ingress:

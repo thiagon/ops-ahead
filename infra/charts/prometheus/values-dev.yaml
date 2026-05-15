@@ -12,7 +12,6 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
   grafana:
-    adminPassword: "ops-ahead-dev"
     resources:
       requests:
         cpu: 50m

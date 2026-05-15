@@ -5,16 +5,19 @@ mlflow:
   artifactRoot: s3://ops-ahead-lake/mlflow
   minio:
     endpoint: http://minio.data.svc.cluster.local:9000
-    accessKey: minioadmin
-    secretKey: minioadmin
+    accessKey: ""
+    secretKey: ""
 
 # ─── Postgres (bitnami — backend do MLflow) ──────────────────────────────────
 mlflow-postgres:
   enabled: true
   auth:
     username: mlflow
-    password: mlflow
     database: mlflow
+    existingSecret: mlflow-postgres-secret
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
   primary:
     persistence:
       size: 10Gi
@@ -34,4 +37,4 @@ redis:
         memory: 256Mi
 
 networkPolicy:
-  enabled: false
+  enabled: true

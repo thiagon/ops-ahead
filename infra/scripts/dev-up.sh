@@ -74,10 +74,18 @@ done
 step "Bootstrap ArgoCD"
 kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
+# Grafana admin secret precisa existir antes do prometheus chart sincronizar
+kubectl create secret generic grafana-secret \
+  --from-literal=admin-user="admin" \
+  --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
+  -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+# Vault dev token passado via --set para não ficar em git
 helm upgrade --install ops-ahead-infra ./infra/charts/infra \
   -n infra \
   -f infra/charts/infra/values.yaml \
   -f infra/charts/infra/values-dev.yaml \
+  --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
   --wait --timeout 8m
 info "ArgoCD pronto"
 
@@ -112,14 +120,40 @@ info "Vault: secret/agent, secret/mlflow, secret/litellm, secret/grafana, secret
 # impede o selfHeal de sobrescrever com os PLACEHOLDERs do chart.
 kubectl create namespace agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 kubectl create namespace ml   --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-kubectl create secret generic litellm-api-keys \
+# minio (envFrom no StatefulSet e bootstrap Job)
+kubectl create secret generic minio-secret \
+  --from-literal=rootUser="${MINIO_ROOT_USER}" \
+  --from-literal=rootPassword="${MINIO_ROOT_PASSWORD}" \
+  -n data --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+
+# Secrets — criados aqui (não nos charts) seguindo a recomendação do ArgoCD:
+# https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
+# Em produção isso é substituído por External Secrets Operator lendo do Vault.
+
+# agent-postgres (Bitnami existingSecret)
+kubectl create secret generic agent-postgres-secret \
+  --from-literal=postgres-password="${POSTGRES_AGENT_PASSWORD}" \
+  --from-literal=password="${POSTGRES_AGENT_PASSWORD}" \
+  -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+# mlflow-postgres (Bitnami existingSecret)
+kubectl create secret generic mlflow-postgres-secret \
+  --from-literal=postgres-password="${POSTGRES_MLFLOW_PASSWORD}" \
+  --from-literal=password="${POSTGRES_MLFLOW_PASSWORD}" \
+  -n ml --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+# litellm (envFrom no Deployment)
+kubectl create secret generic litellm-secret \
   --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
   --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
   --from-literal=LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" \
   -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-kubectl create secret generic mlflow-credentials \
+# mlflow (envFrom no Deployment)
+kubectl create secret generic mlflow-secret \
   --from-literal=POSTGRES_USER="mlflow" \
   --from-literal=POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" \
   --from-literal=POSTGRES_DB="mlflow" \
@@ -128,7 +162,7 @@ kubectl create secret generic mlflow-credentials \
   --from-literal=MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000" \
   -n ml --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-info "Secrets k8s criados em agent e ml"
+info "Secrets criados: minio-secret, grafana-secret, agent-postgres-secret, mlflow-postgres-secret, litellm-secret, mlflow-secret"
 
 # ─── Labels ───────────────────────────────────────────────────────────────────
 for ns in data ml agent ui infra; do

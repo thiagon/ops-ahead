@@ -36,7 +36,7 @@ spec:
             - "4000"
           envFrom:
             - secretRef:
-                name: litellm-api-keys
+                name: litellm-secret
           ports:
             - containerPort: 4000
               name: http

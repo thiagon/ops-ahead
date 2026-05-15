@@ -20,11 +20,13 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # Egress inter-namespace permitido
+    # infra: Vault API (8200)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: infra
+      ports:
+        - port: 8200
     # Pods do mesmo namespace
     - to:
         - podSelector: {}

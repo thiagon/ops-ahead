@@ -4,7 +4,7 @@ vault:
   server:
     dev:
       enabled: true        # in-memory, auto-unsealed — só para dev
-      devRootToken: "ops-ahead-dev"
+      # devRootToken passado via --set pelo dev-up.sh (vem do .env / VAULT_TOKEN)
     standalone:
       enabled: false
     resources:
@@ -23,9 +23,6 @@ vault:
         cpu: 100m
         memory: 128Mi
 
-argo-cd:
-  configs:
-    secret:
-      # bcrypt de "ops-ahead-dev" — gerado com bcrypt.gensalt(rounds=10)
-      argocdServerAdminPassword: "$2b$10$WTAsbO3t5aDwQH.6dlIFZOCQXA4scArrgOe4a91UHZN2vDyYTO2Ge"
-      argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"
+# ArgoCD: senha inicial auto-gerada em `argocd-initial-admin-secret`.
+# Recuperar com:
+#   kubectl -n infra get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d

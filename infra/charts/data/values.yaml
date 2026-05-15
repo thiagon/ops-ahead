@@ -40,9 +40,8 @@ minio:
   storage:
     size: 50Gi
   bucket: ops-ahead-lake
-  credentials:
-    rootUser: PLACEHOLDER
-    rootPassword: PLACEHOLDER
+  # Credenciais (rootUser, rootPassword) vêm do Secret `minio-secret`
+  # criado pelo dev-up.sh a partir do .env (MINIO_ROOT_USER, MINIO_ROOT_PASSWORD).
 
 # ─── ClickHouse (Altinity Operator) ──────────────────────────────────────────
 clickhouse:
@@ -68,4 +67,4 @@ argo-workflows:
       - server
 
 networkPolicy:
-  enabled: false
+  enabled: true

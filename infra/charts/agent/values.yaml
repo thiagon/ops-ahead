@@ -7,8 +7,11 @@ agent-postgres:
     tag: pg16
   auth:
     username: agent
-    password: agent
     database: agent
+    existingSecret: agent-postgres-secret
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
   primary:
     persistence:
       size: 10Gi
@@ -51,7 +54,8 @@ litellm:
   image: ghcr.io/berriai/litellm:main-stable
   defaultModel: claude-sonnet-4-6
   fallbackModel: gpt-4.1
-  masterKey: "PLACEHOLDER"  # sobrescrever via Secret ou values-dev.yaml
+  # Credenciais (LITELLM_MASTER_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY)
+  # vêm do Secret `litellm-secret` criado pelo dev-up.sh a partir do .env.
 
 networkPolicy:
-  enabled: false
+  enabled: true

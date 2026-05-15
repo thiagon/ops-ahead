@@ -20,6 +20,11 @@ kube-prometheus-stack:
     enabled: true
     persistence:
       enabled: false
+    # Senha do admin vem do Secret `grafana-secret` criado pelo dev-up.sh.
+    admin:
+      existingSecret: grafana-secret
+      userKey: admin-user
+      passwordKey: admin-password
     additionalDataSources:
       - name: Loki
         type: loki

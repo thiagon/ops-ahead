@@ -18,13 +18,20 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # agent: LiteLLM proxy (4000)
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: agent
+      ports:
+        - port: 4000
+    # ml: MLflow API (5000)
+    - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ml
+      ports:
+        - port: 5000
     - to:
         - podSelector: {}
   ingress:

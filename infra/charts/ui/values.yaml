@@ -15,4 +15,4 @@ ui:
     host: ui.ops-ahead.localtest.me
 
 networkPolicy:
-  enabled: false
+  enabled: true

@@ -21,7 +21,3 @@ redis:
       limits:
         cpu: 200m
         memory: 128Mi
-
-
-networkPolicy:
-  enabled: true

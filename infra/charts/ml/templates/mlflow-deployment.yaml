@@ -55,7 +55,7 @@ spec:
               --port 5000
           envFrom:
             - secretRef:
-                name: mlflow-credentials
+                name: mlflow-secret
           ports:
             - containerPort: 5000
               name: http

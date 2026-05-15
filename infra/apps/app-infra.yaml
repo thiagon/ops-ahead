@@ -43,10 +43,3 @@ spec:
       kind: ValidatingWebhookConfiguration
       jsonPointers:
         - /webhooks/0/clientConfig/caBundle
-    - group: ""
-      kind: Secret
-      name: argocd-secret
-      namespace: infra
-      jsonPointers:
-        - /data/admin.password
-        - /data/admin.passwordMtime
