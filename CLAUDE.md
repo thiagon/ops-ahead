@@ -41,6 +41,12 @@ scripts/
 - Excluded from KPI: `incidente_pai` filled OR `status == "Sem Intervenção"`
 - Time limits: P1/P2 ≤ 4h · P3 ≤ 12h · P4 ≤ 24h · P5 ≤ 96h
 
+## Conventions
+
+- **Commit messages**: always in English, following Conventional Commits
+- **Code and comments**: English
+- **Docs and specs** (`conductor/`, `docs/`): Portuguese
+
 ## Sprint Deadlines
 
 | Sprint | Due |

@@ -57,8 +57,8 @@ feat(agent): implement agent graph with 3 initial tools
 Every track created with `/conductor:new-track` must:
 
 1. **Criar um GitHub Issue** via `gh issue create` com:
-   - Title: `[<track-id>] <Track Title>`
-   - Body: conteúdo do `spec.md` gerado
+   - Title: título em linguagem natural e simples, descrevendo o que será feito (ex: "Configurar infraestrutura base no Kubernetes"). Sem colchetes, sem track-id no título.
+   - Body: conteúdo do `spec.md` gerado. Incluir no início do body a linha `track: <track-id>` para rastreabilidade.
    - Label: `type:dev` para Feature, `type:research` para Chore de análise, `chore` para infra/config
    - Milestone: conforme a sprint em que a track será entregue (ver tabela abaixo)
 
@@ -91,7 +91,7 @@ Em qual sprint esta track será entregue?
 Criar o issue com milestone via API (o flag `--milestone` do `gh issue create` usa o título, não o número):
 ```bash
 gh issue create \
-  --title "[<track-id>] <Track Title>" \
+  --title "<título em linguagem natural>" \
   --body-file conductor/tracks/<trackId>/spec.md \
   --label "type:dev"
 
@@ -113,10 +113,11 @@ git checkout -b feat/<slug>
 git push -u origin feat/<slug>
 
 gh pr create --draft \
-  --title "[<track-id>] <Track Title>" \
+  --title "<título em linguagem natural>" \
   --body "closes #<issue-number>
 
 ## Track
+- ID: <track-id>
 - Spec: conductor/tracks/<trackId>/spec.md
 - Plan: conductor/tracks/<trackId>/plan.md" \
   --milestone <número>
