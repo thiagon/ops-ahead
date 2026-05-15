@@ -1,0 +1,26 @@
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      retention: 24h
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
+      serviceMonitorSelectorNilUsesHelmValues: false
+      serviceMonitorNamespaceSelector:
+        matchLabels:
+          ops-ahead/monitor: "true"
+  alertmanager:
+    alertmanagerSpec:
+      replicas: 1
+  grafana:
+    enabled: true
+    persistence:
+      enabled: false
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        url: http://ops-ahead-loki-gateway.infra.svc.cluster.local

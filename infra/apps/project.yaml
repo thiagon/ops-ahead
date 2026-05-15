@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ops-ahead
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Ops Ahead — AIOps platform (FIAP Enterprise Challenge 2026)
+  sourceRepos:
+    - https://github.com/thiagon/ops-ahead
+    - https://argoproj.github.io/argo-helm
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://helm.releases.hashicorp.com
+    - https://strimzi.io/charts/
+    - https://docs.altinity.com/clickhouse-operator/
+    - https://charts.bitnami.com/bitnami
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: infra
+    - server: https://kubernetes.default.svc
+      namespace: data
+    - server: https://kubernetes.default.svc
+      namespace: ml
+    - server: https://kubernetes.default.svc
+      namespace: agent
+    - server: https://kubernetes.default.svc
+      namespace: ui
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true

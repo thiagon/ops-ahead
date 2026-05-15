@@ -1,0 +1,26 @@
+# Ponto de entrada do App-of-Apps.
+# Aplicar uma única vez: kubectl apply -f infra/bootstrap/root-app.yaml
+# Após isso, o ArgoCD gerencia tudo via infra/apps.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ops-ahead-root
+  namespace: infra
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/thiagon/ops-ahead
+    targetRevision: main
+    path: infra/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

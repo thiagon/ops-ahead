@@ -1,0 +1,31 @@
+vault:
+  ui:
+    enabled: true
+  server:
+    dev:
+      enabled: true        # in-memory, auto-unsealed — só para dev
+      devRootToken: "ops-ahead-dev"
+    standalone:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  injector:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+argo-cd:
+  configs:
+    secret:
+      # bcrypt de "ops-ahead-dev" — gerado com bcrypt.gensalt(rounds=10)
+      argocdServerAdminPassword: "$2b$10$WTAsbO3t5aDwQH.6dlIFZOCQXA4scArrgOe4a91UHZN2vDyYTO2Ge"
+      argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"

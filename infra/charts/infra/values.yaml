@@ -4,7 +4,7 @@ argocd:
   app:
     repoURL: https://github.com/thiagon/ops-ahead
     targetRevision: main
-    path: infra/overlays/dev
+    path: infra/apps
 
 argo-cd:
   server:
@@ -19,56 +19,6 @@ argo-cd:
   notifications:
     enabled: false
 
-# ─── Prometheus + Grafana (kube-prometheus-stack) ────────────────────────────
-prometheus:
-  enabled: true
-
-kube-prometheus-stack:
-  prometheus:
-    prometheusSpec:
-      retention: 24h
-      storageSpec:
-        volumeClaimTemplate:
-          spec:
-            accessModes: ["ReadWriteOnce"]
-            resources:
-              requests:
-                storage: 2Gi
-      serviceMonitorSelectorNilUsesHelmValues: false
-      serviceMonitorNamespaceSelector:
-        matchLabels:
-          ops-ahead/monitor: "true"
-  alertmanager:
-    alertmanagerSpec:
-      replicas: 1
-  grafana:
-    enabled: true
-    persistence:
-      enabled: false
-    additionalDataSources:
-      - name: Loki
-        type: loki
-        url: http://ops-ahead-infra-loki:3100
-
-# ─── Loki (single-binary) ─────────────────────────────────────────────────────
-loki:
-  enabled: true
-  deploymentMode: SingleBinary
-  loki:
-    auth_enabled: false
-    storage:
-      type: filesystem
-  singleBinary:
-    replicas: 1
-    persistence:
-      size: 2Gi
-  backend:
-    replicas: 0
-  read:
-    replicas: 0
-  write:
-    replicas: 0
-
 # ─── Vault ────────────────────────────────────────────────────────────────────
 vault:
   enabled: true
@@ -81,10 +31,3 @@ vault:
       enabled: true
     ha:
       enabled: false
-
-# ─── Promtail (DaemonSet) ─────────────────────────────────────────────────────
-promtail:
-  enabled: true
-  config:
-    clients:
-      - url: http://ops-ahead-infra-loki:3100/loki/api/v1/push

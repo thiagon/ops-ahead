@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ops-ahead-infra
-description: Ops Ahead infra namespace — ArgoCD, Prometheus, Loki, Grafana
+description: Ops Ahead infra namespace — ArgoCD, Vault
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
@@ -9,18 +9,6 @@ dependencies:
     version: "6.11.1"
     repository: "https://argoproj.github.io/argo-helm"
     condition: argocd.enabled
-  - name: kube-prometheus-stack
-    version: "59.1.0"
-    repository: "https://prometheus-community.github.io/helm-charts"
-    condition: prometheus.enabled
-  - name: loki
-    version: "6.6.4"
-    repository: "https://grafana.github.io/helm-charts"
-    condition: loki.enabled
-  - name: promtail
-    version: "6.16.4"
-    repository: "https://grafana.github.io/helm-charts"
-    condition: promtail.enabled
   - name: vault
     version: "0.32.0"
     repository: "https://helm.releases.hashicorp.com"
