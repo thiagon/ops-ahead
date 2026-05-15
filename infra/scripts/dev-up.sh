@@ -23,10 +23,20 @@ step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
 # ─── Credenciais do .env ──────────────────────────────────────────────────────
 ENV_FILE="$ROOT_DIR/.env"
-[ -f "$ENV_FILE" ] || error ".env não encontrado em $ROOT_DIR — copie .env.example e preencha"
+[ -f "$ENV_FILE" ] || error ".env não encontrado — rode: make setup"
 set -a; source "$ENV_FILE"; set +a
 
 : "${VAULT_TOKEN:?'VAULT_TOKEN não definido no .env'}"
+
+# Credenciais por serviço — obrigatórias no .env (copie de .env.example)
+: "${POSTGRES_AGENT_PASSWORD:?'Defina POSTGRES_AGENT_PASSWORD no .env'}"
+: "${POSTGRES_MLFLOW_PASSWORD:?'Defina POSTGRES_MLFLOW_PASSWORD no .env'}"
+: "${MINIO_ROOT_USER:?'Defina MINIO_ROOT_USER no .env'}"
+: "${MINIO_ROOT_PASSWORD:?'Defina MINIO_ROOT_PASSWORD no .env'}"
+: "${LITELLM_MASTER_KEY:?'Defina LITELLM_MASTER_KEY no .env'}"
+: "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
+ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
 # ─── Pré-condições ────────────────────────────────────────────────────────────
 docker info > /dev/null 2>&1        || error "Docker não está rodando."
@@ -78,7 +88,6 @@ info "ops-ahead-root criado — ArgoCD vai sincronizar o overlay"
 
 
 # ─── Bootstrap Vault ──────────────────────────────────────────────────────────
-# Vault roda em dev mode (in-memory) — precisa de configuração pós-deploy.
 step "Bootstrap Vault"
 kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
   --for=condition=Ready --timeout=120s > /dev/null
@@ -86,22 +95,40 @@ kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
 VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
   -o jsonpath='{.items[0].metadata.name}')
 
-kubectl exec -n infra "$VAULT_POD" -- \
-  env VAULT_TOKEN="${VAULT_TOKEN}" \
-  vault kv put secret/ops-ahead \
-    user="admin" \
-    password="ops-ahead-dev" > /dev/null
+# Heredoc evita expor VAULT_TOKEN como argumento de processo (visível em ps/audit)
+kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
+export VAULT_TOKEN='${VAULT_TOKEN}'
+vault auth enable kubernetes 2>/dev/null || true
+vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
+vault kv put secret/agent   POSTGRES_USER="agent"  POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}"  POSTGRES_DB="agent"
+vault kv put secret/mlflow  POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
+vault kv put secret/litellm LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" OPENAI_API_KEY="${OPENAI_API_KEY}"
+vault kv put secret/grafana ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
+vault kv put secret/minio   ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
+VAULT_SCRIPT
+info "Vault: secret/agent, secret/mlflow, secret/litellm, secret/grafana, secret/minio escritos"
 
-kubectl exec -n infra "$VAULT_POD" -- \
-  env VAULT_TOKEN="${VAULT_TOKEN}" \
-  vault auth enable kubernetes 2>/dev/null || true
+# Cria Secrets k8s antes do ArgoCD sincronizar — ignoreDifferences nos Applications
+# impede o selfHeal de sobrescrever com os PLACEHOLDERs do chart.
+kubectl create namespace agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+kubectl create namespace ml   --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-kubectl exec -n infra "$VAULT_POD" -- \
-  env VAULT_TOKEN="${VAULT_TOKEN}" \
-  vault write auth/kubernetes/config \
-    kubernetes_host="https://kubernetes.default.svc" > /dev/null
+kubectl create secret generic litellm-api-keys \
+  --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
+  --from-literal=LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" \
+  -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-info "secret/ops-ahead escrito — Vault pronto"
+kubectl create secret generic mlflow-credentials \
+  --from-literal=POSTGRES_USER="mlflow" \
+  --from-literal=POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" \
+  --from-literal=POSTGRES_DB="mlflow" \
+  --from-literal=AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" \
+  --from-literal=MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000" \
+  -n ml --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+info "Secrets k8s criados em agent e ml"
 
 # ─── Labels ───────────────────────────────────────────────────────────────────
 for ns in data ml agent ui infra; do
@@ -113,10 +140,10 @@ done
 # ─── Pronto ───────────────────────────────────────────────────────────────────
 step "Pronto"
 echo ""
-echo "  Vault           →  http://vault.ops-ahead.localtest.me        token: ${VAULT_TOKEN}"
-echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       admin / ops-ahead-dev"
-echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      admin / ops-ahead-dev"
-echo "  MinIO           →  http://minio.ops-ahead.localtest.me        admin / ops-ahead-dev"
+echo "  Vault           →  http://vault.ops-ahead.localtest.me        (credenciais em .env)"
+echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       (credenciais em .env)"
+echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      (credenciais em .env)"
+echo "  MinIO           →  http://minio.ops-ahead.localtest.me        (credenciais em .env)"
 echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
 echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
 echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
