@@ -5,7 +5,7 @@ SHELL := /bin/bash
 APP ?= argocd-server
 NS  ?= infra
 
-.PHONY: setup up down argo logs
+.PHONY: setup up down sync argo logs
 
 ## Cria .env a partir de .env.example se ainda não existir (target de arquivo).
 .env:
@@ -20,6 +20,11 @@ up:
 
 down:
 	bash infra/scripts/dev-down.sh
+
+## Re-push do working dir pro Gitea local + refresh ArgoCD.
+## Use após editar charts/manifests sem precisar rebuildar o cluster.
+sync:
+	bash infra/scripts/dev-sync.sh
 
 ## Verifica se o ArgoCD subiu e mostra o status de todos os Applications.
 ## Útil logo após `make up` para acompanhar a sincronização.

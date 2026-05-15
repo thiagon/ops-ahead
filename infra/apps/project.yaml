@@ -11,6 +11,7 @@ spec:
   description: Ops Ahead — AIOps platform (FIAP Enterprise Challenge 2026)
   sourceRepos:
     - https://github.com/thiagon/ops-ahead
+    - http://ops-ahead-infra-gitea-http.infra.svc.cluster.local:3000/ops-ahead/ops-ahead
     - https://argoproj.github.io/argo-helm
     - https://prometheus-community.github.io/helm-charts
     - https://grafana.github.io/helm-charts
@@ -29,6 +30,10 @@ spec:
       namespace: agent
     - server: https://kubernetes.default.svc
       namespace: ui
+    # Operadores (argo-workflows, clickhouse, strimzi) deployam roles/CRDs
+    # em 'default' como parte de instalação cluster-wide.
+    - server: https://kubernetes.default.svc
+      namespace: default
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

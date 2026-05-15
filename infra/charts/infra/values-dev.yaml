@@ -23,3 +23,48 @@ vault:
         cpu: 100m
         memory: 128Mi
 
+# ─── Gitea ────────────────────────────────────────────────────────────────────
+# Git server local — ArgoCD aponta pra ele em vez do GitHub.
+# Working dir é pushado como branch 'main' pelo dev-up.sh / dev-sync.sh.
+gitea:
+  enabled: true
+  gitea:
+    admin:
+      # Lê username/password/email de Secret pré-criado pelo dev-up.sh
+      # (mais robusto que --set; alguns valores não propagam via CLI)
+      existingSecret: gitea-admin-secret
+    config:
+      database:
+        DB_TYPE: sqlite3      # storage in-pod (efêmero, ok pra dev)
+      server:
+        DISABLE_SSH: true     # só HTTP em dev
+        OFFLINE_MODE: true    # sem chamadas externas
+      service:
+        DISABLE_REGISTRATION: true
+      security:
+        INSTALL_LOCK: true
+  service:
+    http:
+      type: ClusterIP
+      clusterIP: ""           # IP normal, não headless (precisa pro Ingress)
+      port: 3000
+  persistence:
+    enabled: false            # efêmero — push do workspace recria tudo
+  postgresql:
+    enabled: false
+  postgresql-ha:
+    enabled: false
+  redis-cluster:
+    enabled: false
+  redis:
+    enabled: false
+  memcached:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+

@@ -35,8 +35,7 @@ set -a; source "$ENV_FILE"; set +a
 : "${MINIO_ROOT_PASSWORD:?'Defina MINIO_ROOT_PASSWORD no .env'}"
 : "${LITELLM_MASTER_KEY:?'Defina LITELLM_MASTER_KEY no .env'}"
 : "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
-: "${ARGOCD_ADMIN_PASSWORD:?'Defina ARGOCD_ADMIN_PASSWORD no .env'}"
-: "${GITHUB_PERSONAL_ACCESS_TOKEN:?'Defina GITHUB_PERSONAL_ACCESS_TOKEN no .env — repo é privado'}"
+: "${GITEA_ADMIN_PASSWORD:?'Defina GITEA_ADMIN_PASSWORD no .env'}"
 ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
@@ -55,7 +54,6 @@ if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
 else
   info "Criando cluster 'ops-ahead'..."
   k3d cluster create ops-ahead \
-    --agents 1 \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
     --wait
@@ -79,22 +77,13 @@ kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f - > /
 # Secrets que o chart consome (existingSecret/createSecret=false) — criados
 # antes do helm install, mesmo padrão que ESO usaria lendo do Vault.
 
-# argocd-secret: bcrypt computado via httpd:alpine (formato $2y → $2b que ArgoCD aceita)
-ARGOCD_ADMIN_BCRYPT=$(docker run --rm httpd:alpine \
-  htpasswd -bnBC 10 "" "${ARGOCD_ADMIN_PASSWORD}" 2>/dev/null \
-  | tail -1 | tr -d ':\n' | sed 's/^\$2y/\$2b/')
+# argocd-secret: SÓ server.secretkey. SEM admin.password e SEM passwordMtime —
+# qualquer um dos dois confunde o ArgoCD quando o outro não existe.
+# Resultado: ArgoCD gera tudo do zero e cria argocd-initial-admin-secret.
+kubectl delete secret argocd-secret -n infra --ignore-not-found > /dev/null 2>&1
 
-# Preserva server.secretkey entre execuções para não invalidar sessões
-if kubectl -n infra get secret argocd-secret > /dev/null 2>&1; then
-  ARGOCD_SERVER_SECRETKEY=$(kubectl -n infra get secret argocd-secret \
-    -o jsonpath='{.data.server\.secretkey}' | base64 -d)
-else
-  ARGOCD_SERVER_SECRETKEY=$(openssl rand -base64 32)
-fi
-
+ARGOCD_SERVER_SECRETKEY=$(openssl rand -base64 32)
 kubectl create secret generic argocd-secret \
-  --from-literal=admin.password="${ARGOCD_ADMIN_BCRYPT}" \
-  --from-literal=admin.passwordMtime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --from-literal=server.secretkey="${ARGOCD_SERVER_SECRETKEY}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
@@ -104,44 +93,110 @@ kubectl create secret generic grafana-secret \
   --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
+# gitea-admin-secret: lido pelo Gitea via gitea.admin.existingSecret
+kubectl create secret generic gitea-admin-secret \
+  --from-literal=username="ops-ahead" \
+  --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
+  -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
 # Vault dev token via --set (não fica em git)
 helm upgrade --install ops-ahead-infra ./infra/charts/infra \
   -n infra \
   -f infra/charts/infra/values.yaml \
   -f infra/charts/infra/values-dev.yaml \
   --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
-  --wait --timeout 8m
-info "ArgoCD pronto"
+  --wait --timeout 10m
+info "ArgoCD + Gitea + Vault prontos"
 
-# ─── Root Application ─────────────────────────────────────────────────────────
-step "Root Application (App-of-Apps)"
+# ─── Gitea: espelho do working dir pro ArgoCD ler ────────────────────────────
+# ArgoCD é pull-based: precisa de uma URL Git pra clonar. Em dev usamos Gitea
+# local em vez do GitHub pra evitar push remoto a cada iteração.
+step "Push do working dir pro Gitea local"
 
-# Get the current Git branch to ensure ArgoCD tracks the correct working tree
-CURRENT_BRANCH=$(git branch --show-current)
-if [ -z "$CURRENT_BRANCH" ]; then
-  # Fallback just in case we are in a detached HEAD state
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-fi
+GITEA_EXTERNAL="http://gitea.ops-ahead.localtest.me"
+GITEA_INTERNAL="http://ops-ahead-infra-gitea-http.infra.svc.cluster.local:3000"
+GITEA_REPO_URL="${GITEA_INTERNAL}/ops-ahead/ops-ahead.git"
 
-info "Tracking branch: ${CURRENT_BRANCH}"
+# Cria a ingress do Gitea imediatamente — o root-app a recria depois (idempotente)
+# Sem isso, gitea.ops-ahead.localtest.me dá 404 (root-app só roda depois do push).
+kubectl apply -f - > /dev/null <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea
+  namespace: infra
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: gitea.ops-ahead.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ops-ahead-infra-gitea-http
+                port:
+                  number: 3000
+EOF
 
-# Credencial do repo privado — ArgoCD identifica via label argocd.argoproj.io/secret-type=repository
-kubectl create secret generic github-repo-secret \
+# Espera Gitea API responder
+for i in {1..30}; do
+  curl -sf "${GITEA_EXTERNAL}/api/v1/version" > /dev/null 2>&1 && break
+  sleep 2
+done
+
+# Cria o repo (idempotente — ignora 409 conflict se já existe)
+curl -s -X POST -u "ops-ahead:${GITEA_ADMIN_PASSWORD}" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"ops-ahead","auto_init":false,"private":false}' \
+  "${GITEA_EXTERNAL}/api/v1/user/repos" > /dev/null
+
+# Snapshot do working dir (inclui modified + untracked) → push como 'main' no Gitea
+# sem mexer em branches locais. Working dir do user fica intocado.
+GITEA_PUSH_URL="http://ops-ahead:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/ops-ahead/ops-ahead.git"
+git add -A
+TREE_HASH=$(git write-tree)
+git reset > /dev/null 2>&1
+COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot")
+git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1
+info "Working dir snapshot → gitea.ops-ahead.localtest.me/ops-ahead/ops-ahead (branch: main)"
+
+# ─── ArgoCD Repo Secret ──────────────────────────────────────────────────────
+# Aponta ArgoCD pro Gitea interno (URL cluster-internal, sem passar pelo ingress)
+kubectl create secret generic gitea-repo-secret \
   --from-literal=type=git \
-  --from-literal=url=https://github.com/thiagon/ops-ahead \
-  --from-literal=username=thiagon \
-  --from-literal=password="${GITHUB_PERSONAL_ACCESS_TOKEN}" \
+  --from-literal=url="${GITEA_REPO_URL}" \
+  --from-literal=username=ops-ahead \
+  --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml \
   | kubectl label --local -f - --dry-run=client -o yaml \
       argocd.argoproj.io/secret-type=repository \
   | kubectl apply -f - > /dev/null
 
-# Dynamically inject the current branch into the root application manifest
-# This replaces whatever targetRevision is set in the yaml with the active branch
-# The sed command works in-memory only, preserving the versioned file on disk.
-sed "s#targetRevision:.*#targetRevision: ${CURRENT_BRANCH}#g" infra/bootstrap/root-app.yaml | kubectl apply -f -
+# ─── Root Application + Child Applications ───────────────────────────────────
+step "Root Application (App-of-Apps)"
 
-info "ops-ahead-root criado — ArgoCD vai sincronizar o overlay da branch: ${CURRENT_BRANCH}"
+# Substitui repoURL do GitHub → Gitea interno. targetRevision: main fica como tá
+# (porque pushamos HEAD:main acima). Sem sed na branch.
+SED_REPO="s#https://github.com/thiagon/ops-ahead#${GITEA_REPO_URL%.git}#g"
+
+sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f -
+info "ops-ahead-root → ${GITEA_REPO_URL}"
+
+for app_yaml in infra/apps/app-*.yaml; do
+  # Loki/promtail usam charts externos (repoURL diferente), só aplicar como tá
+  basename "$app_yaml" | grep -qE "app-(loki|promtail)" && {
+    kubectl apply -f "$app_yaml" > /dev/null
+    info "$(basename "$app_yaml") (chart externo)"
+    continue
+  }
+  sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null
+  info "$(basename "$app_yaml") OK"
+done
+
 
 # ─── Bootstrap Vault ──────────────────────────────────────────────────────────
 step "Bootstrap Vault"
@@ -180,10 +235,11 @@ kubectl create secret generic minio-secret \
 # Secrets criados aqui (não nos charts) — ArgoCD recomenda popular secrets
 # direto no cluster destino: https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
 
-# agent-postgres (Bitnami existingSecret)
+# agent-postgres: envFrom no StatefulSet do chart
 kubectl create secret generic agent-postgres-secret \
-  --from-literal=postgres-password="${POSTGRES_AGENT_PASSWORD}" \
-  --from-literal=password="${POSTGRES_AGENT_PASSWORD}" \
+  --from-literal=POSTGRES_USER="agent" \
+  --from-literal=POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}" \
+  --from-literal=POSTGRES_DB="agent" \
   -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
 # mlflow-postgres (Bitnami existingSecret)
@@ -220,9 +276,29 @@ done
 
 # ─── Pronto ───────────────────────────────────────────────────────────────────
 step "Pronto"
+
+# Lê senha initial-admin que ArgoCD auto-gerou e persiste em .env.local
+# (gitignored). Reusa entre runs no mesmo cluster.
+sleep 3
+ARGOCD_INITIAL_PASS=""
+if kubectl -n infra get secret argocd-initial-admin-secret > /dev/null 2>&1; then
+  ARGOCD_INITIAL_PASS=$(kubectl -n infra get secret argocd-initial-admin-secret \
+    -o jsonpath='{.data.password}' | base64 -d)
+
+  # Escreve em .env.local (sobrescreve a cada make up)
+  cat > "$ROOT_DIR/.env.local" <<EOF
+# Credenciais geradas dinamicamente pelo make up — NÃO commitar
+# Atualizadas a cada nova subida de cluster.
+ARGOCD_ADMIN_USER=admin
+ARGOCD_ADMIN_PASSWORD=${ARGOCD_INITIAL_PASS}
+EOF
+  info ".env.local atualizado com a senha do ArgoCD"
+fi
+
 echo ""
+echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me        (credenciais em .env.local)"
+echo "  Gitea (local)   →  http://gitea.ops-ahead.localtest.me        (user: ops-ahead | senha em .env)"
 echo "  Vault           →  http://vault.ops-ahead.localtest.me        (credenciais em .env)"
-echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me       (credenciais em .env)"
 echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      (credenciais em .env)"
 echo "  MinIO           →  http://minio.ops-ahead.localtest.me        (credenciais em .env)"
 echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
@@ -231,4 +307,6 @@ echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
 echo "  LiteLLM         →  http://litellm.ops-ahead.localtest.me"
 echo "  Gateway         →  http://gateway.ops-ahead.localtest.me"
 echo "  UI              →  http://ui.ops-ahead.localtest.me"
+echo ""
+echo "  Iterar:  edite os charts/manifests e rode  make sync"
 echo ""

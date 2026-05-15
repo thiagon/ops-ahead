@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ops-ahead-infra
-description: Ops Ahead infra namespace — ArgoCD, Vault
+description: Ops Ahead infra namespace — ArgoCD, Vault, Gitea (dev)
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
@@ -13,3 +13,7 @@ dependencies:
     version: "0.32.0"
     repository: "https://helm.releases.hashicorp.com"
     condition: vault.enabled
+  - name: gitea
+    version: "10.4.1"
+    repository: "https://dl.gitea.io/charts/"
+    condition: gitea.enabled

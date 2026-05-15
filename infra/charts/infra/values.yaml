@@ -34,3 +34,9 @@ vault:
       enabled: true
     ha:
       enabled: false
+
+# ─── Gitea ────────────────────────────────────────────────────────────────────
+# Disabled by default — só ativado em dev via values-dev.yaml.
+# Em prod, ArgoCD aponta direto pro GitHub.
+gitea:
+  enabled: false

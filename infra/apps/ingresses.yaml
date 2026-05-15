@@ -44,6 +44,28 @@ spec:
                 port:
                   number: 80
 ---
+# Gitea local — só dev. Permite ArgoCD apontar pra Git local em vez do GitHub.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea
+  namespace: infra
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: gitea.ops-ahead.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ops-ahead-infra-gitea-http
+                port:
+                  number: 3000
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

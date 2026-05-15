@@ -47,7 +47,6 @@ spec:
             - /bin/bash
             - -c
             - >-
-              pip install --quiet psycopg2-binary boto3 &&
               mlflow server
               --backend-store-uri postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "ops-ahead-ml.postgresHost" . }}:5432/$(POSTGRES_DB)
               --artifacts-destination {{ .Values.mlflow.artifactRoot }}

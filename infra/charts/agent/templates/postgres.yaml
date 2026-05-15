@@ -1,17 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: agent-postgres-credentials
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "ops-ahead-agent.labels" . | nindent 4 }}
-type: Opaque
-stringData:
-  POSTGRES_USER: {{ index .Values "agent-postgres" "auth" "username" | quote }}
-  POSTGRES_PASSWORD: {{ index .Values "agent-postgres" "auth" "password" | quote }}
-  POSTGRES_DB: {{ index .Values "agent-postgres" "auth" "database" | quote }}
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: agent-postgres-init
@@ -72,9 +59,10 @@ spec:
       containers:
         - name: postgres
           image: pgvector/pgvector:pg16
+          # Secret pré-criado pelo dev-up.sh com POSTGRES_USER/PASSWORD/DB
           envFrom:
             - secretRef:
-                name: agent-postgres-credentials
+                name: agent-postgres-secret
           ports:
             - containerPort: 5432
               name: postgres

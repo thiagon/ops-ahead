@@ -24,3 +24,11 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true     # ← obriga selfHeal a respeitar ignoreDifferences
+  # dev-up.sh substitui repoURL dos child Apps pra apontar pro Gitea local.
+  # Sem este ignore + RespectIgnoreDifferences, selfHeal reverteria pra GitHub.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/source/repoURL

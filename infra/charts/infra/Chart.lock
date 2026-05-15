@@ -5,5 +5,8 @@ dependencies:
 - name: vault
   repository: https://helm.releases.hashicorp.com
   version: 0.32.0
-digest: sha256:0d9498e908370ee24f0142eb2a414273d0d04a36c85f0190211d0bfaba88d8f2
-generated: "2026-05-14T22:29:39.256011682-03:00"
+- name: gitea
+  repository: https://dl.gitea.io/charts/
+  version: 10.4.1
+digest: sha256:0173c84acae7d73d6317ab0ce711580a67e5a974d65cada695dd4ce944850bdc
+generated: "2026-05-15T14:54:14.944500977-03:00"

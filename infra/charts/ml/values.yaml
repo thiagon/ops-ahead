@@ -1,6 +1,8 @@
 # ─── MLflow ───────────────────────────────────────────────────────────────────
 mlflow:
-  image: ghcr.io/mlflow/mlflow:v2.13.0
+  # Imagem comunidade que já vem com psycopg2-binary + boto3 instalados
+  # (evita pip install em runtime que falha em pods sem internet)
+  image: burakince/mlflow:2.20.0
   replicas: 1
   artifactRoot: s3://ops-ahead-lake/mlflow
   minio:
