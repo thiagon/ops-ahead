@@ -116,6 +116,15 @@ info "ArgoCD pronto"
 # ─── Root Application ─────────────────────────────────────────────────────────
 step "Root Application (App-of-Apps)"
 
+# Get the current Git branch to ensure ArgoCD tracks the correct working tree
+CURRENT_BRANCH=$(git branch --show-current)
+if [ -z "$CURRENT_BRANCH" ]; then
+  # Fallback just in case we are in a detached HEAD state
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+fi
+
+info "Tracking branch: ${CURRENT_BRANCH}"
+
 # Credencial do repo privado — ArgoCD identifica via label argocd.argoproj.io/secret-type=repository
 kubectl create secret generic github-repo-secret \
   --from-literal=type=git \
@@ -127,9 +136,12 @@ kubectl create secret generic github-repo-secret \
       argocd.argoproj.io/secret-type=repository \
   | kubectl apply -f - > /dev/null
 
-kubectl apply -f infra/bootstrap/root-app.yaml
-info "ops-ahead-root criado — ArgoCD vai sincronizar o overlay"
+# Dynamically inject the current branch into the root application manifest
+# This replaces whatever targetRevision is set in the yaml with the active branch
+# The sed command works in-memory only, preserving the versioned file on disk.
+sed "s#targetRevision:.*#targetRevision: ${CURRENT_BRANCH}#g" infra/bootstrap/root-app.yaml | kubectl apply -f -
 
+info "ops-ahead-root criado — ArgoCD vai sincronizar o overlay da branch: ${CURRENT_BRANCH}"
 
 # ─── Bootstrap Vault ──────────────────────────────────────────────────────────
 step "Bootstrap Vault"
