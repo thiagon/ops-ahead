@@ -129,9 +129,8 @@ kubectl create secret generic minio-secret \
   -n data --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
 
-# Secrets — criados aqui (não nos charts) seguindo a recomendação do ArgoCD:
-# https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
-# Em produção isso é substituído por External Secrets Operator lendo do Vault.
+# Secrets criados aqui (não nos charts) — ArgoCD recomenda popular secrets
+# direto no cluster destino: https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
 
 # agent-postgres (Bitnami existingSecret)
 kubectl create secret generic agent-postgres-secret \

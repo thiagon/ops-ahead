@@ -1,6 +1,6 @@
-# Namespace definitions com Pod Security Standards, ResourceQuotas e LimitRanges.
-# PSS enforce=baseline bloqueia containers privilegiados; warn=restricted alerta sobre
-# configurações que devem ser corrigidas antes de produção.
+# Namespaces com Pod Security Standards, ResourceQuotas e LimitRanges.
+# PSS enforce=baseline bloqueia privileged/hostPID/hostPath; warn=restricted
+# alerta no kubectl apply quando algo poderia ser mais restrito.
 ---
 apiVersion: v1
 kind: Namespace

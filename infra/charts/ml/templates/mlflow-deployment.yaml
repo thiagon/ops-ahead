@@ -33,7 +33,7 @@ spec:
                 echo "Waiting for Postgres..."; sleep 3
               done
       securityContext:
-        runAsNonRoot: false  # mlflow image runs as root; fix na imagem custom pré-prd
+        runAsNonRoot: false  # imagem oficial do mlflow roda como root
         seccompProfile:
           type: RuntimeDefault
       containers:

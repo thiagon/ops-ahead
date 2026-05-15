@@ -19,7 +19,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/litellm-configmap.yaml") . | sha256sum }}
     spec:
       securityContext:
-        runAsNonRoot: false  # litellm image runs as root; fix na imagem custom pré-prd
+        runAsNonRoot: false  # imagem oficial do litellm roda como root
         seccompProfile:
           type: RuntimeDefault
       containers:
