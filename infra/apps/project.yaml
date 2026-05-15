@@ -30,7 +30,33 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: ui
   clusterResourceWhitelist:
-    - group: '*'
+    - group: ""
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: AppProject
+    # Strimzi (Kafka operator)
+    - group: kafka.strimzi.io
+      kind: '*'
+    # ClickHouse operator
+    - group: clickhouse.altinity.com
+      kind: '*'
+    # Prometheus operator
+    - group: monitoring.coreos.com
+      kind: '*'
+    # Vault
+    - group: vault.hashicorp.com
       kind: '*'
   namespaceResourceWhitelist:
     - group: '*'

@@ -1,8 +1,0 @@
-gateway:
-  replicas: 1
-
-ui:
-  replicas: 1
-
-networkPolicy:
-  enabled: true

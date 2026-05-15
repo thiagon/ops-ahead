@@ -12,6 +12,7 @@ agent-postgres:
 
 litellm:
   replicas: 1
+  masterKey: "ops-ahead-dev-key"
 
 networkPolicy:
   enabled: true

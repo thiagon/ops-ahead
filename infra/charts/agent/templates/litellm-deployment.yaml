@@ -18,9 +18,17 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/litellm-configmap.yaml") . | sha256sum }}
     spec:
+      securityContext:
+        runAsNonRoot: false  # litellm image runs as root; fix na imagem custom pré-prd
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: litellm
           image: {{ .Values.litellm.image }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           args:
             - --config
             - /app/config.yaml

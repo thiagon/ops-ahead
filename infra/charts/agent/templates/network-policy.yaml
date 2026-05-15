@@ -9,6 +9,27 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Acesso a data (MinIO, Kafka, ClickHouse) e ml (MLflow)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ml
+    # Pods do mesmo namespace
+    - to:
+        - podSelector: {}
   ingress:
     - from:
         - podSelector: {}

@@ -10,6 +10,24 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Egress inter-namespace permitido
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
+    # Pods do mesmo namespace
+    - to:
+        - podSelector: {}
   ingress:
     # Allow from same namespace
     - from:
