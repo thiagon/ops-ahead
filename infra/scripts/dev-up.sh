@@ -36,6 +36,7 @@ set -a; source "$ENV_FILE"; set +a
 : "${LITELLM_MASTER_KEY:?'Defina LITELLM_MASTER_KEY no .env'}"
 : "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
 : "${ARGOCD_ADMIN_PASSWORD:?'Defina ARGOCD_ADMIN_PASSWORD no .env'}"
+: "${GITHUB_PERSONAL_ACCESS_TOKEN:?'Defina GITHUB_PERSONAL_ACCESS_TOKEN no .env — repo é privado'}"
 ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
@@ -114,6 +115,18 @@ info "ArgoCD pronto"
 
 # ─── Root Application ─────────────────────────────────────────────────────────
 step "Root Application (App-of-Apps)"
+
+# Credencial do repo privado — ArgoCD identifica via label argocd.argoproj.io/secret-type=repository
+kubectl create secret generic github-repo-secret \
+  --from-literal=type=git \
+  --from-literal=url=https://github.com/thiagon/ops-ahead \
+  --from-literal=username=thiagon \
+  --from-literal=password="${GITHUB_PERSONAL_ACCESS_TOKEN}" \
+  -n infra --dry-run=client -o yaml \
+  | kubectl label --local -f - --dry-run=client -o yaml \
+      argocd.argoproj.io/secret-type=repository \
+  | kubectl apply -f - > /dev/null
+
 kubectl apply -f infra/bootstrap/root-app.yaml
 info "ops-ahead-root criado — ArgoCD vai sincronizar o overlay"
 
