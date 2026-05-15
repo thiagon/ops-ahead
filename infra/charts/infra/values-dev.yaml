@@ -23,6 +23,3 @@ vault:
         cpu: 100m
         memory: 128Mi
 
-# ArgoCD: senha inicial auto-gerada em `argocd-initial-admin-secret`.
-# Recuperar com:
-#   kubectl -n infra get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d

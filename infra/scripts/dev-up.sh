@@ -35,6 +35,7 @@ set -a; source "$ENV_FILE"; set +a
 : "${MINIO_ROOT_PASSWORD:?'Defina MINIO_ROOT_PASSWORD no .env'}"
 : "${LITELLM_MASTER_KEY:?'Defina LITELLM_MASTER_KEY no .env'}"
 : "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
+: "${ARGOCD_ADMIN_PASSWORD:?'Defina ARGOCD_ADMIN_PASSWORD no .env'}"
 ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
@@ -74,13 +75,35 @@ done
 step "Bootstrap ArgoCD"
 kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-# Grafana admin secret precisa existir antes do prometheus chart sincronizar
+# Secrets que o chart consome (existingSecret/createSecret=false) — criados
+# antes do helm install, mesmo padrão que ESO usaria lendo do Vault.
+
+# argocd-secret: bcrypt computado via httpd:alpine (formato $2y → $2b que ArgoCD aceita)
+ARGOCD_ADMIN_BCRYPT=$(docker run --rm httpd:alpine \
+  htpasswd -bnBC 10 "" "${ARGOCD_ADMIN_PASSWORD}" 2>/dev/null \
+  | tail -1 | tr -d ':\n' | sed 's/^\$2y/\$2b/')
+
+# Preserva server.secretkey entre execuções para não invalidar sessões
+if kubectl -n infra get secret argocd-secret > /dev/null 2>&1; then
+  ARGOCD_SERVER_SECRETKEY=$(kubectl -n infra get secret argocd-secret \
+    -o jsonpath='{.data.server\.secretkey}' | base64 -d)
+else
+  ARGOCD_SERVER_SECRETKEY=$(openssl rand -base64 32)
+fi
+
+kubectl create secret generic argocd-secret \
+  --from-literal=admin.password="${ARGOCD_ADMIN_BCRYPT}" \
+  --from-literal=admin.passwordMtime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --from-literal=server.secretkey="${ARGOCD_SERVER_SECRETKEY}" \
+  -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+
+# grafana-secret: lido pelo grafana via admin.existingSecret
 kubectl create secret generic grafana-secret \
   --from-literal=admin-user="admin" \
   --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-# Vault dev token passado via --set para não ficar em git
+# Vault dev token via --set (não fica em git)
 helm upgrade --install ops-ahead-infra ./infra/charts/infra \
   -n infra \
   -f infra/charts/infra/values.yaml \
