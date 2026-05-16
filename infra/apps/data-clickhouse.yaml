@@ -27,9 +27,18 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
         duration: 15s
         factor: 2
         maxDuration: 5m
+  ignoreDifferences:
+    - group: clickhouse.altinity.com
+      kind: ClickHouseInstallation
+      jqPathExpressions:
+        - .spec.configuration.clusters[].layout.shards
+        - .spec.configuration.clusters[].layout.replicas
+        - .spec.templates.podTemplates[].metadata.labels
+        - .spec.templates.podTemplates[].metadata.annotations

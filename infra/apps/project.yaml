@@ -90,9 +90,6 @@ spec:
       - group: ""
         kind: Secret
         name: gitea-repo-secret
-      - group: ""
-        kind: Secret
-        name: grafana-secret
       - group: argoproj.io
         kind: AppProject
         name: default
@@ -105,18 +102,3 @@ spec:
       - group: ""
         kind: ServiceAccount
         name: default
-      - group: ""
-        kind: Secret
-        name: minio-secret
-      - group: ""
-        kind: Secret
-        name: mlflow-postgres-secret
-      - group: ""
-        kind: Secret
-        name: mlflow-secret
-      - group: ""
-        kind: Secret
-        name: litellm-secret
-      - group: ""
-        kind: Secret
-        name: llm-postgres-secret
