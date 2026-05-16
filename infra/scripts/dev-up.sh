@@ -88,7 +88,7 @@ done
 # GitOps entrar em ação. Após o root-app ser aplicado, infra-argocd/vault/gitea
 # (wave 0-2) assumem a gestão contínua desses charts.
 step "Bootstrap ArgoCD + Vault + Gitea"
-kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+kubectl apply -f infra/apps/namespaces.yaml > /dev/null
 
 # argocd-secret: SÓ server.secretkey. SEM admin.password e SEM passwordMtime —
 # qualquer um dos dois confunde o ArgoCD quando o outro não existe.
@@ -116,7 +116,7 @@ helm upgrade --install infra-argocd ./infra/charts/infra-argocd \
   -n infra \
   -f infra/charts/infra-argocd/values.yaml \
   -f infra/charts/infra-argocd/values-dev.yaml \
-  --wait --timeout 10m
+  --wait --timeout 10m 2>/dev/null
 info "ArgoCD pronto"
 
 # Vault dev token via --set (não fica em git)
@@ -125,14 +125,14 @@ helm upgrade --install infra-vault ./infra/charts/infra-vault \
   -f infra/charts/infra-vault/values.yaml \
   -f infra/charts/infra-vault/values-dev.yaml \
   --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
-  --wait --timeout 5m
+  --wait --timeout 5m 2>/dev/null
 info "Vault pronto"
 
 helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
   -n infra \
   -f infra/charts/infra-gitea/values.yaml \
   -f infra/charts/infra-gitea/values-dev.yaml \
-  --wait --timeout 5m
+  --wait --timeout 5m 2>/dev/null
 info "Gitea pronto"
 
 # ─── Gitea: espelho do working dir pro ArgoCD ler ────────────────────────────
@@ -210,7 +210,7 @@ step "Root Application (App-of-Apps)"
 # (porque pushamos HEAD:main acima). Sem sed na branch.
 SED_REPO="s#https://github.com/thiagon/ops-ahead#${GITEA_REPO_URL%.git}#g"
 
-sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f -
+sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f - 2>/dev/null
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
 GITHUB_REPO="https://github.com/thiagon/ops-ahead"
@@ -220,10 +220,10 @@ for app_yaml in infra/apps/*.yaml; do
   [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
   # Apps que referenciam o GitHub precisam do sed; apps com chart externo (Helm repo) não
   if grep -q "$GITHUB_REPO" "$app_yaml"; then
-    sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null
+    sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1
     info "$name OK"
   else
-    kubectl apply -f "$app_yaml" > /dev/null
+    kubectl apply -f "$app_yaml" > /dev/null 2>&1
     info "$name (chart externo)"
   fi
 done
@@ -249,13 +249,6 @@ vault kv put secret/infra-grafana  ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
 vault kv put secret/data-minio     ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
 VAULT_SCRIPT
 info "Vault: secret/llm-postgres, secret/ml-mlflow, secret/llm-litellm, secret/infra-grafana, secret/data-minio escritos"
-
-# Pré-cria namespaces antes do ArgoCD sincronizar (necessário para os Secrets abaixo).
-# Fonte única: namespaces.yaml — adicionar namespace lá é suficiente.
-while IFS= read -r ns; do
-  [[ "$ns" == "infra" ]] && continue   # infra já existe desde o bootstrap
-  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-done < <(namespaces_from_yaml)
 
 # ─── Secrets k8s ──────────────────────────────────────────────────────────────
 # Criados aqui (não nos charts) — ArgoCD recomenda popular secrets

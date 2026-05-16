@@ -19,7 +19,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: vault
+                name: infra-vault
                 port:
                   number: 8200
 ---
@@ -40,7 +40,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: argocd-server
+                name: infra-argocd-server
                 port:
                   number: 80
 ---
@@ -62,7 +62,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: gitea-http
+                name: infra-gitea-http
                 port:
                   number: 3000
 ---
@@ -83,7 +83,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: grafana
+                name: infra-prometheus-grafana
                 port:
                   number: 80
 ---
@@ -104,7 +104,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: prometheus-kube-prometheus-prometheus
+                name: infra-prometheus-kube-prometheus-prometheus
                 port:
                   number: 9090
 ---
