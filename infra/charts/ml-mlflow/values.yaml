@@ -1,0 +1,11 @@
+mlflow:
+  image: burakince/mlflow:2.20.0
+  replicas: 1
+  artifactRoot: s3://ops-ahead-lake/mlflow
+  minio:
+    endpoint: http://minio.data.svc.cluster.local:9000
+    accessKey: ""
+    secretKey: ""
+
+networkPolicy:
+  enabled: true

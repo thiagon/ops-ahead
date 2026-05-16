@@ -1,0 +1,7 @@
+argo-workflows:
+  controller:
+    replicas: 1
+  server:
+    replicas: 1
+    authModes:
+      - server

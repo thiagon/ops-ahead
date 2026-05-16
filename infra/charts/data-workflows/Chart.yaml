@@ -1,0 +1,10 @@
+apiVersion: v2
+name: data-workflows
+description: Argo Workflows — workflow engine
+type: application
+version: 0.1.0
+appVersion: "3.5.0"
+dependencies:
+  - name: argo-workflows
+    version: "0.41.9"
+    repository: "https://argoproj.github.io/argo-helm"

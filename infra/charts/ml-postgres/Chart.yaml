@@ -1,0 +1,10 @@
+apiVersion: v2
+name: ml-postgres
+description: PostgreSQL for MLflow backend store
+type: application
+version: 0.1.0
+appVersion: "16"
+dependencies:
+  - name: postgresql
+    version: "18.6.6"
+    repository: "https://charts.bitnami.com/bitnami"

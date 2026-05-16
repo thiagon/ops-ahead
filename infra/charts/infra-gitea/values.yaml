@@ -1,0 +1,3 @@
+# Gitea is disabled by default — only enabled in dev via values-dev.yaml.
+gitea:
+  enabled: false

@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-loki
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: ops-ahead
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: "6.6.4"
+    helm:
+      releaseName: loki
+      parameters:
+        - name: deploymentMode
+          value: SingleBinary
+        - name: loki.useTestSchema
+          value: "true"
+        - name: loki.auth_enabled
+          value: "false"
+        - name: loki.commonConfig.replication_factor
+          value: "1"
+        - name: loki.storage.type
+          value: filesystem
+        - name: loki.storage.bucketNames.chunks
+          value: chunks
+        - name: loki.storage.bucketNames.ruler
+          value: ruler
+        - name: loki.storage.bucketNames.admin
+          value: admin
+        - name: singleBinary.replicas
+          value: "1"
+        - name: backend.replicas
+          value: "0"
+        - name: read.replicas
+          value: "0"
+        - name: write.replicas
+          value: "0"
+        - name: chunksCache.enabled
+          value: "false"
+        - name: resultsCache.enabled
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

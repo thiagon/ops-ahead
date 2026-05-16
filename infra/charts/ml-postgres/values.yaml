@@ -1,0 +1,12 @@
+postgresql:
+  fullnameOverride: mlflow-postgres
+  auth:
+    username: mlflow
+    database: mlflow
+    existingSecret: mlflow-postgres-secret
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+  primary:
+    persistence:
+      size: 10Gi

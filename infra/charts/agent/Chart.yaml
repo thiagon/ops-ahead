@@ -1,7 +1,0 @@
-apiVersion: v2
-name: ops-ahead-agent
-description: Ops Ahead agent namespace — Postgres + pgvector, LiteLLM proxy
-type: application
-version: 0.1.0
-appVersion: "1.0.0"
-dependencies: []

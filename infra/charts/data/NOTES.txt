@@ -1,7 +1,0 @@
-ops-ahead — {{ .Chart.Name }} {{ .Chart.Version }}
-
-Namespace: {{ .Release.Namespace }}
-Release:   {{ .Release.Name }}
-
-Acesse via: http://*.ops-ahead.localtest.me (requer make up)
-ArgoCD:     http://argocd.ops-ahead.localtest.me

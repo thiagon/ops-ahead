@@ -1,0 +1,14 @@
+{{- if gt (int .Values.litellm.replicas) 1 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: litellm
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "llm-litellm.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: litellm
+{{- end }}

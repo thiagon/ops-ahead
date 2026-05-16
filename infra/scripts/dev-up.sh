@@ -21,6 +21,20 @@ warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
+# Cria (ou atualiza) um k8s Secret de forma idempotente.
+# Uso: ksecret <nome> <namespace> --from-literal=KEY=VALUE ...
+ksecret() {
+  local name="$1" ns="$2"; shift 2
+  kubectl create secret generic "$name" "$@" \
+    -n "$ns" --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+  info "secret $name → ns:$ns"
+}
+
+# Lê os namespaces declarados em namespaces.yaml (fonte única de verdade).
+namespaces_from_yaml() {
+  grep "^  name:" infra/apps/namespaces.yaml | awk '{print $2}'
+}
+
 # ─── Credenciais do .env ──────────────────────────────────────────────────────
 ENV_FILE="$ROOT_DIR/.env"
 [ -f "$ENV_FILE" ] || error ".env não encontrado — rode: make setup"
@@ -60,22 +74,21 @@ else
 fi
 kubectl get nodes
 
-# ─── Dependências dos charts ──────────────────────────────────────────────────
+# ─── Dependências dos charts (auto-detectadas pelo Chart.yaml) ───────────────
 step "Dependências dos charts"
-for chart in data ml agent ui infra; do
-  helm dependency build "./infra/charts/$chart" > /dev/null 2>&1 || \
-  helm dependency update "./infra/charts/$chart" > /dev/null
-  info "charts/$chart OK"
+for chart_dir in infra/charts/*/; do
+  grep -q "^dependencies:" "${chart_dir}Chart.yaml" 2>/dev/null || continue
+  helm dependency build "./$chart_dir" > /dev/null 2>&1 || \
+  helm dependency update "./$chart_dir" > /dev/null
+  info "$(basename "$chart_dir") OK"
 done
 
-# ─── Bootstrap: ArgoCD ────────────────────────────────────────────────────────
-# Único helm install manual — ArgoCD precisa existir antes de gerenciar qualquer coisa.
-# Após isso, app-infra.yaml (wave 0) assume a gestão do chart infra completo.
-step "Bootstrap ArgoCD"
+# ─── Bootstrap: ArgoCD + Vault + Gitea ───────────────────────────────────────
+# Instalação manual dos 3 serviços de plataforma — precisam existir antes do
+# GitOps entrar em ação. Após o root-app ser aplicado, infra-argocd/vault/gitea
+# (wave 0-2) assumem a gestão contínua desses charts.
+step "Bootstrap ArgoCD + Vault + Gitea"
 kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-# Secrets que o chart consome (existingSecret/createSecret=false) — criados
-# antes do helm install, mesmo padrão que ESO usaria lendo do Vault.
 
 # argocd-secret: SÓ server.secretkey. SEM admin.password e SEM passwordMtime —
 # qualquer um dos dois confunde o ArgoCD quando o outro não existe.
@@ -99,14 +112,28 @@ kubectl create secret generic gitea-admin-secret \
   --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-# Vault dev token via --set (não fica em git)
-helm upgrade --install ops-ahead-infra ./infra/charts/infra \
+helm upgrade --install infra-argocd ./infra/charts/infra-argocd \
   -n infra \
-  -f infra/charts/infra/values.yaml \
-  -f infra/charts/infra/values-dev.yaml \
-  --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
+  -f infra/charts/infra-argocd/values.yaml \
+  -f infra/charts/infra-argocd/values-dev.yaml \
   --wait --timeout 10m
-info "ArgoCD + Gitea + Vault prontos"
+info "ArgoCD pronto"
+
+# Vault dev token via --set (não fica em git)
+helm upgrade --install infra-vault ./infra/charts/infra-vault \
+  -n infra \
+  -f infra/charts/infra-vault/values.yaml \
+  -f infra/charts/infra-vault/values-dev.yaml \
+  --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
+  --wait --timeout 5m
+info "Vault pronto"
+
+helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
+  -n infra \
+  -f infra/charts/infra-gitea/values.yaml \
+  -f infra/charts/infra-gitea/values-dev.yaml \
+  --wait --timeout 5m
+info "Gitea pronto"
 
 # ─── Gitea: espelho do working dir pro ArgoCD ler ────────────────────────────
 # ArgoCD é pull-based: precisa de uma URL Git pra clonar. Em dev usamos Gitea
@@ -114,7 +141,7 @@ info "ArgoCD + Gitea + Vault prontos"
 step "Push do working dir pro Gitea local"
 
 GITEA_EXTERNAL="http://gitea.ops-ahead.localtest.me"
-GITEA_INTERNAL="http://ops-ahead-infra-gitea-http.infra.svc.cluster.local:3000"
+GITEA_INTERNAL="http://infra-gitea-http.infra.svc.cluster.local:3000"
 GITEA_REPO_URL="${GITEA_INTERNAL}/ops-ahead/ops-ahead.git"
 
 # Cria a ingress do Gitea imediatamente — o root-app a recria depois (idempotente)
@@ -137,7 +164,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-gitea-http
+                name: infra-gitea-http
                 port:
                   number: 3000
 EOF
@@ -186,15 +213,19 @@ SED_REPO="s#https://github.com/thiagon/ops-ahead#${GITEA_REPO_URL%.git}#g"
 sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f -
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
-for app_yaml in infra/apps/app-*.yaml; do
-  # Loki/promtail usam charts externos (repoURL diferente), só aplicar como tá
-  basename "$app_yaml" | grep -qE "app-(loki|promtail)" && {
+GITHUB_REPO="https://github.com/thiagon/ops-ahead"
+for app_yaml in infra/apps/*.yaml; do
+  name="$(basename "$app_yaml" .yaml)"
+  # namespaces, project e ingresses são recursos K8s — o root-app os sincroniza
+  [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
+  # Apps que referenciam o GitHub precisam do sed; apps com chart externo (Helm repo) não
+  if grep -q "$GITHUB_REPO" "$app_yaml"; then
+    sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null
+    info "$name OK"
+  else
     kubectl apply -f "$app_yaml" > /dev/null
-    info "$(basename "$app_yaml") (chart externo)"
-    continue
-  }
-  sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null
-  info "$(basename "$app_yaml") OK"
+    info "$name (chart externo)"
+  fi
 done
 
 
@@ -211,68 +242,39 @@ kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
 export VAULT_TOKEN='${VAULT_TOKEN}'
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
-vault kv put secret/agent   POSTGRES_USER="agent"  POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}"  POSTGRES_DB="agent"
-vault kv put secret/mlflow  POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
-vault kv put secret/litellm LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" OPENAI_API_KEY="${OPENAI_API_KEY}"
-vault kv put secret/grafana ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
-vault kv put secret/minio   ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
+vault kv put secret/llm-postgres  POSTGRES_USER="agent"  POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}"  POSTGRES_DB="agent"
+vault kv put secret/ml-mlflow     POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
+vault kv put secret/llm-litellm   LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" OPENAI_API_KEY="${OPENAI_API_KEY}"
+vault kv put secret/infra-grafana  ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
+vault kv put secret/data-minio     ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
 VAULT_SCRIPT
-info "Vault: secret/agent, secret/mlflow, secret/litellm, secret/grafana, secret/minio escritos"
+info "Vault: secret/llm-postgres, secret/ml-mlflow, secret/llm-litellm, secret/infra-grafana, secret/data-minio escritos"
 
-# Cria Secrets k8s antes do ArgoCD sincronizar — ignoreDifferences nos Applications
-# impede o selfHeal de sobrescrever com os PLACEHOLDERs do chart.
-kubectl create namespace agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-kubectl create namespace ml   --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+# Pré-cria namespaces antes do ArgoCD sincronizar (necessário para os Secrets abaixo).
+# Fonte única: namespaces.yaml — adicionar namespace lá é suficiente.
+while IFS= read -r ns; do
+  [[ "$ns" == "infra" ]] && continue   # infra já existe desde o bootstrap
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+done < <(namespaces_from_yaml)
 
-# minio (envFrom no StatefulSet e bootstrap Job)
-kubectl create secret generic minio-secret \
-  --from-literal=rootUser="${MINIO_ROOT_USER}" \
-  --from-literal=rootPassword="${MINIO_ROOT_PASSWORD}" \
-  -n data --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+# ─── Secrets k8s ──────────────────────────────────────────────────────────────
+# Criados aqui (não nos charts) — ArgoCD recomenda popular secrets
+# diretamente no cluster: https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
+# Para adicionar um novo serviço: ksecret <nome> <namespace> --from-literal=KEY=VALUE ...
 
-
-# Secrets criados aqui (não nos charts) — ArgoCD recomenda popular secrets
-# direto no cluster destino: https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
-
-# agent-postgres: envFrom no StatefulSet do chart
-kubectl create secret generic agent-postgres-secret \
-  --from-literal=POSTGRES_USER="agent" \
-  --from-literal=POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}" \
-  --from-literal=POSTGRES_DB="agent" \
-  -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-# mlflow-postgres (Bitnami existingSecret)
-kubectl create secret generic mlflow-postgres-secret \
-  --from-literal=postgres-password="${POSTGRES_MLFLOW_PASSWORD}" \
-  --from-literal=password="${POSTGRES_MLFLOW_PASSWORD}" \
-  -n ml --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-# litellm (envFrom no Deployment)
-kubectl create secret generic litellm-secret \
-  --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
-  --from-literal=LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" \
-  -n agent --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-# mlflow (envFrom no Deployment)
-kubectl create secret generic mlflow-secret \
-  --from-literal=POSTGRES_USER="mlflow" \
-  --from-literal=POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" \
-  --from-literal=POSTGRES_DB="mlflow" \
-  --from-literal=AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" \
-  --from-literal=AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" \
-  --from-literal=MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000" \
-  -n ml --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-info "Secrets criados: minio-secret, grafana-secret, agent-postgres-secret, mlflow-postgres-secret, litellm-secret, mlflow-secret"
+ksecret minio-secret          data  --from-literal=rootUser="${MINIO_ROOT_USER}"           --from-literal=rootPassword="${MINIO_ROOT_PASSWORD}"
+ksecret llm-postgres-secret   llm   --from-literal=postgres-password="${POSTGRES_AGENT_PASSWORD}"  --from-literal=password="${POSTGRES_AGENT_PASSWORD}"
+ksecret litellm-secret        llm   --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}"  --from-literal=LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}"
+ksecret mlflow-postgres-secret ml   --from-literal=postgres-password="${POSTGRES_MLFLOW_PASSWORD}" --from-literal=password="${POSTGRES_MLFLOW_PASSWORD}"
+ksecret mlflow-secret          ml   --from-literal=POSTGRES_USER="mlflow"  --from-literal=POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}"  --from-literal=POSTGRES_DB="mlflow"  --from-literal=AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}"  --from-literal=AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}"  --from-literal=MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
 
 # ─── Labels ───────────────────────────────────────────────────────────────────
-for ns in data ml agent ui infra; do
+# Derivados de namespaces.yaml — adicionar namespace lá aplica o label automaticamente.
+while IFS= read -r ns; do
   kubectl get namespace "$ns" > /dev/null 2>&1 && \
     kubectl label namespace "$ns" ops-ahead/monitor=true --overwrite > /dev/null || \
     warn "namespace $ns ainda não existe — label será aplicado quando o ArgoCD criar"
-done
+done < <(namespaces_from_yaml)
 
 # ─── Pronto ───────────────────────────────────────────────────────────────────
 step "Pronto"

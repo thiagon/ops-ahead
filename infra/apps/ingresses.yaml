@@ -19,7 +19,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-vault
+                name: vault
                 port:
                   number: 8200
 ---
@@ -40,7 +40,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-argocd-server
+                name: argocd-server
                 port:
                   number: 80
 ---
@@ -62,7 +62,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-gitea-http
+                name: gitea-http
                 port:
                   number: 3000
 ---
@@ -83,7 +83,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-grafana
+                name: grafana
                 port:
                   number: 80
 ---
@@ -104,7 +104,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-infra-kube-prome-prometheus
+                name: prometheus-kube-prometheus-prometheus
                 port:
                   number: 9090
 ---
@@ -167,7 +167,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ops-ahead-data-argo-workflows-server
+                name: argo-workflows-server
                 port:
                   number: 2746
 ---
@@ -175,7 +175,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: litellm
-  namespace: agent
+  namespace: llm
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:

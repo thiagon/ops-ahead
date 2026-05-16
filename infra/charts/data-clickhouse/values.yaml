@@ -1,0 +1,8 @@
+clickhouse:
+  cluster:
+    shards: 1
+    replicas: 2
+    storage:
+      size: 50Gi
+
+altinity-clickhouse-operator: {}

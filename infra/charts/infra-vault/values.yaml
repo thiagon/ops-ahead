@@ -1,0 +1,10 @@
+vault:
+  injector:
+    enabled: true
+  server:
+    dev:
+      enabled: false
+    standalone:
+      enabled: true
+    ha:
+      enabled: false

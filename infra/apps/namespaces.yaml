@@ -32,7 +32,7 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: agent
+  name: llm
   labels:
     ops-ahead/monitor: "true"
     pod-security.kubernetes.io/enforce: baseline
@@ -111,7 +111,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: default-quota
-  namespace: agent
+  namespace: llm
 spec:
   hard:
     requests.cpu: "2"
@@ -157,7 +157,7 @@ apiVersion: v1
 kind: LimitRange
 metadata:
   name: default-limits
-  namespace: agent
+  namespace: llm
 spec:
   limits:
     - type: Container

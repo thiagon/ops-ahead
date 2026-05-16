@@ -1,0 +1,15 @@
+argocd:
+  server:
+    replicas: 1
+  repoServer:
+    replicas: 1
+  applicationSet:
+    replicas: 1
+  configs:
+    params:
+      server.insecure: "true"
+    # argocd-secret é provisionado externamente (dev-up.sh em dev, ESO em prod)
+    secret:
+      createSecret: false
+  notifications:
+    enabled: false

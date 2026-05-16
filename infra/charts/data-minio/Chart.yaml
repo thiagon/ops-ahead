@@ -1,0 +1,6 @@
+apiVersion: v2
+name: data-minio
+description: MinIO — S3-compatible object storage
+type: application
+version: 0.1.0
+appVersion: "2024-03-15"

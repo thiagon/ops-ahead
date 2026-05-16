@@ -1,0 +1,11 @@
+minio:
+  mode: distributed
+  replicas: 4
+  storage:
+    size: 50Gi
+  bucket: ops-ahead-lake
+  # Credenciais (rootUser, rootPassword) vêm do Secret `minio-secret`
+  # criado pelo dev-up.sh a partir do .env (MINIO_ROOT_USER, MINIO_ROOT_PASSWORD).
+
+networkPolicy:
+  enabled: true
