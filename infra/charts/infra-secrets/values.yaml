@@ -1,0 +1,4 @@
+vault:
+  address: http://infra-vault.infra.svc.cluster.local:8200
+  role: eso-role
+  kvPath: secret

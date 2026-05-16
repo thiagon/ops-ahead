@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: minio
-    {{- include "data-kafka.labels" . | nindent 4 }}
+    {{- include "data-minio.labels" . | nindent 4 }}
 spec:
   serviceName: minio-headless
   replicas: {{ .Values.minio.replicas }}

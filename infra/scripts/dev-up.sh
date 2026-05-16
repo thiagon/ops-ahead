@@ -242,24 +242,38 @@ kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
 export VAULT_TOKEN='${VAULT_TOKEN}'
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
+
 vault kv put secret/llm-postgres  POSTGRES_USER="agent"  POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}"  POSTGRES_DB="agent"
 vault kv put secret/ml-mlflow     POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
 vault kv put secret/llm-litellm   LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" OPENAI_API_KEY="${OPENAI_API_KEY}"
-vault kv put secret/infra-grafana  ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
+vault kv put secret/infra-grafana  ADMIN_USER="admin" ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
 vault kv put secret/data-minio     ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
+
+# ESO policy: permite ESO ler todos os secrets da engine KV
+vault policy write eso-policy - << 'POLICY'
+path "secret/data/*" { capabilities = ["read"] }
+POLICY
+
+# ESO role: mapeia o ServiceAccount do ESO (namespace infra) à policy acima
+vault write auth/kubernetes/role/eso-role \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=infra \
+  policies=eso-policy \
+  ttl=1h > /dev/null
 VAULT_SCRIPT
-info "Vault: secret/llm-postgres, secret/ml-mlflow, secret/llm-litellm, secret/infra-grafana, secret/data-minio escritos"
+info "Vault: secrets e ESO role configurados"
 
-# ─── Secrets k8s ──────────────────────────────────────────────────────────────
-# Criados aqui (não nos charts) — ArgoCD recomenda popular secrets
-# diretamente no cluster: https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
-# Para adicionar um novo serviço: ksecret <nome> <namespace> --from-literal=KEY=VALUE ...
+# ─── Aguarda ESO sincronizar os secrets ───────────────────────────────────────
+step "Aguardando ESO sincronizar secrets do Vault"
+# ESO precisa estar rodando e o ClusterSecretStore pronto antes de criar ExternalSecrets
+kubectl wait pod -l app.kubernetes.io/name=external-secrets -n infra \
+  --for=condition=Ready --timeout=180s > /dev/null 2>&1 || warn "ESO pod não ficou Ready em 3min — secrets podem demorar"
 
-ksecret minio-secret          data  --from-literal=rootUser="${MINIO_ROOT_USER}"           --from-literal=rootPassword="${MINIO_ROOT_PASSWORD}"
-ksecret llm-postgres-secret   llm   --from-literal=postgres-password="${POSTGRES_AGENT_PASSWORD}"  --from-literal=password="${POSTGRES_AGENT_PASSWORD}"
-ksecret litellm-secret        llm   --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}"  --from-literal=LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}"
-ksecret mlflow-postgres-secret ml   --from-literal=postgres-password="${POSTGRES_MLFLOW_PASSWORD}" --from-literal=password="${POSTGRES_MLFLOW_PASSWORD}"
-ksecret mlflow-secret          ml   --from-literal=POSTGRES_USER="mlflow"  --from-literal=POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}"  --from-literal=POSTGRES_DB="mlflow"  --from-literal=AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}"  --from-literal=AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}"  --from-literal=MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000"
+# Aguarda todos os ExternalSecrets em todos os namespaces ficarem prontos
+kubectl wait externalsecret --all --all-namespaces \
+  --for=condition=Ready --timeout=120s > /dev/null 2>&1 \
+  && info "ESO: todos os ExternalSecrets prontos" \
+  || warn "ESO: algum ExternalSecret não ficou Ready — verifique ClusterSecretStore"
 
 # ─── Labels ───────────────────────────────────────────────────────────────────
 # Derivados de namespaces.yaml — adicionar namespace lá aplica o label automaticamente.

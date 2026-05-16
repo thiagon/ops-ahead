@@ -4,3 +4,6 @@ gateway:
   port: 80
   ingress:
     host: gateway.ops-ahead.localtest.me
+
+networkPolicy:
+  enabled: true

@@ -4,7 +4,7 @@ metadata:
   name: minio-create-bucket
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "data-kafka.labels" . | nindent 4 }}
+    {{- include "data-minio.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "10"

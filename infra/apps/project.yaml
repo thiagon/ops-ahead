@@ -11,14 +11,14 @@ spec:
   description: Ops Ahead — AIOps platform (FIAP Enterprise Challenge 2026)
   sourceRepos:
     - https://github.com/thiagon/ops-ahead
-    - http://ops-ahead-infra-gitea-http.infra.svc.cluster.local:3000/ops-ahead/ops-ahead
+    - http://infra-gitea-http.infra.svc.cluster.local:3000/ops-ahead/ops-ahead
     - https://argoproj.github.io/argo-helm
     - https://prometheus-community.github.io/helm-charts
     - https://grafana.github.io/helm-charts
     - https://helm.releases.hashicorp.com
+    - https://charts.external-secrets.io
     - https://strimzi.io/charts/
     - https://docs.altinity.com/clickhouse-operator/
-    - https://charts.bitnami.com/bitnami
   destinations:
     - server: https://kubernetes.default.svc
       namespace: infra
@@ -63,8 +63,60 @@ spec:
     # Vault
     - group: vault.hashicorp.com
       kind: '*'
+    # External Secrets Operator
+    - group: external-secrets.io
+      kind: ClusterSecretStore
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'
   orphanedResources:
     warn: true
+    ignore:
+      - group: ""
+        kind: Secret
+        name: "sh.helm.release.v1.*"
+      - group: ""
+        kind: Secret
+        name: argocd-initial-admin-secret
+      - group: ""
+        kind: Secret
+        name: argocd-redis
+      - group: ""
+        kind: Secret
+        name: argocd-secret
+      - group: ""
+        kind: Secret
+        name: gitea-admin-secret
+      - group: ""
+        kind: Secret
+        name: gitea-repo-secret
+      - group: ""
+        kind: Secret
+        name: grafana-secret
+      - group: argoproj.io
+        kind: AppProject
+        name: default
+      - group: argoproj.io
+        kind: Application
+        name: ops-ahead-root
+      - group: ""
+        kind: ConfigMap
+        name: kube-root-ca.crt
+      - group: ""
+        kind: ServiceAccount
+        name: default
+      - group: ""
+        kind: Secret
+        name: minio-secret
+      - group: ""
+        kind: Secret
+        name: mlflow-postgres-secret
+      - group: ""
+        kind: Secret
+        name: mlflow-secret
+      - group: ""
+        kind: Secret
+        name: litellm-secret
+      - group: ""
+        kind: Secret
+        name: llm-postgres-secret

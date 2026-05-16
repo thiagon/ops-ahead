@@ -28,5 +28,8 @@ kafkaTopics:
     partitions: 3
     replicas: 2
 
+argoWorkflows:
+  enabled: false
+
 networkPolicy:
   enabled: true
