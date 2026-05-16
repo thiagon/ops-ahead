@@ -1,5 +1,5 @@
 mlflow:
-  image: burakince/mlflow:2.20.0
+  image: ghcr.io/mlflow/mlflow:v3.12.0
   replicas: 1
   artifactRoot: s3://ops-ahead-lake/mlflow
   minio:
