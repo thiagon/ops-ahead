@@ -19,5 +19,13 @@ argocd:
     # argocd-secret é provisionado externamente (dev-up.sh em dev, ESO em prod)
     secret:
       createSecret: false
+    cm:
+      server.diff.server.side: "true"
+      resource.customizations.ignoreDifferences.apps_Deployment: |
+        jqPathExpressions:
+          - '.metadata.annotations."deployment.kubernetes.io/revision"'
+      resource.customizations.ignoreDifferences.apps_DaemonSet: |
+        jqPathExpressions:
+          - '.metadata.annotations."deprecated.daemonset.template.generation"'
   notifications:
     enabled: false

@@ -27,7 +27,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
@@ -35,6 +34,11 @@ spec:
         factor: 2
         maxDuration: 5m
   ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - '.spec.template.spec.containers[].env[].valueFrom.resourceFieldRef.divisor'
+        - '.spec.template.spec.initContainers[].env[].valueFrom.resourceFieldRef.divisor'
     - group: clickhouse.altinity.com
       kind: ClickHouseInstallation
       jqPathExpressions:
@@ -43,7 +47,3 @@ spec:
         - .spec.configuration.clusters[].layout.replicas
         - .spec.templates.podTemplates[].metadata
         - .spec.templates.podTemplates[].spec.volumes
-    - group: apps
-      kind: Deployment
-      jsonPointers:
-        - /metadata/annotations/deployment.kubernetes.io~1revision

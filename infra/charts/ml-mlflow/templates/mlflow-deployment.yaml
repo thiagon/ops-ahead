@@ -53,6 +53,7 @@ spec:
               --serve-artifacts
               --host 0.0.0.0
               --port 5000
+              --allowed-hosts '*'
           envFrom:
             - secretRef:
                 name: mlflow-secret
@@ -62,10 +63,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: 500m
-              memory: 1Gi
+              memory: 2Gi
           readinessProbe:
             httpGet:
               path: /health

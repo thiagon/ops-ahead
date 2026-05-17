@@ -105,3 +105,9 @@ spec:
       - group: ""
         kind: ServiceAccount
         name: default
+      - group: ""
+        kind: Secret
+        name: grafana-secret
+      - group: ""
+        kind: Secret
+        name: infra-gitea

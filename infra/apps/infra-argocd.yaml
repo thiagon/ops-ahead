@@ -27,7 +27,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
@@ -44,10 +43,6 @@ spec:
       jqPathExpressions:
         - .webhooks[].clientConfig.caBundle
     - group: apps
-      kind: StatefulSet
-      jsonPointers:
-        - /spec/volumeClaimTemplates
-    - group: apps
       kind: Deployment
-      jsonPointers:
-        - /metadata/annotations/deployment.kubernetes.io~1revision
+      jqPathExpressions:
+        - '.spec.template.spec.initContainers[] | select(.name == "copyutil") | .resources'
