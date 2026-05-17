@@ -112,5 +112,5 @@ spec:
         kind: Secret
         name: infra-gitea
       - group: ""
-        kind: Service
-        name: alertmanager-operated
+        kind: Secret
+        name: "*-admission"
