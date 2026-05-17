@@ -4,7 +4,7 @@ metadata:
   name: ml-redis
   namespace: infra
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

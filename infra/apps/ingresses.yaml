@@ -8,6 +8,7 @@ metadata:
   name: vault
   namespace: infra
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -29,6 +30,7 @@ metadata:
   name: argocd
   namespace: infra
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -51,6 +53,7 @@ metadata:
   name: gitea
   namespace: infra
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -72,6 +75,7 @@ metadata:
   name: grafana
   namespace: infra
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -93,6 +97,7 @@ metadata:
   name: prometheus
   namespace: infra
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -114,6 +119,7 @@ metadata:
   name: mlflow
   namespace: ml
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -135,6 +141,7 @@ metadata:
   name: minio
   namespace: data
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -156,6 +163,7 @@ metadata:
   name: argo-workflows
   namespace: data
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
@@ -177,6 +185,7 @@ metadata:
   name: litellm
   namespace: llm
   annotations:
+    argocd.argoproj.io/sync-wave: "9"
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik

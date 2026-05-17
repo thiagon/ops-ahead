@@ -5,6 +5,14 @@ argocd:
     replicas: 1
   applicationSet:
     replicas: 1
+  controller:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
   configs:
     params:
       server.insecure: "true"

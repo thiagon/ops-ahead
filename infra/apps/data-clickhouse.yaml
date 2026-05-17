@@ -4,7 +4,7 @@ metadata:
   name: data-clickhouse
   namespace: infra
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -38,7 +38,12 @@ spec:
     - group: clickhouse.altinity.com
       kind: ClickHouseInstallation
       jqPathExpressions:
+        - .spec.defaults
         - .spec.configuration.clusters[].layout.shards
         - .spec.configuration.clusters[].layout.replicas
-        - .spec.templates.podTemplates[].metadata.labels
-        - .spec.templates.podTemplates[].metadata.annotations
+        - .spec.templates.podTemplates[].metadata
+        - .spec.templates.podTemplates[].spec.volumes
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /metadata/annotations/deployment.kubernetes.io~1revision

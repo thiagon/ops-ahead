@@ -34,6 +34,9 @@ spec:
     # em 'default' como parte de instalação cluster-wide.
     - server: https://kubernetes.default.svc
       namespace: default
+    # kube-prometheus-stack cria Services em kube-system para scraping de componentes k8s
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

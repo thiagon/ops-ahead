@@ -4,7 +4,7 @@ metadata:
   name: infra-loki
   namespace: infra
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -66,3 +66,7 @@ spec:
       kind: StatefulSet
       jsonPointers:
         - /spec/volumeClaimTemplates
+    - group: apps
+      kind: DaemonSet
+      jsonPointers:
+        - /metadata/annotations/deprecated.daemonset.template.generation

@@ -59,10 +59,16 @@ spec:
       containers:
         - name: postgres
           image: pgvector/pgvector:pg16
-          # Secret pré-criado pelo dev-up.sh com POSTGRES_USER/PASSWORD/DB
-          envFrom:
-            - secretRef:
-                name: llm-postgres-secret
+          env:
+            - name: POSTGRES_USER
+              value: {{ index .Values "llm-postgres" "auth" "username" | quote }}
+            - name: POSTGRES_DB
+              value: {{ index .Values "llm-postgres" "auth" "database" | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ index .Values "llm-postgres" "auth" "existingSecret" | quote }}
+                  key: {{ index .Values "llm-postgres" "auth" "secretKeys" "userPasswordKey" | quote }}
           ports:
             - containerPort: 5432
               name: postgres

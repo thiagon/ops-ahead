@@ -35,6 +35,10 @@ spec:
         factor: 2
         maxDuration: 3m
   ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
     - group: apps
       kind: StatefulSet
       jsonPointers:

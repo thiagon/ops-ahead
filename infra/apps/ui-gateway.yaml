@@ -4,7 +4,7 @@ metadata:
   name: ui-gateway
   namespace: infra
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "9"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
