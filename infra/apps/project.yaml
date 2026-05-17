@@ -111,3 +111,6 @@ spec:
       - group: ""
         kind: Secret
         name: infra-gitea
+      - group: ""
+        kind: Service
+        name: alertmanager-operated
