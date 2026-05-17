@@ -54,6 +54,9 @@ spec:
               --host 0.0.0.0
               --port 5000
               --allowed-hosts '*'
+          env:
+            - name: MLFLOW_ENABLE_PROXY_FIX
+              value: "true"
           envFrom:
             - secretRef:
                 name: mlflow-secret
