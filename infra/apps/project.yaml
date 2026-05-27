@@ -28,11 +28,11 @@ spec:
       namespace: ml
     - server: https://kubernetes.default.svc
       namespace: ui
-    # Operadores (argo-workflows, clickhouse, strimzi) deployam roles/CRDs
-    # em 'default' como parte de instalação cluster-wide.
+    # Operators (argo-workflows, clickhouse, strimzi) deploy roles/CRDs in
+    # 'default' as part of a cluster-wide install.
     - server: https://kubernetes.default.svc
       namespace: default
-    # kube-prometheus-stack cria Services em kube-system para scraping de componentes k8s
+    # kube-prometheus-stack creates Services in kube-system to scrape k8s components.
     - server: https://kubernetes.default.svc
       namespace: kube-system
   clusterResourceWhitelist:

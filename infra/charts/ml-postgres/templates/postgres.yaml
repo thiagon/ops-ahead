@@ -20,16 +20,9 @@ spec:
       containers:
         - name: postgres
           image: {{ .Values.image }}
-          env:
-            - name: POSTGRES_USER
-              value: {{ .Values.auth.username }}
-            - name: POSTGRES_DB
-              value: {{ .Values.auth.database }}
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.existingSecret }}
-                  key: {{ .Values.auth.secretKeys.userPasswordKey }}
+          envFrom:
+            - secretRef:
+                name: postgres-mlflow-secret
           ports:
             - containerPort: 5432
               name: postgres
@@ -41,12 +34,12 @@ spec:
               subPath: pgdata
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.auth.username | quote }}]
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.auth.username | quote }}]
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
             initialDelaySeconds: 30
             periodSeconds: 10
   volumeClaimTemplates:

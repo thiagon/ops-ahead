@@ -57,6 +57,8 @@ spec:
           env:
             - name: MLFLOW_ENABLE_PROXY_FIX
               value: "true"
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: {{ .Values.mlflow.minio.endpoint | quote }}
           envFrom:
             - secretRef:
                 name: mlflow-secret

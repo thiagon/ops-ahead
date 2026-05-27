@@ -1,5 +1,5 @@
-# Git server local — ArgoCD aponta pra ele em vez do GitHub.
-# Working dir é pushado como branch 'main' pelo dev-up.sh / dev-sync.sh.
+# Local Git server — ArgoCD points to it instead of GitHub.
+# Working dir is pushed as branch 'main' by dev-up.sh / dev-sync.sh.
 gitea:
   enabled: true
   gitea:

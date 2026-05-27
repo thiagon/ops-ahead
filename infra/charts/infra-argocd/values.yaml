@@ -16,7 +16,6 @@ argocd:
   configs:
     params:
       server.insecure: "true"
-    # argocd-secret é provisionado externamente (dev-up.sh em dev, ESO em prod)
     secret:
       createSecret: false
     cm:

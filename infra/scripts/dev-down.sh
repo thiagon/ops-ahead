@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
-# =============================================================================
-# dev-down.sh — derrubar o ambiente (equivalente a docker compose down)
-# =============================================================================
+# dev-down.sh — tear down the k3d cluster
 set -euo pipefail
 
-export PATH="$HOME/.local/bin:$PATH"
-
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-info() { echo -e "${GREEN}▶${NC} $*"; }
-warn() { echo -e "${YELLOW}⚠${NC}  $*"; }
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 if ! command -v k3d > /dev/null 2>&1; then
-  warn "k3d não encontrado — nada a fazer"
+  warn "k3d not found — nothing to do"
   exit 0
 fi
 
 if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
-  info "Removendo cluster 'ops-ahead'..."
+  info "Removing cluster 'ops-ahead'..."
   k3d cluster delete ops-ahead
-  info "Pronto"
+  info "Done"
 else
-  warn "Cluster 'ops-ahead' não encontrado"
+  warn "Cluster 'ops-ahead' not found"
 fi

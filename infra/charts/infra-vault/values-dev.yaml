@@ -3,8 +3,8 @@ vault:
     enabled: true
   server:
     dev:
-      enabled: true        # in-memory, auto-unsealed — só para dev
-      # devRootToken passado via --set pelo dev-up.sh (vem do .env / VAULT_TOKEN)
+      enabled: true        # in-memory, auto-unsealed — dev only
+      # devRootToken is passed via --set by dev-up.sh (from .env / VAULT_TOKEN).
     standalone:
       enabled: false
     resources:

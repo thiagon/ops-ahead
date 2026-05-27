@@ -1,12 +1,5 @@
 image: postgres:16-alpine
 
-auth:
-  username: mlflow
-  database: mlflow
-  existingSecret: mlflow-postgres-secret
-  secretKeys:
-    userPasswordKey: password
-
 primary:
   persistence:
     size: 10Gi

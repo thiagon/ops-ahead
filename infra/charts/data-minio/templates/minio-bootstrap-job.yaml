@@ -27,17 +27,9 @@ spec:
       containers:
         - name: mc
           image: quay.io/minio/mc:RELEASE.2024-03-13T23-51-57Z
-          env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                secretKeyRef:
-                  name: minio-secret
-                  key: rootUser
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: minio-secret
-                  key: rootPassword
+          envFrom:
+            - secretRef:
+                name: minio-secret
           command:
             - /bin/sh
             - -c

@@ -1,71 +1,30 @@
 #!/usr/bin/env bash
-# =============================================================================
-# dev-up.sh — bootstrap GitOps do ambiente de dev
-#
-# Fluxo:
-#   1. Cria cluster k3d
-#   2. Instala só o ArgoCD (bootstrap)
-#   3. Aplica root-app → ArgoCD sincroniza tudo via infra/apps/dev
-#   4. Aguarda todos os Applications ficarem Healthy
-#   5. Bootstrap do Vault (exec, não pode ser GitOps)
-# =============================================================================
+# dev-up.sh — GitOps bootstrap for the dev environment (k3d + ArgoCD + Vault + Gitea)
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-export PATH="$HOME/.local/bin:$PATH"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
-info()  { echo -e "${GREEN}▶${NC} $*"; }
-warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
-error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
-step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
-
-# Cria (ou atualiza) um k8s Secret de forma idempotente.
-# Uso: ksecret <nome> <namespace> --from-literal=KEY=VALUE ...
-ksecret() {
-  local name="$1" ns="$2"; shift 2
-  kubectl create secret generic "$name" "$@" \
-    -n "$ns" --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-  info "secret $name → ns:$ns"
-}
-
-# Lê os namespaces declarados em namespaces.yaml (fonte única de verdade).
-namespaces_from_yaml() {
-  grep "^  name:" infra/apps/namespaces.yaml | awk '{print $2}'
-}
-
-# ─── Credenciais do .env ──────────────────────────────────────────────────────
 ENV_FILE="$ROOT_DIR/.env"
-[ -f "$ENV_FILE" ] || error ".env não encontrado — rode: make setup"
+[ -f "$ENV_FILE" ] || error ".env not found — run: make setup"
 set -a; source "$ENV_FILE"; set +a
 
-: "${VAULT_TOKEN:?'VAULT_TOKEN não definido no .env'}"
+: "${VAULT_TOKEN:?'VAULT_TOKEN must be set in .env'}"
+: "${GITEA_ADMIN_USERNAME:?'GITEA_ADMIN_USERNAME must be set in .env'}"
+: "${GITEA_ADMIN_PASSWORD:?'GITEA_ADMIN_PASSWORD must be set in .env'}"
 
-# Credenciais por serviço — obrigatórias no .env (copie de .env.example)
-: "${POSTGRES_MLFLOW_PASSWORD:?'Defina POSTGRES_MLFLOW_PASSWORD no .env'}"
-: "${MINIO_ROOT_USER:?'Defina MINIO_ROOT_USER no .env'}"
-: "${MINIO_ROOT_PASSWORD:?'Defina MINIO_ROOT_PASSWORD no .env'}"
-: "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
-: "${GITEA_ADMIN_PASSWORD:?'Defina GITEA_ADMIN_PASSWORD no .env'}"
-: "${MLFLOW_ADMIN_USERNAME:?'Defina MLFLOW_ADMIN_USERNAME no .env'}"
-: "${MLFLOW_ADMIN_PASSWORD:?'Defina MLFLOW_ADMIN_PASSWORD no .env'}"
-: "${MLFLOW_CRYPTO_KEK_PASSPHRASE:?'Defina MLFLOW_CRYPTO_KEK_PASSPHRASE no .env'}"
-
-# ─── Pré-condições ────────────────────────────────────────────────────────────
-docker info > /dev/null 2>&1        || error "Docker não está rodando."
-command -v kubectl > /dev/null 2>&1 || error "kubectl não encontrado — rode: make setup"
-command -v helm    > /dev/null 2>&1 || error "helm não encontrado — rode: make setup"
-command -v k3d     > /dev/null 2>&1 || error "k3d não encontrado — rode: make setup"
+docker info > /dev/null 2>&1        || error "Docker is not running"
+command -v kubectl > /dev/null 2>&1 || error "kubectl not found — run: make setup"
+command -v helm    > /dev/null 2>&1 || error "helm not found — run: make setup"
+command -v k3d     > /dev/null 2>&1 || error "k3d not found — run: make setup"
+command -v yq      > /dev/null 2>&1 || error "yq not found — run: make setup"
 
 cd "$ROOT_DIR"
 
-# ─── Cluster ──────────────────────────────────────────────────────────────────
-step "Cluster k3d"
+step "k3d cluster"
 if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
-  info "Cluster já existe"
+  info "Cluster already exists"
 else
-  info "Criando cluster 'ops-ahead'..."
+  info "Creating cluster 'ops-ahead'..."
   k3d cluster create ops-ahead \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
@@ -73,8 +32,7 @@ else
 fi
 kubectl get nodes
 
-# ─── Dependências dos charts (auto-detectadas pelo Chart.yaml) ───────────────
-step "Dependências dos charts"
+step "Chart dependencies"
 for chart_dir in infra/charts/*/; do
   grep -q "^dependencies:" "${chart_dir}Chart.yaml" 2>/dev/null || continue
   helm dependency build "./$chart_dir" > /dev/null 2>&1 || \
@@ -82,32 +40,23 @@ for chart_dir in infra/charts/*/; do
   info "$(basename "$chart_dir") OK"
 done
 
-# ─── Bootstrap: ArgoCD + Vault + Gitea ───────────────────────────────────────
-# Instalação manual dos 3 serviços de plataforma — precisam existir antes do
-# GitOps entrar em ação. Após o root-app ser aplicado, infra-argocd/vault/gitea
-# (wave 0-2) assumem a gestão contínua desses charts.
 step "Bootstrap ArgoCD + Vault + Gitea"
+# ArgoCD, Vault and Gitea must exist before root-app — after that GitOps takes
+# over (waves 0-2). Gitea is dev-only: ArgoCD is pull-based and needs a Git URL,
+# so we use a local Gitea instead of GitHub.
 kubectl apply -f infra/apps/namespaces.yaml > /dev/null
 
-# argocd-secret: SÓ server.secretkey. SEM admin.password e SEM passwordMtime —
-# qualquer um dos dois confunde o ArgoCD quando o outro não existe.
-# Resultado: ArgoCD gera tudo do zero e cria argocd-initial-admin-secret.
+# argocd-secret only with server.secretkey. Including admin.password or
+# passwordMtime makes ArgoCD skip generating argocd-initial-admin-secret.
 kubectl delete secret argocd-secret -n infra --ignore-not-found > /dev/null 2>&1
-
 ARGOCD_SERVER_SECRETKEY=$(openssl rand -base64 32)
 kubectl create secret generic argocd-secret \
   --from-literal=server.secretkey="${ARGOCD_SERVER_SECRETKEY}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
-# grafana-secret: lido pelo grafana via admin.existingSecret
-kubectl create secret generic grafana-secret \
-  --from-literal=admin-user="admin" \
-  --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
-  -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
-
-# gitea-admin-secret: lido pelo Gitea via gitea.admin.existingSecret
+# Gitea comes up before Vault/ESO, so the secret is created directly (dev-only).
 kubectl create secret generic gitea-admin-secret \
-  --from-literal=username="ops-ahead" \
+  --from-literal=username="${GITEA_ADMIN_USERNAME}" \
   --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
 
@@ -116,35 +65,31 @@ helm upgrade --install infra-argocd ./infra/charts/infra-argocd \
   -f infra/charts/infra-argocd/values.yaml \
   -f infra/charts/infra-argocd/values-dev.yaml \
   --wait --timeout 10m 2>/dev/null
-info "ArgoCD pronto"
+info "ArgoCD ready"
 
-# Vault dev token via --set (não fica em git)
 helm upgrade --install infra-vault ./infra/charts/infra-vault \
   -n infra \
   -f infra/charts/infra-vault/values.yaml \
   -f infra/charts/infra-vault/values-dev.yaml \
   --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
   --wait --timeout 5m 2>/dev/null
-info "Vault pronto"
+info "Vault ready"
 
 helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
   -n infra \
   -f infra/charts/infra-gitea/values.yaml \
   -f infra/charts/infra-gitea/values-dev.yaml \
   --wait --timeout 5m 2>/dev/null
-info "Gitea pronto"
+info "Gitea ready"
 
-# ─── Gitea: espelho do working dir pro ArgoCD ler ────────────────────────────
-# ArgoCD é pull-based: precisa de uma URL Git pra clonar. Em dev usamos Gitea
-# local em vez do GitHub pra evitar push remoto a cada iteração.
-step "Push do working dir pro Gitea local"
+step "Push working dir to Gitea"
 
 GITEA_EXTERNAL="http://gitea.ops-ahead.localtest.me"
 GITEA_INTERNAL="http://infra-gitea-http.infra.svc.cluster.local:3000"
-GITEA_REPO_URL="${GITEA_INTERNAL}/ops-ahead/ops-ahead.git"
+GITEA_REPO_URL="${GITEA_INTERNAL}/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
 
-# Cria a ingress do Gitea imediatamente — o root-app a recria depois (idempotente)
-# Sem isso, gitea.ops-ahead.localtest.me dá 404 (root-app só roda depois do push).
+# Ingress applied manually — without it the external host returns 404 until
+# root-app syncs. Idempotent: root-app recreates it later.
 kubectl apply -f - > /dev/null <<EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -168,67 +113,58 @@ spec:
                   number: 3000
 EOF
 
-# Espera Gitea API responder
 for i in {1..30}; do
   curl -sf "${GITEA_EXTERNAL}/api/v1/version" > /dev/null 2>&1 && break
   sleep 2
 done
 
-# Cria o repo (idempotente — ignora 409 conflict se já existe)
-curl -s -X POST -u "ops-ahead:${GITEA_ADMIN_PASSWORD}" \
+curl -s -X POST -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
   -H "Content-Type: application/json" \
   -d '{"name":"ops-ahead","auto_init":false,"private":false}' \
   "${GITEA_EXTERNAL}/api/v1/user/repos" > /dev/null
 
-# Snapshot do working dir (inclui modified + untracked) → push como 'main' no Gitea
-# sem mexer em branches locais. Working dir do user fica intocado.
-GITEA_PUSH_URL="http://ops-ahead:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/ops-ahead/ops-ahead.git"
+# Working dir snapshot (modified + untracked) without touching the user's HEAD.
+GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
 git add -A
 TREE_HASH=$(git write-tree)
 git reset > /dev/null 2>&1
 COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot")
 git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1
-info "Working dir snapshot → gitea.ops-ahead.localtest.me/ops-ahead/ops-ahead (branch: main)"
+info "Snapshot → ${GITEA_ADMIN_USERNAME}/ops-ahead@main"
 
-# ─── ArgoCD Repo Secret ──────────────────────────────────────────────────────
-# Aponta ArgoCD pro Gitea interno (URL cluster-internal, sem passar pelo ingress)
+# ArgoCD repo secret pointing to internal Gitea (cluster-internal, no ingress).
 kubectl create secret generic gitea-repo-secret \
   --from-literal=type=git \
   --from-literal=url="${GITEA_REPO_URL}" \
-  --from-literal=username=ops-ahead \
+  --from-literal=username="${GITEA_ADMIN_USERNAME}" \
   --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
   -n infra --dry-run=client -o yaml \
   | kubectl label --local -f - --dry-run=client -o yaml \
       argocd.argoproj.io/secret-type=repository \
   | kubectl apply -f - > /dev/null
 
-# ─── Root Application + Child Applications ───────────────────────────────────
 step "Root Application (App-of-Apps)"
 
-# Substitui repoURL do GitHub → Gitea interno. targetRevision: main fica como tá
-# (porque pushamos HEAD:main acima). Sem sed na branch.
-SED_REPO="s#https://github.com/thiagon/ops-ahead#${GITEA_REPO_URL%.git}#g"
+# Rewrite repoURL from GitHub to internal Gitea in every Application.
+GITHUB_REPO="https://github.com/thiagon/ops-ahead"
+SED_REPO="s#${GITHUB_REPO}#${GITEA_REPO_URL%.git}#g"
 
 sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f - 2>/dev/null
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
-GITHUB_REPO="https://github.com/thiagon/ops-ahead"
 for app_yaml in infra/apps/*.yaml; do
   name="$(basename "$app_yaml" .yaml)"
-  # namespaces, project e ingresses são recursos K8s — o root-app os sincroniza
+  # namespaces/project/ingresses are K8s resources, not Applications — root-app syncs them.
   [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
-  # Apps que referenciam o GitHub precisam do sed; apps com chart externo (Helm repo) não
   if grep -q "$GITHUB_REPO" "$app_yaml"; then
     sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1
     info "$name OK"
   else
     kubectl apply -f "$app_yaml" > /dev/null 2>&1
-    info "$name (chart externo)"
+    info "$name (external chart)"
   fi
 done
 
-
-# ─── Bootstrap Vault ──────────────────────────────────────────────────────────
 step "Bootstrap Vault"
 kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
   --for=condition=Ready --timeout=120s > /dev/null
@@ -236,82 +172,91 @@ kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
 VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
   -o jsonpath='{.items[0].metadata.name}')
 
-# Heredoc evita expor VAULT_TOKEN como argumento de processo (visível em ps/audit)
+# Discover paths and properties from each chart's ExternalSecret and build the
+# `vault kv put` commands. Convention: each `remoteRef.property` matches a var
+# with the same name in .env. Adding an app = external-secret.yaml + .env vars.
+declare -A VAULT_PAIRS
+while IFS=$'\t' read -r path prop; do
+  [ -z "$path" ] && continue
+  val="${!prop:-}"
+  [ -z "$val" ] && error "$prop not set in .env (declared in secret/$path)"
+  VAULT_PAIRS[$path]+=" ${prop}=\"${val}\""
+done < <(yq eval-all --no-doc '.spec.data[] | [.remoteRef.key, .remoteRef.property] | @tsv' \
+  infra/charts/*/templates/external-secret.yaml 2>/dev/null | sort -u)
+
+VAULT_KV_CMDS=""
+for path in "${!VAULT_PAIRS[@]}"; do
+  VAULT_KV_CMDS+="vault kv put secret/${path}${VAULT_PAIRS[$path]}"$'\n'
+  info "secret/${path} →$(echo "${VAULT_PAIRS[$path]}" | sed 's/="[^"]*"//g')"
+done
+
+# Heredoc keeps VAULT_TOKEN out of argv (visible in ps/audit).
 kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
 export VAULT_TOKEN='${VAULT_TOKEN}'
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
 
-vault kv put secret/ml-mlflow     POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000" MLFLOW_ADMIN_USERNAME="${MLFLOW_ADMIN_USERNAME}" MLFLOW_ADMIN_PASSWORD="${MLFLOW_ADMIN_PASSWORD}" MLFLOW_CRYPTO_KEK_PASSPHRASE="${MLFLOW_CRYPTO_KEK_PASSPHRASE}"
-vault kv put secret/infra-grafana  ADMIN_USER="admin" ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
-vault kv put secret/data-minio     ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
-
-# ESO policy: permite ESO ler todos os secrets da engine KV
+${VAULT_KV_CMDS}
 vault policy write eso-policy - << 'POLICY'
 path "secret/data/*" { capabilities = ["read"] }
 POLICY
 
-# ESO role: mapeia o ServiceAccount do ESO (namespace infra) à policy acima
 vault write auth/kubernetes/role/eso-role \
   bound_service_account_names=external-secrets \
   bound_service_account_namespaces=infra \
   policies=eso-policy \
   ttl=1h > /dev/null
 VAULT_SCRIPT
-info "Vault: secrets e ESO role configurados"
+info "Vault: secrets and ESO role configured"
 
-# ─── Aguarda ESO sincronizar os secrets ───────────────────────────────────────
-step "Aguardando ESO sincronizar secrets do Vault"
-# ESO precisa estar rodando e o ClusterSecretStore pronto antes de criar ExternalSecrets
+step "Waiting for ESO to sync secrets"
 kubectl wait pod -l app.kubernetes.io/name=external-secrets -n infra \
-  --for=condition=Ready --timeout=180s > /dev/null 2>&1 || warn "ESO pod não ficou Ready em 3min — secrets podem demorar"
+  --for=condition=Ready --timeout=180s > /dev/null 2>&1 || warn "ESO pod did not become Ready within 3min"
 
-# Aguarda todos os ExternalSecrets em todos os namespaces ficarem prontos
 kubectl wait externalsecret --all --all-namespaces \
   --for=condition=Ready --timeout=120s > /dev/null 2>&1 \
-  && info "ESO: todos os ExternalSecrets prontos" \
-  || warn "ESO: algum ExternalSecret não ficou Ready — verifique ClusterSecretStore"
+  && info "ESO: all ExternalSecrets ready" \
+  || warn "ESO: some ExternalSecret not Ready — check ClusterSecretStore"
 
-# ─── Labels ───────────────────────────────────────────────────────────────────
-# Derivados de namespaces.yaml — adicionar namespace lá aplica o label automaticamente.
+step "Labels"
+# Apply monitoring label to declared namespaces — source: namespaces.yaml.
 while IFS= read -r ns; do
   kubectl get namespace "$ns" > /dev/null 2>&1 && \
     kubectl label namespace "$ns" ops-ahead/monitor=true --overwrite > /dev/null || \
-    warn "namespace $ns ainda não existe — label será aplicado quando o ArgoCD criar"
-done < <(namespaces_from_yaml)
+    warn "namespace $ns does not exist yet — label will be applied once ArgoCD creates it"
+done < <(yq eval-all 'select(.kind == "Namespace") | .metadata.name' infra/apps/namespaces.yaml | grep -Ev "^(---|null)$")
 
-# ─── Pronto ───────────────────────────────────────────────────────────────────
-step "Pronto"
+step "Done"
 
-# Lê senha initial-admin que ArgoCD auto-gerou e persiste em .env.local
-# (gitignored). Reusa entre runs no mesmo cluster.
+# Generate .env.local with ArgoCD admin password + auto-discovered service URLs.
+# Subdomain becomes the var name: argo-workflows.* → ARGO_WORKFLOWS_URL.
 sleep 3
 ARGOCD_INITIAL_PASS=""
 if kubectl -n infra get secret argocd-initial-admin-secret > /dev/null 2>&1; then
   ARGOCD_INITIAL_PASS=$(kubectl -n infra get secret argocd-initial-admin-secret \
     -o jsonpath='{.data.password}' | base64 -d)
-
-  # Escreve em .env.local (sobrescreve a cada make up)
-  cat > "$ROOT_DIR/.env.local" <<EOF
-# Credenciais geradas dinamicamente pelo make up — NÃO commitar
-# Atualizadas a cada nova subida de cluster.
-ARGOCD_ADMIN_USER=admin
-ARGOCD_ADMIN_PASSWORD=${ARGOCD_INITIAL_PASS}
-EOF
-  info ".env.local atualizado com a senha do ArgoCD"
 fi
 
+{
+  echo "# Generated by make up — do not commit. Refreshed on every cluster bring-up."
+  echo ""
+  grep -E '^[A-Z_]+=' "$ENV_FILE"
+  echo ""
+  echo "ARGOCD_ADMIN_USER=admin"
+  echo "ARGOCD_ADMIN_PASSWORD=${ARGOCD_INITIAL_PASS}"
+  echo ""
+  ( yq eval-all '.spec.rules[]?.host' infra/apps/ingresses.yaml 2>/dev/null
+    yq eval-all '.. | select(has("host")) | .host' infra/charts/*/values*.yaml 2>/dev/null
+  ) | grep -E '^[a-z0-9].*localtest' | sort -u | while read -r host; do
+    name="$(echo "$host" | cut -d. -f1 | tr 'a-z-' 'A-Z_')_URL"
+    echo "${name}=http://${host}"
+  done
+} > "$ROOT_DIR/.env.local"
+info ".env.local updated"
+
 echo ""
-echo "  ArgoCD          →  http://argocd.ops-ahead.localtest.me        (credenciais em .env.local)"
-echo "  Gitea (local)   →  http://gitea.ops-ahead.localtest.me        (user: ops-ahead | senha em .env)"
-echo "  Vault           →  http://vault.ops-ahead.localtest.me        (credenciais em .env)"
-echo "  Grafana         →  http://grafana.ops-ahead.localtest.me      (credenciais em .env)"
-echo "  MinIO           →  http://minio.ops-ahead.localtest.me        (credenciais em .env)"
-echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
-echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
-echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
-echo "  Gateway         →  http://gateway.ops-ahead.localtest.me"
-echo "  UI              →  http://ui.ops-ahead.localtest.me"
+grep -E '_URL=' "$ROOT_DIR/.env.local" | sed 's/=/  →  /' | column -t -s'→' | sed 's/^/  /'
 echo ""
-echo "  Iterar:  edite os charts/manifests e rode  make sync"
+echo "  Credentials: .env (apps) | .env.local (ArgoCD admin)"
+echo "  Iterate:     edit charts/manifests and run  make sync"
 echo ""

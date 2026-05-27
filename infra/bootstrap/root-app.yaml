@@ -1,6 +1,6 @@
-# Ponto de entrada do App-of-Apps.
-# Aplicar uma única vez: kubectl apply -f infra/bootstrap/root-app.yaml
-# Após isso, o ArgoCD gerencia tudo via infra/apps.
+# App-of-Apps entry point.
+# Apply once: kubectl apply -f infra/bootstrap/root-app.yaml
+# After that, ArgoCD manages everything via infra/apps.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,9 +24,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true     # ← obriga selfHeal a respeitar ignoreDifferences
-  # dev-up.sh substitui repoURL dos child Apps pra apontar pro Gitea local.
-  # Sem este ignore + RespectIgnoreDifferences, selfHeal reverteria pra GitHub.
+      - RespectIgnoreDifferences=true     # forces selfHeal to respect ignoreDifferences
+  # dev-up.sh rewrites child Apps' repoURL to the local Gitea.
+  # Without this ignore + RespectIgnoreDifferences, selfHeal would revert it to GitHub.
   ignoreDifferences:
     - group: argoproj.io
       kind: Application
