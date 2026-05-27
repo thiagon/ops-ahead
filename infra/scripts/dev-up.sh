@@ -43,18 +43,14 @@ set -a; source "$ENV_FILE"; set +a
 : "${VAULT_TOKEN:?'VAULT_TOKEN não definido no .env'}"
 
 # Credenciais por serviço — obrigatórias no .env (copie de .env.example)
-: "${POSTGRES_AGENT_PASSWORD:?'Defina POSTGRES_AGENT_PASSWORD no .env'}"
 : "${POSTGRES_MLFLOW_PASSWORD:?'Defina POSTGRES_MLFLOW_PASSWORD no .env'}"
 : "${MINIO_ROOT_USER:?'Defina MINIO_ROOT_USER no .env'}"
 : "${MINIO_ROOT_PASSWORD:?'Defina MINIO_ROOT_PASSWORD no .env'}"
-: "${LITELLM_MASTER_KEY:?'Defina LITELLM_MASTER_KEY no .env'}"
 : "${GRAFANA_ADMIN_PASSWORD:?'Defina GRAFANA_ADMIN_PASSWORD no .env'}"
 : "${GITEA_ADMIN_PASSWORD:?'Defina GITEA_ADMIN_PASSWORD no .env'}"
 : "${MLFLOW_ADMIN_USERNAME:?'Defina MLFLOW_ADMIN_USERNAME no .env'}"
 : "${MLFLOW_ADMIN_PASSWORD:?'Defina MLFLOW_ADMIN_PASSWORD no .env'}"
 : "${MLFLOW_CRYPTO_KEK_PASSPHRASE:?'Defina MLFLOW_CRYPTO_KEK_PASSPHRASE no .env'}"
-ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
-OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
 # ─── Pré-condições ────────────────────────────────────────────────────────────
 docker info > /dev/null 2>&1        || error "Docker não está rodando."
@@ -246,9 +242,7 @@ export VAULT_TOKEN='${VAULT_TOKEN}'
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
 
-vault kv put secret/llm-postgres  POSTGRES_USER="agent"  POSTGRES_PASSWORD="${POSTGRES_AGENT_PASSWORD}"  POSTGRES_DB="agent"
 vault kv put secret/ml-mlflow     POSTGRES_USER="mlflow" POSTGRES_PASSWORD="${POSTGRES_MLFLOW_PASSWORD}" POSTGRES_DB="mlflow" AWS_ACCESS_KEY_ID="${MINIO_ROOT_USER}" AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" MLFLOW_S3_ENDPOINT_URL="http://minio.data.svc.cluster.local:9000" MLFLOW_ADMIN_USERNAME="${MLFLOW_ADMIN_USERNAME}" MLFLOW_ADMIN_PASSWORD="${MLFLOW_ADMIN_PASSWORD}" MLFLOW_CRYPTO_KEK_PASSPHRASE="${MLFLOW_CRYPTO_KEK_PASSPHRASE}"
-vault kv put secret/llm-litellm   LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" OPENAI_API_KEY="${OPENAI_API_KEY}"
 vault kv put secret/infra-grafana  ADMIN_USER="admin" ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}"
 vault kv put secret/data-minio     ROOT_USER="${MINIO_ROOT_USER}" ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
 
@@ -316,7 +310,6 @@ echo "  MinIO           →  http://minio.ops-ahead.localtest.me        (credenc
 echo "  Prometheus      →  http://prometheus.ops-ahead.localtest.me"
 echo "  MLflow          →  http://mlflow.ops-ahead.localtest.me"
 echo "  Argo Workflows  →  http://argo-workflows.ops-ahead.localtest.me"
-echo "  LiteLLM         →  http://litellm.ops-ahead.localtest.me"
 echo "  Gateway         →  http://gateway.ops-ahead.localtest.me"
 echo "  UI              →  http://ui.ops-ahead.localtest.me"
 echo ""

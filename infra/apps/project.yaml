@@ -27,8 +27,6 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: ml
     - server: https://kubernetes.default.svc
-      namespace: llm
-    - server: https://kubernetes.default.svc
       namespace: ui
     # Operadores (argo-workflows, clickhouse, strimzi) deployam roles/CRDs
     # em 'default' como parte de instalação cluster-wide.

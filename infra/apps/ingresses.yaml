@@ -178,25 +178,3 @@ spec:
                 name: argo-workflows-server
                 port:
                   number: 2746
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: litellm
-  namespace: llm
-  annotations:
-    argocd.argoproj.io/sync-wave: "9"
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-spec:
-  ingressClassName: traefik
-  rules:
-    - host: litellm.ops-ahead.localtest.me
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: litellm
-                port:
-                  number: 4000

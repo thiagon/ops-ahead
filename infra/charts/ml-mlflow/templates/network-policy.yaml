@@ -1,5 +1,5 @@
 {{- if .Values.networkPolicy.enabled }}
-# ns:ml — accepts from ns:llm and ns:ui (API port only); infra for metrics
+# ns:ml — accepts from ns:ui (API port only); infra for metrics
 # Direct access to ClickHouse in ns:data is governed by ns:data policy
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -35,10 +35,6 @@ spec:
   ingress:
     - from:
         - podSelector: {}
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: llm
     - from:
         - namespaceSelector:
             matchLabels:

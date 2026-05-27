@@ -10,7 +10,7 @@ NS  ?= infra
 ## Cria .env a partir de .env.example se ainda não existir (target de arquivo).
 .env:
 	cp .env.example .env
-	@echo "⚠  .env criado — preencha ANTHROPIC_API_KEY e OPENAI_API_KEY antes de usar o LiteLLM."
+	@echo "⚠  .env criado — preencha os valores antes de rodar make up."
 
 setup: .env
 	bash infra/scripts/dev-setup.sh
@@ -42,7 +42,6 @@ argo:
 ## Uso:
 ##   make logs                          # argocd-server no namespace infra
 ##   make logs APP=mlflow NS=ml
-##   make logs APP=litellm NS=agent
 ##   make logs APP=vault NS=infra
 logs:
 	kubectl logs -n $(NS) -l app.kubernetes.io/name=$(APP) \
