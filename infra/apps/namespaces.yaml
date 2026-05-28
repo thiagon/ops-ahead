@@ -173,9 +173,18 @@ spec:
       max:
         cpu: "4"
         memory: 4Gi
-# ─── Default-deny NetworkPolicies ────────────────────────────────────────────
-# Blocks all ingress by default; explicit allow rules open only what's needed.
+# ─── NetworkPolicies ─────────────────────────────────────────────────────────
+# Estratégia: default-deny ingress por namespace; egress livre.
+# Tráfego permitido em todos os namespaces:
+#   - mesmo namespace (pods se comunicam internamente)
+#   - kube-system (Traefik roteia URLs externas para os pods)
+#   - infra (ESO puxa segredos, Prometheus coleta métricas, ArgoCD health checks)
+# Fluxos cross-namespace adicionais conforme topologia da aplicação.
+#
+# Egress não é restrito — restrições de egress exigem mapeamento completo de
+# destinos externos (DBs, APIs, DNS) e não agregam valor em dev local.
 ---
+# ── infra ──────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -190,7 +199,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-same-namespace
+  name: allow-ingress
   namespace: infra
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -200,40 +209,12 @@ spec:
   ingress:
     - from:
         - podSelector: {}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-infra-ingress
-  namespace: infra
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: infra
+              kubernetes.io/metadata.name: kube-system
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns-egress
-  namespace: infra
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Egress]
-  egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
----
+# ── data ───────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -248,7 +229,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-same-namespace
+  name: allow-ingress
   namespace: data
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -258,177 +239,35 @@ spec:
   ingress:
     - from:
         - podSelector: {}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-infra-ingress
-  namespace: data
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: infra
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns-egress
-  namespace: data
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Egress]
-  egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: ml
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-same-namespace
-  namespace: ml
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - podSelector: {}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-infra-ingress
-  namespace: ml
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: infra
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns-egress
-  namespace: ml
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Egress]
-  egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: ui
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-same-namespace
-  namespace: ui
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - podSelector: {}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-infra-ingress
-  namespace: ui
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: infra
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns-egress
-  namespace: ui
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Egress]
-  egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
-# Cross-namespace data flows
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ml-ingress
-  namespace: data
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ml
 ---
+# ── ml ─────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ui-ingress
+  name: default-deny-ingress
+  namespace: ml
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress
   namespace: ml
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -437,30 +276,36 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
+        - podSelector: {}
+    - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ui
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ui-ingress
-  namespace: data
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
+              kubernetes.io/metadata.name: kube-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ui
 ---
+# ── ui ─────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-kube-system-ingress
+  name: default-deny-ingress
+  namespace: ui
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress
   namespace: ui
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -469,6 +314,12 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
+        - podSelector: {}
+    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
