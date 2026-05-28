@@ -1,3 +1,6 @@
+monitoring:
+  enabled: true
+
 redis:
   enabled: true
   master:

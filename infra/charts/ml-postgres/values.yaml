@@ -1,5 +1,8 @@
 image: postgres:16-alpine
 
+monitoring:
+  enabled: true
+
 primary:
   persistence:
     size: 10Gi

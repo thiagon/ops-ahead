@@ -63,6 +63,35 @@ spec:
               command: ["redis-cli", "PING"]
             initialDelaySeconds: 15
             periodSeconds: 10
+        {{- if .Values.monitoring.enabled }}
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.62.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65534
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: REDIS_ADDR
+              value: "redis://localhost:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASSWORD
+          ports:
+            - containerPort: 9121
+              name: metrics
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -94,6 +123,11 @@ spec:
     - name: redis
       port: 6379
       targetPort: 6379
+    {{- if .Values.monitoring.enabled }}
+    - name: metrics
+      port: 9121
+      targetPort: 9121
+    {{- end }}
 ---
 apiVersion: v1
 kind: Service

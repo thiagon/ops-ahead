@@ -8,6 +8,20 @@ metadata:
     {{- include "data-clickhouse.labels" . | nindent 4 }}
 spec:
   configuration:
+    users:
+      ops_ahead/k8s_secret_password:
+        namespace: {{ .Release.Namespace }}
+        name: clickhouse-secret
+        key: CLICKHOUSE_PASSWORD
+      ops_ahead/networks/ip:
+        - "::/0"
+        - "0.0.0.0/0"
+      ops_ahead/profile: default
+      ops_ahead/quota: default
+      default/networks/ip:
+        - "127.0.0.1"
+        - "::1"
+      default/password: ""
     clusters:
       - name: ops-ahead
         layout:

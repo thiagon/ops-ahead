@@ -7,3 +7,6 @@ minio:
 
 networkPolicy:
   enabled: true
+
+monitoring:
+  enabled: true
