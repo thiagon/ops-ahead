@@ -32,6 +32,13 @@ argocd:
       createSecret: false
     cm:
       server.diff.server.side: "true"
+      resource.exclusions: |
+        - apiGroups:
+          - ""
+          kinds:
+          - PersistentVolumeClaim
+          clusters:
+          - '*'
       resource.customizations.ignoreDifferences.apps_Deployment: |
         jqPathExpressions:
           - '.metadata.annotations."deployment.kubernetes.io/revision"'
