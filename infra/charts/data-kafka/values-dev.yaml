@@ -3,8 +3,7 @@ kafka:
   cluster:
     replicas: 1
     storage:
-      type: persistent-claim
-      size: 2Gi
+      type: ephemeral
     retention:
       ms: "3600000"   # 1 hour
     resources:
@@ -20,8 +19,7 @@ kafka:
   zookeeper:
     replicas: 1
     storage:
-      type: persistent-claim
-      size: 1Gi
+      type: ephemeral
 
 kafkaTopics:
   - name: incidents.raw
