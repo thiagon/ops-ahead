@@ -1,8 +1,16 @@
 argocd:
   server:
     replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
   repoServer:
     replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
   applicationSet:
     replicas: 1
   controller:
@@ -13,6 +21,10 @@ argocd:
       limits:
         cpu: 500m
         memory: 1Gi
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
   configs:
     params:
       server.insecure: "true"

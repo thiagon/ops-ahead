@@ -206,6 +206,8 @@ vault write auth/kubernetes/role/eso-role \
   bound_service_account_namespaces=infra \
   policies=eso-policy \
   ttl=1h > /dev/null
+
+vault audit enable file file_path=/vault/logs/audit.log 2>/dev/null || true
 VAULT_SCRIPT
 info "Vault: secrets and ESO role configured"
 

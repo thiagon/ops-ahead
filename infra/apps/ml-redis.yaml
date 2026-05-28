@@ -8,6 +8,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
+  revisionHistoryLimit: 3
   project: ops-ahead
   source:
     repoURL: https://github.com/thiagon/ops-ahead

@@ -27,6 +27,8 @@ spec:
     metadata:
       labels:
         app: gateway
+      annotations:
+        checksum/nginx-config: {{ include "ui-gateway.nginxConfig" . | sha256sum }}
     spec:
       serviceAccountName: ui-gateway
       automountServiceAccountToken: false
