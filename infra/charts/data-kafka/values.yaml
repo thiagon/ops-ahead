@@ -33,4 +33,4 @@ argoWorkflows:
   enabled: false
 
 networkPolicy:
-  enabled: true
+  enabled: false

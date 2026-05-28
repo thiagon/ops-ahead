@@ -38,5 +38,10 @@ argocd:
       resource.customizations.ignoreDifferences.apps_DaemonSet: |
         jqPathExpressions:
           - '.metadata.annotations."deprecated.daemonset.template.generation"'
+      resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+        jqPathExpressions:
+          - '.spec.data[].remoteRef.conversionStrategy'
+          - '.spec.data[].remoteRef.decodingStrategy'
+          - '.spec.data[].remoteRef.metadataPolicy'
   notifications:
     enabled: false

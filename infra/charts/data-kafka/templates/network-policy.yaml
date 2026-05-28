@@ -27,6 +27,9 @@ spec:
         - port: 8200
     - to:
         - podSelector: {}
+    - ports:
+        - port: 443
+          protocol: TCP
   ingress:
     - from:
         - podSelector: {}
