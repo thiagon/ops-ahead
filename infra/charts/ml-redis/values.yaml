@@ -1,4 +1,5 @@
 redis:
+  enabled: true
   master:
     persistence:
       size: 5Gi

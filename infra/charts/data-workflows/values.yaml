@@ -5,3 +5,7 @@ argo-workflows:
     replicas: 1
     authModes:
       - server
+
+argoWorkflows:
+  rbac:
+    enabled: false

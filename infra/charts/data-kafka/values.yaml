@@ -1,5 +1,6 @@
 # ─── Kafka cluster ────────────────────────────────────────────────────────────
 kafka:
+  enabled: true
   cluster:
     replicas: 3
     storage:

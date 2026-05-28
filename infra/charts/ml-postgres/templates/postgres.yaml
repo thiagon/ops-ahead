@@ -17,9 +17,22 @@ spec:
       labels:
         app: mlflow-postgres
     spec:
+      serviceAccountName: ml-postgres
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           envFrom:
             - secretRef:
                 name: postgres-mlflow-secret
@@ -32,6 +45,11 @@ spec:
             - name: data
               mountPath: /var/lib/postgresql/data
               subPath: pgdata
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             exec:
               command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
@@ -50,6 +68,13 @@ spec:
         resources:
           requests:
             storage: {{ .Values.primary.persistence.size }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-postgres
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
 ---
 apiVersion: v1
 kind: Service

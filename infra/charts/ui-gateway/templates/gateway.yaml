@@ -28,9 +28,20 @@ spec:
       labels:
         app: gateway
     spec:
+      serviceAccountName: ui-gateway
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: gateway
           image: {{ .Values.gateway.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE]
           ports:
             - containerPort: {{ .Values.gateway.port }}
           resources:
@@ -54,6 +65,13 @@ spec:
         - name: nginx-config
           configMap:
             name: gateway-nginx-config
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ui-gateway
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
 ---
 apiVersion: v1
 kind: Service

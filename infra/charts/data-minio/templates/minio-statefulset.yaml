@@ -17,9 +17,19 @@ spec:
       labels:
         app: minio
     spec:
+      serviceAccountName: data-minio
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: minio
           image: quay.io/minio/minio:RELEASE.2024-03-15T01-07-19Z
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           args:
             {{- if eq .Values.minio.mode "standalone" }}
             - server
@@ -48,6 +58,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+          startupProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            failureThreshold: 30
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /minio/health/live
@@ -70,3 +86,10 @@ spec:
         resources:
           requests:
             storage: {{ .Values.minio.storage.size }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-minio
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
