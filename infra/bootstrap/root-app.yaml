@@ -10,6 +10,7 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  revisionHistoryLimit: 3
   source:
     repoURL: https://github.com/thiagon/ops-ahead
     targetRevision: main
@@ -25,6 +26,12 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true     # forces selfHeal to respect ignoreDifferences
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
   # dev-up.sh rewrites child Apps' repoURL to the local Gitea.
   # Without this ignore + RespectIgnoreDifferences, selfHeal would revert it to GitHub.
   ignoreDifferences:
