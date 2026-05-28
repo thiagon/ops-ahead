@@ -2,13 +2,13 @@ kafka:
   cluster:
     replicas: 1
     storage:
-      size: 2Gi
+      type: ephemeral
     retention:
       ms: "3600000"   # 1 hour
   zookeeper:
     replicas: 1
     storage:
-      size: 1Gi
+      type: ephemeral
 
 kafkaTopics:
   - name: incidents.raw

@@ -27,15 +27,23 @@ spec:
       type: jbod
       volumes:
         - id: 0
+          {{- if eq .Values.kafka.cluster.storage.type "ephemeral" }}
+          type: ephemeral
+          {{- else }}
           type: persistent-claim
           size: {{ .Values.kafka.cluster.storage.size }}
           deleteClaim: false
+          {{- end }}
   zookeeper:
     replicas: {{ .Values.kafka.zookeeper.replicas }}
     storage:
+      {{- if eq .Values.kafka.zookeeper.storage.type "ephemeral" }}
+      type: ephemeral
+      {{- else }}
       type: persistent-claim
       size: {{ .Values.kafka.zookeeper.storage.size }}
       deleteClaim: false
+      {{- end }}
   entityOperator:
     topicOperator: {}
     userOperator: {}

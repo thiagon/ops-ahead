@@ -4,12 +4,14 @@ kafka:
   cluster:
     replicas: 3
     storage:
+      type: persistent-claim
       size: 20Gi
     retention:
       ms: "604800000"   # 7 days
   zookeeper:
     replicas: 3
     storage:
+      type: persistent-claim
       size: 5Gi
 
 kafkaTopics:
