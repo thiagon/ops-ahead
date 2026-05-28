@@ -1,15 +1,27 @@
 kafka:
-  enabled: false
+  enabled: true
   cluster:
     replicas: 1
     storage:
-      type: ephemeral
+      type: persistent-claim
+      size: 2Gi
     retention:
       ms: "3600000"   # 1 hour
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 200m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+    jvmOptions:
+      "-Xms": "256m"
+      "-Xmx": "512m"
   zookeeper:
     replicas: 1
     storage:
-      type: ephemeral
+      type: persistent-claim
+      size: 1Gi
 
 kafkaTopics:
   - name: incidents.raw

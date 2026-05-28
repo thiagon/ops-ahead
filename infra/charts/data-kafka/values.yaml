@@ -8,6 +8,16 @@ kafka:
       size: 20Gi
     retention:
       ms: "604800000"   # 7 days
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 2000m
+    jvmOptions:
+      "-Xms": "512m"
+      "-Xmx": "1g"
   zookeeper:
     replicas: 3
     storage:

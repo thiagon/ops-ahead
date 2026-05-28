@@ -23,6 +23,10 @@ spec:
       log.retention.ms: {{ .Values.kafka.cluster.retention.ms | quote }}
       log.message.format.version: "3.7"
       inter.broker.protocol.version: "3.7"
+    resources:
+      {{- toYaml .Values.kafka.cluster.resources | nindent 6 }}
+    jvmOptions:
+      {{- toYaml .Values.kafka.cluster.jvmOptions | nindent 6 }}
     storage:
       type: jbod
       volumes:
