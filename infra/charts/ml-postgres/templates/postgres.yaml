@@ -20,19 +20,13 @@ spec:
       serviceAccountName: ml-postgres
       automountServiceAccountToken: false
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-        fsGroup: 999
+        fsGroup: 70
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: postgres
           image: {{ .Values.image }}
           imagePullPolicy: IfNotPresent
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
           envFrom:
             - secretRef:
                 name: postgres-mlflow-secret

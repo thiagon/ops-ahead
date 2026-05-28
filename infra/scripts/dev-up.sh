@@ -262,6 +262,6 @@ info ".env.local updated"
 echo ""
 grep -E '_URL=' "$ROOT_DIR/.env.local" | sed 's/=/  →  /' | column -t -s'→' | sed 's/^/  /'
 echo ""
-echo "  Credentials: .env (apps) | .env.local (ArgoCD admin)"
+echo "  Credentials: .env.local"
 echo "  Iterate:     edit charts/manifests and run  make sync"
 echo ""
