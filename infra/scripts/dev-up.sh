@@ -129,8 +129,11 @@ git add -A
 TREE_HASH=$(git write-tree)
 git reset > /dev/null 2>&1
 COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot")
-git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1
-info "Snapshot → ${GITEA_ADMIN_USERNAME}/ops-ahead@main"
+if git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1; then
+  info "Snapshot → ${GITEA_ADMIN_USERNAME}/ops-ahead@main"
+else
+  warn "Snapshot push failed — run 'make sync' once Gitea is accessible"
+fi
 
 # ArgoCD repo secret pointing to internal Gitea (cluster-internal, no ingress).
 kubectl create secret generic gitea-repo-secret \
