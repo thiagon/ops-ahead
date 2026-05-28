@@ -1,4 +1,5 @@
 kafka:
+  enabled: false
   cluster:
     replicas: 1
     storage:
