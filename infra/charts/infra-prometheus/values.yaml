@@ -13,6 +13,10 @@ kube-prometheus-stack:
       serviceMonitorNamespaceSelector:
         matchLabels:
           ops-ahead/monitor: "true"
+      podMonitorSelectorNilUsesHelmValues: false
+      podMonitorNamespaceSelector:
+        matchLabels:
+          ops-ahead/monitor: "true"
   alertmanager:
     alertmanagerSpec:
       replicas: 1
