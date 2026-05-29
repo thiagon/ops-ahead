@@ -163,7 +163,7 @@ Aplicar as políticas de rede e validar o overlay completo do zero.
 
 - [x] Todos os acceptance criteria da spec atendidos
 - [x] README de deploy revisado por outro membro do time
-- [ ] ArgoCD reconciliando após merge na `main`
+- [x] ArgoCD reconciliando após merge na `main`
 - [x] Nenhum segredo real commitado (API keys como placeholder documentadas)
 
 ---
