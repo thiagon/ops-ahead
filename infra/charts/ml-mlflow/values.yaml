@@ -5,5 +5,8 @@ mlflow:
   minio:
     endpoint: http://minio.data.svc.cluster.local:9000
 
+monitoring:
+  enabled: true
+
 networkPolicy:
   enabled: true

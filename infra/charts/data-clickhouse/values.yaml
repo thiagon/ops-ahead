@@ -6,4 +6,7 @@ clickhouse:
     storage:
       size: 50Gi
 
+monitoring:
+  enabled: true
+
 altinity-clickhouse-operator: {}

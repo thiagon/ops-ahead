@@ -31,6 +31,13 @@ spec:
       max_connections: "100"
       max_concurrent_queries: "50"
       keep_alive_timeout: "3"
+      {{- if .Values.monitoring.enabled }}
+      prometheus/endpoint: /metrics
+      prometheus/port: "9363"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      {{- end }}
   templates:
     volumeClaimTemplates:
       - name: data-volume
@@ -53,6 +60,28 @@ spec:
                 limits:
                   cpu: "1"
                   memory: 2Gi
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: native
+                  containerPort: 9000
+                {{- if .Values.monitoring.enabled }}
+                - name: prometheus
+                  containerPort: 9363
+                {{- end }}
+              readinessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                failureThreshold: 5
+              livenessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 30
+                periodSeconds: 15
               volumeMounts:
                 - name: data-volume
                   mountPath: /var/lib/clickhouse

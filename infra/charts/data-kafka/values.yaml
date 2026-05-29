@@ -44,5 +44,8 @@ kafkaTopics:
 argoWorkflows:
   enabled: false
 
+monitoring:
+  enabled: true
+
 networkPolicy:
   enabled: false

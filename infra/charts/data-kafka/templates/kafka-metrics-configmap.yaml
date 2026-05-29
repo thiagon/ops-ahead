@@ -1,0 +1,48 @@
+{{- if and .Values.kafka.enabled .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-kafka.labels" . | nindent 4 }}
+data:
+  kafka-metrics-config.yml: |
+    lowercaseOutputName: true
+    rules:
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          topic: "$4"
+          partition: "$5"
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          broker: "$4:$5"
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)><>(\w+)
+        name: kafka_$1_$2_$3_$4
+        type: GAUGE
+      - pattern: kafka.(\w+)<type=(.+), name=(.+)><>Count
+        name: kafka_$1_$2_$3_count
+        type: COUNTER
+      - pattern: ".*"
+  zookeeper-metrics-config.yml: |
+    lowercaseOutputName: true
+    rules:
+      - pattern: "org.apache.ZooKeeperService<name0=(.+)><>(\\w+)"
+        name: "zookeeper_$2"
+        type: GAUGE
+        labels:
+          replicaId: "$1"
+      - pattern: "org.apache.ZooKeeperService<name0=(.+), name1=(.+)><>(\\w+)"
+        name: "zookeeper_$3"
+        type: GAUGE
+        labels:
+          replicaId: "$1"
+          memberType: "$2"
+      - pattern: ".*"
+{{- end }}

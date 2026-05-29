@@ -1,0 +1,18 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clickhouse
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-clickhouse.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      clickhouse.altinity.com/chi: ops-ahead
+  podMetricsEndpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+{{- end }}

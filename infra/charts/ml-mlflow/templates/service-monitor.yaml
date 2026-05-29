@@ -1,0 +1,18 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlflow
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-mlflow.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: mlflow
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+{{- end }}

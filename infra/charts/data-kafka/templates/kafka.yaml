@@ -38,6 +38,14 @@ spec:
           size: {{ .Values.kafka.cluster.storage.size }}
           deleteClaim: false
           {{- end }}
+    {{- if .Values.monitoring.enabled }}
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
+    {{- end }}
   zookeeper:
     replicas: {{ .Values.kafka.zookeeper.replicas }}
     storage:
@@ -48,6 +56,14 @@ spec:
       size: {{ .Values.kafka.zookeeper.storage.size }}
       deleteClaim: false
       {{- end }}
+    {{- if .Values.monitoring.enabled }}
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: zookeeper-metrics-config.yml
+    {{- end }}
   entityOperator:
     topicOperator: {}
     userOperator: {}

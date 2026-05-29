@@ -19,7 +19,8 @@ kafka:
   zookeeper:
     replicas: 1
     storage:
-      type: ephemeral
+      type: persistent-claim
+      size: 1Gi
 
 kafkaTopics:
   - name: incidents.raw

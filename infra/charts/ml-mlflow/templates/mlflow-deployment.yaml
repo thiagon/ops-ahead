@@ -62,6 +62,10 @@ spec:
               value: "true"
             - name: MLFLOW_S3_ENDPOINT_URL
               value: {{ .Values.mlflow.minio.endpoint | quote }}
+            {{- if .Values.monitoring.enabled }}
+            - name: ENABLE_MLFLOW_PROMETHEUS_METRICS
+              value: "true"
+            {{- end }}
           envFrom:
             - secretRef:
                 name: mlflow-secret
