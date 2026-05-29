@@ -40,6 +40,12 @@ argo:
 	@kubectl get applications -n infra \
 	  -o custom-columns='NAME:.metadata.name,HEALTH:.status.health.status,SYNC:.status.sync.status,MESSAGE:.status.conditions[0].message'
 
+# Generate bcrypt hash for a password. Usage: make bcrypt PWD=ops-ahead-dev
+.PHONY: bcrypt
+bcrypt:
+	@docker run --rm httpd:alpine htpasswd -nbBC 10 "" "$(PWD)" 2>/dev/null \
+	  | tr -d ':\n' | sed 's/$$2y/$$2a/' && echo
+
 # Follow pod logs by label. Usage: make logs APP=mlflow NS=ml
 .PHONY: logs
 logs:
