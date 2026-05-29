@@ -1,0 +1,12 @@
+minio:
+  mode: distributed
+  replicas: 4
+  storage:
+    size: 50Gi
+  bucket: ops-ahead-lake
+
+networkPolicy:
+  enabled: true
+
+monitoring:
+  enabled: true

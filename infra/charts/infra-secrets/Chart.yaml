@@ -1,0 +1,5 @@
+apiVersion: v2
+name: infra-secrets
+description: ClusterSecretStore + ExternalSecrets — pulls app secrets from Vault via ESO
+type: application
+version: 0.1.0

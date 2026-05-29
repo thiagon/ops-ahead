@@ -1,0 +1,9 @@
+gateway:
+  replicas: 1
+  image: nginx:1.27-alpine
+  port: 80
+  ingress:
+    host: gateway.ops-ahead.localtest.me
+
+networkPolicy:
+  enabled: true

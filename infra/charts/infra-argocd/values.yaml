@@ -1,0 +1,54 @@
+argocd:
+  server:
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+  repoServer:
+    replicas: 1
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+  applicationSet:
+    replicas: 1
+  controller:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+  configs:
+    params:
+      server.insecure: "true"
+    secret:
+      createSecret: false
+    cm:
+      server.diff.server.side: "true"
+      resource.exclusions: |
+        - apiGroups:
+          - ""
+          kinds:
+          - PersistentVolumeClaim
+          clusters:
+          - '*'
+      resource.customizations.ignoreDifferences.apps_Deployment: |
+        jqPathExpressions:
+          - '.metadata.annotations."deployment.kubernetes.io/revision"'
+      resource.customizations.ignoreDifferences.apps_DaemonSet: |
+        jqPathExpressions:
+          - '.metadata.annotations."deprecated.daemonset.template.generation"'
+      resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+        jqPathExpressions:
+          - '.spec.data[].remoteRef.conversionStrategy'
+          - '.spec.data[].remoteRef.decodingStrategy'
+          - '.spec.data[].remoteRef.metadataPolicy'
+  notifications:
+    enabled: false

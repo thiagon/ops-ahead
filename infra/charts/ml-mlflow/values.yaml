@@ -1,0 +1,9 @@
+mlflow:
+  image: ghcr.io/mlflow/mlflow:v3.12.0-full
+  replicas: 1
+  artifactRoot: s3://ops-ahead-lake/mlflow
+  minio:
+    endpoint: http://minio.data.svc.cluster.local:9000
+
+networkPolicy:
+  enabled: true

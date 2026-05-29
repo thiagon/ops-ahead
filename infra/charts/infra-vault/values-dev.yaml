@@ -1,0 +1,24 @@
+vault:
+  ui:
+    enabled: true
+  server:
+    dev:
+      enabled: true        # in-memory, auto-unsealed — dev only
+      # devRootToken is passed via --set by dev-up.sh (from .env / VAULT_TOKEN).
+    standalone:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  injector:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

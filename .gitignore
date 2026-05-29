@@ -14,8 +14,12 @@ wheels/
 
 # sensitive files
 .env
+.env.local
 
 # presentation files
 *.pptx
 *.ppt
 *.pdf
+
+# Helm dependency archives (baixados por helm dependency build)
+infra/charts/*/charts/*.tgz

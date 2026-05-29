@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-clickhouse
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  source:
+    repoURL: https://github.com/thiagon/ops-ahead
+    targetRevision: main
+    path: infra/charts/data-clickhouse
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - '.spec.template.spec.containers[].env[].valueFrom.resourceFieldRef.divisor'
+        - '.spec.template.spec.initContainers[].env[].valueFrom.resourceFieldRef.divisor'
+    - group: clickhouse.altinity.com
+      kind: ClickHouseInstallation
+      jqPathExpressions:
+        - .spec.defaults
+        - .spec.configuration.clusters[].layout.shards
+        - .spec.configuration.clusters[].layout.replicas
+        - .spec.templates.podTemplates[].metadata
+        - .spec.templates.podTemplates[].spec.volumes

@@ -1,0 +1,41 @@
+# Local Git server — ArgoCD points to it instead of GitHub.
+# Working dir is pushed as branch 'main' by dev-up.sh / dev-sync.sh.
+gitea:
+  enabled: true
+  gitea:
+    admin:
+      existingSecret: gitea-admin-secret
+    config:
+      database:
+        DB_TYPE: sqlite3
+      server:
+        DISABLE_SSH: true
+        OFFLINE_MODE: true
+      service:
+        DISABLE_REGISTRATION: true
+      security:
+        INSTALL_LOCK: true
+  service:
+    http:
+      type: ClusterIP
+      clusterIP: ""
+      port: 3000
+  persistence:
+    enabled: false
+  postgresql:
+    enabled: false
+  postgresql-ha:
+    enabled: false
+  redis-cluster:
+    enabled: false
+  redis:
+    enabled: false
+  memcached:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

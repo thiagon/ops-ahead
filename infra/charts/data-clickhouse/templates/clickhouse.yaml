@@ -1,0 +1,88 @@
+{{- if .Values.clickhouse.operatorEnabled }}
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: ops-ahead
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-clickhouse.labels" . | nindent 4 }}
+spec:
+  configuration:
+    users:
+      ops_ahead/k8s_secret_password:
+        namespace: {{ .Release.Namespace }}
+        name: clickhouse-secret
+        key: CLICKHOUSE_PASSWORD
+      ops_ahead/networks/ip:
+        - "::/0"
+        - "0.0.0.0/0"
+      ops_ahead/profile: default
+      ops_ahead/quota: default
+      default/networks/ip:
+        - "127.0.0.1"
+        - "::1"
+      default/password: ""
+    clusters:
+      - name: ops-ahead
+        layout:
+          shardsCount: {{ .Values.clickhouse.cluster.shards }}
+          replicasCount: {{ .Values.clickhouse.cluster.replicas }}
+    settings:
+      max_connections: "100"
+      max_concurrent_queries: "50"
+      keep_alive_timeout: "3"
+      {{- if .Values.monitoring.enabled }}
+      prometheus/endpoint: /metrics
+      prometheus/port: "9363"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      {{- end }}
+  templates:
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.clickhouse.cluster.storage.size }}
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:24.3-alpine
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 512Mi
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: native
+                  containerPort: 9000
+                {{- if .Values.monitoring.enabled }}
+                - name: prometheus
+                  containerPort: 9363
+                {{- end }}
+              readinessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                failureThreshold: 5
+              livenessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 30
+                periodSeconds: 15
+              volumeMounts:
+                - name: data-volume
+                  mountPath: /var/lib/clickhouse
+{{- end }}

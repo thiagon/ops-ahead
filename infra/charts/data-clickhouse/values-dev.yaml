@@ -1,0 +1,6 @@
+clickhouse:
+  cluster:
+    shards: 1
+    replicas: 1
+    storage:
+      size: 5Gi

@@ -1,0 +1,4 @@
+argo-workflows:
+  server:
+    authModes:
+      - client   # no auth in dev

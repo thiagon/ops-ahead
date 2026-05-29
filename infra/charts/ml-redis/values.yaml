@@ -1,0 +1,15 @@
+monitoring:
+  enabled: true
+
+redis:
+  enabled: true
+  master:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

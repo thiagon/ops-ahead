@@ -1,0 +1,10 @@
+apiVersion: v2
+name: data-clickhouse
+description: ClickHouse — analytics database (Altinity operator + cluster)
+type: application
+version: 0.1.0
+appVersion: "24.3"
+dependencies:
+  - name: altinity-clickhouse-operator
+    version: "0.23.7"
+    repository: "https://docs.altinity.com/clickhouse-operator/"

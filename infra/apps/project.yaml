@@ -1,0 +1,114 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ops-ahead
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Ops Ahead — AIOps platform (FIAP Enterprise Challenge 2026)
+  sourceRepos:
+    - https://github.com/thiagon/ops-ahead
+    - http://infra-gitea-http.infra.svc.cluster.local:3000/ops-ahead/ops-ahead
+    - https://argoproj.github.io/argo-helm
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://helm.releases.hashicorp.com
+    - https://charts.external-secrets.io
+    - https://strimzi.io/charts/
+    - https://docs.altinity.com/clickhouse-operator/
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: infra
+    - server: https://kubernetes.default.svc
+      namespace: data
+    - server: https://kubernetes.default.svc
+      namespace: ml
+    - server: https://kubernetes.default.svc
+      namespace: ui
+    # Operators (argo-workflows, clickhouse, strimzi) deploy roles/CRDs in
+    # 'default' as part of a cluster-wide install.
+    - server: https://kubernetes.default.svc
+      namespace: default
+    # kube-prometheus-stack creates Services in kube-system to scrape k8s components.
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: AppProject
+    # Strimzi (Kafka operator)
+    - group: kafka.strimzi.io
+      kind: '*'
+    # ClickHouse operator
+    - group: clickhouse.altinity.com
+      kind: '*'
+    # Prometheus operator
+    - group: monitoring.coreos.com
+      kind: '*'
+    # Vault
+    - group: vault.hashicorp.com
+      kind: '*'
+    # External Secrets Operator
+    - group: external-secrets.io
+      kind: ClusterSecretStore
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true
+    ignore:
+      - group: ""
+        kind: Secret
+        name: "sh.helm.release.v1.*"
+      - group: ""
+        kind: Secret
+        name: argocd-initial-admin-secret
+      - group: ""
+        kind: Secret
+        name: argocd-redis
+      - group: ""
+        kind: Secret
+        name: argocd-secret
+      - group: ""
+        kind: Secret
+        name: gitea-admin-secret
+      - group: ""
+        kind: Secret
+        name: gitea-repo-secret
+      - group: argoproj.io
+        kind: AppProject
+        name: default
+      - group: argoproj.io
+        kind: Application
+        name: ops-ahead-root
+      - group: ""
+        kind: ConfigMap
+        name: kube-root-ca.crt
+      - group: ""
+        kind: ServiceAccount
+        name: default
+      - group: ""
+        kind: Secret
+        name: grafana-secret
+      - group: ""
+        kind: Secret
+        name: infra-gitea
+      - group: ""
+        kind: Secret
+        name: "*-admission"

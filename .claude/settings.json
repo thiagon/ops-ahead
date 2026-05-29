@@ -1,4 +1,8 @@
 {
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "enabledPlugins": {
     "machine-learning-ops@claude-code-workflows": true,
     "data-engineering@claude-code-workflows": true,

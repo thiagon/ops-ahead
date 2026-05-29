@@ -1,0 +1,70 @@
+{{- if .Values.kafka.enabled }}
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: ops-ahead
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-kafka.labels" . | nindent 4 }}
+spec:
+  kafka:
+    version: 3.7.0
+    replicas: {{ .Values.kafka.cluster.replicas }}
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    config:
+      log.retention.ms: {{ .Values.kafka.cluster.retention.ms | quote }}
+      log.message.format.version: "3.7"
+      inter.broker.protocol.version: "3.7"
+    resources:
+      {{- toYaml .Values.kafka.cluster.resources | nindent 6 }}
+    jvmOptions:
+      {{- toYaml .Values.kafka.cluster.jvmOptions | nindent 6 }}
+    storage:
+      type: jbod
+      volumes:
+        - id: 0
+          {{- if eq .Values.kafka.cluster.storage.type "ephemeral" }}
+          type: ephemeral
+          {{- else }}
+          type: persistent-claim
+          size: {{ .Values.kafka.cluster.storage.size }}
+          deleteClaim: false
+          {{- end }}
+    {{- if .Values.monitoring.enabled }}
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
+    {{- end }}
+  zookeeper:
+    replicas: {{ .Values.kafka.zookeeper.replicas }}
+    storage:
+      {{- if eq .Values.kafka.zookeeper.storage.type "ephemeral" }}
+      type: ephemeral
+      {{- else }}
+      type: persistent-claim
+      size: {{ .Values.kafka.zookeeper.storage.size }}
+      deleteClaim: false
+      {{- end }}
+    {{- if .Values.monitoring.enabled }}
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: zookeeper-metrics-config.yml
+    {{- end }}
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+{{- end }}
