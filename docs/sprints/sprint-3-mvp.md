@@ -52,7 +52,7 @@ O desenho da arquitetura é obrigatório em toda entrega. A estrutura de quatro 
                              incidents.csv / simulador
 ```
 
-O que muda em relação ao diagrama completo da Sprint 2: o MVP **não implementa** Feast (feature store), Langfuse (auditoria LLM), Grafana tático, Keycloak (SSO) e a projeção Monte Carlo completa. Essas peças ficam para a Sprint 4. A arquitetura cabe — o que muda é até onde chegamos nesta sprint.
+O que muda em relação ao diagrama completo da Sprint 2: o MVP **não implementa** Feast (feature store), Langfuse (auditoria LLM), Grafana tático, Authentik (SSO) e a projeção Monte Carlo completa. Essas peças ficam para a Sprint 4. A arquitetura cabe — o que muda é até onde chegamos nesta sprint.
 
 ---
 
@@ -90,7 +90,7 @@ Essas três perguntas definem o escopo do MVP. **Tudo o que não responde a elas
 | Feast (feature store) | Redis direto é suficiente para as features online do MVP; Feast adiciona robustez, não funcionalidade nova |
 | Langfuse | Auditoria em Postgres já registra o necessário para a avaliação informal |
 | Grafana tático | O gestor não está na avaliação do MVP; painel tático é Sprint 4 |
-| Keycloak (SSO) | Header fixo de dev não é risco no MVP; autenticação real é Sprint 4 |
+| Authentik (SSO) | Header fixo de dev não é risco no MVP; autenticação real é Sprint 4 |
 | Projeção KPI Monte Carlo (endpoint) | A lógica Python pode ser validada como script antes de virar endpoint |
 | Detector de evento externo (Isolation Forest endpoint) | Modelo pode ser treinado no MVP; servir fica para Sprint 4 |
 | 6 ferramentas restantes do copiloto | As 3 mínimas testam a hipótese de acionabilidade — as demais refinam |
