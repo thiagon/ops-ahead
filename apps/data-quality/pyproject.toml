@@ -1,0 +1,14 @@
+[project]
+name = "ops-ahead-data-quality"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "great-expectations>=1.2",
+    "clickhouse-sqlalchemy>=0.3",
+    "sqlalchemy>=2.0",
+    "boto3>=1.35",
+]
+
+[tool.ops-ahead]
+workload = "job"
+namespace = "data"

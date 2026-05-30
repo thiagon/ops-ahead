@@ -1,0 +1,10 @@
+[project]
+name = "ops-ahead-data-transform"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ops-ahead]
+workload = "job"
+namespace = "data"
+image = "ghcr.io/dbt-labs/dbt-clickhouse"

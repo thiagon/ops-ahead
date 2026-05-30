@@ -1,0 +1,69 @@
+import great_expectations as gx
+import great_expectations.expectations as gxe
+
+
+def _table_asset(context: gx.DataContext, table: str) -> gx.core.batch_definition.BatchDefinition:
+    datasource = context.data_sources.get("clickhouse")
+    asset = datasource.add_table_asset(name=table, table_name=table)
+    return asset.add_batch_definition_whole_table("full")
+
+
+def register_incidents_by_ic(context: gx.DataContext) -> gx.ValidationDefinition:
+    batch_def = _table_asset(context, "incidents_by_ic")
+    suite = context.suites.add(gx.ExpectationSuite(name="mart_incidents_by_ic"))
+
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="entity_id"))
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="window_start"))
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="incident_count", min_value=0)
+    )
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeInSet(column="window_hours", value_set=[1, 6, 24])
+    )
+
+    return context.validation_definitions.add(
+        gx.ValidationDefinition(name="mart_incidents_by_ic", data=batch_def, suite=suite)
+    )
+
+
+def register_daily_anomaly_features(context: gx.DataContext) -> gx.ValidationDefinition:
+    batch_def = _table_asset(context, "daily_anomaly_features")
+    suite = context.suites.add(gx.ExpectationSuite(name="mart_daily_anomaly_features"))
+
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="date"))
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="source"))
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="total_incidents", min_value=0)
+    )
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="p1_share", min_value=0, max_value=1)
+    )
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="violation_rate", min_value=0, max_value=1)
+    )
+
+    return context.validation_definitions.add(
+        gx.ValidationDefinition(
+            name="mart_daily_anomaly_features", data=batch_def, suite=suite
+        )
+    )
+
+
+def register_kpi_monthly_state(context: gx.DataContext) -> gx.ValidationDefinition:
+    batch_def = _table_asset(context, "kpi_monthly_state")
+    suite = context.suites.add(gx.ExpectationSuite(name="mart_kpi_monthly_state"))
+
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="month"))
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeInSet(column="severity", value_set=[1, 2, 3])
+    )
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="violation_rate", min_value=0, max_value=1)
+    )
+    suite.add_expectation(
+        gxe.ExpectColumnValuesToBeBetween(column="total", min_value=0)
+    )
+
+    return context.validation_definitions.add(
+        gx.ValidationDefinition(name="mart_kpi_monthly_state", data=batch_def, suite=suite)
+    )
