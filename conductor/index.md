@@ -18,6 +18,8 @@ Navigation hub for project context.
 
 ## Active Tracks
 
+- [data-pipeline_20260529 — Pipeline de Dados](./tracks/data-pipeline_20260529/index.md)
+
 <!-- Auto-populated by /conductor:new-track -->
 
 ## Getting Started

@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "incidents-raw/v1",
+  "title": "IncidentRaw",
+  "description": "Hybrid schema for incidents.raw Kafka topic. Universal fields first-class; origin-specific payload preserved verbatim in payload_raw.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "source",
+    "received_at",
+    "opened_at",
+    "severity",
+    "entity_id",
+    "status",
+    "payload_raw"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique event identifier (UUID v4)."
+    },
+    "source": {
+      "type": "string",
+      "description": "Origin adapter identifier.",
+      "examples": ["itsm-locaweb", "alertmanager", "datadog"]
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the consumer received the event (UTC, ISO 8601)."
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the incident was opened in the originating system (UTC, ISO 8601)."
+    },
+    "severity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Normalized severity: 1=Critical, 2=High, 3=Medium, 4=Low, 5=VeryLow."
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "Identifier of the affected IC, host, or service."
+    },
+    "status": {
+      "type": "string",
+      "description": "Current status of the incident in the originating system."
+    },
+    "payload_raw": {
+      "type": "string",
+      "description": "Full original event as JSON string, verbatim from the originating system."
+    }
+  }
+}
