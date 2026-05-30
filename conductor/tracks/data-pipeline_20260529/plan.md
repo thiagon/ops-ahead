@@ -125,23 +125,23 @@ DAG que conecta dbt → GE → registro de snapshot no MLflow. Disparável manua
 
 ---
 
-## Phase 5: Validação ponta a ponta
+## Phase 5: Validação ponta a ponta (local)
 
-Roda o pipeline completo contra o dataset histórico e mede o que importa.
+Valida o fluxo completo num subconjunto realista para ambiente k3d local.
 
 ### Tasks
 
-- [ ] 5.1: Producer dispara o CSV completo (122.543 eventos) em modo `--speed 100x`
-- [ ] 5.2: Aguardar consumer completar ingestão; verificar `count()` em `incidents_raw` coerente
-- [ ] 5.3: Disparar `WorkflowTemplate data-pipeline`; medir tempo total da DAG
-- [ ] 5.4: Verificar 6 marts populados, GE verde, snapshot MLflow registrado
-- [ ] 5.5: Verificar Parquets no MinIO particionados por data
-- [ ] 5.6: Registrar tempos em `docs/insights/pipeline_e2e_baseline.md` (mediana e p95 por step)
+- [ ] 5.1: Producer dispara 1.000 eventos: `uv run --package ops-ahead-scripts python scripts/incident_producer.py --limit 1000`
+- [ ] 5.2: Verificar ingestão: `SELECT count() FROM incidents_raw` deve retornar ~1.000
+- [ ] 5.3: Disparar WorkflowTemplate manualmente via Argo UI ou `argo submit`
+- [ ] 5.4: Verificar 6 marts populados, GE suite `critical` verde, snapshot no MLflow
+- [ ] 5.5: Verificar Parquets no MinIO: `raw/source=itsm-locaweb/date=.../`
+- [ ] 5.6: Anotar observações e ajustes necessários em `docs/insights/pipeline_e2e_baseline.md`
 
 ### Verification
 
-- [ ] Fluxo completo (producer → consumer → DAG → marts) abaixo de 15 minutos no dataset histórico
-- [ ] Contagens raw → marts coerentes (auditoria via SQL ad-hoc)
+- [ ] Fluxo completo (producer → consumer → DAG → marts) funciona sem erros
+- [ ] Contagens raw → marts coerentes (queries em `scripts/audit.sql`)
 
 ---
 
