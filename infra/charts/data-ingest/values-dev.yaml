@@ -1,0 +1,5 @@
+consumer:
+  replicaCount: 1
+  env:
+    batchMaxSize: "100"
+    batchMaxSeconds: "5"

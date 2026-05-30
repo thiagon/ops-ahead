@@ -1,0 +1,6 @@
+apiVersion: v2
+name: data-ingest
+description: Kafka consumer → ClickHouse + MinIO (ns:data)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
