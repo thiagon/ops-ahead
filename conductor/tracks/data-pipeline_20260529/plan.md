@@ -108,13 +108,14 @@ DAG que conecta dbt → GE → registro de snapshot no MLflow. Disparável manua
 
 ### Tasks
 
-- [ ] 4.1: `WorkflowTemplate` `data-pipeline` em `infra/charts/data-workflows/templates/`
+- [x] 4.1: `WorkflowTemplate` `data-pipeline` em `infra/charts/data-workflows/templates/`
   - Steps em sequência: `dbt-run` → `great-expectations` → `register-snapshot`
-  - `dbt-run` e `great-expectations` usam imagens das fases 2 e 3
-- [ ] 4.2: Step `register-snapshot` — script Python que calcula hash SHA-256 dos marts, registra no experimento MLflow `data-pipeline-snapshots` (params: hash, dag_run_id; metrics: contagem por mart; tags: source, timestamp)
-- [ ] 4.3: `ArgoCD Application` apontando o template para reconciliação no overlay `dev`
-- [ ] 4.4: `CronWorkflow` opcional (comentado no overlay `dev`, ativado no `prod`) — disparo diário às 02:00
-- [ ] 4.5: Documentação em `apps/argo/README.md` — como disparar manualmente, como inspecionar falhas, como rerodar a partir de um step
+  - `dbt-run` usa imagem `data-transform` (dbt-clickhouse base + COPY projeto)
+  - `great-expectations` usa imagem `data-quality`
+- [x] 4.2: Step `register-snapshot` — script inline Python: SHA-256 dos counts dos marts, MLflow experiment `data-pipeline-snapshots`
+- [x] 4.3: `ArgoCD Application` já existia; `values.yaml` atualizado com bloco `pipeline:`
+- [x] 4.4: `CronWorkflow` controlado por `pipeline.cron.enabled` (false em dev, true em prod) — disparo diário às 02:00 UTC
+- [ ] 4.5: Documentação em `docs/data-pipeline.md` — como disparar manualmente, inspecionar falhas, rerodar step
 
 ### Verification
 

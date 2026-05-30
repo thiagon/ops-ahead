@@ -1,0 +1,15 @@
+{{- if .Values.pipeline.cron.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: data-pipeline-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: {{ .Values.pipeline.cron.schedule | quote }}
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 0
+  workflowSpec:
+    workflowTemplateRef:
+      name: data-pipeline
+{{- end }}
