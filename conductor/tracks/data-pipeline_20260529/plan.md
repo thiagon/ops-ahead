@@ -56,18 +56,18 @@ Constrói os 6 marts que são o contrato com as camadas superiores. dbt-clickhou
 
 ### Tasks
 
-- [ ] 2.1: Projeto dbt em `apps/data-transform/` com `dbt-clickhouse`
-  - `dbt_project.yml`, `profiles.yml` (perfil `clickhouse-dev` apontando para o `ns: data`)
-  - Estrutura `staging/` (extrai universais + parsing de `payload_raw`), `intermediate/` (joins e features), `marts/` (contratos)
-- [ ] 2.2: Staging `stg_incidents` — desserializa `payload_raw` para os 27 campos ITSM via `JSONExtract*`
-- [ ] 2.3: Mart `marts/incidents_by_ic` — agregado por (entity_id × janela 1h/6h/24h)
-- [ ] 2.4: Mart `marts/p4_sequences_by_ci` — window function sobre `severity=4` por entity_id (sequências crescentes)
-- [ ] 2.5: Mart `marts/first_touch_duration` — `opened_at × grupo_designado_inicial × OLA da severity`
-- [ ] 2.6: Mart `marts/priority_changes_log` — histórico de transições de `severity` extraído de eventos sequenciais por `event_id`
-- [ ] 2.7: Mart `marts/daily_anomaly_features` — features diárias (volume, share P1, % abertura manual, dispersão de entity_ids)
-- [ ] 2.8: Mart `marts/kpi_monthly_state` — estado mensal dos 4 KPIs PPR por (severity × dimensão)
-- [ ] 2.9: Testes dbt em cada mart (`unique`, `not_null`, relações entre marts)
-- [ ] 2.10: Imagem container `apps/data-transform/Dockerfile` versionada no Gitea registry
+- [x] 2.1: Projeto dbt em `transform/` (sem Python, sem Dockerfile — imagem oficial `dbt-labs/dbt-clickhouse`)
+  - `dbt_project.yml`, `profiles.yml` lendo env vars (`CLICKHOUSE_HOST`, `CLICKHOUSE_USER`, etc.)
+  - Estrutura `staging/` (extrai universais + parsing de `payload_raw`), `marts/` (contratos)
+- [x] 2.2: Staging `stg_incidents` — desserializa `payload_raw` para os 27 campos ITSM via `JSONExtract*`
+- [x] 2.3: Mart `marts/incidents_by_ic` — agregado por (entity_id × janela 1h/6h/24h) via `arrayJoin`
+- [x] 2.4: Mart `marts/p4_sequences_by_ci` — islands-and-gaps sobre `severity=4` por entity_id
+- [x] 2.5: Mart `marts/first_touch_duration` — `opened_at × grupo_designado × OLA da severity`
+- [x] 2.6: Mart `marts/priority_changes_log` — transições de `severity` via `lag()` por `numero`
+- [x] 2.7: Mart `marts/daily_anomaly_features` — features diárias para ML (volume, share P1, violation_rate, dispersão de entity_ids)
+- [x] 2.8: Mart `marts/kpi_monthly_state` — estado mensal dos KPIs por (severity × source)
+- [x] 2.9: Testes dbt em `_schema.yml` para cada mart (`unique`, `not_null`, `accepted_values`)
+- [~] 2.10: N/A — sem Dockerfile; Argo usa imagem oficial diretamente
 
 ### Verification
 
