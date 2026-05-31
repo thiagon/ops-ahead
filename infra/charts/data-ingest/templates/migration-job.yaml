@@ -23,6 +23,7 @@ spec:
       initContainers:
         - name: copy-migrations
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["cp", "-r", "/app/migrations/.", "/migrations/"]
           volumeMounts:
             - name: migrations
