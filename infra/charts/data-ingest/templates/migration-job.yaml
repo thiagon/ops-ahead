@@ -41,7 +41,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.migration.secretName }}
-                  key: clickhouse-migrate-url
+                  key: CLICKHOUSE_MIGRATE_URL
           volumeMounts:
             - name: migrations
               mountPath: /migrations
