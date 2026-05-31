@@ -4,6 +4,8 @@ image:
   pullPolicy: IfNotPresent
 
 migration:
+  image: migrate/migrate:v4.18.1
+  pullPolicy: IfNotPresent
   secretName: clickhouse-secret
 
 consumer:

@@ -1,6 +1,9 @@
 image:
   pullPolicy: Never
 
+migration:
+  pullPolicy: Never
+
 consumer:
   replicaCount: 1
   env:

@@ -30,7 +30,8 @@ spec:
               mountPath: /migrations
       containers:
         - name: migrate
-          image: ghcr.io/golang-migrate/migrate:latest
+          image: {{ .Values.migration.image }}
+          imagePullPolicy: {{ .Values.migration.pullPolicy }}
           args:
             - "-path=/migrations"
             - "-database=$(DATABASE_URL)"
