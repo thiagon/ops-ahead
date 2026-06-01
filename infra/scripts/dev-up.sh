@@ -8,7 +8,7 @@ ENV_FILE="$ROOT_DIR/.env"
 [ -f "$ENV_FILE" ] || error ".env not found — run: make setup"
 set -a; source "$ENV_FILE"; set +a
 
-: "${VAULT_TOKEN:=ops-ahead-dev}"
+: "${VAULT_TOKEN:?'VAULT_TOKEN must be set in .env'}"
 : "${GITEA_ADMIN_USERNAME:?'GITEA_ADMIN_USERNAME must be set in .env'}"
 : "${GITEA_ADMIN_PASSWORD:?'GITEA_ADMIN_PASSWORD must be set in .env'}"
 : "${ARGOCD_ADMIN_PASSWORD:?'ARGOCD_ADMIN_PASSWORD must be set in .env'}"
