@@ -8,7 +8,7 @@ ENV_FILE="$ROOT_DIR/.env"
 [ -f "$ENV_FILE" ] || error ".env not found — run: make setup"
 set -a; source "$ENV_FILE"; set +a
 
-: "${VAULT_TOKEN:?'VAULT_TOKEN must be set in .env'}"
+: "${VAULT_TOKEN:=ops-ahead-dev}"
 : "${GITEA_ADMIN_USERNAME:?'GITEA_ADMIN_USERNAME must be set in .env'}"
 : "${GITEA_ADMIN_PASSWORD:?'GITEA_ADMIN_PASSWORD must be set in .env'}"
 : "${ARGOCD_ADMIN_PASSWORD:?'ARGOCD_ADMIN_PASSWORD must be set in .env'}"
@@ -27,9 +27,11 @@ if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
   info "Cluster already exists"
 else
   info "Creating cluster 'ops-ahead'..."
+  mkdir -p "$ROOT_DIR/.data"
   k3d cluster create ops-ahead \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
+    --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server[0]" \
     --wait
 fi
 kubectl get nodes
@@ -75,8 +77,52 @@ helm upgrade --install infra-vault ./infra/charts/infra-vault \
   -n infra \
   -f infra/charts/infra-vault/values.yaml \
   -f infra/charts/infra-vault/values-dev.yaml \
-  --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
-  --wait --timeout 5m 2>/dev/null
+  --timeout 5m 2>/dev/null
+info "Vault deployed (standalone)"
+
+# Vault standalone starts sealed — wait for the pod to be Running, then init/unseal.
+for i in $(seq 1 40); do
+  VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
+    --field-selector=status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  [ -n "${VAULT_POD:-}" ] && break
+  sleep 3
+done
+[ -z "${VAULT_POD:-}" ] && error "Vault pod did not reach Running phase within 2min"
+
+VAULT_INIT_FILE="$ROOT_DIR/.data/vault-init.json"
+mkdir -p "$ROOT_DIR/.data"
+
+kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
+  > /tmp/vault-status.json 2>/dev/null || true
+
+IS_INIT=$(python3 -c \
+  "import json; d=json.load(open('/tmp/vault-status.json')); print(d.get('initialized',False))" \
+  2>/dev/null || echo "False")
+
+if [ "$IS_INIT" != "True" ]; then
+  info "Initializing Vault (first run)..."
+  kubectl exec -n infra "$VAULT_POD" -- \
+    vault operator init -key-shares=1 -key-threshold=1 -format=json \
+    > "$VAULT_INIT_FILE"
+  info "Init output → .data/vault-init.json"
+fi
+
+UNSEAL_KEY=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['unseal_keys_b64'][0])")
+VAULT_TOKEN=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['root_token'])")
+
+kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
+  > /tmp/vault-status.json 2>/dev/null || true
+IS_SEALED=$(python3 -c \
+  "import json; d=json.load(open('/tmp/vault-status.json')); print(d.get('sealed',True))" \
+  2>/dev/null || echo "True")
+
+if [ "$IS_SEALED" = "True" ]; then
+  kubectl exec -n infra "$VAULT_POD" -- vault operator unseal "$UNSEAL_KEY" > /dev/null
+  info "Vault unsealed"
+fi
+
+kubectl wait pod -n infra "$VAULT_POD" --for=condition=Ready --timeout=60s > /dev/null
 info "Vault ready"
 
 helm upgrade --install infra-gitea ./infra/charts/infra-gitea \

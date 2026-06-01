@@ -23,7 +23,9 @@ gitea:
       clusterIP: ""
       port: 3000
   persistence:
-    enabled: false
+    enabled: true
+    storageClass: local-path
+    size: 1Gi
   postgresql:
     enabled: false
   postgresql-ha:
