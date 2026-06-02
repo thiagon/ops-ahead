@@ -31,7 +31,7 @@ else
   k3d cluster create ops-ahead \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
-    --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server[0]" \
+    --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
     --wait
 fi
 kubectl get nodes
@@ -80,21 +80,30 @@ helm upgrade --install infra-vault ./infra/charts/infra-vault \
   --timeout 5m 2>/dev/null
 info "Vault deployed (standalone)"
 
-# Vault standalone starts sealed — wait for the pod to be Running, then init/unseal.
+# Vault standalone starts sealed — wait for pod to exist, then Running, then respond.
 for i in $(seq 1 40); do
   VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
-    --field-selector=status.phase=Running \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
   [ -n "${VAULT_POD:-}" ] && break
   sleep 3
 done
-[ -z "${VAULT_POD:-}" ] && error "Vault pod did not reach Running phase within 2min"
+[ -z "${VAULT_POD:-}" ] && error "Vault pod did not appear within 2min"
+
+for i in $(seq 1 40); do
+  PHASE=$(kubectl get pod -n infra "$VAULT_POD" -o jsonpath='{.status.phase}' 2>/dev/null)
+  [ "$PHASE" = "Running" ] && break
+  sleep 3
+done
+
+# Wait until vault binary responds (container may still be starting)
+for i in $(seq 1 30); do
+  kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
+    > /tmp/vault-status.json 2>/dev/null && break || true
+  sleep 2
+done
 
 VAULT_INIT_FILE="$ROOT_DIR/.data/vault-init.json"
 mkdir -p "$ROOT_DIR/.data"
-
-kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
-  > /tmp/vault-status.json 2>/dev/null || true
 
 IS_INIT=$(python3 -c \
   "import json; d=json.load(open('/tmp/vault-status.json')); print(d.get('initialized',False))" \
@@ -246,6 +255,7 @@ done
 # Heredoc keeps VAULT_TOKEN out of argv (visible in ps/audit).
 kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
 export VAULT_TOKEN='${VAULT_TOKEN}'
+vault secrets enable -path=secret kv-v2 2>/dev/null || true
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
 
