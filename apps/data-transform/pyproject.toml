@@ -2,9 +2,8 @@
 name = "ops-ahead-data-transform"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["dbt-clickhouse==1.8.1"]
 
 [tool.ops-ahead]
 workload = "job"
 namespace = "data"
-image = "ghcr.io/dbt-labs/dbt-clickhouse"
