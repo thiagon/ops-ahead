@@ -21,10 +21,15 @@ setup: .env
 up:
 	bash infra/scripts/dev-up.sh
 
-# Tear down the k3d cluster.
+# Stop the k3d cluster, preserving data (resume with `make up`).
 .PHONY: down
 down:
 	bash infra/scripts/dev-down.sh
+
+# Delete the cluster and wipe persisted state (.data/). Destructive.
+.PHONY: destroy
+destroy:
+	bash infra/scripts/dev-destroy.sh
 
 # Push working dir to Gitea + refresh ArgoCD (use after editing charts).
 .PHONY: sync
