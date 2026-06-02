@@ -46,6 +46,18 @@ bcrypt:
 	@docker run --rm httpd:alpine htpasswd -nbBC 10 "" "$(PWD)" 2>/dev/null \
 	  | tr -d ':\n' | sed 's/$$2y/$$2a/' && echo
 
+# Build all custom app images and import them into k3d.
+.PHONY: build
+build:
+	docker build -t gitea.ops-ahead.local/ops-ahead/data-ingest:latest   apps/data-ingest/
+	docker build -t gitea.ops-ahead.local/ops-ahead/data-transform:latest apps/data-transform/
+	docker build -t gitea.ops-ahead.local/ops-ahead/data-quality:latest   apps/data-quality/
+	k3d image import \
+	  gitea.ops-ahead.local/ops-ahead/data-ingest:latest \
+	  gitea.ops-ahead.local/ops-ahead/data-transform:latest \
+	  gitea.ops-ahead.local/ops-ahead/data-quality:latest \
+	  -c ops-ahead
+
 # Follow pod logs by label. Usage: make logs APP=mlflow NS=ml
 .PHONY: logs
 logs:
