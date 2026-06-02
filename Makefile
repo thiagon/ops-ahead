@@ -49,6 +49,8 @@ bcrypt:
 # Build a custom app image and import it into k3d. Usage: make build APP=data-ingest
 .PHONY: build
 build:
+	@source .env && echo "$$GITHUB_PERSONAL_ACCESS_TOKEN" | \
+	  docker login ghcr.io -u token --password-stdin 2>/dev/null || true
 	docker build -t gitea.ops-ahead.local/ops-ahead/$(APP):latest apps/$(APP)/
 	k3d image import gitea.ops-ahead.local/ops-ahead/$(APP):latest -c ops-ahead
 
