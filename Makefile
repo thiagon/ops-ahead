@@ -46,11 +46,23 @@ bcrypt:
 	@docker run --rm httpd:alpine htpasswd -nbBC 10 "" "$(PWD)" 2>/dev/null \
 	  | tr -d ':\n' | sed 's/$$2y/$$2a/' && echo
 
-# Build a custom app image and import it into k3d. Usage: make build APP=data-ingest
+# Build a custom app image and import into k3d. Usage: make build APP=data-ingest
+GITEA_REGISTRY ?= gitea.ops-ahead.localtest.me
+LOCAL_IMAGE     = gitea.ops-ahead.local/ops-ahead/$(APP):latest
+GITEA_IMAGE     = $(GITEA_REGISTRY)/ops-ahead/$(APP):latest
+
 .PHONY: build
 build:
-	docker build -f apps/$(APP)/Dockerfile -t gitea.ops-ahead.local/ops-ahead/$(APP):latest .
-	k3d image import gitea.ops-ahead.local/ops-ahead/$(APP):latest -c ops-ahead
+	docker build -f apps/$(APP)/Dockerfile -t $(LOCAL_IMAGE) .
+	k3d image import $(LOCAL_IMAGE) -c ops-ahead
+
+# Push image to Gitea container registry. Usage: make push APP=data-ingest
+.PHONY: push
+push:
+	@source .env && echo "$$GITEA_ADMIN_PASSWORD" | \
+	  docker login $(GITEA_REGISTRY) -u "$$GITEA_ADMIN_USERNAME" --password-stdin
+	docker tag $(LOCAL_IMAGE) $(GITEA_IMAGE)
+	docker push $(GITEA_IMAGE)
 
 # Follow pod logs by label. Usage: make logs APP=mlflow NS=ml
 .PHONY: logs
