@@ -95,10 +95,11 @@ for i in $(seq 1 40); do
   sleep 3
 done
 
-# Wait until vault binary responds (container may still be starting)
+# Wait until vault binary responds (sealed = exit 2, uninitialized = exit 2, ok = exit 0)
 for i in $(seq 1 30); do
   kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
-    > /tmp/vault-status.json 2>/dev/null && break || true
+    > /tmp/vault-status.json 2>/dev/null || true
+  [ -s /tmp/vault-status.json ] && break
   sleep 2
 done
 
