@@ -2,6 +2,10 @@
 # Working dir is pushed as branch 'main' by dev-up.sh / dev-sync.sh.
 gitea:
   enabled: true
+  # RWO PVC: old pod must release the LevelDB lock before the new one starts.
+  # RollingUpdate deadlocks on the shared /data volume (CrashLoop on the new pod).
+  strategy:
+    type: Recreate
   gitea:
     admin:
       existingSecret: gitea-admin-secret
