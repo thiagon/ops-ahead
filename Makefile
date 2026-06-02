@@ -62,7 +62,7 @@ push:
 	@source .env && echo "$$GITEA_ADMIN_PASSWORD" | \
 	  docker login $(GITEA_REGISTRY) -u "$$GITEA_ADMIN_USERNAME" --password-stdin
 	docker tag $(LOCAL_IMAGE) $(GITEA_IMAGE)
-	docker push $(GITEA_IMAGE)
+	docker push $(GITEA_IMAGE) || (docker rmi $(GITEA_IMAGE) 2>/dev/null; exit 1)
 
 # Follow pod logs by label. Usage: make logs APP=mlflow NS=ml
 .PHONY: logs
