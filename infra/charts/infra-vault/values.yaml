@@ -1,3 +1,10 @@
+# Auto-unsealer is dev-only; production uses a real seal (KMS/transit).
+unsealer:
+  enabled: false
+  image: hashicorp/vault:1.21.2
+  vaultAddr: http://infra-vault-0.infra-vault-internal.infra.svc.cluster.local:8200
+  secretName: vault-unseal-key
+
 vault:
   injector:
     enabled: true
