@@ -9,6 +9,9 @@ gitea:
       database:
         DB_TYPE: sqlite3
       server:
+        DOMAIN: gitea.ops-ahead.localtest.me
+        HTTP_PORT: 3000
+        ROOT_URL: http://gitea.ops-ahead.localtest.me
         DISABLE_SSH: true
         OFFLINE_MODE: true
       service:
