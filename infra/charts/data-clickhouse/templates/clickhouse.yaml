@@ -31,6 +31,10 @@ spec:
       max_connections: "100"
       max_concurrent_queries: "50"
       keep_alive_timeout: "3"
+      # Explicit cap: ClickHouse otherwise auto-derives the limit from the
+      # memory *request* (0.9 ratio), not the container limit, capping itself
+      # at ~460 MiB on a 512 MiB request and OOMing trivial queries.
+      max_server_memory_usage: {{ .Values.clickhouse.cluster.maxServerMemoryUsage | quote }}
       {{- if .Values.monitoring.enabled }}
       prometheus/endpoint: /metrics
       prometheus/port: "9363"

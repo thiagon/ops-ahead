@@ -3,6 +3,8 @@ clickhouse:
   cluster:
     shards: 1
     replicas: 2
+    # Must stay under the container memory limit (2Gi). 1.5 GiB leaves headroom.
+    maxServerMemoryUsage: "1610612736"
     storage:
       size: 50Gi
 
