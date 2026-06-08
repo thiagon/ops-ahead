@@ -1,4 +1,6 @@
 clickhouse:
+  # Dev-only: fixed password for the ops_ahead user (hashed at render time).
+  devPassword: ops-ahead-dev
   cluster:
     shards: 1
     replicas: 1

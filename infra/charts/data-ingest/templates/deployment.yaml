@@ -47,15 +47,12 @@ spec:
             - name: BATCH_MAX_SECONDS
               value: {{ .Values.consumer.env.batchMaxSeconds | quote }}
             - name: CLICKHOUSE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.consumer.secretName }}
-                  key: clickhouse-user
+              value: {{ .Values.consumer.env.clickhouseUser | quote }}
             - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.consumer.secretName }}
-                  key: clickhouse-password
+                  key: CLICKHOUSE_PASSWORD
             - name: MINIO_ACCESS_KEY
               valueFrom:
                 secretKeyRef:

@@ -9,10 +9,17 @@ metadata:
 spec:
   configuration:
     users:
+      {{- if .Values.clickhouse.devPassword }}
+      # Dev: deterministic password so it always matches ops-ahead-dev. The
+      # operator's k8s_secret_password generated a stale hash when ESO was down
+      # at CHI creation and never re-read the secret.
+      ops_ahead/password_sha256_hex: {{ .Values.clickhouse.devPassword | sha256sum }}
+      {{- else }}
       ops_ahead/k8s_secret_password:
         namespace: {{ .Release.Namespace }}
         name: clickhouse-secret
         key: CLICKHOUSE_PASSWORD
+      {{- end }}
       ops_ahead/networks/ip:
         - "::/0"
         - "0.0.0.0/0"
