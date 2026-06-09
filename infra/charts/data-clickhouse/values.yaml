@@ -3,10 +3,18 @@ clickhouse:
   cluster:
     shards: 1
     replicas: 2
-    # Must stay under the container memory limit (2Gi). 1.5 GiB leaves headroom.
+    # Must stay under both the container limit and 0.9x the memory request
+    # (ClickHouse reads the request as available RAM and caps itself there).
     maxServerMemoryUsage: "1610612736"
     storage:
       size: 50Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
 
 monitoring:
   enabled: true

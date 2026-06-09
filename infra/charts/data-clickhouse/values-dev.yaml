@@ -1,6 +1,15 @@
 clickhouse:
   # Dev-only: fixed password for the ops_ahead user (hashed at render time).
   devPassword: ops-ahead-dev
+  # Request high enough that ClickHouse's RAM-ratio cap clears idle RSS + a
+  # migrate query (~800 MiB). 1.5Gi request -> ~1.38Gi effective ceiling.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1536Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
   cluster:
     shards: 1
     replicas: 1

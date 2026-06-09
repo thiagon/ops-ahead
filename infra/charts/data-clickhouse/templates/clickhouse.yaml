@@ -64,13 +64,11 @@ spec:
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:24.3-alpine
+              # ClickHouse derives its memory ceiling from the *request* (it
+              # reads it as available RAM), so the request must be generous
+              # enough or max_server_memory_usage gets cut down below idle RSS.
               resources:
-                requests:
-                  cpu: 200m
-                  memory: 512Mi
-                limits:
-                  cpu: "1"
-                  memory: 2Gi
+                {{- toYaml .Values.clickhouse.resources | nindent 16 }}
               ports:
                 - name: http
                   containerPort: 8123
