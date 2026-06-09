@@ -9,10 +9,14 @@ metadata:
 spec:
   configuration:
     users:
-      ops_ahead/k8s_secret_password:
-        namespace: {{ .Release.Namespace }}
-        name: clickhouse-secret
-        key: CLICKHOUSE_PASSWORD
+      # Password from the Vault/ESO secret (sourced from .env CLICKHOUSE_PASSWORD).
+      # operator 0.23.x: the map form of k8s_secret_password is not parsed and the
+      # string form is deprecated — valueFrom/secretKeyRef is the supported syntax.
+      ops_ahead/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: CLICKHOUSE_PASSWORD
       ops_ahead/networks/ip:
         - "::/0"
         - "0.0.0.0/0"
