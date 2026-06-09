@@ -7,6 +7,12 @@ metadata:
   labels:
     {{- include "data-clickhouse.labels" . | nindent 4 }}
 spec:
+  # Without these references the operator ignores the podTemplate (resources)
+  # and volumeClaimTemplate (persistence) below and falls back to its defaults.
+  defaults:
+    templates:
+      podTemplate: default
+      dataVolumeClaimTemplate: data-volume
   configuration:
     users:
       # Password from the Vault/ESO secret (sourced from .env CLICKHOUSE_PASSWORD).
