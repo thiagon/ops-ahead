@@ -20,6 +20,9 @@ spec:
         prometheus.io/port: "8000"
         prometheus.io/path: "/metrics"
     spec:
+      # The 'clickhouse' Service makes Kubernetes inject a legacy CLICKHOUSE_PORT
+      # env (tcp://ip:port) that collides with the app's int CLICKHOUSE_PORT.
+      enableServiceLinks: false
       containers:
         - name: consumer
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
