@@ -17,6 +17,15 @@ kubectl get ns infra > /dev/null 2>&1 || error "Cluster not found — run: make 
 
 GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
 
+# Wait for the Gitea HTTP endpoint (pod-Ready is not enough — the ingress
+# route may still be coming up after a cluster start).
+info "Waiting for Gitea HTTP..."
+for i in $(seq 1 60); do
+  curl -sf "http://gitea.ops-ahead.localtest.me/api/v1/version" > /dev/null 2>&1 && break
+  [ "$i" -eq 60 ] && warn "Gitea HTTP not responding after 2min — push may fail"
+  sleep 2
+done
+
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 info "Snapshotting working dir..."
 git add -A
