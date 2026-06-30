@@ -23,6 +23,14 @@ spec:
       log.retention.ms: {{ .Values.kafka.cluster.retention.ms | quote }}
       log.message.format.version: "3.7"
       inter.broker.protocol.version: "3.7"
+      # Internal-topic replication must not exceed the broker count, or the
+      # __consumer_offsets topic never gets created and consumers loop on
+      # GroupCoordinatorNotAvailableError. Derive both from the replica count.
+      offsets.topic.replication.factor: {{ .Values.kafka.cluster.replicas }}
+      transaction.state.log.replication.factor: {{ .Values.kafka.cluster.replicas }}
+      transaction.state.log.min.isr: 1
+      default.replication.factor: {{ .Values.kafka.cluster.replicas }}
+      min.insync.replicas: 1
     resources:
       {{- toYaml .Values.kafka.cluster.resources | nindent 6 }}
     jvmOptions:
