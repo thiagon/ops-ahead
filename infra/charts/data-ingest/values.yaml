@@ -18,7 +18,7 @@ consumer:
       cpu: 500m
       memory: 512Mi
   env:
-    kafkaBootstrapServers: kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
     kafkaTopic: incidents.raw
     kafkaGroupId: raw-ingest
     clickhouseHost: clickhouse.data.svc.cluster.local
