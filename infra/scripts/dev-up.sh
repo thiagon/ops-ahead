@@ -25,6 +25,9 @@ cd "$ROOT_DIR"
 VAULT_INIT_FILE="$ROOT_DIR/.data/vault-init.json"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
+# Pin the Kubernetes version so clusters are reproducible across machines.
+K3S_IMAGE="rancher/k3s:v1.31.5-k3s1"
+
 # Seed/refresh the Secret the in-cluster auto-unsealer reads (from the persisted
 # init file). No-op until Vault has been initialized at least once.
 ensure_unseal_secret() {
@@ -67,6 +70,7 @@ else
   info "Creating cluster 'ops-ahead'..."
   mkdir -p "$ROOT_DIR/.data"
   k3d cluster create ops-ahead \
+    --image "$K3S_IMAGE" \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
     --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
