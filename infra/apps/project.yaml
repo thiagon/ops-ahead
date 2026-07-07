@@ -112,3 +112,8 @@ spec:
       - group: ""
         kind: Secret
         name: "*-admission"
+      # Seeded imperatively by dev-up.sh's Vault auto-unsealer (holds the unseal
+      # key — must not live in Git), so no Application manages it.
+      - group: ""
+        kind: Secret
+        name: vault-unseal-key
