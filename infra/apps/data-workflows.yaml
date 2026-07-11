@@ -10,6 +10,8 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
+  # Engine only. The pipeline definitions live in pipelines/* and are deployed by
+  # the pipelines ApplicationSet (infra/apps/pipelines-appset.yaml), wave 6.
   source:
     repoURL: https://github.com/thiagon/ops-ahead
     targetRevision: main

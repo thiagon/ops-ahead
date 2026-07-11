@@ -1,6 +1,6 @@
-# Never for the app image (built locally, imported into k3d via `make build`).
+# Pulled from the in-cluster Gitea registry (built + pushed by Gitea Actions).
 image:
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
 
 # migrate/migrate is a public image — it must be pulled, not Never.
 migration:

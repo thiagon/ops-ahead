@@ -24,6 +24,8 @@ gitea:
         INSTALL_LOCK: true
       packages:
         ENABLED: true
+      actions:
+        ENABLED: true
   service:
     http:
       type: ClusterIP
@@ -50,3 +52,14 @@ gitea:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Gitea Actions runner: act_runner drives builds via a dind sidecar. hostNetwork
+# so the registry host `gitea.ops-ahead.localtest.me` (→127.0.0.1 via hostAliases)
+# lands on the node's Traefik, the same path `make push` uses from the host.
+runner:
+  enabled: true
+  image: gitea/act_runner:0.2.11
+  dindImage: docker:27-dind
+  # Job container image (has git + tooling; act's default ubuntu runner).
+  jobImage: ghcr.io/catthehacker/ubuntu:act-22.04
+  registrationSecret: gitea-runner-token

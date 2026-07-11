@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation "Navigation Bar" [ref=e3]:
+      - generic [ref=e4]:
+        - link "Home" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - link "Explore" [ref=e7] [cursor=pointer]:
+          - /url: /explore/repos
+        - link "Help" [ref=e8] [cursor=pointer]:
+          - /url: https://docs.gitea.com
+      - link "Sign In" [ref=e10] [cursor=pointer]:
+        - /url: /user/login?redirect_to=%2fops-ahead%2fops-ahead%2factions%2fruns%2f2
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e16]:
+          - generic [ref=e22]:
+            - link "ops-ahead" [ref=e23] [cursor=pointer]:
+              - /url: /ops-ahead
+            - text: /
+            - link "ops-ahead" [ref=e24] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead
+          - generic [ref=e25]:
+            - link "RSS Feed" [ref=e26] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead.rss
+            - generic "Sign in to watch this repository." [ref=e30] [cursor=pointer]:
+              - button "Watch" [disabled]
+              - link "1" [ref=e31]:
+                - /url: /ops-ahead/ops-ahead/watchers
+            - generic "Sign in to star this repository." [ref=e33] [cursor=pointer]:
+              - button "Star" [disabled]
+              - link "0" [ref=e34]:
+                - /url: /ops-ahead/ops-ahead/stars
+            - generic "Sign in to fork this repository." [ref=e35]:
+              - generic: Fork
+              - link "0" [ref=e36] [cursor=pointer]:
+                - /url: /ops-ahead/ops-ahead/forks
+        - navigation [ref=e38]:
+          - generic [ref=e39]:
+            - link "Code" [ref=e40] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead
+            - link "Issues" [ref=e44] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/issues
+            - link "Pull Requests" [ref=e49] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/pulls
+            - link "Actions" [ref=e53] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/actions
+            - link "Packages" [ref=e57] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/packages
+            - link "Projects" [ref=e61] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/projects
+            - link "Releases" [ref=e65] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/releases
+            - link "Wiki" [ref=e69] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/wiki
+            - link "Activity" [ref=e73] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/activity
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e82]:
+            - generic "Failure" [ref=e83]
+            - 'heading "dev: working dir snapshot" [level=2] [ref=e86]'
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - link "build.yaml" [ref=e89] [cursor=pointer]:
+                - /url: /ops-ahead/ops-ahead/actions/?workflow=build.yaml
+              - text: ":"
+            - text: Commit
+            - link "6441f4876b" [ref=e90] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/commit/6441f4876b5ac9736b4ee8261728a7b9331e7414
+            - text: pushed by
+            - link "ops-ahead" [ref=e91] [cursor=pointer]:
+              - /url: /ops-ahead
+            - link "main" [ref=e93] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/src/branch/main
+        - generic [ref=e94]:
+          - generic [ref=e97]:
+            - link "Failure build (data-ingest) 5s" [ref=e98] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/actions/runs/2/jobs/0
+              - generic [ref=e99]:
+                - generic "Failure" [ref=e100]
+                - generic [ref=e103]: build (data-ingest)
+              - generic [ref=e104]: 5s
+            - link "Failure build (data-quality) 4s" [ref=e106] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/actions/runs/2/jobs/1
+              - generic [ref=e107]:
+                - generic "Failure" [ref=e108]
+                - generic [ref=e111]: build (data-quality)
+              - generic [ref=e112]: 4s
+            - link "Failure build (data-transform) 3s" [ref=e114] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/actions/runs/2/jobs/2
+              - generic [ref=e115]:
+                - generic "Failure" [ref=e116]
+                - generic [ref=e119]: build (data-transform)
+              - generic [ref=e120]: 3s
+            - link "Skipped write-back 0s" [ref=e122] [cursor=pointer]:
+              - /url: /ops-ahead/ops-ahead/actions/runs/2/jobs/3
+              - generic [ref=e123]:
+                - generic "Skipped" [ref=e124]
+                - generic [ref=e127]: write-back
+              - generic [ref=e128]: 0s
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - heading "build (data-ingest)" [level=3] [ref=e133]
+                - paragraph [ref=e134]: Failure
+              - button [ref=e137] [cursor=pointer]
+            - generic [ref=e140]:
+              - generic [ref=e142] [cursor=pointer]:
+                - generic [ref=e148]: Set up job
+                - generic [ref=e149]: 2s
+              - generic [ref=e151] [cursor=pointer]:
+                - generic [ref=e157]: actions/checkout@v4
+                - generic [ref=e158]: 2s
+              - generic [ref=e160] [cursor=pointer]:
+                - generic [ref=e166]: "Build & push ${{ matrix.app }}:${{ github.sha }}"
+                - generic [ref=e167]: 0s
+              - generic [ref=e169] [cursor=pointer]:
+                - generic [ref=e175]: Complete job
+                - generic [ref=e176]: 1s
+  - group "Footer" [ref=e177]:
+    - contentinfo "About Software" [ref=e178]:
+      - link "Powered by Gitea" [ref=e179] [cursor=pointer]:
+        - /url: https://about.gitea.com
+      - text: "Version: 1.22.2 Page:"
+      - strong [ref=e180]: 12ms
+      - text: "Template:"
+      - strong [ref=e181]: 2ms
+    - group "Links" [ref=e182]:
+      - menu [ref=e183] [cursor=pointer]:
+        - generic [ref=e184]: English
+      - link "Licenses" [ref=e187] [cursor=pointer]:
+        - /url: /assets/licenses.txt
+      - link "API" [ref=e188] [cursor=pointer]:
+        - /url: /api/swagger

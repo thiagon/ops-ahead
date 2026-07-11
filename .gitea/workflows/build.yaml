@@ -1,0 +1,66 @@
+name: build-apps
+
+# App/source changes trigger a build. The write-back commit only touches the
+# colocated chart overlays (apps/*/chart) and infra/**, all ignored here — so it
+# never re-triggers this workflow (plus [skip ci] on the commit as a belt).
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'apps/*/chart/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'conductor/**'
+      - '**.md'
+
+env:
+  REGISTRY: gitea.ops-ahead.localtest.me
+  OWNER: ops-ahead
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # checkout
+      packages: write     # push images to the Gitea registry
+    strategy:
+      matrix:
+        app: [data-ingest, data-transform, data-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & push ${{ matrix.app }}:${{ github.sha }}
+        run: |
+          IMAGE="${REGISTRY}/${OWNER}/${{ matrix.app }}"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
+          docker build -f "apps/${{ matrix.app }}/Dockerfile" -t "${IMAGE}:${{ github.sha }}" .
+          docker push "${IMAGE}:${{ github.sha }}"
+
+  write-back:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # commit the pinned image tags back to main
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin image tags to ${{ github.sha }}
+        run: |
+          SHA="${{ github.sha }}"
+          REG="${REGISTRY}/${OWNER}"
+          # Each app owns its image tag overlay, colocated with the app. The
+          # pipeline steps use app-scoped keys so the pipeline App can layer both
+          # via $values without colliding.
+          printf 'image:\n  tag: "%s"\n' "$SHA" \
+            > apps/data-ingest/chart/values-image.yaml
+          printf 'transform:\n  image: %s/data-transform:%s\n' "$REG" "$SHA" \
+            > apps/data-transform/chart/values-image.yaml
+          printf 'quality:\n  image: %s/data-quality:%s\n' "$REG" "$SHA" \
+            > apps/data-quality/chart/values-image.yaml
+      - name: Commit & push write-back
+        run: |
+          git config user.name "gitea-actions"
+          git config user.email "actions@ops-ahead.local"
+          git add apps/data-ingest/chart/values-image.yaml \
+                  apps/data-transform/chart/values-image.yaml \
+                  apps/data-quality/chart/values-image.yaml
+          git commit -m "ci: pin image tags to ${{ github.sha }} [skip ci]" || exit 0
+          git push origin HEAD:main

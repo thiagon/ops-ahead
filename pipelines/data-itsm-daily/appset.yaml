@@ -1,0 +1,10 @@
+# Consumed by infra/apps/pipelines-appset.yaml (git files generator).
+# Declares this pipeline's deploy identity and which per-app image overlays to
+# layer via $values. Adding a pipeline = adding a folder with this file.
+name: data-itsm-daily
+namespace: data
+syncWave: "6"
+chart: infra/charts/data-pipeline   # base chart (templates); this folder is config only
+extraValueFiles:
+  - apps/data-transform/chart/values-image.yaml
+  - apps/data-quality/chart/values-image.yaml

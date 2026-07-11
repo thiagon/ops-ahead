@@ -32,10 +32,19 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-  # dev-up.sh rewrites child Apps' repoURL to the local Gitea.
-  # Without this ignore + RespectIgnoreDifferences, selfHeal would revert it to GitHub.
+  # dev-up.sh rewrites child Apps' (and the ApplicationSet's) repoURL to the local
+  # Gitea. Without this ignore + RespectIgnoreDifferences, selfHeal would revert it
+  # to GitHub — and for the ApplicationSet that would cascade to the Apps it generates.
   ignoreDifferences:
     - group: argoproj.io
       kind: Application
+      jqPathExpressions:
+        - .spec.source.repoURL          # single-source apps
+        - .spec.sources[].repoURL       # multi-source apps (e.g. data-ingest)
+    - group: argoproj.io
+      kind: ApplicationSet
       jsonPointers:
-        - /spec/source/repoURL
+        - /spec/templatePatch           # raw block restates sources[].repoURL
+      jqPathExpressions:
+        - .spec.generators[].git.repoURL
+        - .spec.template.spec.sources[].repoURL

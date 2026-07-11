@@ -73,6 +73,8 @@ else
     --image "$K3S_IMAGE" \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
+    --registry-config "$SCRIPT_DIR/registries.yaml" \
+    --host-alias "127.0.0.1:gitea.ops-ahead.localtest.me" \
     --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
     --wait
 fi
@@ -203,12 +205,16 @@ info "Vault ready"
 # Hand the unseal key to the in-cluster auto-unsealer for future restarts.
 ensure_unseal_secret
 
+# No --wait: the act-runner (in this chart) mounts the gitea-runner-token
+# secret, which we can only mint from the Gitea API further down — waiting on
+# the whole release here would deadlock. Gitea readiness is asserted by the
+# curl loop below; the runner recovers once the token secret exists.
 helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
   -n infra \
   -f infra/charts/infra-gitea/values.yaml \
   -f infra/charts/infra-gitea/values-dev.yaml \
-  --wait --timeout 5m 2>/dev/null
-info "Gitea ready"
+  --timeout 5m 2>/dev/null
+info "Gitea installed"
 
 step "Push working dir to Gitea"
 
@@ -250,6 +256,29 @@ curl -s -X POST -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
   -H "Content-Type: application/json" \
   -d '{"name":"ops-ahead","auto_init":false,"private":false}' \
   "${GITEA_EXTERNAL}/api/v1/user/repos" > /dev/null
+
+# Gitea Actions runner registration token → Secret the act_runner pod reads.
+# Regenerated each full bootstrap; the token is instance-wide, not per-repo.
+RUNNER_TOKEN=$(curl -s -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
+  "${GITEA_EXTERNAL}/api/v1/admin/runners/registration-token" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
+if [ -n "$RUNNER_TOKEN" ]; then
+  kubectl create secret generic gitea-runner-token \
+    --from-literal=token="$RUNNER_TOKEN" \
+    -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+  info "Gitea Actions runner token → secret/gitea-runner-token"
+else
+  warn "Could not fetch runner registration token — act_runner will not register"
+fi
+
+# Actions secret the build workflow uses to log into the Gitea registry.
+# The automatic GITEA_TOKEN cannot auth to the package registry, so we hand the
+# admin password (same credential `make push` used) to the workflow explicitly.
+curl -s -X PUT -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
+  -H "Content-Type: application/json" \
+  -d "{\"data\":\"${GITEA_ADMIN_PASSWORD}\"}" \
+  "${GITEA_EXTERNAL}/api/v1/repos/${GITEA_ADMIN_USERNAME}/ops-ahead/actions/secrets/REGISTRY_PASSWORD" > /dev/null
+info "Actions secret REGISTRY_PASSWORD set on repo"
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"

@@ -1,11 +1,11 @@
-{{- if .Values.pipeline.cron.enabled }}
+{{- if .Values.cron.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:
   name: data-pipeline-daily
   namespace: {{ .Release.Namespace }}
 spec:
-  schedule: {{ .Values.pipeline.cron.schedule | quote }}
+  schedule: {{ .Values.cron.schedule | quote }}
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 0

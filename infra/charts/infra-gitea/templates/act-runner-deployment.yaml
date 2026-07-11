@@ -1,0 +1,108 @@
+{{- if .Values.runner.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: act-runner
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: act-runner
+    app.kubernetes.io/part-of: infra-gitea
+spec:
+  replicas: 1
+  # dind owns /var/lib/docker; avoid two daemons racing the same host netns.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: act-runner
+  template:
+    metadata:
+      labels:
+        app: act-runner
+        app.kubernetes.io/name: act-runner
+    spec:
+      # hostNetwork makes 127.0.0.1 the node loopback, where svclb binds the
+      # Traefik hostPorts — so the registry host resolves to the ingress.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostAliases:
+        - ip: "127.0.0.1"
+          hostnames:
+            - gitea.ops-ahead.localtest.me
+      containers:
+        - name: dind
+          image: {{ .Values.runner.dindImage }}
+          securityContext:
+            privileged: true
+          command: ["dockerd"]
+          args:
+            - "--host=tcp://127.0.0.1:2375"
+            - "--insecure-registry=gitea.ops-ahead.localtest.me"
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
+          readinessProbe:
+            exec:
+              command: ["docker", "-H", "tcp://127.0.0.1:2375", "info"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+        - name: runner
+          image: {{ .Values.runner.image }}
+          workingDir: /data
+          # `daemon` needs a .runner file — it does not self-register. Register
+          # once (idempotent per emptyDir lifetime) using the env below, then
+          # exec the daemon so it stays PID-visible for probes/signals.
+          command: ["sh", "-c"]
+          args:
+            - |
+              if [ ! -f /data/.runner ]; then
+                act_runner register --no-interactive \
+                  --instance "$GITEA_INSTANCE_URL" \
+                  --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
+                  --name "$GITEA_RUNNER_NAME" \
+                  --config /config/config.yaml
+              fi
+              exec act_runner daemon --config /config/config.yaml
+          env:
+            - name: DOCKER_HOST
+              value: tcp://127.0.0.1:2375
+            - name: GITEA_INSTANCE_URL
+              value: http://gitea.ops-ahead.localtest.me
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.runner.registrationSecret }}
+                  key: token
+            - name: GITEA_RUNNER_NAME
+              value: k3d-runner
+          volumeMounts:
+            - name: runner-config
+              mountPath: /config
+            - name: runner-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: dind-storage
+          emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: act-runner-config
+        - name: runner-data
+          emptyDir: {}
+{{- end }}

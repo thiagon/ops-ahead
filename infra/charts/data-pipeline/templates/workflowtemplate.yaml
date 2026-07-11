@@ -9,7 +9,7 @@ spec:
   arguments:
     parameters:
       - name: source
-        value: "itsm-locaweb"
+        value: {{ .Values.source | quote }}
 
   templates:
     - name: pipeline
@@ -31,56 +31,56 @@ spec:
 
     - name: dbt-run
       container:
-        image: {{ .Values.pipeline.dbtImage | quote }}
+        image: {{ .Values.transform.image | quote }}
         command: ["dbt", "run", "--profiles-dir", "/dbt"]
         env:
           - name: CLICKHOUSE_HOST
-            value: {{ .Values.pipeline.clickhouseHost | quote }}
+            value: {{ .Values.clickhouseHost | quote }}
           - name: CLICKHOUSE_DATABASE
-            value: {{ .Values.pipeline.clickhouseDatabase | quote }}
+            value: {{ .Values.clickhouseDatabase | quote }}
           - name: CLICKHOUSE_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-user
           - name: CLICKHOUSE_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-password
 
     - name: great-expectations
       container:
-        image: {{ .Values.pipeline.dataQualityImage | quote }}
+        image: {{ .Values.quality.image | quote }}
         args: ["--suite", "critical", "--upload-docs"]
         env:
           - name: CLICKHOUSE_HOST
-            value: {{ .Values.pipeline.clickhouseHost | quote }}
+            value: {{ .Values.clickhouseHost | quote }}
           - name: CLICKHOUSE_DATABASE
-            value: {{ .Values.pipeline.clickhouseDatabase | quote }}
+            value: {{ .Values.clickhouseDatabase | quote }}
           - name: CLICKHOUSE_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-user
           - name: CLICKHOUSE_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-password
           - name: MINIO_ENDPOINT
-            value: {{ .Values.pipeline.minioEndpoint | quote }}
+            value: {{ .Values.minioEndpoint | quote }}
           - name: MINIO_BUCKET
-            value: {{ .Values.pipeline.minioBucket | quote }}
+            value: {{ .Values.minioBucket | quote }}
           - name: MINIO_ACCESS_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: minio-access-key
           - name: MINIO_SECRET_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: minio-secret-key
 
     - name: register-snapshot
@@ -93,21 +93,21 @@ spec:
         command: [python]
         env:
           - name: CLICKHOUSE_HOST
-            value: {{ .Values.pipeline.clickhouseHost | quote }}
+            value: {{ .Values.clickhouseHost | quote }}
           - name: CLICKHOUSE_DATABASE
-            value: {{ .Values.pipeline.clickhouseDatabase | quote }}
+            value: {{ .Values.clickhouseDatabase | quote }}
           - name: CLICKHOUSE_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-user
           - name: CLICKHOUSE_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.pipeline.secretName }}
+                name: {{ .Values.secretName }}
                 key: clickhouse-password
           - name: MLFLOW_TRACKING_URI
-            value: {{ .Values.pipeline.mlflowUri | quote }}
+            value: {{ .Values.mlflowUri | quote }}
           - name: SOURCE
             value: "{{`{{inputs.parameters.source}}`}}"
           - name: DAG_RUN_ID
@@ -124,14 +124,7 @@ spec:
               password=os.environ["CLICKHOUSE_PASSWORD"],
           )
 
-          marts = [
-              "incidents_by_ic",
-              "p4_sequences_by_ci",
-              "first_touch_duration",
-              "priority_changes_log",
-              "daily_anomaly_features",
-              "kpi_monthly_state",
-          ]
+          marts = {{ .Values.snapshot.marts | toJson }}
 
           counts = {}
           for mart in marts:

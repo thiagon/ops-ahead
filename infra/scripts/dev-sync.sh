@@ -26,6 +26,21 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# Pull-forward CI-managed image tags. The snapshot below force-pushes over main,
+# which would revert the tags Gitea Actions wrote back. Fetch their current
+# content from Gitea first so the snapshot carries them forward instead.
+GITEA_RAW="http://gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead/raw/branch/main"
+for f in apps/data-ingest/chart/values-image.yaml \
+         apps/data-transform/chart/values-image.yaml \
+         apps/data-quality/chart/values-image.yaml; do
+  tmp=$(mktemp)
+  if curl -sf "${GITEA_RAW}/${f}" -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    mv "$tmp" "$f"; info "pull-forward ${f}"
+  else
+    rm -f "$tmp"
+  fi
+done
+
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 info "Snapshotting working dir..."
 git add -A

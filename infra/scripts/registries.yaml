@@ -1,0 +1,12 @@
+# k3s containerd registry config (dev only) — passed to `k3d cluster create`
+# via --registry-config. Lets the node pull CI-built images from the in-cluster
+# Gitea registry over the existing gitea-tls ingress.
+#
+# The ref host `gitea.ops-ahead.localtest.me` resolves to 127.0.0.1 on the node
+# (public DNS + --host-alias); svclb binds hostPort 443 there, routing to Traefik
+# → gitea-tls ingress → Gitea. Traefik serves a self-signed cert, so skip verify.
+# Same path `make push` uses from the host — no ClusterIP, no mirror endpoint.
+configs:
+  "gitea.ops-ahead.localtest.me":
+    tls:
+      insecure_skip_verify: true

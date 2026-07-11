@@ -51,23 +51,20 @@ bcrypt:
 	@docker run --rm httpd:alpine htpasswd -nbBC 10 "" "$(PWD)" 2>/dev/null \
 	  | tr -d ':\n' | sed 's/$$2y/$$2a/' && echo
 
-# Build a custom app image and import into k3d. Usage: make build APP=data-ingest
+# Deploy path is Gitea Actions: push to the repo → CI builds the changed apps,
+# pushes :<sha> to the Gitea registry and writes the tag back (ArgoCD reconciles).
+# The targets below are local-debug shortcuts only — not the deploy path.
 GITEA_REGISTRY ?= gitea.ops-ahead.localtest.me
-LOCAL_IMAGE     = gitea.ops-ahead.local/ops-ahead/$(APP):latest
-GITEA_IMAGE     = $(GITEA_REGISTRY)/ops-ahead/$(APP):latest
+DEBUG_TAG      ?= debug
+LOCAL_IMAGE     = $(GITEA_REGISTRY)/ops-ahead/$(APP):$(DEBUG_TAG)
 
-.PHONY: build
-build:
+# Build + push an app image manually (debug). Usage: make build-local APP=data-ingest
+.PHONY: build-local
+build-local:
 	docker build -f apps/$(APP)/Dockerfile -t $(LOCAL_IMAGE) .
-	k3d image import $(LOCAL_IMAGE) -c ops-ahead
-
-# Push image to Gitea container registry. Usage: make push APP=data-ingest
-.PHONY: push
-push:
 	@source .env && echo "$$GITEA_ADMIN_PASSWORD" | \
 	  docker login $(GITEA_REGISTRY) -u "$$GITEA_ADMIN_USERNAME" --password-stdin
-	docker tag $(LOCAL_IMAGE) $(GITEA_IMAGE)
-	docker push $(GITEA_IMAGE) || (docker rmi $(GITEA_IMAGE) 2>/dev/null; exit 1)
+	docker push $(LOCAL_IMAGE) || (docker rmi $(LOCAL_IMAGE) 2>/dev/null; exit 1)
 
 # Follow pod logs by label. Usage: make logs APP=mlflow NS=ml
 .PHONY: logs

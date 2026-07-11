@@ -1,5 +1,5 @@
 image:
-  repository: gitea.ops-ahead.local/ops-ahead/data-ingest
+  repository: gitea.ops-ahead.localtest.me/ops-ahead/data-ingest
   tag: latest
   pullPolicy: IfNotPresent
 
