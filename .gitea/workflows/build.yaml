@@ -3,7 +3,14 @@ name: build-apps
 # App/source changes trigger a build. The write-back commit only touches the
 # colocated chart overlays (apps/*/chart) and infra/**, all ignored here — so it
 # never re-triggers this workflow (plus [skip ci] on the commit as a belt).
+#
+# `create` seeds a fresh registry on bootstrap: `make destroy` wipes the Gitea
+# PVC, so repo + registry vanish together. The next `make up` snapshot-pushes an
+# empty repo, which *creates* main → this fires once and rebuilds all images.
+# A clean working dir produces no push diff, so push alone would never trigger.
+# `workflow_dispatch` stays for manual reseeds.
 on:
+  create:
   push:
     branches: [main]
     paths-ignore:
@@ -12,6 +19,7 @@ on:
       - 'docs/**'
       - 'conductor/**'
       - '**.md'
+  workflow_dispatch: {}
 
 env:
   REGISTRY: gitea.ops-ahead.localtest.me
