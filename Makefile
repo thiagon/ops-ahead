@@ -36,6 +36,11 @@ destroy:
 sync:
 	bash infra/scripts/dev-sync.sh
 
+# One-shot health probe (apps, pods, secrets, warnings). Run after up/sync.
+.PHONY: health
+health:
+	bash infra/scripts/dev-health.sh
+
 # Show ArgoCD pods + Applications status.
 .PHONY: argo
 argo:
