@@ -1,5 +1,7 @@
-# Per-environment overlay for this pipeline step. Carries this step's image
-# under an app-scoped key so the pipeline App can layer multiple steps via
-# $values without colliding; the ref is pinned by the Gitea Actions write-back.
-transform:
-  image: gitea.ops-ahead.localtest.me/ops-ahead/data-transform:4c1f59a8cab580de106f62814c607667b698720d
+# Per-environment overlay for this pipeline step. Every app follows the same
+# rule — <app>.image.tag — pinned by the Gitea Actions write-back. The registry
+# repository lives in the chart defaults; keying by app name keeps distinct
+# top-level keys so the pipeline App layers several steps without colliding.
+data-transform:
+  image:
+    tag: "bc36074b5b525f1e5110ea919d4e2b4a4275eea8"

@@ -39,7 +39,7 @@ sync:
 # One-shot health probe (apps, pods, secrets, warnings). Run after up/sync.
 .PHONY: health
 health:
-	bash infra/scripts/dev-health.sh
+	@bash infra/scripts/dev-health.sh $(filter-out $@,$(MAKECMDGOALS))
 
 # Show ArgoCD pods + Applications status.
 .PHONY: argo

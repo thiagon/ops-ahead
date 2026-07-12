@@ -29,8 +29,8 @@ spec:
           emptyDir: {}
       initContainers:
         - name: copy-migrations
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ (index .Values "data-ingest").image.repository }}:{{ (index .Values "data-ingest").image.tag }}"
+          imagePullPolicy: {{ (index .Values "data-ingest").image.pullPolicy }}
           command: ["cp", "-r", "/app/migrations/.", "/migrations/"]
           volumeMounts:
             - name: migrations

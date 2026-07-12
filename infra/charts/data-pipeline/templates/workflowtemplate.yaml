@@ -31,7 +31,7 @@ spec:
 
     - name: dbt-run
       container:
-        image: {{ .Values.transform.image | quote }}
+        image: "{{ (index .Values "data-transform").image.repository }}:{{ (index .Values "data-transform").image.tag }}"
         command: ["dbt", "run", "--profiles-dir", "/dbt"]
         env:
           - name: CLICKHOUSE_HOST
@@ -51,7 +51,7 @@ spec:
 
     - name: great-expectations
       container:
-        image: {{ .Values.quality.image | quote }}
+        image: "{{ (index .Values "data-quality").image.repository }}:{{ (index .Values "data-quality").image.tag }}"
         args: ["--suite", "critical", "--upload-docs"]
         env:
           - name: CLICKHOUSE_HOST

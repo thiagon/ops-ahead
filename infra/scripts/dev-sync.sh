@@ -44,9 +44,11 @@ pull_forward_key() {
   fi
   rm -f "$remote"
 }
-pull_forward_key apps/data-ingest/chart/values-dev.yaml    '.image.tag'
-pull_forward_key apps/data-transform/chart/values-dev.yaml '.transform.image'
-pull_forward_key apps/data-quality/chart/values-dev.yaml   '.quality.image'
+# Same rule as the Gitea Actions write-back: every app pins <app>.image.tag,
+# keyed by its own name. Add an app = add it to this list.
+for app in data-ingest data-transform data-quality; do
+  pull_forward_key "apps/${app}/chart/values-dev.yaml" ".[\"${app}\"].image.tag"
+done
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 info "Snapshotting working dir..."

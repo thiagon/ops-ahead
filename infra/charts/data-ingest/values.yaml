@@ -1,7 +1,10 @@
-image:
-  repository: gitea.ops-ahead.localtest.me/ops-ahead/data-ingest
-  tag: latest
-  pullPolicy: IfNotPresent
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+data-ingest:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-ingest
+    tag: latest
+    pullPolicy: IfNotPresent
 
 migration:
   image: migrate/migrate:v4.18.1

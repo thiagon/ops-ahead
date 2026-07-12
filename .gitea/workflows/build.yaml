@@ -1,24 +1,15 @@
 name: build-apps
 
-# App/source changes trigger a build. The write-back commit only touches the
-# colocated chart overlays (apps/*/chart) and infra/**, all ignored here — so it
-# never re-triggers this workflow (plus [skip ci] on the commit as a belt).
-#
-# `create` seeds a fresh registry on bootstrap: `make destroy` wipes the Gitea
-# PVC, so repo + registry vanish together. The next `make up` snapshot-pushes an
-# empty repo, which *creates* main → this fires once and rebuilds all images.
-# A clean working dir produces no push diff, so push alone would never trigger.
-# `workflow_dispatch` stays for manual reseeds.
 on:
   create:
   push:
     branches: [main]
     paths-ignore:
-      - 'apps/*/chart/**'
-      - 'infra/**'
-      - 'docs/**'
-      - 'conductor/**'
-      - '**.md'
+      - "apps/*/chart/**"
+      - "infra/**"
+      - "docs/**"
+      - "conductor/**"
+      - "**.md"
   workflow_dispatch: {}
 
 env:
@@ -26,22 +17,88 @@ env:
   OWNER: ops-ahead
 
 jobs:
-  build:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.set-matrix.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed apps
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" == "push" ] && git rev-parse HEAD^ >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD | grep '^apps/' | cut -d/ -f2 | sort -u)
+          else
+            CHANGED=$(ls -1 apps/)
+          fi
+
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "Nenhum app modificado."
+            exit 0
+          fi
+
+          JSON_ARRAY=$(echo "$CHANGED" | jq -R . | jq -s -c .)
+
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+          echo "Apps alterados: ${JSON_ARRAY}"
+
+  registry-ready:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: read      # checkout
-      packages: write     # push images to the Gitea registry
+      packages: write
+    steps:
+      - name: Wait until the registry accepts a push
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
+          mkdir -p /tmp/probe && echo ok > /tmp/probe/ok
+          printf 'FROM scratch\nCOPY ok /ok\n' > /tmp/probe/Dockerfile
+          PROBE="${REGISTRY}/${OWNER}/ci-registry-probe:latest"
+          docker build -t "${PROBE}" /tmp/probe
+          deadline=$(( SECONDS + 480 ))
+          until docker push "${PROBE}"; do
+            if [ "${SECONDS}" -ge "${deadline}" ]; then
+              echo "registry never accepted a push after 8min" >&2
+              exit 1
+            fi
+            echo "registry not accepting pushes yet (Gitea/ingress settling) — retrying in 15s" >&2
+            sleep 15
+          done
+
+  # One job per app, in parallel. The matrix is STATIC (a literal list) — that
+  # expands fine on Gitea act_runner. Only a *dynamic* matrix from a needs-output
+  # fails to expand (the strategy is resolved before needs outputs exist), which
+  # is why detect-changes feeds the job `if:` instead of the matrix: a job whose
+  # app didn't change is skipped, so only changed apps actually build.
+  build:
+    needs: [detect-changes, registry-ready]
+    if: needs.detect-changes.outputs.has_changes == 'true' && contains(fromJson(needs.detect-changes.outputs.matrix), matrix.app)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         app: [data-ingest, data-transform, data-quality]
     steps:
       - uses: actions/checkout@v4
+
       - name: Build ${{ matrix.app }}:${{ github.sha }}
         run: |
           IMAGE="${REGISTRY}/${OWNER}/${{ matrix.app }}"
           docker build -f "apps/${{ matrix.app }}/Dockerfile" -t "${IMAGE}:${{ github.sha }}" .
+
       - name: Log in to registry
         run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
+
       - name: Push ${{ matrix.app }}:${{ github.sha }}
         # Push is the only step that talks to the registry service, so isolate it
         # and retry just here — a transient registry hiccup never re-runs the build.
@@ -56,32 +113,34 @@ jobs:
           exit 1
 
   write-back:
-    needs: build
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write     # commit the pinned image tags back to main
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Pin image tags to ${{ github.sha }}
+
+      - name: Pin image tags
+        env:
+          CHANGED_APPS_JSON: ${{ needs.detect-changes.outputs.matrix }}
         run: |
           SHA="${{ github.sha }}"
-          REG="${REGISTRY}/${OWNER}"
-          # Every app pins its image inline in its per-env overlay — yq edits just
-          # the relevant key, leaving the rest of that env's config untouched.
-          # Workers key on .image.tag; pipeline steps key on an app-scoped .image
-          # so the pipeline App can layer several steps via $values.
-          SHA="$SHA" yq -i '.image.tag = strenv(SHA)' \
-            apps/data-ingest/chart/values-dev.yaml
-          REG="$REG" SHA="$SHA" yq -i '.transform.image = strenv(REG) + "/data-transform:" + strenv(SHA)' \
-            apps/data-transform/chart/values-dev.yaml
-          REG="$REG" SHA="$SHA" yq -i '.quality.image = strenv(REG) + "/data-quality:" + strenv(SHA)' \
-            apps/data-quality/chart/values-dev.yaml
+
+          # Same rule for every app: pin <app>.image.tag. Keying by the app's own
+          # name keeps distinct top-level keys, so a pipeline App that layers
+          # several step overlays into one release never collides on `image`.
+          for app in $(echo "$CHANGED_APPS_JSON" | jq -r '.[]'); do
+            FILE="apps/${app}/chart/values-dev.yaml"
+            if [ -f "$FILE" ]; then
+              APP="$app" SHA="$SHA" yq -i '.[env(APP)].image.tag = env(SHA)' "$FILE"
+              git add "$FILE"
+            fi
+          done
+
       - name: Commit & push write-back
         run: |
           git config user.name "gitea-actions"
           git config user.email "actions@ops-ahead.local"
-          git add apps/data-ingest/chart/values-dev.yaml \
-                  apps/data-transform/chart/values-dev.yaml \
-                  apps/data-quality/chart/values-dev.yaml
-          git commit -m "ci: pin image tags to ${{ github.sha }} [skip ci]" || exit 0
+          git diff --staged --quiet || git commit -m "ci: pin image tags to ${{ github.sha }} [skip ci]"
           git push origin HEAD:main

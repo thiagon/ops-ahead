@@ -1,12 +1,17 @@
 # Defaults for the pipeline shape. A pipeline in pipelines/<name>/ overrides only
 # what is specific to it (source, marts, cron) via $values; the step images come
-# from each app's per-env overlay (values-dev.yaml, app-scoped keys transform/quality).
+# from each app's per-env overlay (values-dev.yaml), keyed by the app's own name
+# so several steps layer into one release without colliding.
 source: ""
 
-transform:
-  image: ""
-quality:
-  image: ""
+data-transform:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-transform
+    tag: ""
+data-quality:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-quality
+    tag: ""
 
 # Marts counted by register-snapshot and logged to MLflow.
 snapshot:
