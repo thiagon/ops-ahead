@@ -10,8 +10,9 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
-  # Multi-source: base chart from infra/charts; per-env overlay + CI-written
-  # image version come from the app's colocated apps/data-ingest/chart/.
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/data-ingest/chart/values-dev.yaml) carries env config *and*
+  # the CI-pinned image tag, so each environment runs its own image.
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead
       targetRevision: main
@@ -23,7 +24,6 @@ spec:
         valueFiles:
           - values.yaml
           - $values/apps/data-ingest/chart/values-dev.yaml
-          - $values/apps/data-ingest/chart/values-image.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: data

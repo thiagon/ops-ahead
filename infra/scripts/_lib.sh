@@ -12,3 +12,27 @@ info()  { echo -e "${GREEN}▶${NC} $*"; }
 warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
+
+# Reconcile the child Application manifests straight from the working tree via
+# client-side apply, rewriting the GitHub repoURL to the internal Gitea. This is
+# what makes structural changes converge: client-side apply's 3-way merge PRUNES
+# fields dropped from a manifest (e.g. a removed valueFiles entry), which the
+# root-app's server-side apply cannot once that field is co-owned by this manager.
+# repoURL is rewritten to Gitea here, so root-app's ignoreDifferences never fights
+# it. namespaces/project/ingresses are plain K8s resources synced by root-app, not
+# Applications — skipped. Requires GITEA_ADMIN_USERNAME in the environment.
+reconcile_child_apps() {
+  local github_repo="https://github.com/thiagon/ops-ahead"
+  local gitea_repo="http://infra-gitea-http.infra.svc.cluster.local:3000/${GITEA_ADMIN_USERNAME}/ops-ahead"
+  local sed_repo="s#${github_repo}#${gitea_repo}#g"
+  local app_yaml name
+  for app_yaml in "$ROOT_DIR"/infra/apps/*.yaml; do
+    name="$(basename "$app_yaml" .yaml)"
+    [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
+    if grep -q "$github_repo" "$app_yaml"; then
+      sed "$sed_repo" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1 && info "reconciled $name"
+    else
+      kubectl apply -f "$app_yaml" > /dev/null 2>&1 && info "reconciled $name (external chart)"
+    fi
+  done
+}

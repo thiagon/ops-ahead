@@ -312,18 +312,7 @@ SED_REPO="s#${GITHUB_REPO}#${GITEA_REPO_URL%.git}#g"
 sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f - 2>/dev/null
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
-for app_yaml in infra/apps/*.yaml; do
-  name="$(basename "$app_yaml" .yaml)"
-  # namespaces/project/ingresses are K8s resources, not Applications — root-app syncs them.
-  [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
-  if grep -q "$GITHUB_REPO" "$app_yaml"; then
-    sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1
-    info "$name OK"
-  else
-    kubectl apply -f "$app_yaml" > /dev/null 2>&1
-    info "$name (external chart)"
-  fi
-done
+reconcile_child_apps
 
 step "Bootstrap Vault"
 kubectl wait pod -l app.kubernetes.io/name=vault -n infra \

@@ -1,11 +1,12 @@
-# Pulled from the in-cluster Gitea registry (built + pushed by Gitea Actions).
+# Pulled from the in-cluster Gitea registry. `tag` is pinned per environment by
+# the Gitea Actions write-back (yq edits just this line), so each env runs its
+# own image.
 image:
   pullPolicy: IfNotPresent
-
+  tag: "4c1f59a8cab580de106f62814c607667b698720d"
 # migrate/migrate is a public image — it must be pulled, not Never.
 migration:
   pullPolicy: IfNotPresent
-
 consumer:
   replicaCount: 1
   env:

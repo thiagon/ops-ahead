@@ -27,19 +27,26 @@ for i in $(seq 1 60); do
 done
 
 # Pull-forward CI-managed image tags. The snapshot below force-pushes over main,
-# which would revert the tags Gitea Actions wrote back. Fetch their current
-# content from Gitea first so the snapshot carries them forward instead.
+# which would revert the tags Gitea Actions wrote back on an incremental sync
+# (resume / `make sync`). Each app pins its image inside its per-env overlay
+# (values-dev.yaml), alongside hand-edited config — so fetch Gitea's copy and
+# merge only the CI-owned image key into the local file, leaving local edits to
+# the rest of that overlay intact.
 GITEA_RAW="http://gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead/raw/branch/main"
-for f in apps/data-ingest/chart/values-image.yaml \
-         apps/data-transform/chart/values-image.yaml \
-         apps/data-quality/chart/values-image.yaml; do
-  tmp=$(mktemp)
-  if curl -sf "${GITEA_RAW}/${f}" -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
-    mv "$tmp" "$f"; info "pull-forward ${f}"
-  else
-    rm -f "$tmp"
+pull_forward_key() {
+  local f="$1" key="$2" remote val
+  remote=$(mktemp)
+  if curl -sf "${GITEA_RAW}/${f}" -o "$remote" 2>/dev/null && [ -s "$remote" ]; then
+    val=$(yq "$key // \"\"" "$remote")
+    if [ -n "$val" ]; then
+      VAL="$val" yq -i "$key = strenv(VAL)" "$f"; info "pull-forward ${f} (${key})"
+    fi
   fi
-done
+  rm -f "$remote"
+}
+pull_forward_key apps/data-ingest/chart/values-dev.yaml    '.image.tag'
+pull_forward_key apps/data-transform/chart/values-dev.yaml '.transform.image'
+pull_forward_key apps/data-quality/chart/values-dev.yaml   '.quality.image'
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 info "Snapshotting working dir..."
@@ -51,6 +58,11 @@ COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot
 info "Pushing → local Gitea..."
 git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1 || \
   error "Push failed — check GITEA_ADMIN_PASSWORD"
+
+# Reconcile child App specs directly so structural changes (dropped valueFiles,
+# changed sources) converge — root-app's server-side apply can't prune those.
+info "Reconciling child Applications..."
+reconcile_child_apps
 
 info "Hard refresh on all Applications..."
 for app in $(kubectl get applications -n infra -o name 2>/dev/null); do

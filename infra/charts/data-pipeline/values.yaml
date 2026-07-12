@@ -1,6 +1,6 @@
 # Defaults for the pipeline shape. A pipeline in pipelines/<name>/ overrides only
 # what is specific to it (source, marts, cron) via $values; the step images come
-# from each app's values-image overlay (app-scoped keys transform/quality).
+# from each app's per-env overlay (values-dev.yaml, app-scoped keys transform/quality).
 source: ""
 
 transform:

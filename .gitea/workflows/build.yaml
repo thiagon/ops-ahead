@@ -54,21 +54,22 @@ jobs:
         run: |
           SHA="${{ github.sha }}"
           REG="${REGISTRY}/${OWNER}"
-          # Each app owns its image tag overlay, colocated with the app. The
-          # pipeline steps use app-scoped keys so the pipeline App can layer both
-          # via $values without colliding.
-          printf 'image:\n  tag: "%s"\n' "$SHA" \
-            > apps/data-ingest/chart/values-image.yaml
-          printf 'transform:\n  image: %s/data-transform:%s\n' "$REG" "$SHA" \
-            > apps/data-transform/chart/values-image.yaml
-          printf 'quality:\n  image: %s/data-quality:%s\n' "$REG" "$SHA" \
-            > apps/data-quality/chart/values-image.yaml
+          # Every app pins its image inline in its per-env overlay — yq edits just
+          # the relevant key, leaving the rest of that env's config untouched.
+          # Workers key on .image.tag; pipeline steps key on an app-scoped .image
+          # so the pipeline App can layer several steps via $values.
+          SHA="$SHA" yq -i '.image.tag = strenv(SHA)' \
+            apps/data-ingest/chart/values-dev.yaml
+          REG="$REG" SHA="$SHA" yq -i '.transform.image = strenv(REG) + "/data-transform:" + strenv(SHA)' \
+            apps/data-transform/chart/values-dev.yaml
+          REG="$REG" SHA="$SHA" yq -i '.quality.image = strenv(REG) + "/data-quality:" + strenv(SHA)' \
+            apps/data-quality/chart/values-dev.yaml
       - name: Commit & push write-back
         run: |
           git config user.name "gitea-actions"
           git config user.email "actions@ops-ahead.local"
-          git add apps/data-ingest/chart/values-image.yaml \
-                  apps/data-transform/chart/values-image.yaml \
-                  apps/data-quality/chart/values-image.yaml
+          git add apps/data-ingest/chart/values-dev.yaml \
+                  apps/data-transform/chart/values-dev.yaml \
+                  apps/data-quality/chart/values-dev.yaml
           git commit -m "ci: pin image tags to ${{ github.sha }} [skip ci]" || exit 0
           git push origin HEAD:main

@@ -1,0 +1,5 @@
+# Per-environment overlay for this pipeline step. Carries this step's image
+# under an app-scoped key so the pipeline App can layer multiple steps via
+# $values without colliding; the ref is pinned by the Gitea Actions write-back.
+quality:
+  image: gitea.ops-ahead.localtest.me/ops-ahead/data-quality:4c1f59a8cab580de106f62814c607667b698720d
