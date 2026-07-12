@@ -10,9 +10,13 @@ metadata:
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 3
-  # Fail (instead of hanging) if the image can't be pulled or migrations stall —
-  # otherwise a PreSync hook stuck on ImagePullBackOff wedges the whole sync.
-  activeDeadlineSeconds: 300
+  # Fail fast if the image can't be pulled or migrations stall — a PreSync hook
+  # stuck on ImagePullBackOff blocks the sync operation, and at bootstrap the
+  # first attempt runs against a stale tag whose image is absent. Failing quickly
+  # releases the operation so auto-sync can roll forward to the CI write-back. A
+  # real migration (local-registry pull + ClickHouse DDL) finishes well inside
+  # this; it only trips on a genuinely missing image.
+  activeDeadlineSeconds: 120
   ttlSecondsAfterFinished: 600
   template:
     metadata:

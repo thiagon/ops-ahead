@@ -36,12 +36,24 @@ jobs:
         app: [data-ingest, data-transform, data-quality]
     steps:
       - uses: actions/checkout@v4
-      - name: Build & push ${{ matrix.app }}:${{ github.sha }}
+      - name: Build ${{ matrix.app }}:${{ github.sha }}
         run: |
           IMAGE="${REGISTRY}/${OWNER}/${{ matrix.app }}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
           docker build -f "apps/${{ matrix.app }}/Dockerfile" -t "${IMAGE}:${{ github.sha }}" .
-          docker push "${IMAGE}:${{ github.sha }}"
+      - name: Log in to registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
+      - name: Push ${{ matrix.app }}:${{ github.sha }}
+        # Push is the only step that talks to the registry service, so isolate it
+        # and retry just here — a transient registry hiccup never re-runs the build.
+        run: |
+          IMAGE="${REGISTRY}/${OWNER}/${{ matrix.app }}"
+          for attempt in 1 2 3; do
+            docker push "${IMAGE}:${{ github.sha }}" && exit 0
+            echo "push attempt ${attempt} failed; retrying in $((attempt * 5))s" >&2
+            sleep $((attempt * 5))
+          done
+          echo "push failed after 3 attempts" >&2
+          exit 1
 
   write-back:
     needs: build
