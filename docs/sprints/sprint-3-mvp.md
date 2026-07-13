@@ -111,7 +111,7 @@ O pipeline roda como DAG no Argo Workflows com quatro steps em sequência:
 [ingest] → [dbt-run] → [great-expectations] → [register-snapshot]
 ```
 
-O step `ingest` tem dois comportamentos: modo `batch` (bootstrap completo para MinIO e ClickHouse) e modo `stream` (alimenta o Kafka topic `incidents.raw` respeitando timestamps). O simulador é um producer Python separado (`scripts/stream_simulator.py`) que relê o CSV com aceleração configurável — permite a demo E2E em menos de 60 segundos.
+O step `ingest` faz o bootstrap completo do CSV para MinIO e ClickHouse. Para a demo E2E, o simulador (`scripts/incident_producer.py`) relê o CSV com aceleração configurável fazendo POST para o `gateway /webhook/incidents` — o mesmo caminho que o webhook real do ITSM usaria em produção.
 
 O step `dbt-run` constrói os seis marts que as camadas superiores consomem. A ordem de execução importa — alguns marts dependem de outros:
 
@@ -325,10 +325,10 @@ O MVP não é validado por demo bonita — é validado por evidência em dado re
 **Período:** Junho, semana 1
 **Descrição:** sem o simulador, o fluxo E2E não pode ser testado. É pré-requisito para quase tudo a partir do mês 2.
 **Tasks:**
-- [ ] `scripts/stream_simulator.py --speed <N>x` — replay N× mais rápido que o tempo real do dataset
-- [ ] Publicar em `incidents.raw` com o mesmo schema que o gateway real usaria
+- [ ] `scripts/incident_producer.py --speed <N>x` — replay N× mais rápido que o tempo real do dataset
+- [ ] Faz POST para `gateway /webhook/incidents` com o payload bruto do ITSM — mesmo contrato do webhook real
 - [ ] Flag `--incident-ids` para replay de incidentes específicos (útil para demo da apresentação)
-- [ ] Containerizar como `Job` K8s com flag `--demo`
+- [ ] Flag `--limit` para testes rápidos com subconjunto do dataset
 
 #### DAG Argo — ingestão + dbt + GE
 **Responsável:** Samuel Gusman

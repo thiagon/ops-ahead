@@ -1,0 +1,55 @@
+{{- if .Values.unsealer.enabled }}
+# Dev-only auto-unsealer. Standalone Vault with file storage comes back SEALED
+# after every pod restart or cluster stop/start, which breaks ESO until unsealed.
+# This loop watches Vault and unseals it with the key from the `vault-unseal-key`
+# Secret (created by dev-up.sh from .data/vault-init.json — never committed).
+# It targets the headless `-internal` Service, which publishes not-ready
+# addresses, so it can reach Vault while it is still sealed (0/1).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-unsealer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault-unsealer
+    app.kubernetes.io/part-of: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault-unsealer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault-unsealer
+    spec:
+      containers:
+        - name: unsealer
+          image: {{ .Values.unsealer.image | quote }}
+          env:
+            - name: VAULT_ADDR
+              value: {{ .Values.unsealer.vaultAddr | quote }}
+            - name: UNSEAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.unsealer.secretName | quote }}
+                  key: unseal-key
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              while true; do
+                # vault status exit codes: 0=unsealed, 2=sealed, 1=unreachable.
+                if ! vault status >/dev/null 2>&1; then
+                  vault operator unseal "$UNSEAL_KEY" >/dev/null 2>&1 \
+                    && echo "unsealed" || true
+                fi
+                sleep "${POLL_SECONDS:-10}"
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+{{- end }}

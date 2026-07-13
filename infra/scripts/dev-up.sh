@@ -22,17 +22,87 @@ command -v yq      > /dev/null 2>&1 || error "yq not found — run: make setup"
 
 cd "$ROOT_DIR"
 
+VAULT_INIT_FILE="$ROOT_DIR/.data/vault-init.json"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+# Pin the Kubernetes version so clusters are reproducible across machines.
+K3S_IMAGE="rancher/k3s:v1.31.5-k3s1"
+
+# Seed/refresh the Secret the in-cluster auto-unsealer reads (from the persisted
+# init file). No-op until Vault has been initialized at least once.
+ensure_unseal_secret() {
+  [ -f "$VAULT_INIT_FILE" ] || return 0
+  local key
+  key=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['unseal_keys_b64'][0])")
+  kubectl create secret generic vault-unseal-key \
+    --from-literal=unseal-key="$key" \
+    -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+}
+
+# Wait for the Vault pod to run, then unseal if sealed. Idempotent fallback —
+# the in-cluster unsealer normally handles this; this just makes `make up`
+# deterministic instead of racing the unsealer.
+unseal_vault() {
+  local pod key i
+  for i in $(seq 1 40); do
+    pod=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    [ -n "${pod:-}" ] && \
+      [ "$(kubectl get pod -n infra "$pod" -o jsonpath='{.status.phase}' 2>/dev/null)" = "Running" ] && break
+    sleep 3
+  done
+  [ -z "${pod:-}" ] && { warn "Vault pod did not appear"; return 0; }
+  key=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['unseal_keys_b64'][0])")
+  for i in $(seq 1 30); do
+    kubectl exec -n infra "$pod" -- vault status >/dev/null 2>&1 && return 0
+    kubectl exec -n infra "$pod" -- vault operator unseal "$key" >/dev/null 2>&1 || true
+    sleep 3
+  done
+}
+
 step "k3d cluster"
+CLUSTER_EXISTS=0
 if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
-  info "Cluster already exists"
+  CLUSTER_EXISTS=1
+  info "Cluster exists — ensuring it is started..."
+  k3d cluster start ops-ahead > /dev/null 2>&1 || true
 else
   info "Creating cluster 'ops-ahead'..."
+  mkdir -p "$ROOT_DIR/.data"
   k3d cluster create ops-ahead \
+    --image "$K3S_IMAGE" \
     --port "80:80@loadbalancer" \
     --port "443:443@loadbalancer" \
+    --registry-config "$SCRIPT_DIR/registries.yaml" \
+    --host-alias "127.0.0.1:gitea.ops-ahead.localtest.me" \
+    --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
     --wait
 fi
+
+# Wait for the node to answer (matters right after a `k3d cluster start`).
+for i in $(seq 1 40); do
+  kubectl get nodes 2>/dev/null | grep -q " Ready" && break
+  sleep 3
+done
 kubectl get nodes
+
+# Fast path: a previously bootstrapped cluster only needs to be resumed. All
+# workloads persist in etcd across stop/start, so skip the heavy bootstrap —
+# just make sure Vault is unsealed and push the working dir. ArgoCD self-heals
+# the rest. (Run `make destroy` to force a clean bootstrap.)
+if [ "$CLUSTER_EXISTS" = "1" ] && [ -f "$VAULT_INIT_FILE" ] \
+   && kubectl get application ops-ahead-root -n infra > /dev/null 2>&1; then
+  step "Resuming existing cluster (fast path)"
+  ensure_unseal_secret
+  unseal_vault
+  info "Vault unsealed — pushing working dir + refreshing ArgoCD"
+  bash "$SCRIPT_DIR/dev-sync.sh"
+  step "Done"
+  echo ""
+  echo "  Resumed (data preserved). Iterate:  edit charts/manifests and run  make sync"
+  echo ""
+  exit 0
+fi
 
 step "Chart dependencies"
 for chart_dir in infra/charts/*/; do
@@ -75,16 +145,76 @@ helm upgrade --install infra-vault ./infra/charts/infra-vault \
   -n infra \
   -f infra/charts/infra-vault/values.yaml \
   -f infra/charts/infra-vault/values-dev.yaml \
-  --set vault.server.dev.devRootToken="${VAULT_TOKEN}" \
-  --wait --timeout 5m 2>/dev/null
+  --timeout 5m 2>/dev/null
+info "Vault deployed (standalone)"
+
+# Vault standalone starts sealed — wait for pod to exist, then Running, then respond.
+for i in $(seq 1 40); do
+  VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  [ -n "${VAULT_POD:-}" ] && break
+  sleep 3
+done
+[ -z "${VAULT_POD:-}" ] && error "Vault pod did not appear within 2min"
+
+for i in $(seq 1 40); do
+  PHASE=$(kubectl get pod -n infra "$VAULT_POD" -o jsonpath='{.status.phase}' 2>/dev/null)
+  [ "$PHASE" = "Running" ] && break
+  sleep 3
+done
+
+# Wait until vault binary responds (sealed = exit 2, uninitialized = exit 2, ok = exit 0)
+for i in $(seq 1 30); do
+  kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
+    > /tmp/vault-status.json 2>/dev/null || true
+  [ -s /tmp/vault-status.json ] && break
+  sleep 2
+done
+
+mkdir -p "$ROOT_DIR/.data"
+
+IS_INIT=$(python3 -c \
+  "import json; d=json.load(open('/tmp/vault-status.json')); print(d.get('initialized',False))" \
+  2>/dev/null || echo "False")
+
+if [ "$IS_INIT" != "True" ]; then
+  info "Initializing Vault (first run)..."
+  kubectl exec -n infra "$VAULT_POD" -- \
+    vault operator init -key-shares=1 -key-threshold=1 -format=json \
+    > "$VAULT_INIT_FILE"
+  info "Init output → .data/vault-init.json"
+fi
+
+UNSEAL_KEY=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['unseal_keys_b64'][0])")
+VAULT_TOKEN=$(python3 -c "import json; print(json.load(open('$VAULT_INIT_FILE'))['root_token'])")
+
+kubectl exec -n infra "$VAULT_POD" -- vault status -format=json \
+  > /tmp/vault-status.json 2>/dev/null || true
+IS_SEALED=$(python3 -c \
+  "import json; d=json.load(open('/tmp/vault-status.json')); print(d.get('sealed',True))" \
+  2>/dev/null || echo "True")
+
+if [ "$IS_SEALED" = "True" ]; then
+  kubectl exec -n infra "$VAULT_POD" -- vault operator unseal "$UNSEAL_KEY" > /dev/null
+  info "Vault unsealed"
+fi
+
+kubectl wait pod -n infra "$VAULT_POD" --for=condition=Ready --timeout=60s > /dev/null
 info "Vault ready"
 
+# Hand the unseal key to the in-cluster auto-unsealer for future restarts.
+ensure_unseal_secret
+
+# No --wait: the act-runner (in this chart) mounts the gitea-runner-token
+# secret, which we can only mint from the Gitea API further down — waiting on
+# the whole release here would deadlock. Gitea readiness is asserted by the
+# curl loop below; the runner recovers once the token secret exists.
 helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
   -n infra \
   -f infra/charts/infra-gitea/values.yaml \
   -f infra/charts/infra-gitea/values-dev.yaml \
-  --wait --timeout 5m 2>/dev/null
-info "Gitea ready"
+  --timeout 5m 2>/dev/null
+info "Gitea installed"
 
 step "Push working dir to Gitea"
 
@@ -127,6 +257,29 @@ curl -s -X POST -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
   -d '{"name":"ops-ahead","auto_init":false,"private":false}' \
   "${GITEA_EXTERNAL}/api/v1/user/repos" > /dev/null
 
+# Gitea Actions runner registration token → Secret the act_runner pod reads.
+# Regenerated each full bootstrap; the token is instance-wide, not per-repo.
+RUNNER_TOKEN=$(curl -s -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
+  "${GITEA_EXTERNAL}/api/v1/admin/runners/registration-token" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
+if [ -n "$RUNNER_TOKEN" ]; then
+  kubectl create secret generic gitea-runner-token \
+    --from-literal=token="$RUNNER_TOKEN" \
+    -n infra --dry-run=client -o yaml | kubectl apply -f - > /dev/null
+  info "Gitea Actions runner token → secret/gitea-runner-token"
+else
+  warn "Could not fetch runner registration token — act_runner will not register"
+fi
+
+# Actions secret the build workflow uses to log into the Gitea registry.
+# The automatic GITEA_TOKEN cannot auth to the package registry, so we hand the
+# admin password (same credential `make push` used) to the workflow explicitly.
+curl -s -X PUT -u "${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
+  -H "Content-Type: application/json" \
+  -d "{\"data\":\"${GITEA_ADMIN_PASSWORD}\"}" \
+  "${GITEA_EXTERNAL}/api/v1/repos/${GITEA_ADMIN_USERNAME}/ops-ahead/actions/secrets/REGISTRY_PASSWORD" > /dev/null
+info "Actions secret REGISTRY_PASSWORD set on repo"
+
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
 git add -A
@@ -159,18 +312,7 @@ SED_REPO="s#${GITHUB_REPO}#${GITEA_REPO_URL%.git}#g"
 sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f - 2>/dev/null
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
-for app_yaml in infra/apps/*.yaml; do
-  name="$(basename "$app_yaml" .yaml)"
-  # namespaces/project/ingresses are K8s resources, not Applications — root-app syncs them.
-  [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
-  if grep -q "$GITHUB_REPO" "$app_yaml"; then
-    sed "${SED_REPO}" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1
-    info "$name OK"
-  else
-    kubectl apply -f "$app_yaml" > /dev/null 2>&1
-    info "$name (external chart)"
-  fi
-done
+reconcile_child_apps
 
 step "Bootstrap Vault"
 kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
@@ -200,6 +342,7 @@ done
 # Heredoc keeps VAULT_TOKEN out of argv (visible in ps/audit).
 kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
 export VAULT_TOKEN='${VAULT_TOKEN}'
+vault secrets enable -path=secret kv-v2 2>/dev/null || true
 vault auth enable kubernetes 2>/dev/null || true
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
 

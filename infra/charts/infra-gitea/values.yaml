@@ -1,3 +1,7 @@
 # Gitea is disabled by default — only enabled in dev via values-dev.yaml.
 gitea:
   enabled: false
+
+# Gitea Actions runner (act_runner + dind) — dev only, enabled in values-dev.yaml.
+runner:
+  enabled: false

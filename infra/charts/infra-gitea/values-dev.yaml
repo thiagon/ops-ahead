@@ -2,6 +2,10 @@
 # Working dir is pushed as branch 'main' by dev-up.sh / dev-sync.sh.
 gitea:
   enabled: true
+  # RWO PVC: old pod must release the LevelDB lock before the new one starts.
+  # RollingUpdate deadlocks on the shared /data volume (CrashLoop on the new pod).
+  strategy:
+    type: Recreate
   gitea:
     admin:
       existingSecret: gitea-admin-secret
@@ -9,19 +13,28 @@ gitea:
       database:
         DB_TYPE: sqlite3
       server:
+        DOMAIN: gitea.ops-ahead.localtest.me
+        HTTP_PORT: 3000
+        ROOT_URL: http://gitea.ops-ahead.localtest.me
         DISABLE_SSH: true
         OFFLINE_MODE: true
       service:
         DISABLE_REGISTRATION: true
       security:
         INSTALL_LOCK: true
+      packages:
+        ENABLED: true
+      actions:
+        ENABLED: true
   service:
     http:
       type: ClusterIP
       clusterIP: ""
       port: 3000
   persistence:
-    enabled: false
+    enabled: true
+    storageClass: local-path
+    size: 1Gi
   postgresql:
     enabled: false
   postgresql-ha:
@@ -39,3 +52,14 @@ gitea:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Gitea Actions runner: act_runner drives builds via a dind sidecar. hostNetwork
+# so the registry host `gitea.ops-ahead.localtest.me` (→127.0.0.1 via hostAliases)
+# lands on the node's Traefik, the same path `make push` uses from the host.
+runner:
+  enabled: true
+  image: gitea/act_runner:0.2.11
+  dindImage: docker:27-dind
+  # Job container image (has git + tooling; act's default ubuntu runner).
+  jobImage: ghcr.io/catthehacker/ubuntu:act-22.04
+  registrationSecret: gitea-runner-token

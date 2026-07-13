@@ -7,12 +7,22 @@ metadata:
   labels:
     {{- include "data-clickhouse.labels" . | nindent 4 }}
 spec:
+  # Without these references the operator ignores the podTemplate (resources)
+  # and volumeClaimTemplate (persistence) below and falls back to its defaults.
+  defaults:
+    templates:
+      podTemplate: default
+      dataVolumeClaimTemplate: data-volume
   configuration:
     users:
-      ops_ahead/k8s_secret_password:
-        namespace: {{ .Release.Namespace }}
-        name: clickhouse-secret
-        key: CLICKHOUSE_PASSWORD
+      # Password from the Vault/ESO secret (sourced from .env CLICKHOUSE_PASSWORD).
+      # operator 0.23.x: the map form of k8s_secret_password is not parsed and the
+      # string form is deprecated — valueFrom/secretKeyRef is the supported syntax.
+      ops_ahead/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: CLICKHOUSE_PASSWORD
       ops_ahead/networks/ip:
         - "::/0"
         - "0.0.0.0/0"
@@ -31,6 +41,10 @@ spec:
       max_connections: "100"
       max_concurrent_queries: "50"
       keep_alive_timeout: "3"
+      # Explicit cap: ClickHouse otherwise auto-derives the limit from the
+      # memory *request* (0.9 ratio), not the container limit, capping itself
+      # at ~460 MiB on a 512 MiB request and OOMing trivial queries.
+      max_server_memory_usage: {{ .Values.clickhouse.cluster.maxServerMemoryUsage | quote }}
       {{- if .Values.monitoring.enabled }}
       prometheus/endpoint: /metrics
       prometheus/port: "9363"
@@ -53,13 +67,11 @@ spec:
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:24.3-alpine
+              # ClickHouse derives its memory ceiling from the *request* (it
+              # reads it as available RAM), so the request must be generous
+              # enough or max_server_memory_usage gets cut down below idle RSS.
               resources:
-                requests:
-                  cpu: 200m
-                  memory: 512Mi
-                limits:
-                  cpu: "1"
-                  memory: 2Gi
+                {{- toYaml .Values.clickhouse.resources | nindent 16 }}
               ports:
                 - name: http
                   containerPort: 8123

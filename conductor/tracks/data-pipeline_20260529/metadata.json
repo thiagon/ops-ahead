@@ -1,0 +1,16 @@
+{
+  "id": "data-pipeline_20260529",
+  "title": "Pipeline de Dados",
+  "type": "feature",
+  "status": "pending",
+  "created": "2026-05-29T00:00:00Z",
+  "updated": "2026-05-29T00:00:00Z",
+  "phases": {
+    "total": 5,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 31,
+    "completed": 0
+  }
+}

@@ -1,12 +1,33 @@
+# Dev-only auto-unsealer (see templates/unsealer.yaml). Reads the key from the
+# `vault-unseal-key` Secret that dev-up.sh seeds from .data/vault-init.json.
+unsealer:
+  enabled: true
+  image: hashicorp/vault:1.21.2
+  vaultAddr: http://infra-vault-0.infra-vault-internal.infra.svc.cluster.local:8200
+  secretName: vault-unseal-key
+
 vault:
   ui:
     enabled: true
   server:
     dev:
-      enabled: true        # in-memory, auto-unsealed — dev only
-      # devRootToken is passed via --set by dev-up.sh (from .env / VAULT_TOKEN).
-    standalone:
       enabled: false
+    standalone:
+      enabled: true
+      config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 1
+          address     = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+        storage "file" {
+          path = "/vault/data"
+        }
+    dataStorage:
+      enabled: true
+      storageClass: local-path
+      size: 1Gi
     resources:
       requests:
         cpu: 50m

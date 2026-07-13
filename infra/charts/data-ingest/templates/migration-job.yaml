@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "data-ingest.fullname" . }}-migrate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-ingest.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  # Fail fast if the image can't be pulled or migrations stall — a PreSync hook
+  # stuck on ImagePullBackOff blocks the sync operation, and at bootstrap the
+  # first attempt runs against a stale tag whose image is absent. Failing quickly
+  # releases the operation so auto-sync can roll forward to the CI write-back. A
+  # real migration (local-registry pull + ClickHouse DDL) finishes well inside
+  # this; it only trips on a genuinely missing image.
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: {{ include "data-ingest.fullname" . }}-migrate
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: migrations
+          emptyDir: {}
+      initContainers:
+        - name: copy-migrations
+          image: "{{ (index .Values "data-ingest").image.repository }}:{{ (index .Values "data-ingest").image.tag }}"
+          imagePullPolicy: {{ (index .Values "data-ingest").image.pullPolicy }}
+          command: ["cp", "-r", "/app/migrations/.", "/migrations/"]
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      containers:
+        - name: migrate
+          image: {{ .Values.migration.image }}
+          imagePullPolicy: {{ .Values.migration.pullPolicy }}
+          args:
+            - "-path=/migrations"
+            - "-database=$(DATABASE_URL)"
+            - "up"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.secretName }}
+                  key: CLICKHOUSE_MIGRATE_URL
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations

@@ -13,5 +13,11 @@ spec:
   partitions: {{ .partitions }}
   replicas: {{ .replicas }}
   topicName: {{ .name }}
+  {{- if .config }}
+  config:
+    {{- range $k, $v := .config }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}

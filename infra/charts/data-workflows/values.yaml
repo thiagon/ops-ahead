@@ -6,6 +6,8 @@ argo-workflows:
     authModes:
       - server
 
+# Namespace-scoped executor SA + Role, shared by every pipeline that runs on this
+# engine (pipelines/*). Enabled here since this chart is now engine-only.
 argoWorkflows:
   rbac:
-    enabled: false
+    enabled: true

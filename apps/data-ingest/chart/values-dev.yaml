@@ -1,0 +1,14 @@
+# Every app follows the same rule — <app>.image.tag — pinned by the Gitea
+# Actions write-back. The registry repository and pullPolicy live in the chart
+# defaults; the overlay only carries the per-env tag.
+data-ingest:
+  image:
+    tag: "bc36074b5b525f1e5110ea919d4e2b4a4275eea8"
+# migrate/migrate is a public image — it must be pulled, not Never.
+migration:
+  pullPolicy: IfNotPresent
+consumer:
+  replicaCount: 1
+  env:
+    batchMaxSize: "100"
+    batchMaxSeconds: "5"

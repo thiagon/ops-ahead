@@ -1,0 +1,26 @@
+{{- if .Values.clickhouse.operatorEnabled }}
+# Stable alias Service. The Altinity operator publishes its own Service as
+# `clickhouse-<chi>` (here clickhouse-ops-ahead), which couples the hostname to
+# the CHI name. Consumers and the migrate Job target a CHI-independent
+# `clickhouse.<ns>.svc` endpoint, so expose one that selects the ready pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-clickhouse.labels" . | nindent 4 }}
+spec:
+  selector:
+    clickhouse.altinity.com/app: chop
+    clickhouse.altinity.com/chi: ops-ahead
+    clickhouse.altinity.com/namespace: {{ .Release.Namespace }}
+    clickhouse.altinity.com/ready: "yes"
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+    - name: native
+      port: 9000
+      targetPort: 9000
+{{- end }}

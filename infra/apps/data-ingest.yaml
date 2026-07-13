@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-ingest
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/data-ingest/chart/values-dev.yaml) carries env config *and*
+  # the CI-pinned image tag, so each environment runs its own image.
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/data-ingest
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/data-ingest/chart/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+    # Retry kept low on purpose. The migrate PreSync hook pulls the CI-pinned
+    # image tag; at bootstrap the snapshot still carries the *previous* run's tag,
+    # whose image isn't in the freshly-seeded registry. Retrying that revision is
+    # futile and pins the sync operation to it, blocking automated sync from
+    # advancing to the CI write-back (the commit whose tag *does* have an image).
+    # A short, bounded retry still covers genuine transient apply failures without
+    # holding the operation long enough to stall the roll-forward.
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 40s

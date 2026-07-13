@@ -1,0 +1,17 @@
+# Simple config for this pipeline. The chart shape lives in infra/charts/data-pipeline;
+# here we only declare what is specific to this run. Step images come from each app's
+# per-env overlay (values-dev.yaml, layered via $values by the pipelines ApplicationSet).
+source: itsm
+
+snapshot:
+  marts:
+    - incidents_by_ic
+    - p4_sequences_by_ci
+    - first_touch_duration
+    - priority_changes_log
+    - daily_anomaly_features
+    - kpi_monthly_state
+
+cron:
+  enabled: false
+  schedule: "0 2 * * *"

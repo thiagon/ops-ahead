@@ -1,0 +1,149 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: data-pipeline
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceAccountName: argo-workflow-executor
+  entrypoint: pipeline
+  arguments:
+    parameters:
+      - name: source
+        value: {{ .Values.source | quote }}
+
+  templates:
+    - name: pipeline
+      steps:
+        - - name: dbt-run
+            template: dbt-run
+
+        - - name: great-expectations
+            template: great-expectations
+
+        - - name: register-snapshot
+            template: register-snapshot
+            arguments:
+              parameters:
+                - name: source
+                  value: "{{`{{workflow.parameters.source}}`}}"
+                - name: dag-run-id
+                  value: "{{`{{workflow.name}}`}}"
+
+    - name: dbt-run
+      container:
+        image: "{{ (index .Values "data-transform").image.repository }}:{{ (index .Values "data-transform").image.tag }}"
+        command: ["dbt", "run", "--profiles-dir", "/dbt"]
+        env:
+          - name: CLICKHOUSE_HOST
+            value: {{ .Values.clickhouseHost | quote }}
+          - name: CLICKHOUSE_DATABASE
+            value: {{ .Values.clickhouseDatabase | quote }}
+          - name: CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-user
+          - name: CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-password
+
+    - name: great-expectations
+      container:
+        image: "{{ (index .Values "data-quality").image.repository }}:{{ (index .Values "data-quality").image.tag }}"
+        args: ["--suite", "critical", "--upload-docs"]
+        env:
+          - name: CLICKHOUSE_HOST
+            value: {{ .Values.clickhouseHost | quote }}
+          - name: CLICKHOUSE_DATABASE
+            value: {{ .Values.clickhouseDatabase | quote }}
+          - name: CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-user
+          - name: CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-password
+          - name: MINIO_ENDPOINT
+            value: {{ .Values.minioEndpoint | quote }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.minioBucket | quote }}
+          - name: MINIO_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: minio-access-key
+          - name: MINIO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: minio-secret-key
+
+    - name: register-snapshot
+      inputs:
+        parameters:
+          - name: source
+          - name: dag-run-id
+      script:
+        image: python:3.12-slim
+        command: [python]
+        env:
+          - name: CLICKHOUSE_HOST
+            value: {{ .Values.clickhouseHost | quote }}
+          - name: CLICKHOUSE_DATABASE
+            value: {{ .Values.clickhouseDatabase | quote }}
+          - name: CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-user
+          - name: CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-password
+          - name: MLFLOW_TRACKING_URI
+            value: {{ .Values.mlflowUri | quote }}
+          - name: SOURCE
+            value: "{{`{{inputs.parameters.source}}`}}"
+          - name: DAG_RUN_ID
+            value: "{{`{{inputs.parameters.dag-run-id}}`}}"
+        source: |
+          import hashlib, json, os
+          import mlflow
+          from clickhouse_driver import Client
+
+          ch = Client(
+              host=os.environ["CLICKHOUSE_HOST"],
+              database=os.environ["CLICKHOUSE_DATABASE"],
+              user=os.environ["CLICKHOUSE_USER"],
+              password=os.environ["CLICKHOUSE_PASSWORD"],
+          )
+
+          marts = {{ .Values.snapshot.marts | toJson }}
+
+          counts = {}
+          for mart in marts:
+              row = ch.execute(f"SELECT count() FROM {mart}")
+              counts[mart] = row[0][0]
+
+          fingerprint = hashlib.sha256(
+              json.dumps(counts, sort_keys=True).encode()
+          ).hexdigest()
+
+          mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+          mlflow.set_experiment("data-pipeline-snapshots")
+
+          with mlflow.start_run(run_name=os.environ["DAG_RUN_ID"]):
+              mlflow.log_param("hash", fingerprint)
+              mlflow.log_param("dag_run_id", os.environ["DAG_RUN_ID"])
+              mlflow.set_tag("source", os.environ["SOURCE"])
+              for mart, count in counts.items():
+                  mlflow.log_metric(mart, count)
+
+          print(f"snapshot registered: {fingerprint}")
+          print(json.dumps(counts, indent=2))

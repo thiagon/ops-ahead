@@ -1,0 +1,34 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+data-ingest:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-ingest
+    tag: latest
+    pullPolicy: IfNotPresent
+
+migration:
+  image: migrate/migrate:v4.18.1
+  pullPolicy: IfNotPresent
+  secretName: clickhouse-secret
+
+consumer:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: incidents.raw
+    kafkaGroupId: raw-ingest
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    minioEndpoint: http://minio.data.svc.cluster.local:9000
+    minioBucket: ops-ahead-lake
+    batchMaxSize: "1000"
+    batchMaxSeconds: "5"
+  secretName: data-ingest-secret

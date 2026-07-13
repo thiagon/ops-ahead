@@ -23,3 +23,6 @@ wheels/
 
 # Helm dependency archives (baixados por helm dependency build)
 infra/charts/*/charts/*.tgz
+
+# Cluster state — PVC data and Vault init output (never commit)
+.data/

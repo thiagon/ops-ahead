@@ -1,0 +1,31 @@
+{{- if .Values.runner.enabled }}
+# act_runner config. Jobs run as containers on the host network so they can
+# reach the dind daemon (127.0.0.1:2375) and the registry (via --add-host).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: act-runner-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: act-runner
+    app.kubernetes.io/part-of: infra-gitea
+data:
+  config.yaml: |
+    log:
+      level: info
+    runner:
+      capacity: 2
+      timeout: 1h
+      fetch_timeout: 5s
+      fetch_interval: 2s
+      labels:
+        - "ubuntu-latest:docker://{{ .Values.runner.jobImage }}"
+    cache:
+      enabled: false
+    container:
+      network: host
+      privileged: true
+      options: "-e DOCKER_HOST=tcp://127.0.0.1:2375 --add-host=gitea.ops-ahead.localtest.me:127.0.0.1"
+      valid_volumes:
+        - '**'
+{{- end }}

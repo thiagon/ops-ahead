@@ -1,0 +1,20 @@
+[project]
+name = "ops-ahead-data-ingest"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "faststream[kafka]>=0.5",
+    "clickhouse-driver>=0.2.9",
+    "boto3>=1.35",
+    "pyarrow>=17.0",
+    "prometheus-client>=0.21",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+]
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator>=0.26",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
