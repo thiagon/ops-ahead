@@ -8,7 +8,7 @@ from src.models import IncidentRaw
 
 _VALID = {
     "event_id": str(uuid4()),
-    "source": "itsm-locaweb",
+    "source": "itsm",
     "received_at": "2024-01-15T10:00:00+00:00",
     "opened_at": "2024-01-15T09:55:00+00:00",
     "severity": 3,

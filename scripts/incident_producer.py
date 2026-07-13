@@ -50,7 +50,7 @@ async def produce(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Post incidents.csv rows to the gateway webhook")
     parser.add_argument("--gateway-url", default="http://localhost:8080")
-    parser.add_argument("--source", default="itsm-locaweb")
+    parser.add_argument("--source", default="itsm")
     parser.add_argument("--speed", type=float, default=0,
                         help="Events per second (0 = as fast as possible)")
     parser.add_argument("--limit", type=int, default=0,

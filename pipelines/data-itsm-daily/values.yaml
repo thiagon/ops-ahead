@@ -1,7 +1,7 @@
 # Simple config for this pipeline. The chart shape lives in infra/charts/data-pipeline;
 # here we only declare what is specific to this run. Step images come from each app's
 # per-env overlay (values-dev.yaml, layered via $values by the pipelines ApplicationSet).
-source: itsm-locaweb
+source: itsm
 
 snapshot:
   marts:

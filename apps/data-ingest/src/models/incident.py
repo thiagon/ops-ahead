@@ -10,7 +10,7 @@ class IncidentRaw(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_id: Annotated[UUID, Field(description="Globally unique event identifier (UUID v4).")]
-    source: Annotated[str, Field(description="Origin adapter identifier.", examples=["itsm-locaweb", "alertmanager", "datadog"])]
+    source: Annotated[str, Field(description="Origin adapter identifier.", examples=["itsm", "alertmanager", "datadog"])]
     received_at: Annotated[AwareDatetime, Field(description="Timestamp when the consumer received the event (UTC, ISO 8601).")]
     opened_at: Annotated[AwareDatetime, Field(description="Timestamp when the incident was opened in the originating system (UTC, ISO 8601).")]
     severity: Annotated[int, Field(description="Normalized severity: 1=Critical … 5=VeryLow.", ge=1, le=5)]

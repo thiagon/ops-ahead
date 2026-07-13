@@ -24,7 +24,7 @@
     "source": {
       "type": "string",
       "description": "Origin adapter identifier.",
-      "examples": ["itsm-locaweb", "alertmanager", "datadog"]
+      "examples": ["itsm", "alertmanager", "datadog"]
     },
     "received_at": {
       "type": "string",
