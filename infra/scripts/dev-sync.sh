@@ -31,18 +31,30 @@ done
 # (resume / `make sync`). Each app pins its image inside its per-env overlay
 # (values-dev.yaml), alongside hand-edited config — so fetch Gitea's copy and
 # merge only the CI-owned image key into the local file, leaving local edits to
-# the rest of that overlay intact.
+# the rest of that overlay intact. The pulled tag only needs to live in the
+# snapshot pushed to Gitea: each mutated overlay is backed up here and restored
+# after the push, keeping the working tree as the user left it.
 GITEA_RAW="http://gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead/raw/branch/main"
+PULL_FORWARD_BACKUP=$(mktemp -d)
+trap 'rm -rf "$PULL_FORWARD_BACKUP"' EXIT
 pull_forward_key() {
   local f="$1" key="$2" remote val
   remote=$(mktemp)
   if curl -sf "${GITEA_RAW}/${f}" -o "$remote" 2>/dev/null && [ -s "$remote" ]; then
     val=$(yq "$key // \"\"" "$remote")
     if [ -n "$val" ]; then
+      mkdir -p "$PULL_FORWARD_BACKUP/$(dirname "$f")"
+      cp "$f" "$PULL_FORWARD_BACKUP/$f"
       VAL="$val" yq -i "$key = strenv(VAL)" "$f"; info "pull-forward ${f} (${key})"
     fi
   fi
   rm -f "$remote"
+}
+restore_pulled_overlays() {
+  local f
+  while IFS= read -r f; do
+    cp "$PULL_FORWARD_BACKUP/$f" "$f"
+  done < <(cd "$PULL_FORWARD_BACKUP" && find . -type f | sed 's|^\./||')
 }
 # Same rule as the Gitea Actions write-back: every app pins <app>.image.tag,
 # keyed by its own name. Add an app = add it to this list.
@@ -60,6 +72,8 @@ COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot
 info "Pushing → local Gitea..."
 git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1 || \
   error "Push failed — check GITEA_ADMIN_PASSWORD"
+
+restore_pulled_overlays
 
 # Reconcile child App specs directly so structural changes (dropped valueFiles,
 # changed sources) converge — root-app's server-side apply can't prune those.
