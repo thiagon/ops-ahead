@@ -19,6 +19,7 @@ Navigation hub for project context.
 ## Active Tracks
 
 - [data-pipeline_20260529 — Pipeline de Dados](./tracks/data-pipeline_20260529/index.md)
+- [gateway-ingest_20260802 — Gateway de Ingestão (Motor de Integração)](./tracks/gateway-ingest_20260802/index.md)
 
 <!-- Auto-populated by /conductor:new-track -->
 
