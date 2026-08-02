@@ -3,7 +3,7 @@
 **Track ID:** gateway-ingest_20260802
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-02
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -15,10 +15,10 @@ Primeiro serviço Node do monorepo. Estabelece pnpm, TS, Fastify e o esqueleto d
 
 ### Tasks
 
-- [ ] Task 1.1: Criar `apps/gateway/` — `package.json` (Fastify, Zod, kafkajs, prom-client), `tsconfig.json`, `pnpm-lock.yaml`, `.gitignore`, `eslintrc`
-- [ ] Task 1.2: Servidor Fastify base (`src/server.ts`, `src/index.ts`) com config tipada por env (`src/config.ts`)
-- [ ] Task 1.3: Rotas `/health` (liveness/readiness) e `/metrics` (prom-client) com registro de contadores
-- [ ] Task 1.4: Dockerfile Node multi-stage (build pnpm → runtime slim), usuário não-root
+- [x] Task 1.1: Criar `apps/gateway/` — `package.json` (Fastify, Zod, kafkajs, prom-client), `tsconfig.json`, `package-lock.json`, `.gitignore`, `eslint.config.js`
+- [x] Task 1.2: Servidor Fastify base (`src/server.ts`, `src/index.ts`) com config tipada por env (`src/config.ts`)
+- [x] Task 1.3: Rotas `/health` (liveness/readiness) e `/metrics` (prom-client) com registro de contadores
+- [x] Task 1.4: Dockerfile Node multi-stage (build npm → runtime slim), usuário não-root
 
 ### Verification
 

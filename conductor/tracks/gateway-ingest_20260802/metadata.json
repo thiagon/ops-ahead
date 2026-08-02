@@ -2,18 +2,20 @@
   "id": "gateway-ingest_20260802",
   "title": "Gateway de Ingestão (Motor de Integração)",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-08-02T00:00:00Z",
-  "updated": "2026-08-02T00:00:00Z",
+  "updated": "2026-08-02T13:45:00Z",
+  "current_phase": 2,
+  "current_task": "2.1",
   "sprint": 3,
   "milestone": 3,
   "phases": {
     "total": 5,
-    "completed": 0
+    "completed": 1
   },
   "tasks": {
     "total": 22,
-    "completed": 0
+    "completed": 4
   },
   "github_issue": 46,
   "github_pr": 47
