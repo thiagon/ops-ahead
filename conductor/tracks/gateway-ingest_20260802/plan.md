@@ -11,7 +11,7 @@ Cinco fases: primeiro o app Fastify + toolchain Node; depois o núcleo de normal
 
 ## Phase 1: Scaffold do app TypeScript + toolchain
 
-Primeiro serviço Node do monorepo. Estabelece pnpm, TS, Fastify e o esqueleto de servidor.
+Primeiro serviço Node do monorepo. Estabelece npm, TS, Fastify e o esqueleto de servidor.
 
 ### Tasks
 
@@ -22,7 +22,7 @@ Primeiro serviço Node do monorepo. Estabelece pnpm, TS, Fastify e o esqueleto d
 
 ### Verification
 
-- [ ] `pnpm install && pnpm build && pnpm test` passam; container sobe local e responde `/health` e `/metrics`
+- [x] `npm install && npm run build && npm test` passam; container sobe local e responde `/health` e `/metrics`
 
 ## Phase 2: Núcleo de normalização (Zod + adapter ITSM)
 
@@ -66,7 +66,7 @@ Substitui o stub nginx pelo app real na convenção atual.
 - [ ] Task 4.3: `apps/gateway/chart/` — `app.yaml` (`workload: deployment`, `namespace: ui`), `values-dev.yaml`, `values-image.yaml`
 - [ ] Task 4.4: Migrar `infra/apps/ui-gateway.yaml` para multi-source com `$values` (padrão `data-ingest`)
 - [ ] Task 4.5: `ExternalSecret` do segredo HMAC (ESO/Vault) → Secret K8s
-- [ ] Task 4.6: Job de CI (Gitea Actions) para imagem Node — build, push registry interno, write-back `tag=SHA` em `values-image.yaml`
+- [ ] Task 4.6: Job de CI (Gitea Actions) para imagem Node (npm) — build, push registry interno, write-back `tag=SHA` em `values-image.yaml`
 
 ### Verification
 
