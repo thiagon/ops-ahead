@@ -1,15 +1,13 @@
 import json
-from datetime import timezone
 from uuid import uuid4
 
-import pytest
 
-from src.models import IncidentRaw
+from src.models import IncidentEvent
 from src.writer import _minio_key
 
 
-def _make(source: str, opened_at: str) -> IncidentRaw:
-    return IncidentRaw.model_validate(
+def _make(source: str, opened_at: str) -> IncidentEvent:
+    return IncidentEvent.model_validate(
         {
             "event_id": str(uuid4()),
             "source": source,
@@ -25,7 +23,7 @@ def _make(source: str, opened_at: str) -> IncidentRaw:
 
 def test_minio_key_partitioning():
     evt = _make("itsm", "2024-03-07T14:30:00+00:00")
-    assert _minio_key(evt) == "raw/source=itsm/date=2024-03-07/"
+    assert _minio_key(evt) == "received/source=itsm/date=2024-03-07/"
 
 
 def test_minio_key_different_sources():

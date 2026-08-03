@@ -34,10 +34,10 @@ sequenced as (
 select
     entity_id,
     sequence_group,
-    min(opened_at)  as sequence_start,
-    max(opened_at)  as sequence_end,
-    count()         as sequence_length,
-    min(ticket_number)     as first_incident,
-    max(ticket_number)     as last_incident
+    min(opened_at)      as sequence_start,
+    max(opened_at)      as sequence_end,
+    count()             as sequence_length,
+    min(ticket_number)  as first_incident,
+    max(ticket_number)  as last_incident
 from sequenced
 group by entity_id, sequence_group

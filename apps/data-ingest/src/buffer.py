@@ -2,24 +2,24 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 
-from .models import IncidentRaw
+from .models import IncidentEvent
 
 
 class BatchBuffer:
     def __init__(
         self,
-        flush: Callable[[list[IncidentRaw]], Awaitable[None]],
+        flush: Callable[[list[IncidentEvent]], Awaitable[None]],
         max_size: int,
         max_seconds: float,
     ) -> None:
         self._flush = flush
         self._max_size = max_size
         self._max_seconds = max_seconds
-        self._items: list[IncidentRaw] = []
+        self._items: list[IncidentEvent] = []
         self._deadline: float = time.monotonic() + max_seconds
         self._lock = asyncio.Lock()
 
-    async def add(self, item: IncidentRaw) -> None:
+    async def add(self, item: IncidentEvent) -> None:
         async with self._lock:
             self._items.append(item)
             if len(self._items) >= self._max_size:

@@ -22,7 +22,7 @@ apps/                        # one folder per image you build; chart/ overlay co
   data-quality/              # pipeline-step (ns: data) — Great Expectations suites
 pipelines/                   # config-only: order + values per pipeline (chart lives in infra)
   data-itsm-daily/           # transform → quality → snapshot; appset.yaml points at the base chart
-contracts/                   # shared JSON Schemas (incidents-raw.schema.json)
+contracts/                   # shared JSON Schemas (incident-event.schema.json)
 scripts/                     # local utilities, never go to K8s
   prepare_dataset.py         # Excel → CSV pipeline
   incident_producer.py       # mock: publishes assets/incidents.csv to Kafka

@@ -4,7 +4,7 @@ import great_expectations.expectations as gxe
 
 def register(context: gx.DataContext) -> gx.ValidationDefinition:
     datasource = context.data_sources.get("clickhouse")
-    asset = datasource.add_table_asset(name="incidents_raw", table_name="incidents_raw")
+    asset = datasource.add_table_asset(name="incidents_received", table_name="incidents_received")
     batch_def = asset.add_batch_definition_whole_table("full")
 
     suite = context.suites.add(gx.ExpectationSuite(name="critical"))

@@ -67,5 +67,5 @@ models:
           - not_null
           - accepted_values:
               values: [1, 2, 3]
-      - name: violation_rate
+      - name: breach_rate
         tests: [not_null]

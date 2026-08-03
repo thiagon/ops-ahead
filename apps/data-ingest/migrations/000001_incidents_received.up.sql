@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS incidents_raw
+CREATE TABLE IF NOT EXISTS incidents_received
 (
     event_id     UUID,
     source       LowCardinality(String),

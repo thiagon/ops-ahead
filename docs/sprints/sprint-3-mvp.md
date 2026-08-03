@@ -386,7 +386,7 @@ O MVP não é validado por demo bonita — é validado por evidência em dado re
 **Período:** Julho, semana 2
 **Descrição:** consumer stateless que mantém estado por IC em Redis e detecta rajadas em near-real-time.
 **Tasks:**
-- [ ] Consumer Kafka com grupo `burst-detector`, lê `incidents.raw`
+- [ ] Consumer Kafka com grupo `burst-detector`, lê `incidents.received`
 - [ ] Estado por IC em Redis: contagem por janela (15min, 1h, 6h), mediana histórica, MAD histórico
 - [ ] z-score robusto por IC (mediana + MAD) — limiar adaptativo, não global
 - [ ] CUSUM bidirecional para detecção de mudança de regime gradual
@@ -447,7 +447,7 @@ O MVP não é validado por demo bonita — é validado por evidência em dado re
 **Período:** Agosto, semana 2
 **Descrição:** conecta o sistema ao mundo externo. Sem o `gateway`, não há Slack e não há demonstração do fluxo E2E.
 **Tasks:**
-- [ ] `POST /webhook/incidents` — valida HMAC, normaliza schema, publica em `incidents.raw`
+- [ ] `POST /webhook/incidents` — valida HMAC, normaliza schema, publica em `incidents.received`
 - [ ] Consumer de `recommendations` no Kafka — fan-out Slack para criticidade ≥ 4
 - [ ] Block Kit: IC, grupo, score, ação, justificativa + botões `Ack & Aplicar`, `Ignorar (motivo)`, `Ver no painel`
 - [ ] `POST /slack/actions` — valida HMAC, grava em Postgres, publica em `actions.taken`

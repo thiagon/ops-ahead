@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ingestion gateway (Motor de Integração) — HTTP boundary that normalizes ITSM webhooks into incidents.raw (ns:ui)",
+  "description": "Ingestion gateway (Motor de Integração) — HTTP boundary that normalizes ITSM webhooks into incidents.received (ns:ui)",
   "engines": {
     "node": ">=24"
   },

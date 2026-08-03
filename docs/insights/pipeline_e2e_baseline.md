@@ -9,7 +9,7 @@
 | Métrica | Valor |
 |---------|-------|
 | Eventos postados pelo producer | — |
-| Linhas em `incidents_raw` | — |
+| Linhas em `incidents_received` | — |
 | Arquivos Parquet no MinIO | — |
 
 ## DAG (WorkflowTemplate data-pipeline)

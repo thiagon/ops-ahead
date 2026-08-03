@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Output contract — mirrors contracts/incidents-raw.schema.json (draft-07).
+ * Output contract — mirrors contracts/incident-event.schema.json (draft-07).
  * Universal fields first-class; the origin event is preserved verbatim as a
  * JSON string in payload_raw. Strict, to match additionalProperties: false.
  */

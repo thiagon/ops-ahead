@@ -11,7 +11,7 @@ export const envSchema = z
     SERVICE_VERSION: z.string().default('0.1.0'),
 
     KAFKA_BOOTSTRAP_SERVERS: z.string().default('localhost:9092'),
-    KAFKA_TOPIC: z.string().default('incidents.raw'),
+    KAFKA_TOPIC: z.string().default('incidents.received'),
 
     HMAC_ENABLED: z.stringbool().default(false),
     HMAC_SECRET: z.string().default(''),

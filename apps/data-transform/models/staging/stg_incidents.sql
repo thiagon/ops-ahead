@@ -33,4 +33,4 @@ select
     JSONExtractInt(payload_raw, 'counted_in_kpi')                                   as counted_in_kpi,
     JSONExtractInt(payload_raw, 'kpi_breached')                                     as kpi_breached
 
-from {{ source('raw', 'incidents_raw') }}
+from {{ source('ingest', 'incidents_received') }}

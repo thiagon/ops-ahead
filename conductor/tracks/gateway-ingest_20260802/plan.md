@@ -31,18 +31,18 @@ Fica de fora o que é de repo standalone (LICENSE, `.github/`, docker-compose, R
 
 ## Phase 2: Módulo `incidents` (Zod 4 + adapter ITSM)
 
-Contrato de entrada/saída e a normalização para `incidents.raw`, no layout de módulo do template.
+Contrato de entrada/saída e a normalização para `incidents.received`, no layout de módulo do template.
 
 ### Tasks
 
-- [x] Task 2.1: `src/modules/incidents/schema.ts` — `incidentRawSchema` (saída, alinhado a `contracts/incidents-raw.schema.json`), `itsmWebhookSchema` (entrada = shape do `incident_producer.py`) e os schemas da rota (body, aceite, erro)
-- [x] Task 2.2: `service.ts` — interface `SourceAdapter` + `itsmAdapter`: `event_id`=UUID v4, `opened_at` normalizado ISO 8601 UTC, `severity`=`prioridade_codigo`, `entity_id`=`item_configuracao`, `payload_raw`=JSON verbatim; saída validada pelo `incidentRawSchema`; resolução de adapter por `source`
+- [x] Task 2.1: `src/modules/incidents/schema.ts` — `incidentEventSchema` (saída, alinhado a `contracts/incident-event.schema.json`), `itsmWebhookSchema` (entrada = shape do `incident_producer.py`) e os schemas da rota (body, aceite, erro)
+- [x] Task 2.2: `service.ts` — interface `SourceAdapter` + `itsmAdapter`: `event_id`=UUID v4, `opened_at` normalizado ISO 8601 UTC, `severity`=`prioridade_codigo`, `entity_id`=`item_configuracao`, `payload_raw`=JSON verbatim; saída validada pelo `incidentEventSchema`; resolução de adapter por `source`
 - [x] Task 2.3: `routes.ts` + `index.ts` — `POST /webhook/incidents` com `withTypeProvider<ZodTypeProvider>`, schema Zod (body/response), tags OpenAPI; 400 source desconhecido, 422 validação
 - [x] Task 2.4: Testes vitest (`test/unit/modules/incidents/*`) — mapeamento, bordas de data/severity, adapter desconhecido; e2e do handler para um evento do CSV
 
 ### Verification
 
-- [x] Testes cobrem mapeamento e validação; handler devolve o `IncidentRaw` correto para um evento do CSV; rota aparece no `/docs`
+- [x] Testes cobrem mapeamento e validação; handler devolve o `IncidentEvent` correto para um evento do CSV; rota aparece no `/docs`
 
 ## Phase 3: Plugins Kafka + HMAC
 
@@ -50,7 +50,7 @@ Publica no barramento e protege a fronteira, como plugins autoload do template.
 
 ### Tasks
 
-- [ ] Task 3.1: `src/plugins/kafka.ts` — producer `kafkajs` que decora `app.kafka`, conecta no `onReady`, encerra no `onClose`; publica em `incidents.raw`, `key=event_id`, `acks=all`, retry
+- [ ] Task 3.1: `src/plugins/kafka.ts` — producer `kafkajs` que decora `app.kafka`, conecta no `onReady`, encerra no `onClose`; publica em `incidents.received`, `key=event_id`, `acks=all`, retry
 - [ ] Task 3.2: Ligar o `service`/rota ao producer; erro 502 quando Kafka indisponível; incrementa métricas (publicados, falhas)
 - [ ] Task 3.3: `src/plugins/hmac.ts` — hook `preValidation` verifica `X-Signature: sha256=…`, toggle `HMAC_ENABLED`, erro 401; testes
 - [ ] Task 3.4: `src/plugins/metrics.ts` — prom-client expõe `/metrics` (contadores publicados, falhas HMAC, falhas Kafka)
@@ -83,11 +83,11 @@ Substitui o stub nginx pelo app real na convenção atual.
 
 - [ ] Task 5.1: Deploy via GitOps (push → ArgoCD sync); pod `gateway` saudável no `ns: ui`
 - [ ] Task 5.2: Rodar `incident_producer.py --gateway-url <ingress> --limit N` contra o gateway
-- [ ] Task 5.3: Confirmar eventos em `incidents.raw` drenados pelo consumer para ClickHouse (contagem coerente)
+- [ ] Task 5.3: Confirmar eventos em `incidents.received` drenados pelo consumer para ClickHouse (contagem coerente)
 
 ### Verification
 
-- [ ] Fluxo `producer → gateway → incidents.raw → consumer → ClickHouse` verificado no cluster
+- [ ] Fluxo `producer → gateway → incidents.received → consumer → ClickHouse` verificado no cluster
 
 ## Final Verification
 

@@ -1,3 +1,3 @@
-from .incident import IncidentRaw
+from .incident import IncidentEvent
 
-__all__ = ["IncidentRaw"]
+__all__ = ["IncidentEvent"]

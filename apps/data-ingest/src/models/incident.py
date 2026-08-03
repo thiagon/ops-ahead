@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
-class IncidentRaw(BaseModel):
+class IncidentEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_id: Annotated[UUID, Field(description="Globally unique event identifier (UUID v4).")]
