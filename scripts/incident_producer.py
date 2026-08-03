@@ -11,16 +11,51 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# assets/incidents.csv is the original Locaweb base and stays in Portuguese.
+# This mock is the boundary: everything it posts to the gateway is English, so
+# no part of the real system ever sees the original vocabulary.
+COLUMN_NAMES = {
+    "numero": "ticket_number",
+    "prioridade_codigo": "priority_code",
+    "prioridade_label": "priority_label",
+    "produto": "product",
+    "categoria": "category",
+    "subcategoria": "subcategory",
+    "grupo_designado": "assignment_group",
+    "item_configuracao": "configuration_item",
+    "aberto_em": "opened_at",
+    "aberto_data": "opened_date",
+    "aberto_hora": "opened_hour",
+    "aberto_dia_semana": "opened_weekday",
+    "aberto_semana_ano": "opened_week_of_year",
+    "aberto_mes": "opened_month",
+    "resolvido_em": "resolved_at",
+    "encerrado_em": "closed_at",
+    "duracao_segundos": "duration_seconds",
+    "duracao_minutos": "duration_minutes",
+    "duracao_horas": "duration_hours",
+    "status": "status",
+    "codigo_fechamento": "close_code",
+    "solucao": "resolution",
+    "aberto_por": "opened_by",
+    "incidente_pai": "parent_incident",
+    "tem_incidente_pai": "has_parent_incident",
+    "descricao_resumida": "short_description",
+    "entrou_kpi": "counted_in_kpi",
+    "kpi_violado": "kpi_breached",
+}
+
 
 def _map_row(row: pd.Series, source: str) -> dict:
+    payload = {COLUMN_NAMES.get(str(k), str(k)): v for k, v in row.to_dict().items()}
     return {
-        "incidente_id": row["numero"],
+        "ticket_number": payload["ticket_number"],
         "source": source,
-        "aberto_em": row["aberto_em"],
-        "prioridade_codigo": int(row["prioridade_codigo"]),
-        "item_configuracao": row.get("item_configuracao") or "",
-        "status": row.get("status") or "",
-        "payload": row.to_dict(),
+        "opened_at": payload["opened_at"],
+        "priority_code": int(payload["priority_code"]),
+        "configuration_item": payload.get("configuration_item") or "",
+        "status": payload.get("status") or "",
+        "payload": payload,
     }
 
 

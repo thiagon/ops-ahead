@@ -13,7 +13,7 @@ with p4 as (
         entity_id,
         event_id,
         opened_at,
-        numero,
+        ticket_number,
         row_number() over (partition by entity_id order by opened_at) as rn_all,
         row_number() over (partition by entity_id order by opened_at) as rn_p4
     from {{ ref('stg_incidents') }}
@@ -25,7 +25,7 @@ sequenced as (
         entity_id,
         event_id,
         opened_at,
-        numero,
+        ticket_number,
         rn_p4,
         rn_all - rn_p4 as sequence_group
     from p4
@@ -37,7 +37,7 @@ select
     min(opened_at)  as sequence_start,
     max(opened_at)  as sequence_end,
     count()         as sequence_length,
-    min(numero)     as first_incident,
-    max(numero)     as last_incident
+    min(ticket_number)     as first_incident,
+    max(ticket_number)     as last_incident
 from sequenced
 group by entity_id, sequence_group

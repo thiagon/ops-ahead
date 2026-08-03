@@ -77,6 +77,9 @@ Stack runs on Kubernetes (k3s via k3d). All changes go via GitOps — edit files
 
 ## Dataset Key Fields
 
+`assets/incidents.csv` is the original Locaweb base and keeps its Portuguese
+column names. It exists to feed mocks — nothing else reads it.
+
 | Field | Description |
 |-------|-------------|
 | `prioridade_codigo` | 1=Critical, 2=High, 3=Medium, 4=Low, 5=Very Low |
@@ -84,6 +87,19 @@ Stack runs on Kubernetes (k3s via k3d). All changes go via GitOps — edit files
 | `duracao_segundos` | Resolution time in seconds |
 | `entrou_kpi` | 1 if counted in KPI (0 if parent incident or "Sem Intervenção") |
 | `kpi_violado` | 1 if OLA was breached |
+
+## Vocabulary Boundary
+
+The gateway payload is the reference for every field name in the system. The
+original Portuguese exists only in `assets/incidents.csv` and in the mock that
+reads it (`scripts/incident_producer.py`), which holds the Portuguese→English
+dictionary and posts English to the gateway.
+
+- Portuguese stops at the mock. No production code translates column names.
+- Everything from the gateway onward — Kafka payloads, ClickHouse tables, dbt
+  models, marts — uses the English names of the gateway payload.
+- Adding a field means naming it in the gateway payload first; downstream
+  follows that name.
 
 ## KPI / OLA Rules
 

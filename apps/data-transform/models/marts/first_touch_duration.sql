@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(severity, grupo_designado, opened_at)',
+        order_by='(severity, assignment_group, opened_at)',
         partition_by='toYYYYMM(opened_at)'
     )
 }}
@@ -12,24 +12,24 @@
 select
     event_id,
     entity_id,
-    numero,
+    ticket_number,
     opened_at,
-    grupo_designado,
+    assignment_group,
     severity,
-    duracao_segundos,
+    duration_seconds,
     multiIf(
         severity in (1, 2), 14400,
         severity = 3,        43200,
         severity = 4,        86400,
                              345600
     )                                                               as ola_limit_seconds,
-    duracao_segundos <= multiIf(
+    duration_seconds <= multiIf(
         severity in (1, 2), 14400,
         severity = 3,        43200,
         severity = 4,        86400,
                              345600
     )                                                               as within_ola,
-    entrou_kpi,
-    kpi_violado
+    counted_in_kpi,
+    kpi_breached
 from {{ ref('stg_incidents') }}
-where entrou_kpi = 1
+where counted_in_kpi = 1

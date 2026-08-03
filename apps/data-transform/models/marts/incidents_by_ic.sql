@@ -17,8 +17,8 @@ select
     countIf(severity = 2)                                     as p2_count,
     countIf(severity = 3)                                     as p3_count,
     countIf(severity <= 2)                                    as critical_count,
-    countIf(kpi_violado = 1)                                  as violated_count,
-    avg(duracao_segundos)                                     as avg_duration_seconds
+    countIf(kpi_breached = 1)                                  as violated_count,
+    avg(duration_seconds)                                     as avg_duration_seconds
 from {{ ref('stg_incidents') }}
 cross join (
     select arrayJoin([1, 6, 24]) as window_hours

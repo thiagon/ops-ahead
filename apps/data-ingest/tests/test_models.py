@@ -14,7 +14,7 @@ _VALID = {
     "severity": 3,
     "entity_id": "srv-web-01",
     "status": "open",
-    "payload_raw": json.dumps({"numero": "INC0001"}),
+    "payload_raw": json.dumps({"ticket_number": "INC0001"}),
 }
 
 
