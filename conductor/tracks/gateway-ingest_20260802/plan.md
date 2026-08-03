@@ -35,14 +35,14 @@ Contrato de entrada/saída e a normalização para `incidents.raw`, no layout de
 
 ### Tasks
 
-- [ ] Task 2.1: `src/modules/incidents/schema.ts` — `incidentRawSchema` (saída, alinhado a `contracts/incidents-raw.schema.json`) e `itsmWebhookSchema` (entrada = shape do `incident_producer.py`)
-- [ ] Task 2.2: `service.ts` — interface `SourceAdapter` + `itsmAdapter`: `event_id`=UUID v4, `opened_at` normalizado ISO 8601 UTC, `severity`=`prioridade_codigo`, `entity_id`=`item_configuracao`, `payload_raw`=JSON verbatim; resolução de adapter por `source`
-- [ ] Task 2.3: `routes.ts` + `index.ts` — `POST /webhook/incidents` com `withTypeProvider<ZodTypeProvider>`, schema Zod (body/response), tags OpenAPI; 400 source desconhecido, 422/400 validação (via `error-handler` do template)
-- [ ] Task 2.4: Testes vitest (`test/unit/modules/incidents/*`) — mapeamento, bordas de data/severity, adapter desconhecido; e2e do handler para um evento do CSV
+- [x] Task 2.1: `src/modules/incidents/schema.ts` — `incidentRawSchema` (saída, alinhado a `contracts/incidents-raw.schema.json`), `itsmWebhookSchema` (entrada = shape do `incident_producer.py`) e os schemas da rota (body, aceite, erro)
+- [x] Task 2.2: `service.ts` — interface `SourceAdapter` + `itsmAdapter`: `event_id`=UUID v4, `opened_at` normalizado ISO 8601 UTC, `severity`=`prioridade_codigo`, `entity_id`=`item_configuracao`, `payload_raw`=JSON verbatim; saída validada pelo `incidentRawSchema`; resolução de adapter por `source`
+- [x] Task 2.3: `routes.ts` + `index.ts` — `POST /webhook/incidents` com `withTypeProvider<ZodTypeProvider>`, schema Zod (body/response), tags OpenAPI; 400 source desconhecido, 422 validação
+- [x] Task 2.4: Testes vitest (`test/unit/modules/incidents/*`) — mapeamento, bordas de data/severity, adapter desconhecido; e2e do handler para um evento do CSV
 
 ### Verification
 
-- [ ] Testes cobrem mapeamento e validação; handler devolve o `IncidentRaw` correto para um evento do CSV; rota aparece no `/docs`
+- [x] Testes cobrem mapeamento e validação; handler devolve o `IncidentRaw` correto para um evento do CSV; rota aparece no `/docs`
 
 ## Phase 3: Plugins Kafka + HMAC
 
