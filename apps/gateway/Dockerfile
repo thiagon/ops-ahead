@@ -1,33 +1,35 @@
-# Build context is the repo root (CI: docker build -f apps/gateway/Dockerfile .).
-# gateway is a standalone npm project, not part of the uv workspace.
-FROM node:22-slim AS base
-WORKDIR /app
+# syntax=docker/dockerfile:1.7
 
-# --- deps: full install (incl. dev) against the lockfile, cached on manifests ---
+FROM node:24-trixie-slim AS base
+WORKDIR /app
+ENV CI=true
+
 FROM base AS deps
-COPY apps/gateway/package.json apps/gateway/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
 
-# --- build: compile TypeScript to dist/ ---
-FROM deps AS build
-COPY apps/gateway/tsconfig.json ./
-COPY apps/gateway/src ./src
-RUN npm run build
+FROM base AS dev
+ENV NODE_ENV=development
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json tsconfig.json ./
+COPY src ./src
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
 
-# --- prod-deps: production-only node_modules for a slim runtime ---
-FROM base AS prod-deps
-COPY apps/gateway/package.json apps/gateway/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
+FROM base AS build
+ENV NODE_ENV=development
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json tsconfig.json ./
+COPY src ./src
+RUN npm run build \
+ && npm prune --omit=dev
 
-# --- runtime: slim, non-root ---
-FROM node:22-slim AS runtime
-ENV NODE_ENV=production
+FROM node:24-trixie-slim AS prod
 WORKDIR /app
-COPY --from=prod-deps /app/node_modules ./node_modules
+ENV NODE_ENV=production
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY apps/gateway/package.json ./
+COPY package.json ./
+EXPOSE 3000
 USER node
-EXPOSE 8080
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]
