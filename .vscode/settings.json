@@ -1,0 +1,15 @@
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.mypy_cache": true,
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/.python-version": true,
+    "**/.playwright-mcp": true,
+    "**/.security-hardening": true,
+    ".data": true
+  }
+}
