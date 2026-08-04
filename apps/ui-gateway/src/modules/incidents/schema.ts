@@ -49,6 +49,14 @@ export const itsmWebhookSchema = z
 
 export type ItsmWebhook = z.infer<typeof itsmWebhookSchema>;
 
+/** Signed-request header — required when HMAC_ENABLED=true, ignored otherwise. */
+export const webhookHeadersSchema = z.object({
+  'x-signature': z.string().optional().meta({
+    description: 'HMAC-SHA256 of the raw body, hex-encoded: sha256=<hex>',
+    example: 'sha256=5257c92764fd8f5216674eb56ffaf27e0f88a5eb5d9f1e2a9e831b16ef2f4b3c',
+  }),
+});
+
 /** Envelope the route answers with once the event is accepted. */
 export const webhookAcceptedSchema = z
   .object({

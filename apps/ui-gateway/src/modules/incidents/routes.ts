@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { webhookAcceptedSchema, webhookErrorSchema } from './schema.ts';
+import { webhookAcceptedSchema, webhookErrorSchema, webhookHeadersSchema } from './schema.ts';
 import { normalizeWebhook, webhookBodySchema } from './service.ts';
 
 export function registerIncidentRoutes(app: FastifyInstance): void {
@@ -14,6 +14,7 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
         summary: 'Ingest an incident event from an origin system',
         description:
           'The body is discriminated on `source`: each registered origin has its own contract. An unknown source, or a payload that breaks its contract, is a 400.',
+        headers: webhookHeadersSchema,
         body: webhookBodySchema,
         response: {
           202: webhookAcceptedSchema,
