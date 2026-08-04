@@ -23,6 +23,7 @@ apps/                        # one folder per image you build; chart/ overlay co
 pipelines/                   # config-only: order + values per pipeline (chart lives in infra)
   data-itsm-daily/           # transform → quality → snapshot; appset.yaml points at the base chart
 contracts/                   # shared JSON Schemas (incident-event.schema.json)
+domain/                      # domain specs (SDD): language, contexts, ACLs
 scripts/                     # local utilities, never go to K8s
   prepare_dataset.py         # Excel → CSV pipeline
   incident_producer.py       # mock: publishes assets/incidents.csv to Kafka
@@ -88,20 +89,25 @@ column names. It exists to feed mocks — nothing else reads it.
 | `entrou_kpi` | 1 if counted in KPI (0 if parent incident or "Sem Intervenção") |
 | `kpi_violado` | 1 if OLA was breached |
 
-## Vocabulary Boundary
+## Domain
 
-The gateway payload is the reference for every field name in the system. The
-original Portuguese exists only in `assets/incidents.csv` and in the mock that
-reads it (`scripts/incident_producer.py`), which holds the Portuguese→English
-dictionary and posts English to the gateway.
+`domain/` holds the domain specs. Read them before naming anything — a new
+field, table, topic or metric — and before deciding how a context talks to
+another. They describe business intent, never implementation.
 
-- Portuguese stops at the mock. No production code translates column names.
-- Everything from the gateway onward — Kafka payloads, ClickHouse tables, dbt
-  models, marts — uses the English names of the gateway payload.
-- Adding a field means naming it in the gateway payload first; downstream
-  follows that name.
+| Document | Answers |
+|----------|---------|
+| `domain/ubiquitous-language.md` | What each term means and which word to use |
+| `domain/context-map.md` | Which bounded contexts exist and how they integrate |
+| `domain/contexts/integration.md` | The integration context: purpose, business decisions, open questions |
+| `domain/acl/itsm.md` | What the ITSM speaks and how it is translated — including where Portuguese is allowed to exist |
+
+Schema of record lives in `contracts/`; domain specs reference it, never repeat
+it. Business rules of the Locaweb dataset live in `docs/context/data-dictionary.md`.
 
 ## KPI / OLA Rules
+
+Quick reference; `docs/context/data-dictionary.md` is authoritative.
 
 - Only priorities 1, 2, 3 are measured
 - Excluded from KPI: `incidente_pai` filled OR `status == "Sem Intervenção"`

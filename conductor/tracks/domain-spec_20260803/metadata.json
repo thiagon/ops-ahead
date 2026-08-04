@@ -1,0 +1,23 @@
+{
+  "id": "domain-spec_20260803",
+  "title": "Camada de Domínio (Spec-Driven Development)",
+  "type": "chore",
+  "status": "complete",
+  "created": "2026-08-03T19:45:00Z",
+  "updated": "2026-08-03T23:00:00Z",
+  "current_phase": 3,
+  "current_task": "3.2",
+  "sprint": 3,
+  "milestone": 3,
+  "branch": "feat/gateway-ingest",
+  "github_issue": 48,
+  "github_pr": 47,
+  "phases": {
+    "total": 3,
+    "completed": 3
+  },
+  "tasks": {
+    "total": 6,
+    "completed": 6
+  }
+}

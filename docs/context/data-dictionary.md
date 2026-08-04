@@ -2,6 +2,13 @@
 
 **Versão: 2**
 
+> Este documento descreve o **sistema de origem** — os campos do ITSM da Locaweb, no
+> vocabulário da ferramenta, e as regras de negócio do KPI. É a autoridade sobre o que cada
+> dado significa.
+>
+> A linguagem da **plataforma** é outra: está em [`domain/`](../../domain/). A tradução
+> entre as duas está especificada em [`domain/acl/itsm.md`](../../domain/acl/itsm.md).
+
 ---
 
 ## Campos do Incidente
