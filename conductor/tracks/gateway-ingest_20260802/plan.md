@@ -3,7 +3,7 @@
 **Track ID:** gateway-ingest_20260802
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-02
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -81,20 +81,20 @@ Substitui o stub nginx pelo app real na convenção atual.
 
 ### Tasks
 
-- [ ] Task 5.1: Deploy via GitOps (push → ArgoCD sync); pod `gateway` saudável no `ns: ui`
-- [ ] Task 5.2: Rodar `incident_producer.py --gateway-url <ingress> --limit N` contra o gateway
-- [ ] Task 5.3: Confirmar eventos em `incidents.received` drenados pelo consumer para ClickHouse (contagem coerente)
+- [x] Task 5.1: Deploy via GitOps (push → ArgoCD sync); pod `gateway` saudável no `ns: ui`
+- [x] Task 5.2: Rodar `incident_producer.py --gateway-url <ingress> --limit N` contra o gateway
+- [x] Task 5.3: Confirmar eventos em `incidents.received` drenados pelo consumer para ClickHouse (contagem coerente)
 
 ### Verification
 
-- [ ] Fluxo `producer → gateway → incidents.received → consumer → ClickHouse` verificado no cluster
+- [x] Fluxo `producer → gateway → incidents.received → consumer → ClickHouse` verificado no cluster
 
 ## Final Verification
 
-- [ ] Todos os acceptance criteria atendidos
-- [ ] Testes passando
-- [ ] Stub nginx removido; gateway real no ar
-- [ ] Pronto para review
+- [x] Todos os acceptance criteria atendidos
+- [x] Testes passando
+- [x] Stub nginx removido; gateway real no ar
+- [x] Pronto para review
 
 ---
 

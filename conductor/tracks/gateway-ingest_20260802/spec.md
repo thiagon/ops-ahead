@@ -25,14 +25,14 @@ As a engenheiro do pipeline, I want to que o gateway seja a única peça que nor
 
 ## Acceptance Criteria
 
-- [ ] Serviço Fastify roda como `Deployment` no `ns: ui`, com `/health` (liveness/readiness) e `/metrics` (Prometheus)
-- [ ] `POST /webhook/incidents` valida o corpo com Zod (adapter ITSM), normaliza para o schema `incidents.received` e publica no tópico Kafka `incidents.received`
-- [ ] Mapeamento ITSM → universais: `event_id`=UUID v4 gerado · `source`=`source` do payload · `received_at`=timestamp do gateway (UTC) · `opened_at`=`aberto_em` normalizado ISO 8601 · `severity`=`prioridade_codigo` · `entity_id`=`item_configuracao` · `status`=`status` · `payload_raw`=JSON verbatim dos 27 campos
-- [ ] Assinatura HMAC verificada no header; segredo via ESO/Vault → Secret K8s; verificação desativável por env em dev
-- [ ] `scripts/incident_producer.py` assina o request quando o segredo HMAC está configurado
-- [ ] NetworkPolicy permite `ns: ui` → `ns: data` na porta do Kafka (9092)
-- [ ] Fluxo completo `producer → gateway → incidents.received → consumer → ClickHouse` roda verificado no cluster via GitOps
-- [ ] Erros mapeados: 401 (HMAC inválido), 422 (Zod falha), 502 (Kafka indisponível); publicação idempotente por `event_id`
+- [x] Serviço Fastify roda como `Deployment` no `ns: ui`, com `/health` (liveness/readiness) e `/metrics` (Prometheus)
+- [x] `POST /webhook/incidents` valida o corpo com Zod (adapter ITSM), normaliza para o schema `incidents.received` e publica no tópico Kafka `incidents.received`
+- [x] Mapeamento ITSM → universais: `event_id`=UUID v4 gerado · `source`=`source` do payload · `received_at`=timestamp do gateway (UTC) · `opened_at`=`aberto_em` normalizado ISO 8601 · `severity`=`prioridade_codigo` · `entity_id`=`item_configuracao` · `status`=`status` · `payload_raw`=JSON verbatim dos 27 campos
+- [x] Assinatura HMAC verificada no header; segredo via ESO/Vault → Secret K8s; verificação desativável por env em dev
+- [x] `scripts/incident_producer.py` assina o request quando o segredo HMAC está configurado
+- [x] NetworkPolicy permite `ns: ui` → `ns: data` na porta do Kafka (9092)
+- [x] Fluxo completo `producer → gateway → incidents.received → consumer → ClickHouse` roda verificado no cluster via GitOps
+- [x] Erros mapeados: 401 (HMAC inválido), 422 (Zod falha), 502 (Kafka indisponível); publicação idempotente por `event_id`
 
 ## Dependencies
 
