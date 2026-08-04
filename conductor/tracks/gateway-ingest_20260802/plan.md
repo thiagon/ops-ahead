@@ -15,13 +15,13 @@ stub; por fim a verificação e2e no cluster. TDD moderado — testes vitest jun
 
 ## Phase 1: Bootstrap do app a partir do template
 
-Trazer o `src/` e o toolchain do `template-fastify` para `apps/gateway/` e trocar a identidade.
+Trazer o `src/` e o toolchain do `template-fastify` para `apps/ui-gateway/` e trocar a identidade.
 Fica de fora o que é de repo standalone (LICENSE, `.github/`, docker-compose, README próprio).
 
 ### Tasks
 
-- [x] Task 1.1: Portar o `src/` do template (`/home/thiago/workspace/sample_fastify`) para `apps/gateway/` sem o módulo de referência `todos/`; trazer toolchain (biome, vitest, tsconfig, Dockerfile, `.nvmrc`); ajustar `package.json` (name `@ops-ahead/gateway`), `.env.example` e `SERVICE_NAME`
-- [x] Task 1.2: Excluir `apps/gateway` do workspace uv no `pyproject.toml` raiz; `npm install` gera `package-lock.json`; `npm run build`, `npm run typecheck`, `npm run lint` e `npm test` passam
+- [x] Task 1.1: Portar o `src/` do template (`/home/thiago/workspace/sample_fastify`) para `apps/ui-gateway/` sem o módulo de referência `todos/`; trazer toolchain (biome, vitest, tsconfig, Dockerfile, `.nvmrc`); ajustar `package.json` (name `@ops-ahead/ui-gateway`), `.env.example` e `SERVICE_NAME`
+- [x] Task 1.2: Excluir `apps/ui-gateway` do workspace uv no `pyproject.toml` raiz; `npm install` gera `package-lock.json`; `npm run build`, `npm run typecheck`, `npm run lint` e `npm test` passam
 - [x] Task 1.3: Estender `src/env.ts` com `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `HMAC_ENABLED`, `HMAC_SECRET`; validação de env passa
 - [x] Task 1.4: Confirmar Dockerfile do template (`node:24-trixie-slim`, stages base/deps/build/prod) builda a imagem; container sobe e responde `/health`
 
@@ -52,8 +52,8 @@ Publica no barramento e protege a fronteira, como plugins autoload do template.
 
 - [x] Task 3.1: `src/plugins/kafka.ts` — producer `kafkajs` que decora `app.kafka`, conecta no `onReady`, encerra no `onClose`; publica em `incidents.received`, `key=event_id`, `acks=all`, retry
 - [x] Task 3.2: Ligar o `service`/rota ao producer; erro 502 quando Kafka indisponível; incrementa métricas (publicados, falhas)
-- [x] Task 3.3: `src/plugins/hmac.ts` — hook `preValidation` verifica `X-Signature: sha256=…`, toggle `HMAC_ENABLED`, erro 401; testes
-- [x] Task 3.4: `src/plugins/metrics.ts` — prom-client expõe `/metrics` (contadores publicados, falhas HMAC, falhas Kafka)
+- [x] Task 3.3: `src/plugins/hmac.ts` — expõe `app.verifySignature` (hook `preParsing` que a rota adota) verificando `X-Signature: sha256=…`, toggle `HMAC_ENABLED`, erro 401; testes
+- [x] Task 3.4: `src/plugins/metrics.ts` — prom-client decora `app.metrics`; `src/modules/metrics/` expõe `/metrics` (contadores publicados, falhas HMAC, falhas Kafka)
 - [x] Task 3.5: `scripts/incident_producer.py` assina o request quando `HMAC_SECRET` está setado
 
 ### Verification
@@ -68,7 +68,7 @@ Substitui o stub nginx pelo app real na convenção atual.
 
 - [ ] Task 4.1: Reescrever `infra/charts/ui-gateway` — Deployment (app real, porta do template), Service, Ingress, probes `/health`, scrape `/metrics`, securityContext
 - [ ] Task 4.2: `NetworkPolicy` liberando `ns: ui` → `ns: data` na 9092 (Kafka)
-- [ ] Task 4.3: `apps/gateway/chart/` — `app.yaml` (`workload: deployment`, `namespace: ui`), `values-dev.yaml`, `values-image.yaml`
+- [ ] Task 4.3: `apps/ui-gateway/chart/` — `app.yaml` (`workload: deployment`, `namespace: ui`), `values-dev.yaml`, `values-image.yaml`
 - [ ] Task 4.4: Migrar `infra/apps/ui-gateway.yaml` para multi-source com `$values` (padrão `data-ingest`)
 - [ ] Task 4.5: `ExternalSecret` do segredo HMAC (ESO/Vault) → Secret K8s; `HMAC_SECRET` no `.env`/dev-up
 - [ ] Task 4.6: Adicionar `gateway` à matriz de build do CI (Gitea Actions) — build imagem Node (npm), push registry interno, write-back `tag=SHA`

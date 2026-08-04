@@ -1,5 +1,5 @@
 {
-  "name": "@ops-ahead/gateway",
+  "name": "@ops-ahead/ui-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
