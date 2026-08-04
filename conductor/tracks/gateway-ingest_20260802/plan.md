@@ -50,15 +50,15 @@ Publica no barramento e protege a fronteira, como plugins autoload do template.
 
 ### Tasks
 
-- [ ] Task 3.1: `src/plugins/kafka.ts` — producer `kafkajs` que decora `app.kafka`, conecta no `onReady`, encerra no `onClose`; publica em `incidents.received`, `key=event_id`, `acks=all`, retry
-- [ ] Task 3.2: Ligar o `service`/rota ao producer; erro 502 quando Kafka indisponível; incrementa métricas (publicados, falhas)
-- [ ] Task 3.3: `src/plugins/hmac.ts` — hook `preValidation` verifica `X-Signature: sha256=…`, toggle `HMAC_ENABLED`, erro 401; testes
-- [ ] Task 3.4: `src/plugins/metrics.ts` — prom-client expõe `/metrics` (contadores publicados, falhas HMAC, falhas Kafka)
-- [ ] Task 3.5: `scripts/incident_producer.py` assina o request quando `HMAC_SECRET` está setado
+- [x] Task 3.1: `src/plugins/kafka.ts` — producer `kafkajs` que decora `app.kafka`, conecta no `onReady`, encerra no `onClose`; publica em `incidents.received`, `key=event_id`, `acks=all`, retry
+- [x] Task 3.2: Ligar o `service`/rota ao producer; erro 502 quando Kafka indisponível; incrementa métricas (publicados, falhas)
+- [x] Task 3.3: `src/plugins/hmac.ts` — hook `preValidation` verifica `X-Signature: sha256=…`, toggle `HMAC_ENABLED`, erro 401; testes
+- [x] Task 3.4: `src/plugins/metrics.ts` — prom-client expõe `/metrics` (contadores publicados, falhas HMAC, falhas Kafka)
+- [x] Task 3.5: `scripts/incident_producer.py` assina o request quando `HMAC_SECRET` está setado
 
 ### Verification
 
-- [ ] Testes: assinatura válida/inválida, toggle off; publica contra Kafka local/mock e confirma mensagem no tópico; `/metrics` expõe os contadores
+- [x] Testes: assinatura válida/inválida, toggle off; publica contra Kafka local/mock e confirma mensagem no tópico; `/metrics` expõe os contadores
 
 ## Phase 4: Empacotamento K8s + GitOps
 

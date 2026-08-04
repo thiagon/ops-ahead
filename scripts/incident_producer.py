@@ -3,7 +3,11 @@
 
 import argparse
 import asyncio
+import hmac
+import json
+import os
 import time
+from hashlib import sha256
 from pathlib import Path
 
 import httpx
@@ -47,7 +51,12 @@ COLUMN_NAMES = {
 
 
 def _map_row(row: pd.Series, source: str) -> dict:
-    payload = {COLUMN_NAMES.get(str(k), str(k)): v for k, v in row.to_dict().items()}
+    # An empty cell is null on the wire: NaN would serialize as a bare NaN, which
+    # is not JSON and the gateway refuses it.
+    payload = {
+        COLUMN_NAMES.get(str(k), str(k)): (None if pd.isna(v) else v)
+        for k, v in row.to_dict().items()
+    }
     return {
         "ticket_number": payload["ticket_number"],
         "source": source,
@@ -57,6 +66,10 @@ def _map_row(row: pd.Series, source: str) -> dict:
         "status": payload.get("status") or "",
         "payload": payload,
     }
+
+
+def _sign(secret: str, body: bytes) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, sha256).hexdigest()
 
 
 async def produce(args: argparse.Namespace) -> None:
@@ -69,10 +82,18 @@ async def produce(args: argparse.Namespace) -> None:
     total = len(df)
     base_delay = 1.0 / args.speed if args.speed > 0 else 0
 
+    # The gateway verifies the signature over the exact bytes it received, so
+    # the body is serialized here and posted verbatim instead of via json=.
+    secret = os.environ.get("HMAC_SECRET", "")
+
     async with httpx.AsyncClient(base_url=args.gateway_url, timeout=10) as client:
         for i, (_, row) in enumerate(df.iterrows()):
-            payload = _map_row(row, args.source)
-            resp = await client.post("/webhook/incidents", json=payload)
+            body = json.dumps(_map_row(row, args.source)).encode()
+            headers = {"content-type": "application/json"}
+            if secret:
+                headers["X-Signature"] = _sign(secret, body)
+
+            resp = await client.post("/webhook/incidents", content=body, headers=headers)
             resp.raise_for_status()
 
             if (i + 1) % 1000 == 0 or (i + 1) == total:
