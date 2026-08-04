@@ -29,7 +29,7 @@
     "received_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when the consumer received the event (UTC, ISO 8601)."
+      "description": "Timestamp when the gateway received the event (UTC, ISO 8601)."
     },
     "opened_at": {
       "type": "string",

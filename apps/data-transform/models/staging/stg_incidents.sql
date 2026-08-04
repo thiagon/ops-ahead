@@ -16,7 +16,6 @@ select
     JSONExtractString(payload_raw, 'category')                                      as category,
     JSONExtractString(payload_raw, 'subcategory')                                   as subcategory,
     JSONExtractString(payload_raw, 'assignment_group')                              as assignment_group,
-    JSONExtractString(payload_raw, 'configuration_item')                            as configuration_item,
     JSONExtractInt(payload_raw, 'opened_hour')                                      as opened_hour,
     JSONExtractString(payload_raw, 'opened_weekday')                                as opened_weekday,
     JSONExtractInt(payload_raw, 'opened_week_of_year')                              as opened_week_of_year,
