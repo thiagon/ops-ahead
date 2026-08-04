@@ -1,20 +1,12 @@
 {{- define "ui-gateway.labels" -}}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+app.kubernetes.io/name: gateway
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/part-of: ops-ahead
 {{- end }}
 
-{{- define "ui-gateway.nginxConfig" -}}
-server {
-    listen 80;
-    location /health {
-        return 200 'ok';
-        add_header Content-Type text/plain;
-    }
-    location / {
-        return 200 'ops-ahead stub';
-        add_header Content-Type text/plain;
-    }
-}
+{{- define "ui-gateway.image" -}}
+{{- $image := index .Values "ui-gateway" "image" -}}
+{{ $image.repository }}:{{ $image.tag }}
 {{- end }}

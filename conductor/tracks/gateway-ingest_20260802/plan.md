@@ -66,16 +66,16 @@ Substitui o stub nginx pelo app real na convenção atual.
 
 ### Tasks
 
-- [ ] Task 4.1: Reescrever `infra/charts/ui-gateway` — Deployment (app real, porta do template), Service, Ingress, probes `/health`, scrape `/metrics`, securityContext
-- [ ] Task 4.2: `NetworkPolicy` liberando `ns: ui` → `ns: data` na 9092 (Kafka)
-- [ ] Task 4.3: `apps/ui-gateway/chart/` — `app.yaml` (`workload: deployment`, `namespace: ui`), `values-dev.yaml`, `values-image.yaml`
-- [ ] Task 4.4: Migrar `infra/apps/ui-gateway.yaml` para multi-source com `$values` (padrão `data-ingest`)
-- [ ] Task 4.5: `ExternalSecret` do segredo HMAC (ESO/Vault) → Secret K8s; `HMAC_SECRET` no `.env`/dev-up
-- [ ] Task 4.6: Adicionar `gateway` à matriz de build do CI (Gitea Actions) — build imagem Node (npm), push registry interno, write-back `tag=SHA`
+- [x] Task 4.1: Reescrever `infra/charts/ui-gateway` — Deployment (app real, porta do template), Service, Ingress, probes `/health`, scrape `/metrics`, securityContext
+- [x] Task 4.2: `NetworkPolicy` liberando `ns: ui` → `ns: data` na 9092 (Kafka) — egress no chart + ingress correspondente em `infra/apps/namespaces.yaml`
+- [x] Task 4.3: `apps/ui-gateway/chart/` — `app.yaml` (`workload: deployment`, `namespace: ui`) e `values-dev.yaml` (overlay + tag de imagem, convenção em uso pelo write-back do CI)
+- [x] Task 4.4: Migrar `infra/apps/ui-gateway.yaml` para multi-source com `$values` (padrão `data-ingest`)
+- [x] Task 4.5: `ExternalSecret` do segredo HMAC (ESO/Vault) → Secret K8s; `HMAC_SECRET` no `.env`/dev-up
+- [x] Task 4.6: Adicionar `ui-gateway` à matriz de build do CI (Gitea Actions) — build imagem Node (npm) com contexto na raiz, push registry interno, write-back `tag=SHA`
 
 ### Verification
 
-- [ ] `helm template` renderiza sem erro; CI builda e faz push da imagem; ArgoCD sincroniza o app novo
+- [x] `helm template` renderiza sem erro; CI builda e faz push da imagem; ArgoCD sincroniza o app novo
 
 ## Phase 5: Integração e verificação e2e
 

@@ -74,6 +74,13 @@ uv run --package ops-ahead-data-ingest pytest
 
 Stack runs on Kubernetes (k3s via k3d). All changes go via GitOps — edit files → push → ArgoCD syncs. Never `kubectl exec`, `curl`, or direct API calls to the cluster.
 
+**Scripts in `infra/scripts/` never carry a hardcoded list.** Apps, charts, namespaces and
+secrets are discovered — `kubectl ... --all` in the cluster, a glob over the manifests that
+already declare it in the repo (`apps/*/chart/values-dev.yaml`,
+`infra/charts/*/templates/external-secret.yaml`, `infra/apps/namespaces.yaml`). Adding a
+service must not require editing a script; if it does, fix the script — replace the list
+with a glob, never append to it. Rules and the add-a-service flow: `infra/scripts/README.md`.
+
 `kube-prometheus-stack` bundles Grafana inside the `infra-prometheus` chart. The credentials in that chart (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`) are for Grafana, not Prometheus. Prometheus UI has no native authentication — it is exposed without credentials in dev and protected by NetworkPolicy.
 
 ## Dataset Key Fields

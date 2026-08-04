@@ -57,9 +57,12 @@ restore_pulled_overlays() {
   done < <(cd "$PULL_FORWARD_BACKUP" && find . -type f | sed 's|^\./||')
 }
 # Same rule as the Gitea Actions write-back: every app pins <app>.image.tag,
-# keyed by its own name. Add an app = add it to this list.
-for app in data-ingest data-transform data-quality; do
-  pull_forward_key "apps/${app}/chart/values-dev.yaml" ".[\"${app}\"].image.tag"
+# keyed by its own name. Discovered from the overlays themselves — owning one
+# is what makes an app's tag CI-managed.
+for overlay in apps/*/chart/values-dev.yaml; do
+  [ -e "$overlay" ] || continue
+  app=$(basename "$(dirname "$(dirname "$overlay")")")
+  pull_forward_key "$overlay" ".[\"${app}\"].image.tag"
 done
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.

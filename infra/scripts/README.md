@@ -2,43 +2,66 @@
 
 ## Princípio central
 
-`dev-up.sh` é o script de bootstrap do ambiente local. Ele deve ser **estável**: rodar sem alterações mesmo quando novos serviços, secrets ou namespaces são adicionados à plataforma. Qualquer mudança que exija editar o script ao adicionar um serviço é um defeito de design.
+Os scripts desta pasta (`dev-up.sh`, `dev-sync.sh`, `dev-health.sh`, `_lib.sh`, …) são o
+bootstrap e a operação do ambiente local. Todos devem ser **estáveis**: rodar sem alteração
+mesmo quando novos serviços, apps, secrets ou namespaces são adicionados à plataforma.
+Qualquer mudança que exija editar um script ao adicionar um serviço é um defeito de design.
 
 ---
 
 ## Regras obrigatórias
 
-### 1. Sem listas hardcoded de serviços ou secrets
+### 1. Sem listas hardcoded
 
-Loops e esperas devem operar sobre **todos os recursos do tipo**, descobertos dinamicamente no cluster.
+Loops e esperas operam sobre **todos os itens do tipo**, descobertos dinamicamente — no
+cluster via `kubectl`, no repositório via glob dos manifestos que já declaram a informação.
 
 ```bash
 # ERRADO — quebra ao adicionar qualquer novo ExternalSecret
-for es in grafana-secret/infra minio-secret/data litellm-secret/llm; do ...
+for es in grafana-secret/infra minio-secret/data; do ...
 
 # CORRETO — funciona para qualquer quantidade de ExternalSecrets
 kubectl wait externalsecret --all --all-namespaces --for=condition=Ready
 ```
 
-A mesma regra vale para namespaces, pods, aplicações ArgoCD ou qualquer outro recurso.
+```bash
+# ERRADO — adicionar um app exige editar o script, e o que for esquecido falha calado
+for app in data-ingest data-transform data-quality; do ...
 
-### 2. Novos secrets vão ao Vault, não ao script
+# CORRETO — quem tem o overlay é quem entra no loop
+for overlay in apps/*/chart/values-dev.yaml; do
+  app=$(basename "$(dirname "$(dirname "$overlay")")")
+  ...
+done
+```
 
-Ao adicionar um novo serviço que precisa de credenciais:
+Vale para namespaces, pods, Applications do ArgoCD, apps de `apps/`, charts de
+`infra/charts/` ou qualquer outro conjunto que cresça com a plataforma.
 
-1. Adicione o `vault kv put secret/<nome>` no bloco **Bootstrap Vault** do `dev-up.sh`
-2. Crie o `ExternalSecret` no chart do serviço (ou em `infra/charts/infra-secrets/`)
-3. **Não crie** `ksecret` nem `kubectl create secret` no script
+### 2. Novos secrets: ExternalSecret + var no `.env`
 
-O ESO sincroniza automaticamente. O script não precisa saber quais secrets existem.
+O `dev-up.sh` monta os `vault kv put` sozinho: lê todo
+`infra/charts/*/templates/external-secret.yaml`, usa `remoteRef.key` como caminho no Vault
+e `remoteRef.property` como nome da variável, e pega o valor da var de mesmo nome no `.env`.
+
+Ao adicionar um serviço que precisa de credencial:
+
+1. Crie o `ExternalSecret` no chart do serviço (ou em `infra/charts/infra-secrets/`)
+2. Adicione a var em `.env.example` (e no seu `.env`) com **o mesmo nome** de `remoteRef.property`
+3. **Não crie** `kubectl create secret` nem `vault kv put` literal no script
+
+O script falha explicitamente se a var declarada no `ExternalSecret` não existir no `.env`.
 
 ### 3. Sem referências a nomes de namespaces fora do `namespaces.yaml`
 
-Namespaces devem ser declarados em `infra/apps/namespaces.yaml`. O script lê esse arquivo via `namespaces_from_yaml`. Não adicione nomes de namespace literais em outros pontos do script.
+Namespaces são declarados em `infra/apps/namespaces.yaml` e lidos de lá pelo script.
+Não adicione nomes de namespace literais em outros pontos.
 
 ### 4. Bootstrap de infraestrutura, não de aplicação
 
-O `dev-up.sh` instala a fundação (ArgoCD, Vault, Gitea, ESO) e faz o push inicial para o Gitea. O ArgoCD assume o controle de tudo depois disso. Qualquer lógica que pertença ao ciclo de vida de uma aplicação específica deve estar no chart dessa aplicação.
+O `dev-up.sh` instala a fundação (ArgoCD, Vault, Gitea, ESO) e faz o push inicial para o
+Gitea. O ArgoCD assume o controle depois disso. Lógica do ciclo de vida de uma aplicação
+específica pertence ao chart dessa aplicação.
 
 ### 5. Idempotência obrigatória
 
@@ -54,9 +77,8 @@ Cada operação deve ser segura para rodar múltiplas vezes:
 ```
 1. Criar chart em infra/charts/<nome>/
 2. Criar app em infra/apps/<nome>.yaml
-3. Adicionar vault kv put no bloco Bootstrap Vault do dev-up.sh (se precisar de secret)
-4. Criar ExternalSecret no chart infra-secrets (se precisar de secret)
-5. dev-sync.sh  →  ArgoCD sincroniza tudo automaticamente
+3. Criar ExternalSecret no chart + var de mesmo nome no .env (se precisar de secret)
+4. make sync  →  ArgoCD sincroniza tudo automaticamente
 ```
 
-O `dev-up.sh` **não precisa ser editado** nos passos 1, 2, 4 e 5.
+Nenhum passo edita script.

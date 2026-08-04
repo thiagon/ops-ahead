@@ -1,5 +1,8 @@
 {{- if .Values.networkPolicy.enabled }}
 # ns:ui — accepts ingress from Traefik (kube-system); egress to ml API ports
+# and to Kafka in ns:data. The matching ingress side (data accepting ui on
+# 9092) lives in infra/apps/namespaces.yaml, where cross-namespace flows are
+# declared for the target namespace.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -25,6 +28,13 @@ spec:
               kubernetes.io/metadata.name: ml
       ports:
         - port: 5000
+    # data: Kafka plain listener — the gateway publishes incidents.received
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - port: {{ .Values.networkPolicy.kafkaPort }}
     - to:
         - podSelector: {}
   ingress:
