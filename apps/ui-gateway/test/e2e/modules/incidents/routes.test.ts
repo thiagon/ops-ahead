@@ -76,7 +76,7 @@ describe('POST /webhook/incidents', () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ error: 'UnknownSource' });
+    expect(res.json().details).toContainEqual(expect.objectContaining({ path: 'source' }));
     expect(publish).not.toHaveBeenCalled();
   });
 
@@ -87,7 +87,7 @@ describe('POST /webhook/incidents', () => {
       payload: { ...itsmEvent, priority_code: 9 },
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     expect(res.json().details).toContainEqual(expect.objectContaining({ path: 'priority_code' }));
     expect(publish).not.toHaveBeenCalled();
   });
@@ -96,5 +96,18 @@ describe('POST /webhook/incidents', () => {
     const res = await app.inject({ method: 'GET', url: '/docs/json' });
 
     expect(res.json().paths['/webhook/incidents']).toBeDefined();
+  });
+
+  it('documents the body as one variant per source, under components', async () => {
+    const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
+    const body =
+      doc.paths['/webhook/incidents'].post.requestBody.content['application/json'].schema;
+
+    expect(body.$ref).toBe('#/components/schemas/IncidentWebhookInput');
+    expect(doc.components.schemas.IncidentWebhookInput.oneOf).toEqual([
+      { $ref: '#/components/schemas/ItsmWebhookInput' },
+    ]);
+    expect(doc.components.schemas.ItsmWebhookInput.properties.ticket_number).toBeDefined();
+    expect(doc.components.schemas.IncidentEvent.properties.payload_raw).toBeDefined();
   });
 });

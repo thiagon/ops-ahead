@@ -23,6 +23,9 @@ gateway:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
     kafkaTopic: incidents.received
     hmacEnabled: "true"
+    httpsEnabled: "false"
+    corsOrigins:
+      - http://ui.ops-ahead.localtest.me
   secretName: ui-gateway-secret
   ingress:
     host: gateway.ops-ahead.localtest.me

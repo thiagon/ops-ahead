@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import {
   type IncidentEvent,
   type ItsmWebhook,
@@ -6,26 +7,12 @@ import {
   itsmWebhookSchema,
 } from './schema.ts';
 
-export interface NormalizeIssue {
-  path: string;
-  message: string;
-}
+/** The origins the gateway speaks, one variant each. */
+export const webhookBodySchema = z
+  .discriminatedUnion('source', [itsmWebhookSchema])
+  .meta({ id: 'IncidentWebhook', description: 'Incident as its origin system posts it' });
 
-export type NormalizeResult =
-  | { success: true; event: IncidentEvent }
-  | { success: false; issues: NormalizeIssue[] };
-
-/**
- * A source adapter owns the contract of one origin system: it validates the
- * incoming payload and normalizes it into the universal IncidentEvent. Adding a
- * source (alertmanager, datadog) means adding an adapter — nothing downstream
- * (consumer, marts) changes. The result shape keeps the origin's validation
- * vocabulary out of the route.
- */
-export interface SourceAdapter {
-  readonly source: string;
-  normalize(input: unknown): NormalizeResult;
-}
+export type WebhookBody = z.output<typeof webhookBodySchema>;
 
 const NAIVE_TIMESTAMP = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/;
 
@@ -64,27 +51,10 @@ export function toIncidentEvent(input: ItsmWebhook): IncidentEvent {
   });
 }
 
-export const itsmAdapter: SourceAdapter = {
-  source: 'itsm',
-
-  normalize(input) {
-    const parsed = itsmWebhookSchema.safeParse(input);
-    if (!parsed.success) {
-      return {
-        success: false,
-        issues: parsed.error.issues.map(issue => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        })),
-      };
-    }
-    return { success: true, event: toIncidentEvent(parsed.data) };
-  },
-};
-
-const registry = new Map<string, SourceAdapter>([[itsmAdapter.source, itsmAdapter]]);
-
-/** Resolve the adapter for a source id, or undefined if none is registered. */
-export function resolveAdapter(source: string): SourceAdapter | undefined {
-  return registry.get(source);
+/** Map a body the route already validated onto the universal event. */
+export function normalizeWebhook(body: WebhookBody): IncidentEvent {
+  switch (body.source) {
+    case 'itsm':
+      return toIncidentEvent(body);
+  }
 }

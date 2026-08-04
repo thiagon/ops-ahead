@@ -10,6 +10,23 @@ export const envSchema = z
     SERVICE_NAME: z.string().default('gateway'),
     SERVICE_VERSION: z.string().default('0.1.0'),
 
+    // Whether TLS terminates in front of the gateway.
+    HTTPS_ENABLED: z.stringbool().default(false),
+
+    // Empty reflects whatever origin asks.
+    CORS_ORIGINS: z
+      .string()
+      .default('[]')
+      .transform((value, ctx) => {
+        try {
+          return JSON.parse(value) as unknown;
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'must be a JSON array of origins' });
+          return z.NEVER;
+        }
+      })
+      .pipe(z.array(z.url())),
+
     KAFKA_BOOTSTRAP_SERVERS: z.string().default('localhost:9092'),
     KAFKA_TOPIC: z.string().default('incidents.received'),
 

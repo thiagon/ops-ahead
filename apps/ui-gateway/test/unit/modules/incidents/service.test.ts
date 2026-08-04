@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  itsmAdapter,
   normalizeToIsoUtc,
-  resolveAdapter,
+  normalizeWebhook,
   toIncidentEvent,
+  webhookBodySchema,
 } from '../../../../src/modules/incidents/service.ts';
 
 // One row of assets/incidents.csv, as scripts/incident_producer.py posts it.
 const itsmEvent = {
   ticket_number: 'INC0012345',
-  source: 'itsm',
+  source: 'itsm' as const,
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
@@ -61,33 +61,39 @@ describe('toIncidentEvent', () => {
   });
 });
 
-describe('itsmAdapter', () => {
+describe('webhookBodySchema', () => {
+  it('accepts the contract of a registered source', () => {
+    expect(webhookBodySchema.safeParse(itsmEvent).success).toBe(true);
+  });
+
   it('reports the offending field when the payload breaks the contract', () => {
-    const result = itsmAdapter.normalize({ ...itsmEvent, priority_code: 9 });
+    const result = webhookBodySchema.safeParse({ ...itsmEvent, priority_code: 9 });
 
     expect(result.success).toBe(false);
-    expect(result.success === false && result.issues).toContainEqual(
-      expect.objectContaining({ path: 'priority_code' }),
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({ path: ['priority_code'] }),
     );
+  });
+
+  it('refuses a source no adapter claims', () => {
+    const result = webhookBodySchema.safeParse({ ...itsmEvent, source: 'datadog' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['source']);
   });
 
   it('defaults the optional ITSM fields the dataset may leave blank', () => {
     const { configuration_item, status, ...withoutOptionals } = itsmEvent;
-    const result = itsmAdapter.normalize(withoutOptionals);
 
-    expect(result.success === true && result.event).toMatchObject({
+    expect(normalizeWebhook(webhookBodySchema.parse(withoutOptionals))).toMatchObject({
       entity_id: '',
       status: '',
     });
   });
 });
 
-describe('resolveAdapter', () => {
-  it('resolves the registered ITSM source', () => {
-    expect(resolveAdapter('itsm')).toBe(itsmAdapter);
-  });
-
-  it('has nothing for a source no adapter claims', () => {
-    expect(resolveAdapter('datadog')).toBeUndefined();
+describe('normalizeWebhook', () => {
+  it('maps the body through the branch that owns its source', () => {
+    expect(normalizeWebhook(itsmEvent)).toMatchObject({ source: 'itsm', severity: 2 });
   });
 });

@@ -67,6 +67,10 @@ spec:
               value: {{ .Values.gateway.env.serviceName | quote }}
             - name: SERVICE_VERSION
               value: {{ .Chart.AppVersion | quote }}
+            - name: HTTPS_ENABLED
+              value: {{ .Values.gateway.env.httpsEnabled | quote }}
+            - name: CORS_ORIGINS
+              value: {{ .Values.gateway.env.corsOrigins | toJson | quote }}
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ .Values.gateway.env.kafkaBootstrapServers | quote }}
             - name: KAFKA_TOPIC
