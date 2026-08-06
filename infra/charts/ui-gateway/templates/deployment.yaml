@@ -25,10 +25,6 @@ spec:
       labels:
         app: gateway
         {{- include "ui-gateway.labels" . | nindent 8 }}
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: {{ .Values.gateway.port | quote }}
-        prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: ui-gateway
       automountServiceAccountToken: false

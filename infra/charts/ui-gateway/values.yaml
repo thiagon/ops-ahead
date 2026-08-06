@@ -34,3 +34,6 @@ networkPolicy:
   enabled: true
   # Kafka's plain internal listener — the only port ns:ui needs from ns:data.
   kafkaPort: 9092
+
+monitoring:
+  enabled: true
