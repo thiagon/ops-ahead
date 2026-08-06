@@ -87,7 +87,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [data-ingest, data-transform, data-quality]
+        app: [data-ingest, data-transform, data-quality, ui-gateway]
     steps:
       - uses: actions/checkout@v4
 

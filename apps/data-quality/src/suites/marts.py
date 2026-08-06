@@ -39,7 +39,7 @@ def register_daily_anomaly_features(context: gx.DataContext) -> gx.ValidationDef
         gxe.ExpectColumnValuesToBeBetween(column="p1_share", min_value=0, max_value=1)
     )
     suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="violation_rate", min_value=0, max_value=1)
+        gxe.ExpectColumnValuesToBeBetween(column="breach_rate", min_value=0, max_value=1)
     )
 
     return context.validation_definitions.add(
@@ -58,7 +58,7 @@ def register_kpi_monthly_state(context: gx.DataContext) -> gx.ValidationDefiniti
         gxe.ExpectColumnValuesToBeInSet(column="severity", value_set=[1, 2, 3])
     )
     suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="violation_rate", min_value=0, max_value=1)
+        gxe.ExpectColumnValuesToBeBetween(column="breach_rate", min_value=0, max_value=1)
     )
     suite.add_expectation(
         gxe.ExpectColumnValuesToBeBetween(column="total", min_value=0)

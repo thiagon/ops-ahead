@@ -4,11 +4,10 @@ import time
 
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
-from pydantic import ValidationError
 
 from . import metrics
 from .buffer import BatchBuffer
-from .models import IncidentRaw
+from .models import IncidentEvent
 from .settings import Settings
 from .writer import BatchWriter
 
@@ -21,7 +20,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     app = FastStream(broker)
     writer = BatchWriter(settings)
 
-    async def _flush(batch: list[IncidentRaw]) -> None:
+    async def _flush(batch: list[IncidentEvent]) -> None:
         t0 = time.perf_counter()
         await writer.write(batch)
         metrics.batch_latency.observe(time.perf_counter() - t0)
@@ -37,7 +36,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         settings.kafka_topic,
         group_id=settings.kafka_group_id,
     )
-    async def handle(msg: IncidentRaw) -> None:
+    async def handle(msg: IncidentEvent) -> None:
         metrics.events_consumed.labels(source=msg.source).inc()
         await buffer.add(msg)
 

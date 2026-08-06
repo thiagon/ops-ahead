@@ -1,0 +1,89 @@
+# Ubiquitous Language
+
+Glossário vivo do domínio. Estes são os termos que valem em conversa, em spec e em código —
+quando um deles aparece num nome de campo, de tabela ou de função, é este significado.
+
+O documento define **o que os termos querem dizer**. O formato dos dados é assunto de
+[`contracts/`](../contracts/); o significado de negócio de cada campo da Locaweb está no
+[dicionário de dados](../docs/context/data-dictionary.md).
+
+## Termos
+
+### incident
+
+Uma ocorrência no sistema de origem. Vive ao longo do tempo: é aberta, trabalhada,
+resolvida e encerrada, e pode mudar de severity no caminho.
+
+Um incident **não** é o que trafega pelo sistema — o que trafega é o *event*.
+
+### event
+
+Uma observação de um incident num instante, publicada no barramento. É a unidade que se
+move entre contextos.
+
+O mesmo incident gera vários events ao longo da vida. Recategorizar prioridade não corrige
+um event anterior: emite um novo. Por isso o sistema consegue reconstruir a história de um
+incident sem que nenhum contexto precise guardar estado sobre ele.
+
+*Não use:* message, record.
+
+### source
+
+O sistema que emitiu o event. Cada source fala seu próprio vocabulário e tem seu próprio
+contrato — o domínio nunca aprende nenhum deles, porque a tradução acontece na
+[ACL](./acl/itsm.md).
+
+*Não use:* origin, provider.
+
+### entity
+
+O que foi afetado — um ativo de TI, host ou serviço. É por entity que o sistema agrupa para
+detectar repetição e agravamento.
+
+*Não use:* asset. `CI` aparece em conversa por herança do ITSM, mas não em nome de campo.
+
+### severity
+
+A urgência do incident numa escala normalizada de 1 a 5: 1 Crítica, 2 Alta, 3 Média,
+4 Baixa, 5 Muito Baixa.
+
+É a tradução da prioridade da origem para a escala do domínio. A distinção importa: cada
+source pode ter sua própria escala, e `severity` é a única que o domínio conhece. Depois da
+fronteira de ingestão, *priority* não é mais um termo do sistema.
+
+### OLA
+
+O limite de tempo de resolução acordado, por severity: P1 e P2 até 4h, P3 até 12h, P4 até
+24h, P5 até 96h.
+
+*Não use:* SLA. É acordo operacional interno, não com cliente.
+
+### breach
+
+Estourar o limite do OLA. É o evento que o projeto existe para antecipar.
+
+*Não use:* **violation**. Os dois circularam no código até a linguagem ser escrita. `breach`
+ganhou porque já era a língua do projeto fora dele — o objetivo do produto está descrito
+como *identify OLA breach risk*, e o dicionário de origem traduz `KPI Violado?` como *OLA
+was breached*. `violation` tinha entrado só como nome de coluna em dois modelos analíticos,
+sem lastro em lugar nenhum.
+
+### KPI
+
+O indicador que a Locaweb mede mensalmente. Nem todo incident conta: entram apenas severity
+1, 2 e 3, e ficam de fora os que têm incident pai ou que foram encerrados sem intervenção.
+
+Um incident **contado no KPI** pode ou não ter sofrido breach — são duas perguntas
+diferentes, e confundi-las inverte o indicador. As regras completas estão no
+[dicionário de dados](../docs/context/data-dictionary.md).
+
+## Como nomear um estágio
+
+Um estágio se chama pelo **que aconteceu com o dado**, não pelo que ele ainda não passou.
+
+Nomes que descrevem ausência — `raw`, `unprocessed`, `temp` — envelhecem mal: descrevem uma
+etapa pela negativa e passam a mentir assim que ela faz alguma coisa. Foi o que aconteceu
+com o primeiro nome do estágio de ingestão, que carregava dados normalizados desde o
+primeiro dia enquanto se chamava *raw*.
+
+Os estágios e como os contextos se integram estão no [Context Map](./context-map.md).

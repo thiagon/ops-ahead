@@ -25,7 +25,7 @@ kafka:
       size: 5Gi
 
 kafkaTopics:
-  - name: incidents.raw
+  - name: incidents.received
     partitions: 12
     replicas: 2
     config:

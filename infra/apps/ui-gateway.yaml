@@ -10,14 +10,20 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
-  source:
-    repoURL: https://github.com/thiagon/ops-ahead
-    targetRevision: main
-    path: infra/charts/ui-gateway
-    helm:
-      valueFiles:
-        - values.yaml
-        - values-dev.yaml
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/ui-gateway/chart/values-dev.yaml) carries env config *and*
+  # the CI-pinned image tag, so each environment runs its own image.
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/ui-gateway
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/ui-gateway/chart/values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: ui
@@ -27,9 +33,15 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+    # Kept low on purpose — same reason as data-ingest: at bootstrap the
+    # snapshot still carries the previous run's image tag, and retrying that
+    # revision pins the sync operation to it instead of rolling forward to the
+    # CI write-back that does have an image in the registry.
     retry:
-      limit: 5
+      limit: 2
       backoff:
         duration: 10s
         factor: 2
-        maxDuration: 3m
+        maxDuration: 40s

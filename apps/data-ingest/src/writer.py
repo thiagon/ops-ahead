@@ -8,19 +8,19 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from clickhouse_driver import Client
 
-from .models import IncidentRaw
+from .models import IncidentEvent
 from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
 _CLICKHOUSE_INSERT = """
-    INSERT INTO incidents_raw
+    INSERT INTO incidents_received
     (event_id, source, received_at, opened_at, severity, entity_id, status, payload_raw)
     VALUES
 """
 
 
-def _clickhouse_row(evt: IncidentRaw) -> tuple:
+def _clickhouse_row(evt: IncidentEvent) -> tuple:
     return (
         str(evt.event_id),
         evt.source,
@@ -33,9 +33,9 @@ def _clickhouse_row(evt: IncidentRaw) -> tuple:
     )
 
 
-def _minio_key(evt: IncidentRaw) -> str:
+def _minio_key(evt: IncidentEvent) -> str:
     date = evt.opened_at.astimezone(UTC).date()
-    return f"raw/source={evt.source}/date={date}/"
+    return f"received/source={evt.source}/date={date}/"
 
 
 class BatchWriter:
@@ -55,18 +55,18 @@ class BatchWriter:
         )
         self._bucket = settings.minio_bucket
 
-    async def write(self, batch: list[IncidentRaw]) -> None:
+    async def write(self, batch: list[IncidentEvent]) -> None:
         self._write_clickhouse(batch)
         self._write_parquet(batch)
 
-    def _write_clickhouse(self, batch: list[IncidentRaw]) -> None:
+    def _write_clickhouse(self, batch: list[IncidentEvent]) -> None:
         rows = [_clickhouse_row(e) for e in batch]
         self._ch.execute(_CLICKHOUSE_INSERT, rows)
         logger.info("clickhouse: inserted %d rows", len(rows))
 
-    def _write_parquet(self, batch: list[IncidentRaw]) -> None:
+    def _write_parquet(self, batch: list[IncidentEvent]) -> None:
         # group by (source, date) to produce one Parquet file per partition key
-        groups: dict[str, list[IncidentRaw]] = {}
+        groups: dict[str, list[IncidentEvent]] = {}
         for evt in batch:
             key = _minio_key(evt)
             groups.setdefault(key, []).append(evt)

@@ -29,7 +29,7 @@ DAG Argo Workflows que transforma o CSV histórico e o stream em marts validados
 - Steps da DAG: `ingest → dbt-run → great-expectations → register-snapshot`
 - 6 marts dbt sobre ClickHouse: `incidents_by_ic`, `p4_sequences_by_ci`, `first_touch_duration`, `priority_changes_log`, `daily_anomaly_features`, `kpi_monthly_state`
 - Suite Great Expectations com bloqueio crítico (`incidente_id` único, `prioridade_codigo` no domínio, `aberto_em ≤ fechado_em`, contagem coerente com a origem)
-- Simulador de stream (`scripts/stream_simulator.py --speed Nx`) — replay cronológico do CSV publicando em `incidents.raw`
+- Simulador de stream (`scripts/stream_simulator.py --speed Nx`) — replay cronológico do CSV publicando em `incidents.received`
 
 ### 2. Modelos de volume e breach
 
@@ -44,7 +44,7 @@ Hipótese central do produto. Sem evidência de poder preditivo no dado real, o 
 
 Worker stateless que mantém estado por IC em Redis e detecta rajadas em near-real-time. Gatilho primário do copiloto.
 
-- Consumer Kafka em `incidents.raw`, grupo `burst-detector`
+- Consumer Kafka em `incidents.received`, grupo `burst-detector`
 - Estado por IC em Redis: contagem por janela (15min/1h/6h), mediana e MAD histórico
 - z-score robusto (limiar adaptativo por IC) + CUSUM bidirecional
 - Publica em `alerts.burst` quando cruzou
@@ -65,7 +65,7 @@ Track que sobe o `ns: agent` completo: estado, gateway e serviço.
 Substitui os stubs nginx.
 
 - **`gateway` (TS + Fastify):**
-  - `POST /webhook/incidents` com validação HMAC, normalização, publish em `incidents.raw`
+  - `POST /webhook/incidents` com validação HMAC, normalização, publish em `incidents.received`
   - Consumer de `recommendations` → fan-out por `Notifier` (Slack via Block Kit como primeira implementação; arquitetura aberta a OpsGenie/Teams/PagerDuty)
   - `POST /slack/actions` e `/actions/callback` (genérico) com HMAC, grava em Postgres, publica em `actions.taken`
   - API pública `/api/v1/*` com OpenAPI gerado dos schemas Zod

@@ -13,13 +13,13 @@ select
     severity,
     source,
     count()                                                         as total,
-    countIf(entrou_kpi = 1)                                         as in_kpi,
-    countIf(kpi_violado = 1)                                        as violated,
-    countIf(entrou_kpi = 1 and kpi_violado = 0)                     as compliant,
-    countIf(kpi_violado = 1) / nullIf(countIf(entrou_kpi = 1), 0)  as violation_rate,
-    avg(duracao_segundos)                                           as avg_duration_seconds,
-    quantile(0.5)(duracao_segundos)                                 as median_duration_seconds,
-    quantile(0.95)(duracao_segundos)                                as p95_duration_seconds
+    countIf(counted_in_kpi = 1)                                     as in_kpi,
+    countIf(kpi_breached = 1)                                       as breached,
+    countIf(counted_in_kpi = 1 and kpi_breached = 0)                as compliant,
+    countIf(kpi_breached = 1) / nullIf(countIf(counted_in_kpi = 1), 0) as breach_rate,
+    avg(duration_seconds)                                           as avg_duration_seconds,
+    quantile(0.5)(duration_seconds)                                 as median_duration_seconds,
+    quantile(0.95)(duration_seconds)                                as p95_duration_seconds
 from {{ ref('stg_incidents') }}
 where severity in (1, 2, 3)
 group by month, severity, source

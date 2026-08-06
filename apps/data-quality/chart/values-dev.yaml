@@ -4,4 +4,4 @@
 # top-level keys so the pipeline App layers several steps without colliding.
 data-quality:
   image:
-    tag: "bc36074b5b525f1e5110ea919d4e2b4a4275eea8"
+    tag: "latest"

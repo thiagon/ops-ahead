@@ -6,11 +6,11 @@ from uuid import uuid4
 import pytest
 
 from src.buffer import BatchBuffer
-from src.models import IncidentRaw
+from src.models import IncidentEvent
 
 
-def _evt() -> IncidentRaw:
-    return IncidentRaw.model_validate(
+def _evt() -> IncidentEvent:
+    return IncidentEvent.model_validate(
         {
             "event_id": str(uuid4()),
             "source": "test",

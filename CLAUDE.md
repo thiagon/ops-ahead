@@ -22,7 +22,8 @@ apps/                        # one folder per image you build; chart/ overlay co
   data-quality/              # pipeline-step (ns: data) — Great Expectations suites
 pipelines/                   # config-only: order + values per pipeline (chart lives in infra)
   data-itsm-daily/           # transform → quality → snapshot; appset.yaml points at the base chart
-contracts/                   # shared JSON Schemas (incidents-raw.schema.json)
+contracts/                   # shared JSON Schemas (incident-event.schema.json)
+domain/                      # domain specs (SDD): language, contexts, ACLs
 scripts/                     # local utilities, never go to K8s
   prepare_dataset.py         # Excel → CSV pipeline
   incident_producer.py       # mock: publishes assets/incidents.csv to Kafka
@@ -73,9 +74,19 @@ uv run --package ops-ahead-data-ingest pytest
 
 Stack runs on Kubernetes (k3s via k3d). All changes go via GitOps — edit files → push → ArgoCD syncs. Never `kubectl exec`, `curl`, or direct API calls to the cluster.
 
+**Scripts in `infra/scripts/` never carry a hardcoded list.** Apps, charts, namespaces and
+secrets are discovered — `kubectl ... --all` in the cluster, a glob over the manifests that
+already declare it in the repo (`apps/*/chart/values-dev.yaml`,
+`infra/charts/*/templates/external-secret.yaml`, `infra/apps/namespaces.yaml`). Adding a
+service must not require editing a script; if it does, fix the script — replace the list
+with a glob, never append to it. Rules and the add-a-service flow: `infra/scripts/README.md`.
+
 `kube-prometheus-stack` bundles Grafana inside the `infra-prometheus` chart. The credentials in that chart (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`) are for Grafana, not Prometheus. Prometheus UI has no native authentication — it is exposed without credentials in dev and protected by NetworkPolicy.
 
 ## Dataset Key Fields
+
+`assets/incidents.csv` is the original Locaweb base and keeps its Portuguese
+column names. It exists to feed mocks — nothing else reads it.
 
 | Field | Description |
 |-------|-------------|
@@ -85,7 +96,25 @@ Stack runs on Kubernetes (k3s via k3d). All changes go via GitOps — edit files
 | `entrou_kpi` | 1 if counted in KPI (0 if parent incident or "Sem Intervenção") |
 | `kpi_violado` | 1 if OLA was breached |
 
+## Domain
+
+`domain/` holds the domain specs. Read them before naming anything — a new
+field, table, topic or metric — and before deciding how a context talks to
+another. They describe business intent, never implementation.
+
+| Document | Answers |
+|----------|---------|
+| `domain/ubiquitous-language.md` | What each term means and which word to use |
+| `domain/context-map.md` | Which bounded contexts exist and how they integrate |
+| `domain/contexts/integration.md` | The integration context: purpose, business decisions, open questions |
+| `domain/acl/itsm.md` | What the ITSM speaks and how it is translated — including where Portuguese is allowed to exist |
+
+Schema of record lives in `contracts/`; domain specs reference it, never repeat
+it. Business rules of the Locaweb dataset live in `docs/context/data-dictionary.md`.
+
 ## KPI / OLA Rules
+
+Quick reference; `docs/context/data-dictionary.md` is authoritative.
 
 - Only priorities 1, 2, 3 are measured
 - Excluded from KPI: `incidente_pai` filled OR `status == "Sem Intervenção"`

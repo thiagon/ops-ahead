@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
 
     kafka_bootstrap_servers: str = "localhost:9092"
-    kafka_topic: str = "incidents.raw"
-    kafka_group_id: str = "raw-ingest"
+    kafka_topic: str = "incidents.received"
+    kafka_group_id: str = "incidents-ingest"
 
     clickhouse_host: str = "localhost"
     clickhouse_port: int = 9000

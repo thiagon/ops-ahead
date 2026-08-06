@@ -1,11 +1,11 @@
 version: 2
 
 sources:
-  - name: raw
+  - name: ingest
     database: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
     schema: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
     tables:
-      - name: incidents_raw
+      - name: incidents_received
         columns:
           - name: event_id
             tests: [not_null, unique]

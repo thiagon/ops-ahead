@@ -3,7 +3,11 @@
 
 import argparse
 import asyncio
+import hmac
+import json
+import os
 import time
+from hashlib import sha256
 from pathlib import Path
 
 import httpx
@@ -11,17 +15,61 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# assets/incidents.csv is the original Locaweb base and stays in Portuguese.
+# This mock is the boundary: everything it posts to the gateway is English, so
+# no part of the real system ever sees the original vocabulary.
+COLUMN_NAMES = {
+    "numero": "ticket_number",
+    "prioridade_codigo": "priority_code",
+    "prioridade_label": "priority_label",
+    "produto": "product",
+    "categoria": "category",
+    "subcategoria": "subcategory",
+    "grupo_designado": "assignment_group",
+    "item_configuracao": "configuration_item",
+    "aberto_em": "opened_at",
+    "aberto_data": "opened_date",
+    "aberto_hora": "opened_hour",
+    "aberto_dia_semana": "opened_weekday",
+    "aberto_semana_ano": "opened_week_of_year",
+    "aberto_mes": "opened_month",
+    "resolvido_em": "resolved_at",
+    "encerrado_em": "closed_at",
+    "duracao_segundos": "duration_seconds",
+    "duracao_minutos": "duration_minutes",
+    "duracao_horas": "duration_hours",
+    "status": "status",
+    "codigo_fechamento": "close_code",
+    "solucao": "resolution",
+    "aberto_por": "opened_by",
+    "incidente_pai": "parent_incident",
+    "tem_incidente_pai": "has_parent_incident",
+    "descricao_resumida": "short_description",
+    "entrou_kpi": "counted_in_kpi",
+    "kpi_violado": "kpi_breached",
+}
+
 
 def _map_row(row: pd.Series, source: str) -> dict:
-    return {
-        "incidente_id": row["numero"],
-        "source": source,
-        "aberto_em": row["aberto_em"],
-        "prioridade_codigo": int(row["prioridade_codigo"]),
-        "item_configuracao": row.get("item_configuracao") or "",
-        "status": row.get("status") or "",
-        "payload": row.to_dict(),
+    # An empty cell is null on the wire: NaN would serialize as a bare NaN, which
+    # is not JSON and the gateway refuses it.
+    payload = {
+        COLUMN_NAMES.get(str(k), str(k)): (None if pd.isna(v) else v)
+        for k, v in row.to_dict().items()
     }
+    return {
+        "ticket_number": payload["ticket_number"],
+        "source": source,
+        "opened_at": payload["opened_at"],
+        "priority_code": int(payload["priority_code"]),
+        "configuration_item": payload.get("configuration_item") or "",
+        "status": payload.get("status") or "",
+        "payload": payload,
+    }
+
+
+def _sign(secret: str, body: bytes) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, sha256).hexdigest()
 
 
 async def produce(args: argparse.Namespace) -> None:
@@ -34,10 +82,18 @@ async def produce(args: argparse.Namespace) -> None:
     total = len(df)
     base_delay = 1.0 / args.speed if args.speed > 0 else 0
 
+    # The gateway verifies the signature over the exact bytes it received, so
+    # the body is serialized here and posted verbatim instead of via json=.
+    secret = os.environ.get("HMAC_SECRET", "")
+
     async with httpx.AsyncClient(base_url=args.gateway_url, timeout=10) as client:
         for i, (_, row) in enumerate(df.iterrows()):
-            payload = _map_row(row, args.source)
-            resp = await client.post("/webhook/incidents", json=payload)
+            body = json.dumps(_map_row(row, args.source)).encode()
+            headers = {"content-type": "application/json"}
+            if secret:
+                headers["X-Signature"] = _sign(secret, body)
+
+            resp = await client.post("/webhook/incidents", content=body, headers=headers)
             resp.raise_for_status()
 
             if (i + 1) % 1000 == 0 or (i + 1) == total:

@@ -36,7 +36,6 @@ done
 # after the push, keeping the working tree as the user left it.
 GITEA_RAW="http://gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead/raw/branch/main"
 PULL_FORWARD_BACKUP=$(mktemp -d)
-trap 'rm -rf "$PULL_FORWARD_BACKUP"' EXIT
 pull_forward_key() {
   local f="$1" key="$2" remote val
   remote=$(mktemp)
@@ -56,10 +55,16 @@ restore_pulled_overlays() {
     cp "$PULL_FORWARD_BACKUP/$f" "$f"
   done < <(cd "$PULL_FORWARD_BACKUP" && find . -type f | sed 's|^\./||')
 }
+# On any exit — a failed push, Ctrl-C, a closed pipe — the working tree still
+# goes back to what the user left. Restoring twice copies the same bytes.
+trap 'restore_pulled_overlays; rm -rf "$PULL_FORWARD_BACKUP"' EXIT
 # Same rule as the Gitea Actions write-back: every app pins <app>.image.tag,
-# keyed by its own name. Add an app = add it to this list.
-for app in data-ingest data-transform data-quality; do
-  pull_forward_key "apps/${app}/chart/values-dev.yaml" ".[\"${app}\"].image.tag"
+# keyed by its own name. Discovered from the overlays themselves — owning one
+# is what makes an app's tag CI-managed.
+for overlay in apps/*/chart/values-dev.yaml; do
+  [ -e "$overlay" ] || continue
+  app=$(basename "$(dirname "$(dirname "$overlay")")")
+  pull_forward_key "$overlay" ".[\"${app}\"].image.tag"
 done
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.

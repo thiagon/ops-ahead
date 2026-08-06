@@ -251,6 +251,13 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ml
+    # ui: o gateway publica em incidents.received — só o listener do Kafka.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ui
+      ports:
+        - port: 9092
 ---
 # ── ml ─────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1

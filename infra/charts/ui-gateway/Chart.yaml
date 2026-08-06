@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ui-gateway
-description: API gateway stub (nginx)
+description: Ingestion gateway (Fastify) — ITSM webhook → incidents.received (ns:ui)
 type: application
-version: 0.1.0
-appVersion: "1.0.0"
+version: 0.2.0
+appVersion: "0.1.0"

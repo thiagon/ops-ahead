@@ -1,9 +1,39 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ui-gateway:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+
 gateway:
-  replicas: 1
-  image: nginx:1.27-alpine
-  port: 80
+  replicaCount: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    appEnv: dev
+    logLevel: info
+    serviceName: gateway
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: incidents.received
+    hmacEnabled: "true"
+    httpsEnabled: "false"
+    corsOrigins:
+      - http://ui.ops-ahead.localtest.me
+  secretName: ui-gateway-secret
   ingress:
     host: gateway.ops-ahead.localtest.me
 
 networkPolicy:
+  enabled: true
+  # Kafka's plain internal listener — the only port ns:ui needs from ns:data.
+  kafkaPort: 9092
+
+monitoring:
   enabled: true

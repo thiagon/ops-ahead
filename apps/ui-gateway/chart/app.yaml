@@ -1,0 +1,5 @@
+# Deploy identity for this app. Declarative: the base chart renders it; the
+# overlay + version live alongside.
+workload: deployment
+namespace: ui
+chart: infra/charts/ui-gateway
