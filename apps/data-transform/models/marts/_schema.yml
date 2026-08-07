@@ -68,4 +68,5 @@ models:
           - accepted_values:
               values: [1, 2, 3]
       - name: breach_rate
-        tests: [not_null]
+        # Nullable by design: NULL when the bucket has zero KPI-counted
+        # incidents (undefined rate), not the same thing as a 0.0 breach rate.

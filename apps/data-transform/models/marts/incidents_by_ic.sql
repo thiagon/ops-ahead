@@ -7,11 +7,13 @@
     )
 }}
 
--- Incident count per IC per time window (1h / 6h / 24h)
+-- Incident count per IC per time window (1h / 6h / 24h). toStartOfInterval
+-- needs a constant interval, so each window size gets its own literal call.
+{% for hours in [1, 6, 24] %}
 select
     entity_id,
-    window_hours,
-    toStartOfInterval(opened_at, interval window_hours hour) as window_start,
+    {{ hours }}                                               as window_hours,
+    toStartOfInterval(opened_at, interval {{ hours }} hour)   as window_start,
     count()                                                   as incident_count,
     countIf(severity = 1)                                     as p1_count,
     countIf(severity = 2)                                     as p2_count,
@@ -20,7 +22,6 @@ select
     countIf(kpi_breached = 1)                                 as breached_count,
     avg(duration_seconds)                                     as avg_duration_seconds
 from {{ ref('stg_incidents') }}
-cross join (
-    select arrayJoin([1, 6, 24]) as window_hours
-) as w
-group by entity_id, window_hours, window_start
+group by entity_id, window_start
+{% if not loop.last %}union all{% endif %}
+{% endfor %}
