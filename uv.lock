@@ -1448,7 +1448,14 @@ dependencies = [
     { name = "boto3" },
     { name = "clickhouse-sqlalchemy" },
     { name = "great-expectations" },
+    { name = "pydantic-settings" },
     { name = "sqlalchemy" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pandas" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -1456,7 +1463,14 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.35" },
     { name = "clickhouse-sqlalchemy", specifier = ">=0.3" },
     { name = "great-expectations", specifier = ">=1.2" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "sqlalchemy", specifier = ">=2.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pytest", specifier = ">=8.0" },
 ]
 
 [[package]]
