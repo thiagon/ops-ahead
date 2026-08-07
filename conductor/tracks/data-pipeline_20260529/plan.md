@@ -3,7 +3,7 @@
 **Track ID:** data-pipeline_20260529
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-05-29
-**Status:** [~] In Progress — Fases 1-5 completas e verificadas ponta a ponta (2026-08-06); faltam 2 itens de Final Verification fora do escopo de código (gate de testes em CI, PR)
+**Status:** [x] Complete — Fases 1-5 verificadas ponta a ponta (2026-08-06), PR #49 mergeado. Gate de testes em CI permanece como pendência separada, fora do escopo desta track.
 
 ## Overview
 
