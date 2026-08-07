@@ -25,13 +25,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Full history, not a shallow depth: dev-sync.sh always force-pushes
+          # a single squashed snapshot commit, so `HEAD^` is that commit's
+          # local parent, not what Gitea's main actually had before this
+          # push — diffing against it makes every already-committed app look
+          # unchanged. `github.event.before` (the ref's pre-push SHA) is what
+          # actually changed since the last push; it only resolves reliably
+          # with full history available to look it up.
+          fetch-depth: 0
 
       - name: Detect changed apps
         id: set-matrix
         run: |
-          if [ "${{ github.event_name }}" == "push" ] && git rev-parse HEAD^ >/dev/null 2>&1; then
-            CHANGED=$(git diff --name-only HEAD^ HEAD | grep '^apps/' | cut -d/ -f2 | sort -u)
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" == "push" ] \
+             && [ -n "$BEFORE_SHA" ] \
+             && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
+            CHANGED=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep '^apps/' | cut -d/ -f2 | sort -u)
           else
             CHANGED=$(ls -1 apps/)
           fi
