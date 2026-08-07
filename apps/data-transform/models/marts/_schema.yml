@@ -14,6 +14,17 @@ models:
         tests: [not_null]
       - name: incident_count
         tests: [not_null]
+      - name: sem_intervencao_count
+        tests: [not_null]
+
+  - name: group_load_by_window
+    columns:
+      - name: assignment_group
+        tests: [not_null]
+      - name: window_start
+        tests: [not_null]
+      - name: incidents_opened
+        tests: [not_null]
 
   - name: p4_sequences_by_ci
     columns:

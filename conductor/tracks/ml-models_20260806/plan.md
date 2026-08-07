@@ -34,6 +34,8 @@ Primeiro modelo treinado e registrado no MLflow. Prophet como baseline/sanity-ch
 - [ ] Run aparece no MLflow UI com métricas e artefatos; modelo em estágio `Production` — **pendente**, mesma razão
 - [ ] LightGBM bate Prophet no hold-out — **pendente de dado real**; lógica de comparação implementada e logada como param `lgb_beats_prophet_holdout`
 
+**Ajuste retroativo (durante a Fase 2):** `train_end`/`validation_end`/`holdout_end` passaram de default hardcoded no `Settings` para vir de `infra/apps/ml-temporal-split-values.yaml` (fonte única compartilhada com `ml-breach-model`); `split.py` ganhou um guard que falha alto se alguma partição do split sair vazia — proteção contra o range real dos dados divergir dessas datas fixas.
+
 ---
 
 ## Phase 2: Modelo de Breach (LightGBM + isotonic + SHAP)
@@ -42,23 +44,27 @@ O modelo mais crítico da proposta — se o sinal não existir no dado real, o p
 
 ### Tasks
 
-- [ ] 2.1: App `apps/ml-breach-model/` (Python, `workload: job`, `namespace: ml`)
-- [ ] 2.2: Filtro do dataset de treino a partir dos marts: P1–P3, sem `incidente_pai`, sem "Sem Intervenção" (`entrou_kpi = 1`)
-- [ ] 2.3: Feature engineering: precursor P4 (`p4_sequences_by_ci`), tempo no primeiro grupo vs. 25% do OLA (`first_touch_duration`), contagem de "Sem Intervenção" no IC (1h/6h), flag de abertura manual, carga do grupo designado via snapshot Redis, hora/dia da semana
-- [ ] 2.4: Split temporal idêntico ao da fase 1 (mesma função reutilizada)
-- [ ] 2.5: Otimização de hiperparâmetros via Optuna (50 trials), `class_weight='balanced'`
-- [ ] 2.6: Calibração isotônica pós-treino; gerar reliability diagram antes/depois como artefato
-- [ ] 2.7: SHAP calculado por inferência (top-5), validado num batch de exemplo antes de subir para serving
-- [ ] 2.8: Registrar no MLflow (params, AUC-PR, Brier score, recall@top-10, recall@top-50/hora, artefatos); promover para `Production`
-- [ ] 2.9: Chart `infra/charts/ml-breach-model` (`Job`) + `infra/apps/ml-breach-model.yaml`
-- [ ] 2.10: Testes unitários do filtro de elegibilidade KPI e das features de domínio
+- [x] 2.1: App `apps/ml-breach-model/` (Python, `workload: job`, `namespace: ml`)
+- [x] 2.2: Filtro do dataset de treino a partir dos marts: P1–P3, sem `incidente_pai`, sem "Sem Intervenção" (`entrou_kpi = 1`)
+- [x] 2.3: Feature engineering: precursor P4 (`p4_sequences_by_ci`), proxy de "tempo no primeiro grupo vs. 25% do OLA", contagem de "Sem Intervenção" no IC (1h/6h), flag de abertura manual, carga do grupo designado, hora/dia da semana — ver nota de design abaixo
+- [x] 2.4: Split temporal idêntico ao da fase 1 (mesma função reutilizada — `src/split.py` duplicado byte-a-byte, e os limites agora vêm de um único arquivo compartilhado `infra/apps/ml-temporal-split-values.yaml` para as duas apps nunca divergirem)
+- [x] 2.5: Otimização de hiperparâmetros via Optuna (50 trials), `class_weight='balanced'`
+- [x] 2.6: Calibração isotônica pós-treino; gerar reliability diagram antes/depois como artefato
+- [x] 2.7: SHAP calculado por inferência (top-5), validado num batch de exemplo antes de subir para serving
+- [x] 2.8: Registrar no MLflow (params, AUC-PR, Brier score, recall@top-10, recall@top-50/hora, artefatos); promover para `Production`
+- [x] 2.9: Chart `infra/charts/ml-breach-model` (`Job`) + `infra/apps/ml-breach-model.yaml`
+- [x] 2.10: Testes unitários do filtro de elegibilidade KPI e das features de domínio
+
+**Nota de design (2.3):** o dataset não tem timestamps de troca de grupo (o mock producer emite um evento único por incidente — `scripts/incident_producer.py` —, não um stream de lifecycle), então "tempo no primeiro grupo vs. 25% do OLA" não é computável sem vazar o próprio label (`kpi_breached` é literalmente `duração > ola_limit`). Implementado como proxy sem vazamento: média histórica *expanding* (só incidentes anteriores) de `duração/ola_limit` por `assignment_group + severidade` — operacionaliza a regra do N1 documentada em `docs/insights/03-mentoria-insights.md` ("N1 pode cozinhar até 25% do OLA antes de escalar") sem usar a duração do próprio incidente. "Carga do grupo designado": treino usa uma agregação ClickHouse nova (`group_load_by_window` mart); serving online (Fase 4) lê um snapshot cacheado em Redis (cache-aside, TTL curto) do mesmo agregado — é o papel do Redis aqui, não um writer de stream dedicado.
+
+Também adicionado: guard em `split.py` (as duas apps) que falha alto se qualquer partição do split sair vazia — protege contra o range real dos dados divergir das datas fixas no futuro. Validado contra o CSV real: train/validation/holdout com 49908/23026/49609 linhas, nenhuma vazia.
 
 ### Verification
 
-- [ ] AUC-PR em hold-out temporal > 0,60
-- [ ] Reliability diagram mostra melhora visível pós-calibração
-- [ ] SHAP top-5 consistente com as features de domínio esperadas (precursor P4 aparece com peso relevante)
-- [ ] Modelo em estágio `Production` no MLflow Registry
+- [ ] AUC-PR em hold-out temporal > 0,60 — **pendente de dado real**; lógica implementada e testada com dado sintético
+- [ ] Reliability diagram mostra melhora visível pós-calibração — **pendente de dado real**; artefato gerado e logado no MLflow em todo run
+- [ ] SHAP top-5 consistente com as features de domínio esperadas (precursor P4 aparece com peso relevante) — **pendente de dado real**
+- [ ] Modelo em estágio `Production` no MLflow Registry — **pendente**: cluster local não subiu nesta sessão (mesma decisão da Fase 1)
 
 ---
 

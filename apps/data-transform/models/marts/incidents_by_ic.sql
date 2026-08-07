@@ -20,6 +20,7 @@ select
     countIf(severity = 3)                                     as p3_count,
     countIf(severity <= 2)                                    as critical_count,
     countIf(kpi_breached = 1)                                 as breached_count,
+    countIf(status = 'Sem Intervenção')                       as sem_intervencao_count,
     avg(duration_seconds)                                     as avg_duration_seconds
 from {{ ref('stg_incidents') }}
 group by entity_id, window_start

@@ -15,6 +15,9 @@ select
     ticket_number,
     opened_at,
     assignment_group,
+    opened_by,
+    has_parent_incident,
+    status,
     severity,
     duration_seconds,
     multiIf(
