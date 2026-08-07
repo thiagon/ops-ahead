@@ -4,17 +4,17 @@ COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
 
 WORKDIR /app
 
-# Workspace metadata for every member so uv can load the workspace graph,
-# then install only ops-ahead-data-ingest's dependencies (member code is copied
-# into the runtime stage, not installed — hence --no-install-workspace).
-COPY pyproject.toml uv.lock ./
-COPY scripts/pyproject.toml scripts/
-COPY apps/data-ingest/pyproject.toml apps/data-ingest/
-COPY apps/data-quality/pyproject.toml apps/data-quality/
-COPY apps/data-transform/pyproject.toml apps/data-transform/
-
+# uv's documented workspace pattern: install third-party deps from just the
+# root lock/pyproject first, no per-member COPY list to maintain.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-workspace --package ops-ahead-data-ingest
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-workspace
+
+# Now that the whole workspace is present, sync just this member for real.
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --package ops-ahead-data-ingest
 
 FROM python:3.12-slim
 
