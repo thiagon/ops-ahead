@@ -24,6 +24,7 @@ select
     count() / uniqExact(entity_id)                                  as incidents_per_entity,
     countIf(has_parent_incident = 0)                                as standalone_count,
     countIf(has_parent_incident = 0) / count()                      as standalone_share,
+    avg(opened_hour)                                                as avg_opened_hour,
     avg(duration_seconds)                                           as avg_duration_seconds,
     quantile(0.5)(duration_seconds)                                 as median_duration_seconds,
     quantile(0.95)(duration_seconds)                                as p95_duration_seconds

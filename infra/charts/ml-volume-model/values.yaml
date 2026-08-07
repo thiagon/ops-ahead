@@ -1,0 +1,28 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ml-volume-model:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ml-volume-model
+    tag: latest
+    pullPolicy: IfNotPresent
+
+job:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
+    mlflowExperimentName: volume-forecast
+    mlflowRegisteredModelName: volume-forecast
+    trainEnd: "2025-09-30"
+    validationEnd: "2025-10-31"
+    holdoutEnd: "2026-01-31"
+    autoPromote: "true"
+  secretName: ml-volume-model-secret

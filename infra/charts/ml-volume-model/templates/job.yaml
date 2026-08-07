@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ml-volume-model.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-volume-model.labels" . | nindent 4 }}
+spec:
+  # Manual/on-demand — no cron in the MVP. Re-triggering a run means deleting
+  # this Job and letting ArgoCD recreate it on the next sync.
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: {{ include "ml-volume-model.fullname" . }}
+        {{- include "ml-volume-model.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: train
+          image: "{{ (index .Values "ml-volume-model").image.repository }}:{{ (index .Values "ml-volume-model").image.tag }}"
+          imagePullPolicy: {{ (index .Values "ml-volume-model").image.pullPolicy }}
+          env:
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.job.env.clickhouseUser | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.job.secretName }}
+                  key: CLICKHOUSE_PASSWORD
+            - name: CLICKHOUSE_URL
+              value: "clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.job.env.clickhouseHost }}:9000/{{ .Values.job.env.clickhouseDatabase }}"
+            - name: MLFLOW_TRACKING_URI
+              value: {{ .Values.job.env.mlflowTrackingUri | quote }}
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: {{ .Values.job.env.mlflowExperimentName | quote }}
+            - name: MLFLOW_REGISTERED_MODEL_NAME
+              value: {{ .Values.job.env.mlflowRegisteredModelName | quote }}
+            - name: TRAIN_END
+              value: {{ .Values.job.env.trainEnd | quote }}
+            - name: VALIDATION_END
+              value: {{ .Values.job.env.validationEnd | quote }}
+            - name: HOLDOUT_END
+              value: {{ .Values.job.env.holdoutEnd | quote }}
+            - name: AUTO_PROMOTE
+              value: {{ .Values.job.env.autoPromote | quote }}
+          resources:
+            {{- toYaml .Values.job.resources | nindent 12 }}

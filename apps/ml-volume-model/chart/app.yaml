@@ -1,0 +1,5 @@
+# Deploy identity for this app (moved out of pyproject's [tool.ops-ahead]).
+# Declarative: the base chart renders it; the overlay + version live alongside.
+workload: job
+namespace: ml
+chart: infra/charts/ml-volume-model

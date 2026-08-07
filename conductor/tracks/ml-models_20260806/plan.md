@@ -19,20 +19,20 @@ Primeiro modelo treinado e registrado no MLflow. Prophet como baseline/sanity-ch
 
 ### Tasks
 
-- [ ] 1.1: App `apps/ml-volume-model/` (Python, `workload: job` em `chart/app.yaml`, `namespace: ml`)
-- [ ] 1.2: Feature engineering a partir do mart `daily_anomaly_features` (ClickHouse): lags 1/7/14d, médias móveis 7/30d, componentes de Fourier do ciclo semanal, flag de feriado nacional, hora de abertura
-- [ ] 1.3: Split temporal: treino ≤ set/2025, validação out/2025, hold-out nov/2025–jan/2026 — implementado como função reutilizável, não hardcoded inline
-- [ ] 1.4: Treinar Prophet (baseline, sem features adicionais) e LightGBM; ensemble por média ponderada
-- [ ] 1.5: Registrar experimento no MLflow: params, métricas (MAPE por prioridade, MAE, cobertura do IC 80%), artefatos, hash/versão do dataset consumido
-- [ ] 1.6: Promover a melhor run para `Production` no MLflow Model Registry (script ou task manual documentada)
-- [ ] 1.7: Chart `infra/charts/ml-volume-model` (`Job` template) + `infra/apps/ml-volume-model.yaml` (`ArgoCD Application`, sync manual/on-demand — sem cron no MVP)
-- [ ] 1.8: Testes unitários das funções de feature engineering e do split temporal (sem vazamento de futuro)
+- [x] 1.1: App `apps/ml-volume-model/` (Python, `workload: job` em `chart/app.yaml`, `namespace: ml`)
+- [x] 1.2: Feature engineering a partir do mart `daily_anomaly_features` (ClickHouse): lags 1/7/14d, médias móveis 7/30d, componentes de Fourier do ciclo semanal, flag de feriado nacional, hora de abertura
+- [x] 1.3: Split temporal: treino ≤ set/2025, validação out/2025, hold-out nov/2025–jan/2026 — implementado como função reutilizável, não hardcoded inline
+- [x] 1.4: Treinar Prophet (baseline, sem features adicionais) e LightGBM; ensemble por média ponderada
+- [x] 1.5: Registrar experimento no MLflow: params, métricas (MAPE por prioridade, MAE, cobertura do IC 80%), artefatos, hash/versão do dataset consumido
+- [x] 1.6: Promover a melhor run para `Production` no MLflow Model Registry (script ou task manual documentada)
+- [x] 1.7: Chart `infra/charts/ml-volume-model` (`Job` template) + `infra/apps/ml-volume-model.yaml` (`ArgoCD Application`, sync manual/on-demand — sem cron no MVP)
+- [x] 1.8: Testes unitários das funções de feature engineering e do split temporal (sem vazamento de futuro)
 
 ### Verification
 
-- [ ] `Job` roda no cluster (`kubectl apply` via ArgoCD) e completa sem erro sobre os marts reais
-- [ ] Run aparece no MLflow UI com métricas e artefatos; modelo em estágio `Production`
-- [ ] LightGBM bate Prophet no hold-out — se não bater, motivo documentado em `docs/insights/`
+- [ ] `Job` roda no cluster (`kubectl apply` via ArgoCD) e completa sem erro sobre os marts reais — **pendente**: cluster local não subiu nesta sessão (decisão explícita do usuário); código verificado apenas localmente (15 testes unitários + `helm template` + `ruff`)
+- [ ] Run aparece no MLflow UI com métricas e artefatos; modelo em estágio `Production` — **pendente**, mesma razão
+- [ ] LightGBM bate Prophet no hold-out — **pendente de dado real**; lógica de comparação implementada e logada como param `lgb_beats_prophet_holdout`
 
 ---
 

@@ -26,3 +26,8 @@ infra/charts/*/charts/*.tgz
 
 # Cluster state — PVC data and Vault init output (never commit)
 .data/
+
+# MLflow local tracking store (created when running training/tests without a
+# tracking URI override)
+mlruns/
+.pytest_cache/

@@ -2,20 +2,22 @@
   "id": "ml-models_20260806",
   "title": "Modelos de ML (Camada 2 — Inteligência)",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-08-06T00:00:00Z",
-  "updated": "2026-08-06T00:00:00Z",
+  "updated": "2026-08-07T00:00:00Z",
   "sprint": 3,
   "milestone": 3,
   "github_issue": 50,
   "github_pr": 51,
   "branch": "feat/ml-models",
+  "current_phase": 1,
+  "current_task": "1.8",
   "phases": {
     "total": 5,
     "completed": 0
   },
   "tasks": {
     "total": 46,
-    "completed": 0
+    "completed": 8
   }
 }
