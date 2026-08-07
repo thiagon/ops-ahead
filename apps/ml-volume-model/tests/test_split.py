@@ -62,6 +62,26 @@ def test_temporal_split_excludes_rows_after_holdout_end():
     assert total_rows < len(df)
 
 
+def test_temporal_split_handles_tz_aware_dates():
+    # ClickHouse DateTime64 columns (e.g. first_touch_duration.opened_at) come
+    # back tz-aware; the boundary strings parse as naive Timestamps. This must
+    # not raise TypeError: Invalid comparison.
+    df = _daily_frame("2025-08-01", 200)
+    df["date"] = df["date"].dt.tz_localize("UTC")
+
+    result = temporal_split(
+        df,
+        date_column="date",
+        train_end="2025-09-30",
+        validation_end="2025-10-31",
+        holdout_end="2026-01-31",
+    )
+
+    assert not result.train.empty
+    assert not result.validation.empty
+    assert not result.holdout.empty
+
+
 def test_temporal_split_raises_on_empty_partition():
     # Every row falls in "train" — validation/holdout boundaries are past the
     # data's actual range, exactly the drift scenario the guard exists for.

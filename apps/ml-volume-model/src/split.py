@@ -28,7 +28,14 @@ def temporal_split(
     strong weekly/seasonal signal — every caller must go through this function
     instead of slicing inline.
     """
+    # ClickHouse DateTime64 columns come back tz-aware (UTC); Date columns come
+    # back naive. Comparing a tz-aware Series against the naive Timestamps built
+    # from the plain boundary strings raises TypeError, so tz info is dropped
+    # here rather than carried through — the boundaries are calendar dates, not
+    # instants, and every source in this dataset is already UTC.
     dates = pd.to_datetime(df[date_column])
+    if dates.dt.tz is not None:
+        dates = dates.dt.tz_localize(None)
     train_end_ts = pd.Timestamp(train_end)
     validation_end_ts = pd.Timestamp(validation_end)
     holdout_end_ts = pd.Timestamp(holdout_end)
