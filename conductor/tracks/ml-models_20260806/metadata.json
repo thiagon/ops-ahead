@@ -1,0 +1,19 @@
+{
+  "id": "ml-models_20260806",
+  "title": "Modelos de ML (Camada 2 — Inteligência)",
+  "type": "feature",
+  "status": "pending",
+  "created": "2026-08-06T00:00:00Z",
+  "updated": "2026-08-06T00:00:00Z",
+  "sprint": 3,
+  "milestone": 3,
+  "github_issue": 50,
+  "phases": {
+    "total": 5,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 46,
+    "completed": 0
+  }
+}
