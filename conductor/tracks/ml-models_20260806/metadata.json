@@ -8,6 +8,8 @@
   "sprint": 3,
   "milestone": 3,
   "github_issue": 50,
+  "github_pr": 51,
+  "branch": "feat/ml-models",
   "phases": {
     "total": 5,
     "completed": 0
