@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ml-burst-detector.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-burst-detector.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.consumer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "ml-burst-detector.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ml-burst-detector.fullname" . }}
+        {{- include "ml-burst-detector.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: consumer
+          image: "{{ (index .Values "ml-burst-detector").image.repository }}:{{ (index .Values "ml-burst-detector").image.tag }}"
+          imagePullPolicy: {{ (index .Values "ml-burst-detector").image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.consumer.env.kafkaTopic | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.consumer.env.kafkaGroupId | quote }}
+            - name: ALERT_TOPIC
+              value: {{ .Values.consumer.env.alertTopic | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.consumer.secretName }}
+                  key: REDIS_PASSWORD
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.consumer.env.redisHost }}:6379/0"
+          resources:
+            {{- toYaml .Values.consumer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
