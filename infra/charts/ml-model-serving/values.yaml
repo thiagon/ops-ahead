@@ -1,0 +1,27 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ml-model-serving:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ml-model-serving
+    tag: latest
+    pullPolicy: IfNotPresent
+
+deployment:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
+    volumeModelName: volume-forecast
+    breachModelName: breach-risk
+    httpPort: "8080"
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70

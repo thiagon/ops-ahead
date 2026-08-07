@@ -87,7 +87,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [data-ingest, data-transform, data-quality, ui-gateway, ml-volume-model, ml-breach-model, ml-burst-detector]
+        app: [data-ingest, data-transform, data-quality, ui-gateway, ml-volume-model, ml-breach-model, ml-burst-detector, ml-model-serving]
     steps:
       - uses: actions/checkout@v4
 

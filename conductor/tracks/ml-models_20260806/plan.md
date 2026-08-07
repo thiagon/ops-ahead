@@ -101,19 +101,23 @@ Interface única entre os modelos treinados e o resto do sistema (copiloto, pain
 
 ### Tasks
 
-- [ ] 4.1: App `apps/ml-model-serving/` (Python + FastAPI, `workload: deployment`, `namespace: ml`)
-- [ ] 4.2: Carregamento dos artefatos do MLflow Registry no startup (URI `models:/<name>/Production` para volume e breach)
-- [ ] 4.3: `POST /predict/volume` — retorna previsão D+1 e D+7 com intervalo de confiança
-- [ ] 4.4: `POST /predict/breach` — retorna score calibrado e SHAP top-5
-- [ ] 4.5: Schemas Pydantic V2 em request/response de ambos os endpoints
-- [ ] 4.6: `GET /health` e métricas Prometheus em `/metrics`
-- [ ] 4.7: Chart `infra/charts/ml-model-serving` (`Deployment + HPA + Service`) + `infra/apps/ml-model-serving.yaml`
-- [ ] 4.8: Testes unitários dos schemas e de um smoke test de inferência com modelo mockado
+- [x] 4.1: App `apps/ml-model-serving/` (Python + FastAPI, `workload: deployment`, `namespace: ml`)
+- [x] 4.2: Carregamento dos artefatos do MLflow Registry no startup (URI `models:/<name>/Production` para volume e breach)
+- [x] 4.3: `POST /predict/volume` — retorna previsão D+1 e D+7 com intervalo de confiança
+- [x] 4.4: `POST /predict/breach` — retorna score calibrado e SHAP top-5
+- [x] 4.5: Schemas Pydantic V2 em request/response de ambos os endpoints
+- [x] 4.6: `GET /health` e métricas Prometheus em `/metrics`
+- [x] 4.7: Chart `infra/charts/ml-model-serving` (`Deployment + HPA + Service`) + `infra/apps/ml-model-serving.yaml`
+- [x] 4.8: Testes unitários dos schemas e de um smoke test de inferência com modelo mockado
+
+**Nota de escopo:** este serviço é a fronteira de I/O dos modelos, não um serviço de feature engineering — quem chama `/predict/breach` já manda o vetor de features prontas (mesmas colunas de `ml-breach-model/src/features.py::FEATURE_COLUMNS`), e `/predict/volume` já manda os lags/rolling do LightGBM (Fourier/feriado são computados internamente por horizonte, dentro do próprio modelo bundled). Consistente com a task list da Fase 4 (só menciona MLflow como dependência externa, não ClickHouse/Redis).
+
+**Fix retroativo (Fases 1 e 2):** os dois `train.py` faziam `mlflow.pyfunc.log_model` com uma classe customizada (`VolumeForecastModel`/`BreachRiskModel`) sem `code_paths` — carregar o modelo de outro processo (este `model-serving`) quebraria no unpickle porque `src.model.VolumeForecastModel` não existiria no namespace do processo carregador. Corrigido adicionando `code_paths=[str(Path(__file__).resolve().parent)]` nos dois. Testado localmente (o run ainda loga certo); o carregamento cross-processo real só é verificável com MLflow de verdade no cluster.
 
 ### Verification
 
-- [ ] `POST /predict/volume` e `POST /predict/breach` respondem com payload correto contra os modelos `Production` reais
-- [ ] `/health` e `/metrics` respondem; HPA configurado e visível no cluster
+- [ ] `POST /predict/volume` e `POST /predict/breach` respondem com payload correto contra os modelos `Production` reais — **pendente**: cluster local não subiu nesta sessão; verificado localmente com modelo mockado (smoke test)
+- [ ] `/health` e `/metrics` respondem; HPA configurado e visível no cluster — **pendente**, mesma razão; `/health` e `/metrics` testados localmente via `TestClient`
 
 ---
 

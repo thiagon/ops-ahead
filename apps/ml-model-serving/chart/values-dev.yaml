@@ -1,0 +1,6 @@
+# Every app follows the same rule — <app>.image.tag — pinned by the Gitea
+# Actions write-back. The registry repository and pullPolicy live in the chart
+# defaults; the overlay only carries the per-env tag.
+ml-model-serving:
+  image:
+    tag: "latest"
