@@ -2,15 +2,20 @@
   "id": "data-pipeline_20260529",
   "title": "Pipeline de Dados",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-05-29T00:00:00Z",
-  "updated": "2026-05-29T00:00:00Z",
+  "updated": "2026-08-06T00:00:00Z",
+  "current_phase": 5,
+  "current_task": "final_verification",
   "phases": {
     "total": 5,
-    "completed": 0
+    "completed": 5
   },
   "tasks": {
     "total": 31,
-    "completed": 0
-  }
+    "completed": 31
+  },
+  "commits": [
+    "454df7c: implement Kafka consumer with ClickHouse + MinIO batch writer (data-pipeline_20260529)"
+  ]
 }
