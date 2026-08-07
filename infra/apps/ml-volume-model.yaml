@@ -10,9 +10,11 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
-  # Multi-source: base chart from infra/charts; the app's colocated per-env
-  # overlay (apps/ml-volume-model/chart/values-dev.yaml) carries the CI-pinned
-  # image tag.
+  # Multi-source: base chart from infra/charts; the shared temporal-split
+  # values (infra/apps/ml-temporal-split-values.yaml — same file ml-breach-model
+  # reads, so the two training jobs can't drift apart on the split boundaries);
+  # the app's colocated per-env overlay (apps/ml-volume-model/chart/values-dev.yaml)
+  # carries the CI-pinned image tag.
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead
       targetRevision: main
@@ -23,6 +25,7 @@ spec:
       helm:
         valueFiles:
           - values.yaml
+          - $values/infra/apps/ml-temporal-split-values.yaml
           - $values/apps/ml-volume-model/chart/values-dev.yaml
   destination:
     server: https://kubernetes.default.svc

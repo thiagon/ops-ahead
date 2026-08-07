@@ -21,8 +21,9 @@ job:
     mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
     mlflowExperimentName: volume-forecast
     mlflowRegisteredModelName: volume-forecast
-    trainEnd: "2025-09-30"
-    validationEnd: "2025-10-31"
-    holdoutEnd: "2026-01-31"
+    # trainEnd/validationEnd/holdoutEnd deliberately not set here — they come
+    # from the shared infra/apps/ml-temporal-split-values.yaml, layered in by
+    # the ArgoCD Application, so this and ml-breach-model can never drift
+    # apart on the split boundaries.
     autoPromote: "true"
   secretName: ml-volume-model-secret

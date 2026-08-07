@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.split import temporal_split
 
@@ -59,3 +60,18 @@ def test_temporal_split_excludes_rows_after_holdout_end():
 
     total_rows = len(result.train) + len(result.validation) + len(result.holdout)
     assert total_rows < len(df)
+
+
+def test_temporal_split_raises_on_empty_partition():
+    # Every row falls in "train" — validation/holdout boundaries are past the
+    # data's actual range, exactly the drift scenario the guard exists for.
+    df = _daily_frame("2025-01-01", 30)
+
+    with pytest.raises(ValueError, match="empty partition"):
+        temporal_split(
+            df,
+            date_column="date",
+            train_end="2025-09-30",
+            validation_end="2025-10-31",
+            holdout_end="2026-01-31",
+        )

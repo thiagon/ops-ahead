@@ -37,4 +37,30 @@ def temporal_split(
     validation = df.loc[(dates > train_end_ts) & (dates <= validation_end_ts)]
     holdout = df.loc[(dates > validation_end_ts) & (dates <= holdout_end_ts)]
 
-    return TemporalSplit(train=train, validation=validation, holdout=holdout)
+    split = TemporalSplit(train=train, validation=validation, holdout=holdout)
+    _raise_if_any_partition_empty(split, train_end, validation_end, holdout_end)
+    return split
+
+
+def _raise_if_any_partition_empty(
+    split: TemporalSplit, train_end: str, validation_end: str, holdout_end: str
+) -> None:
+    """The split boundaries are fixed calendar dates chosen for this specific
+    dataset (see infra/apps/ml-temporal-split-values.yaml) — if the data's
+    actual date range ever drifts away from them (dataset swap, ingestion bug,
+    wrong env var), a partition can silently come back empty and every metric
+    downstream goes quietly wrong (NaN MAPE, a LightGBM fit on zero rows).
+    Failing loudly here, at the one place all three boundaries are enforced,
+    turns that into an immediate, readable error instead of a debugging hunt
+    days later."""
+    empty = [
+        name
+        for name, part in (("train", split.train), ("validation", split.validation), ("holdout", split.holdout))
+        if part.empty
+    ]
+    if empty:
+        raise ValueError(
+            f"temporal_split produced empty partition(s) {empty} for boundaries "
+            f"train_end={train_end!r} validation_end={validation_end!r} holdout_end={holdout_end!r} — "
+            "the dataset's actual date range likely doesn't match these boundaries anymore."
+        )
