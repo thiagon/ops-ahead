@@ -2,15 +2,27 @@
   "id": "data-pipeline_20260529",
   "title": "Pipeline de Dados",
   "type": "feature",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-05-29T00:00:00Z",
-  "updated": "2026-05-29T00:00:00Z",
+  "updated": "2026-08-06T00:00:00Z",
+  "current_phase": 5,
+  "current_task": null,
   "phases": {
     "total": 5,
-    "completed": 0
+    "completed": 5
   },
   "tasks": {
     "total": 31,
-    "completed": 0
-  }
+    "completed": 31
+  },
+  "github_pr": 49,
+  "commits": [
+    "454df7c: implement Kafka consumer with ClickHouse + MinIO batch writer (data-pipeline_20260529)",
+    "003e1ef: fix(data-quality): fix GX runtime bugs, add local suite tests (data-pipeline_20260529)",
+    "5cf8d12: fix(data-transform): fix ClickHouse-specific SQL bugs in dbt marts (data-pipeline_20260529)",
+    "f35d4ff: fix(python-apps): follow uv's documented Docker workspace pattern (data-pipeline_20260529)",
+    "a7b6a5e: fix(infra): fix data-pipeline chart bugs blocking the Argo DAG (data-pipeline_20260529)",
+    "85faae4: docs(data): add pipeline runbook, fill in e2e validation baseline (data-pipeline_20260529)",
+    "547b00f: chore(conductor): revise data-pipeline track, record e2e verification (data-pipeline_20260529)"
+  ]
 }

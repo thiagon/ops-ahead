@@ -2,8 +2,8 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id, opened_at)',
-        partition_by='toYYYYMM(opened_at)'
+        order_by='(entity_id, sequence_start)',
+        partition_by='toYYYYMM(sequence_start)'
     )
 }}
 

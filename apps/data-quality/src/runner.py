@@ -17,7 +17,19 @@ logger = logging.getLogger(__name__)
 
 def _upload_data_docs(context, settings: Settings) -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        context.build_data_docs(site_names=None, dry_run=False)
+        # Ephemeral contexts have no Data Docs site by default; wire one at `tmp`.
+        context.add_data_docs_site(
+            site_name="local",
+            site_config={
+                "class_name": "SiteBuilder",
+                "store_backend": {
+                    "class_name": "TupleFilesystemStoreBackend",
+                    "base_directory": tmp,
+                },
+                "site_index_builder": {"class_name": "DefaultSiteIndexBuilder"},
+            },
+        )
+        context.build_data_docs(site_names=["local"], dry_run=False)
         docs_dir = pathlib.Path(tmp)
         s3 = boto3.client(
             "s3",

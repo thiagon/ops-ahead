@@ -1,14 +1,19 @@
 import great_expectations as gx
 import great_expectations.expectations as gxe
+from great_expectations.core.batch_definition import BatchDefinition
+from great_expectations.core.validation_definition import ValidationDefinition
+from great_expectations.data_context.data_context.abstract_data_context import (
+    AbstractDataContext,
+)
 
 
-def _table_asset(context: gx.DataContext, table: str) -> gx.core.batch_definition.BatchDefinition:
+def _table_asset(context: AbstractDataContext, table: str) -> BatchDefinition:
     datasource = context.data_sources.get("clickhouse")
     asset = datasource.add_table_asset(name=table, table_name=table)
     return asset.add_batch_definition_whole_table("full")
 
 
-def register_incidents_by_ic(context: gx.DataContext) -> gx.ValidationDefinition:
+def register_incidents_by_ic(context: AbstractDataContext) -> ValidationDefinition:
     batch_def = _table_asset(context, "incidents_by_ic")
     suite = context.suites.add(gx.ExpectationSuite(name="mart_incidents_by_ic"))
 
@@ -26,7 +31,7 @@ def register_incidents_by_ic(context: gx.DataContext) -> gx.ValidationDefinition
     )
 
 
-def register_daily_anomaly_features(context: gx.DataContext) -> gx.ValidationDefinition:
+def register_daily_anomaly_features(context: AbstractDataContext) -> ValidationDefinition:
     batch_def = _table_asset(context, "daily_anomaly_features")
     suite = context.suites.add(gx.ExpectationSuite(name="mart_daily_anomaly_features"))
 
@@ -49,7 +54,7 @@ def register_daily_anomaly_features(context: gx.DataContext) -> gx.ValidationDef
     )
 
 
-def register_kpi_monthly_state(context: gx.DataContext) -> gx.ValidationDefinition:
+def register_kpi_monthly_state(context: AbstractDataContext) -> ValidationDefinition:
     batch_def = _table_asset(context, "kpi_monthly_state")
     suite = context.suites.add(gx.ExpectationSuite(name="mart_kpi_monthly_state"))
 
