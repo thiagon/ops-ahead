@@ -2,9 +2,9 @@
   "id": "exec-trigger_20260807",
   "title": "Serviço de Execução Sob Demanda (Trigger Service)",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-08-07T00:00:00Z",
-  "updated": "2026-08-14T00:00:00Z",
+  "updated": "2026-08-14T21:35:00Z",
   "current_phase": 1,
   "current_task": "1.1",
   "phases": {
@@ -14,5 +14,8 @@
   "tasks": {
     "total": 35,
     "completed": 0
-  }
+  },
+  "github_issue": 52,
+  "github_pr": 53,
+  "commits": []
 }
