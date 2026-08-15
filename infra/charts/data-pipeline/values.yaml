@@ -4,13 +4,9 @@
 # so several steps layer into one release without colliding.
 source: ""
 
-data-transform:
+data-runner:
   image:
-    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-transform
-    tag: ""
-data-quality:
-  image:
-    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-quality
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-runner
     tag: ""
 
 # Marts counted by register-snapshot and logged to MLflow.

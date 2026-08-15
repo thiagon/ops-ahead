@@ -1,0 +1,7 @@
+# RBAC-only for now (phase 3/6 of exec-trigger_20260807) — Deployment/Service/
+# HPA/probes and the trigger-service.image key arrive in phase 4/6, same chart.
+serviceAccountName: trigger-service
+
+# Cross-namespace: trigger-service (deployed in ns: data) also creates
+# ml.volume/ml.breach Workflows in ns: ml — see infra/charts/ml-workflow-template.
+mlNamespace: ml

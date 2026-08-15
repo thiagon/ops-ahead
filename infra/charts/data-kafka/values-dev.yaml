@@ -40,3 +40,6 @@ kafkaTopics:
   - name: actions.taken
     partitions: 1
     replicas: 1
+  - name: trigger.requests
+    partitions: 1
+    replicas: 1

@@ -6,5 +6,4 @@ namespace: data
 syncWave: "6"
 chart: infra/charts/data-pipeline   # base chart (templates); this folder is config only
 extraValueFiles:
-  - apps/data-transform/chart/values-dev.yaml
-  - apps/data-quality/chart/values-dev.yaml
+  - apps/data-runner/chart/values-dev.yaml

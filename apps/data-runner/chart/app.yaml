@@ -1,0 +1,10 @@
+# Deploy identity for this app (documentation — see apps/data-ingest/chart/app.yaml).
+# A pipeline-step has no standalone workload: its image is consumed as a step of
+# the pipeline named below, not rendered into a Deployment/Job of its own.
+# Consumed twice by infra/charts/data-pipeline: the CronWorkflow-driven chain
+# (dbt-run → great-expectations → register-snapshot) AND, since
+# exec-trigger_20260807, the on-demand `single-step` entrypoint dispatched by
+# trigger-service (run transform | run quality).
+workload: pipeline-step
+namespace: data
+pipeline: data-itsm-daily

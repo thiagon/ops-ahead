@@ -42,6 +42,9 @@ kafkaTopics:
   - name: actions.taken
     partitions: 3
     replicas: 2
+  - name: trigger.requests
+    partitions: 3
+    replicas: 2
 
 argoWorkflows:
   enabled: false

@@ -10,6 +10,13 @@ spec:
     parameters:
       - name: source
         value: {{ .Values.source | quote }}
+      # Only used by the `single-step` entrypoint below (trigger-service,
+      # on-demand data_refresh/data_quality_check) — the chain entrypoint
+      # ignores both.
+      - name: step
+        value: ""
+      - name: clickhouse_url
+        value: ""
 
   templates:
     - name: pipeline
@@ -29,9 +36,55 @@ spec:
                 - name: dag-run-id
                   value: "{{`{{workflow.name}}`}}"
 
+    - name: single-step
+      # trigger-service's on-demand entrypoint — one step, no chain, no
+      # register-snapshot. `step` selects which half of data-runner's
+      # dispatch (`run transform` / `run quality`) actually runs; passing
+      # both dbt's discrete CLICKHOUSE_* vars and quality's CLICKHOUSE_URL
+      # is harmless since each subcommand only reads what it needs.
+      container:
+        image: "{{ (index .Values "data-runner").image.repository }}:{{ (index .Values "data-runner").image.tag }}"
+        command: ["sh", "-c"]
+        args:
+          - |
+            export CLICKHOUSE_URL="${CLICKHOUSE_URL_OVERRIDE:-$CLICKHOUSE_URL_DEFAULT}"
+            exec python -m src.main run "$STEP" --suite critical --upload-docs
+        env:
+          - name: STEP
+            value: "{{`{{workflow.parameters.step}}`}}"
+          - name: CLICKHOUSE_URL_OVERRIDE
+            value: "{{`{{workflow.parameters.clickhouse_url}}`}}"
+          - name: CLICKHOUSE_HOST
+            value: {{ .Values.clickhouseHost | quote }}
+          - name: CLICKHOUSE_DATABASE
+            value: {{ .Values.clickhouseDatabase | quote }}
+          - name: CLICKHOUSE_USER
+            value: {{ .Values.clickhouseUser | quote }}
+          - name: CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: clickhouse-password
+          - name: CLICKHOUSE_URL_DEFAULT
+            value: "clickhouse+http://{{ .Values.clickhouseUser }}:$(CLICKHOUSE_PASSWORD)@{{ .Values.clickhouseHost }}:8123/{{ .Values.clickhouseDatabase }}"
+          - name: MINIO_ENDPOINT
+            value: {{ .Values.minioEndpoint | quote }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.minioBucket | quote }}
+          - name: MINIO_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: minio-access-key
+          - name: MINIO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: minio-secret-key
+
     - name: dbt-run
       container:
-        image: "{{ (index .Values "data-transform").image.repository }}:{{ (index .Values "data-transform").image.tag }}"
+        image: "{{ (index .Values "data-runner").image.repository }}:{{ (index .Values "data-runner").image.tag }}"
         command: ["dbt", "run", "--profiles-dir", "/dbt"]
         env:
           - name: CLICKHOUSE_HOST
@@ -48,7 +101,7 @@ spec:
 
     - name: great-expectations
       container:
-        image: "{{ (index .Values "data-quality").image.repository }}:{{ (index .Values "data-quality").image.tag }}"
+        image: "{{ (index .Values "data-runner").image.repository }}:{{ (index .Values "data-runner").image.tag }}"
         # Explicit command: Emissary otherwise looks up the image's ENTRYPOINT
         # from the registry, which isn't reachable over HTTPS here.
         command: ["python", "-m", "src.runner"]

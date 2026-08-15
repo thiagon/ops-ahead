@@ -169,34 +169,53 @@ pra pedidos de execução.
 
 ### Tasks
 
-- [ ] 3.1: `infra/charts/ml-workflow-template/` (novo, `ns: ml`) — `WorkflowTemplate` com
+- [x] 3.1: `infra/charts/ml-workflow-template/` (novo, `ns: ml`) — `WorkflowTemplate` com
       um entrypoint parametrizado (`workload`: `volume`|`breach`, mais as datas de corte e
       `clickhouse_url`) que roda a imagem `ml-trainer` com `command`/`args` resolvidos a
       partir do parâmetro; `serviceAccountName` análogo a `argo-workflow-executor`, criado
-      em `ns: ml` (não existe RBAC de executor lá hoje)
-- [ ] 3.2: Estender `infra/charts/data-pipeline/templates/workflowtemplate.yaml` com um
+      em `ns: ml` (não existe RBAC de executor lá hoje). Também criado
+      `infra/apps/ml-workflow-template.yaml` (Application, automated) — sem ele o chart
+      nunca sincroniza; e `apps/ml-trainer/chart/app.yaml` + `values-dev.yaml` (deferidos da
+      Fase 1, necessários pro CI write-back ter onde escrever a tag)
+- [x] 3.2: Estendido `infra/charts/data-pipeline/templates/workflowtemplate.yaml` com um
       segundo entrypoint de step único (`step`: `transform`|`quality`) usando a imagem
       `data-runner` consolidada — preserva o entrypoint de cadeia completa
       (`dbt-run → great-expectations → register-snapshot`) que o `CronWorkflow` existente
-      (`templates/cronworkflow.yaml`) continua referenciando sem mudança
-- [ ] 3.3: Tópico Kafka `trigger.requests` (seguindo a convenção de criação de tópico já
-      usada por `incidents.received`/`alerts.burst`) + `ExternalSecret`/credencial Kafka pro
-      `trigger-service`, mesmo padrão de `data-ingest`
-- [ ] 3.4: RBAC do `trigger-service`: `ServiceAccount` + `Role`/`RoleBinding` em `ns: data`
+      (`templates/cronworkflow.yaml`) continua referenciando sem mudança. Também trocado
+      `data-transform`/`data-quality` → `data-runner` nas imagens do `dbt-run`/
+      `great-expectations` (Fase 1 já tinha removido as imagens antigas — sem isso o
+      pipeline diário já estaria quebrado) e `pipelines/data-itsm-daily/appset.yaml`
+      (`extraValueFiles` apontava pros dois apps removidos); criado
+      `apps/data-runner/chart/app.yaml` + `values-dev.yaml` (mesmo motivo do ml-trainer acima)
+- [x] 3.3: Tópico Kafka `trigger.requests` em `infra/charts/data-kafka/values.yaml` **e**
+      `values-dev.yaml` (a segunda lista sobrescreve a primeira por completo — Helm não
+      faz merge de listas; sem editar as duas o tópico nunca existiria em dev). Sem
+      `ExternalSecret`/credencial nova: Kafka neste cluster não tem auth (nenhum app
+      existente injeta senha de Kafka — conferido em `data-ingest`/`ml-burst-detector`),
+      então não há segredo real pra buscar
+- [x] 3.4: RBAC do `trigger-service`: `ServiceAccount` + `Role`/`RoleBinding` em `ns: data`
       (criar/ler `workflows.argoproj.io`) e um `Role`/`RoleBinding` equivalente em `ns: ml`
       (cross-namespace) — escopo mínimo: `create`/`get`/`list`/`watch` em
-      `workflows.argoproj.io`, `get`/`watch` em `workflowtaskresults`
-- [ ] 3.5: `NetworkPolicy`: liberar ingress para `trigger-service` a partir de quem for
-      chamá-lo (mínimo: mesmo namespace + `infra`, seguindo o padrão default-deny +
-      allow-explícito já usado em `infra/apps/namespaces.yaml`) e liberar egress do
-      `trigger-service` pro broker Kafka (`ns: data`) e pra API do K8s
+      `workflows.argoproj.io`, `get`/`watch` em `workflowtaskresults`. Vive em
+      `infra/charts/trigger-service/templates/rbac.yaml`, mesmo chart que a Fase 4
+      completa com Deployment/Service/HPA — ainda sem `infra/apps/trigger-service.yaml`
+      (Fase 4), então nada disso está sincronizado no cluster ainda
+- [x] 3.5: Nenhum manifesto novo — `infra/apps/namespaces.yaml` já libera ingress em
+      `ns: data` pra mesmo-namespace + `infra` (e mais: `ml`, `ui:9092`) via a
+      `allow-ingress` default do namespace, e egress já é livre por estratégia do cluster
+      ("Egress não é restrito... não agrega valor em dev local") — checado antes de criar
+      qualquer coisa redundante
 
 ### Verification
 
-- [ ] `helm template infra/charts/ml-workflow-template` e `helm template
-      infra/charts/data-pipeline` renderizam sem erro com os novos parâmetros
+- [x] `helm template infra/charts/ml-workflow-template`, `helm template
+      infra/charts/data-pipeline` (com os values reais da pipeline + `data-runner`) e
+      `helm template infra/charts/data-kafka` (com `values-dev.yaml`, onde o tópico
+      precisou ser adicionado separadamente) renderizam sem erro
 - [ ] `kubectl auth can-i create workflows.argoproj.io --as=system:serviceaccount:data:trigger-service -n ml`
-      retorna `yes` (verificação read-only, sem aplicar nada fora do GitOps)
+      retorna `yes` — **adiado pra Fase 6**: exige `infra/apps/trigger-service.yaml`
+      (Fase 4) sincronizado no cluster; o RBAC em si já está commitado, só falta o
+      Application que o aplica
 
 ---
 

@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-workflow-template
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/ml-trainer/chart/values-dev.yaml) carries the CI-pinned
+  # image tag. Registers the WorkflowTemplate/RBAC/ExternalSecret only —
+  # automated like data-pipeline's, unlike the old per-Job ml-volume-model/
+  # ml-breach-model Applications it replaces: actual runs are triggered by
+  # trigger-service creating a Workflow, never by `argocd app sync`
+  # (exec-trigger_20260807).
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/ml-workflow-template
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/ml-trainer/chart/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

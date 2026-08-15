@@ -1,0 +1,67 @@
+# trigger-service creates the argoproj.io Workflow directly via the
+# Kubernetes client (not through argo-server's REST API — see spec.md
+# "Decisões de arquitetura"), so it needs its own ServiceAccount with
+# create/get/list/watch on workflows.argoproj.io — in its own namespace
+# (data.transform/data.quality) and, cross-namespace, in ns: ml
+# (ml.volume/ml.breach). Minimal scope: no access to Pods/Jobs/Secrets.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccountName }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trigger-service-workflows
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtaskresults"]
+    verbs: ["get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trigger-service-workflows
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trigger-service-workflows
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}
+---
+# Cross-namespace grant — same Role rules, applied in ns: ml, bound to the
+# ServiceAccount that lives in this chart's own namespace (ns: data).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trigger-service-workflows
+  namespace: {{ .Values.mlNamespace }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtaskresults"]
+    verbs: ["get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trigger-service-workflows
+  namespace: {{ .Values.mlNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trigger-service-workflows
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}

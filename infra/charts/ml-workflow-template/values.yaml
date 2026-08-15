@@ -1,0 +1,23 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app — layered in by infra/apps/ml-workflow-template.yaml via
+# apps/ml-trainer/chart/values-dev.yaml.
+ml-trainer:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ml-trainer
+    tag: ""
+
+train:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
+    autoPromote: "true"
+  secretName: ml-workflow-template-secret

@@ -1,0 +1,11 @@
+# Deploy identity for this app (documentation — see apps/data-ingest/chart/app.yaml).
+# A pipeline-step has no standalone workload: its image is consumed as a step of
+# the pipeline named below, not rendered into a Deployment/Job of its own.
+# Unlike data-runner, this isn't a pipelines/<ns>-<name>/ folder — it's a
+# bespoke per-domain WorkflowTemplate (infra/charts/ml-workflow-template,
+# deployed via infra/apps/ml-workflow-template.yaml), dispatched on demand by
+# trigger-service (exec-trigger_20260807). Same "no standalone workload"
+# shape, different deploy path than the pipelines/ ApplicationSet.
+workload: pipeline-step
+namespace: ml
+pipeline: ml-workflow-template
