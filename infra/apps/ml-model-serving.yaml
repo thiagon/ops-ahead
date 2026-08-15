@@ -12,10 +12,11 @@ spec:
   project: ops-ahead
   # Multi-source: base chart from infra/charts; the app's colocated per-env
   # overlay (apps/ml-model-serving/chart/values-dev.yaml) carries the
-  # CI-pinned image tag. Sync wave 10 — after ml-volume-model/ml-breach-model
-  # (wave 9) so at least one training run has had a chance to promote a
-  # Production model before this comes up, though /health tolerates neither
-  # being loaded yet.
+  # CI-pinned image tag. Sync wave 10 — after ml-workflow-template (wave 9),
+  # so the WorkflowTemplate a training run needs exists first. Registering
+  # it doesn't itself run a training (trigger-service does that on demand,
+  # since exec-trigger_20260807) — /health tolerates neither model being
+  # loaded yet either way.
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead
       targetRevision: main

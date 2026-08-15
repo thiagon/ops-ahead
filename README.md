@@ -62,8 +62,8 @@ Monorepo com workspaces `uv` para Python. Cada app em `apps/` gera sua própria 
 ```
 apps/                              # serviços e jobs que vão para o K8s
   data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO
-  data-transform/                  # Job       — dbt-clickhouse (marts)
-  data-quality/                    # Job       — Great Expectations (suites de qualidade)
+  data-runner/                     # pipeline-step — dbt-clickhouse (marts) + Great Expectations
+  trigger-service/                 # Deployment — REST/MCP → Kafka → Argo Workflow sob demanda
 
 contracts/                         # JSON Schemas compartilhados entre apps
   incidents-raw.schema.json        # schema híbrido do tópico incidents.raw

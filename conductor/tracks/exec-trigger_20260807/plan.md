@@ -253,23 +253,35 @@ pra pedidos de execução.
 
 ### Tasks
 
-- [ ] 5.1: Remover `infra/charts/ml-volume-model/`, `infra/charts/ml-breach-model/`,
+- [x] 5.1: Removido `infra/charts/ml-volume-model/`, `infra/charts/ml-breach-model/`,
       `infra/apps/ml-volume-model.yaml`, `infra/apps/ml-breach-model.yaml` (substituídos
-      pelo `WorkflowTemplate` da Fase 3, disparado pelo `trigger-service`)
-- [ ] 5.2: Remover `infra/apps/ml-temporal-split-values.yaml` — as datas de corte deixam de
+      pelo `WorkflowTemplate` da Fase 3, disparado pelo `trigger-service`). Corrigido também
+      o comentário de `infra/apps/ml-model-serving.yaml` que citava as duas Applications
+      removidas como referência de sync-wave
+- [x] 5.2: Removido `infra/apps/ml-temporal-split-values.yaml` — as datas de corte deixam de
       ter fonte fixa em `values.yaml`; passam a vir sempre do payload de cada requisição
-- [ ] 5.3: Atualizar `docs/data-pipeline.md` (e qualquer outro doc que cite
-      `argo submit --from workflowtemplate/data-pipeline`, `kubectl delete job` ou
-      `argocd app sync ml-volume-model`/`ml-breach-model` como fluxo operacional) para o
-      novo `curl` contra `trigger-service`
-- [ ] 5.4: Documentar o payload aceito pelos 4 `workload`s (exemplo de request por tipo) —
-      `docs/context/` ou README do próprio `apps/trigger-service/`
+- [x] 5.3: Reescrito `docs/data-pipeline.md`: nova seção "Rerodar um step isolado (via
+      trigger-service)" — cobre exatamente o caso que o documento antigo dizia ser
+      *impossível* ("Argo Workflows não reinicia um step isolado... um argo submit sempre
+      roda a sequência inteira"). Mantida, mas movida para "raro", a instrução `argo submit`
+      pra rodar a **cadeia completa** (`dbt-run → great-expectations → register-snapshot`) —
+      `trigger-service` não cobre esse caso de propósito (não existe "analysis" pra cadeia
+      inteira, só por domínio). `kubectl delete job`/`argocd app sync ml-` já não aparecem
+      em lugar nenhum (eram só do fluxo Job removido na 5.1). Também corrigidas referências
+      a `data-transform`/`data-quality` em `CLAUDE.md`, `README.md` e
+      `infra/scripts/README.md`
+- [x] 5.4: Documentado o payload dos 4 tipos de `analysis` em
+      `apps/trigger-service/README.md` (tabela campo obrigatório/opcional por tipo +
+      exemplos de `curl`), referenciado a partir de `docs/data-pipeline.md`
 
 ### Verification
 
-- [ ] `grep -r` por `argo submit --from workflowtemplate`, `kubectl delete job` e
-      `argocd app sync ml-` fora de `git log`/`docs/insights/` (achados históricos) não
-      retorna nada em docs operacionais correntes
+- [x] `grep -r` por `argo submit --from workflowtemplate`, `kubectl delete job` e
+      `argocd app sync ml-` fora de `git log`/`docs/insights/`: `kubectl delete job` e
+      `argocd app sync ml-` não retornam nada; `argo submit --from workflowtemplate`
+      retorna uma ocorrência **deliberada** em `docs/data-pipeline.md`, sob "raro" — é o
+      único caso que `trigger-service` não substitui (cadeia completa com
+      `register-snapshot`), não um resquício do fluxo antigo
 
 ---
 

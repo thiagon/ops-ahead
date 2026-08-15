@@ -18,8 +18,8 @@ uv sync          # install all workspace dependencies
 ```
 apps/                        # one folder per image you build; chart/ overlay colocated
   data-ingest/               # worker (ns: data) — Kafka consumer → ClickHouse + MinIO
-  data-transform/            # pipeline-step (ns: data) — dbt-clickhouse marts
-  data-quality/              # pipeline-step (ns: data) — Great Expectations suites
+  data-runner/               # pipeline-step (ns: data) — dbt-clickhouse marts + Great Expectations suites
+  trigger-service/           # deployment (ns: data) — REST/MCP intake → Kafka → Argo Workflow dispatch
 pipelines/                   # config-only: order + values per pipeline (chart lives in infra)
   data-itsm-daily/           # transform → quality → snapshot; appset.yaml points at the base chart
 contracts/                   # shared JSON Schemas (incident-event.schema.json)
