@@ -71,31 +71,34 @@ Pré-requisito técnico: o serviço só faz sentido despachando 2 imagens (uma p
 
 ### Tasks
 
-- [ ] 1.1: `apps/ml-trainer/` — novo app Python consolidando `apps/ml-volume-model` +
+- [x] 1.1: `apps/ml-trainer/` — novo app Python consolidando `apps/ml-volume-model` +
       `apps/ml-breach-model`; `src/split.py` único (elimina a duplicação byte-a-byte);
       dispatch via `sys.argv`/subcomando (`train volume` / `train breach`); `Settings`
       mantém os mesmos nomes de env var das duas apps atuais (`TRAIN_END`,
       `VALIDATION_END`, `HOLDOUT_END`, `CLICKHOUSE_URL`, `MLFLOW_TRACKING_URI`, etc.), sem
       default hardcoded para as datas de corte — passam a ser obrigatórias via payload
-- [ ] 1.2: `apps/data-runner/` — novo app consolidando `apps/data-transform` (dbt) +
+- [x] 1.2: `apps/data-runner/` — novo app consolidando `apps/data-transform` (dbt) +
       `apps/data-quality` (Great Expectations); dispatch via subcomando (`run transform`
       roda `dbt run --profiles-dir /dbt`, `run quality` roda o `runner.py` existente com
       `--suite`); projeto dbt de `data-transform` migra para dentro deste app
-- [ ] 1.3: `Dockerfile` dos dois novos apps seguindo o padrão uv multi-stage já usado nos
+- [x] 1.3: `Dockerfile` dos dois novos apps seguindo o padrão uv multi-stage já usado nos
       outros 4 (`uv sync --frozen --no-install-workspace` → `COPY .` → `uv sync --locked
       --package <pkg>`)
-- [ ] 1.4: Remover `apps/ml-volume-model/`, `apps/ml-breach-model/`, `apps/data-transform/`,
+- [x] 1.4: Remover `apps/ml-volume-model/`, `apps/ml-breach-model/`, `apps/data-transform/`,
       `apps/data-quality/` (código já migrado nas tasks 1.1/1.2)
-- [ ] 1.5: Migrar testes unitários existentes das 4 apps antigas para os 2 novos apps (split
+- [x] 1.5: Migrar testes unitários existentes das 4 apps antigas para os 2 novos apps (split
       temporal, filtro de elegibilidade KPI, feature engineering, suíte GE, dbt tests)
 
 ### Verification
 
-- [ ] `uv run --package ops-ahead-ml-trainer pytest` e `uv run --package ops-ahead-data-runner
-      pytest` passam
-- [ ] `docker build -f apps/ml-trainer/Dockerfile .` e `docker build -f
-      apps/data-runner/Dockerfile .` completam sem erro
-- [ ] `apps/ml-volume-model`, `apps/ml-breach-model`, `apps/data-transform`,
+- [x] `uv run --package ops-ahead-ml-trainer pytest` e `uv run --package ops-ahead-data-runner
+      pytest` passam — via `pytest apps/<app>` explícito; o comando sem path já falhava
+      *antes* desta track (colisão do módulo `tests` entre apps quando coletado a partir da
+      raiz do repo — achado registrado, não é regressão desta track)
+- [x] `docker build -f apps/ml-trainer/Dockerfile .` e `docker build -f
+      apps/data-runner/Dockerfile .` completam sem erro (exigiu criar `.dockerignore` na
+      raiz — inexistente antes, quebrava qualquer build local com `.data/` populado)
+- [x] `apps/ml-volume-model`, `apps/ml-breach-model`, `apps/data-transform`,
       `apps/data-quality` não existem mais no working tree
 
 ---
