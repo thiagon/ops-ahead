@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: incidents_by_ic
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: window_hours
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 6, 24]
+      - name: window_start
+        tests: [not_null]
+      - name: incident_count
+        tests: [not_null]
+      - name: sem_intervencao_count
+        tests: [not_null]
+
+  - name: group_load_by_window
+    columns:
+      - name: assignment_group
+        tests: [not_null]
+      - name: window_start
+        tests: [not_null]
+      - name: incidents_opened
+        tests: [not_null]
+
+  - name: p4_sequences_by_ci
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: sequence_length
+        tests: [not_null]
+
+  - name: first_touch_duration
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: ola_limit_seconds
+        tests: [not_null]
+
+  - name: priority_changes_log
+    columns:
+      - name: ticket_number
+        tests: [not_null]
+      - name: severity_from
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: severity_to
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+
+  - name: daily_anomaly_features
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: source
+        tests: [not_null]
+      - name: total_incidents
+        tests: [not_null]
+      - name: p1_share
+        tests: [not_null]
+
+  - name: kpi_monthly_state
+    columns:
+      - name: month
+        tests: [not_null]
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3]
+      - name: breach_rate
+        # Nullable by design: NULL when the bucket has zero KPI-counted
+        # incidents (undefined rate), not the same thing as a 0.0 breach rate.

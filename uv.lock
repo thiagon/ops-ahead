@@ -20,12 +20,10 @@ resolution-markers = [
 members = [
     "ops-ahead",
     "ops-ahead-data-ingest",
-    "ops-ahead-data-quality",
-    "ops-ahead-data-transform",
-    "ops-ahead-ml-breach-model",
+    "ops-ahead-data-runner",
     "ops-ahead-ml-burst-detector",
     "ops-ahead-ml-model-serving",
-    "ops-ahead-ml-volume-model",
+    "ops-ahead-ml-trainer",
     "ops-ahead-scripts",
 ]
 
@@ -2598,12 +2596,13 @@ dev = [
 ]
 
 [[package]]
-name = "ops-ahead-data-quality"
+name = "ops-ahead-data-runner"
 version = "0.1.0"
-source = { virtual = "apps/data-quality" }
+source = { virtual = "apps/data-runner" }
 dependencies = [
     { name = "boto3" },
     { name = "clickhouse-sqlalchemy" },
+    { name = "dbt-clickhouse" },
     { name = "great-expectations" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
@@ -2619,6 +2618,7 @@ dev = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.35" },
     { name = "clickhouse-sqlalchemy", specifier = ">=0.3" },
+    { name = "dbt-clickhouse", specifier = ">=1.8.1" },
     { name = "great-expectations", specifier = ">=1.2" },
     { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "sqlalchemy", specifier = ">=2.0" },
@@ -2629,56 +2629,6 @@ dev = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pytest", specifier = ">=8.0" },
 ]
-
-[[package]]
-name = "ops-ahead-data-transform"
-version = "0.1.0"
-source = { virtual = "apps/data-transform" }
-dependencies = [
-    { name = "dbt-clickhouse" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "dbt-clickhouse", specifier = ">=1.8.1" }]
-
-[[package]]
-name = "ops-ahead-ml-breach-model"
-version = "0.1.0"
-source = { virtual = "apps/ml-breach-model" }
-dependencies = [
-    { name = "clickhouse-driver" },
-    { name = "lightgbm" },
-    { name = "matplotlib" },
-    { name = "mlflow" },
-    { name = "numpy" },
-    { name = "optuna" },
-    { name = "pandas" },
-    { name = "pydantic-settings" },
-    { name = "scikit-learn" },
-    { name = "shap" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "clickhouse-driver", specifier = ">=0.2.9" },
-    { name = "lightgbm", specifier = ">=4.5" },
-    { name = "matplotlib", specifier = ">=3.9" },
-    { name = "mlflow", specifier = ">=2.17" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "optuna", specifier = ">=4.0" },
-    { name = "pandas", specifier = ">=2.2,<3" },
-    { name = "pydantic-settings", specifier = ">=2.5" },
-    { name = "scikit-learn", specifier = ">=1.5" },
-    { name = "shap", specifier = ">=0.46" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "ops-ahead-ml-burst-detector"
@@ -2753,19 +2703,22 @@ dev = [
 ]
 
 [[package]]
-name = "ops-ahead-ml-volume-model"
+name = "ops-ahead-ml-trainer"
 version = "0.1.0"
-source = { virtual = "apps/ml-volume-model" }
+source = { virtual = "apps/ml-trainer" }
 dependencies = [
     { name = "clickhouse-driver" },
     { name = "holidays" },
     { name = "lightgbm" },
+    { name = "matplotlib" },
     { name = "mlflow" },
     { name = "numpy" },
+    { name = "optuna" },
     { name = "pandas" },
     { name = "prophet" },
     { name = "pydantic-settings" },
     { name = "scikit-learn" },
+    { name = "shap" },
 ]
 
 [package.dev-dependencies]
@@ -2778,12 +2731,15 @@ requires-dist = [
     { name = "clickhouse-driver", specifier = ">=0.2.9" },
     { name = "holidays", specifier = ">=0.60" },
     { name = "lightgbm", specifier = ">=4.5" },
+    { name = "matplotlib", specifier = ">=3.9" },
     { name = "mlflow", specifier = ">=2.17" },
     { name = "numpy", specifier = ">=1.26" },
-    { name = "pandas", specifier = ">=2.2" },
+    { name = "optuna", specifier = ">=4.0" },
+    { name = "pandas", specifier = ">=2.2,<3" },
     { name = "prophet", specifier = ">=1.1.6" },
     { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "shap", specifier = ">=0.46" },
 ]
 
 [package.metadata.requires-dev]
