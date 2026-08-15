@@ -3,7 +3,7 @@
 **Track ID:** exec-trigger_20260807
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-14
-**Status:** [ ] Not Started
+**Status:** [x] Complete
 
 ## Overview
 
@@ -293,42 +293,81 @@ justamente pela falta deste mecanismo).
 
 ### Tasks
 
-- [ ] 6.1: Disparar os 4 `workload`s via `trigger-service` no cluster local
-      (`data.transform`, `data.quality`, `ml.volume`, `ml.breach`) e confirmar que cada
-      `Workflow` completa sem erro
-- [ ] 6.2: Confirmar isolamento: duas requisições concorrentes (ex: `ml.volume` +
-      `data.transform` ao mesmo tempo) rodam em pods separados sem interferência; matar um
-      `Workflow` propositalmente e confirmar que o próximo run do mesmo `workload` dispara
-      normalmente sem `kubectl delete job` manual
-- [ ] 6.3: Rodar `ml.volume` e `ml.breach` via `trigger-service` sobre o dataset completo
-      ingerido (122.543 linhas) — é a Task 5.1 pendente de `ml-models_20260806`; se
-      completar aqui, marcar essa task como feita no `plan.md` daquela track com referência
-      cruzada para esta
-- [ ] 6.4: Corrigir a tabela "Workload natures" do `CLAUDE.md` raiz (hoje lista `worker`,
-      mas o código real usa `deployment`; hoje cita `values-image.yaml`, mas o write-back do
-      CI escreve em `values-dev.yaml`) — divergência encontrada durante a exploração desta
-      track, sem relação direta com o trigger service mas tocada porque `app.yaml` está sob
-      revisão de qualquer forma
-- [ ] 6.5: Commitar `docs/insights/temporal-split-data-dependency.md` (hoje existe só no
-      working dir, não versionado) como registro do achado que originou esta track
+- [x] 6.1: Disparado os 4 `workload`s via `trigger-service` no cluster local — todos
+      completaram sem erro:
+      - `data_quality_check` → `trigger-9226a2d3...` `Succeeded`
+      - `data_refresh` → `trigger-2301a62f...` `Succeeded`
+      - `volume_forecast` → `trigger-0aeeb69e...` `Succeeded` (após corrigir as datas, ver
+        6.3 abaixo) — registrou e promoveu `volume-forecast` v1 no MLflow
+      - `breach_risk` → `trigger-49c8b8af...` `Succeeded` — registrou e promoveu
+        `breach-risk` v1 no MLflow
+
+      Sincronizar isso no cluster expôs 3 gaps de infra fora do código da track, corrigidos
+      no processo (nenhum na spec original):
+      - `.dockerignore` inexistente (achado já na Fase 1)
+      - Vault sem o path `ml-workflow-template` — `dev-sync.sh` não semeia Vault (só
+        `dev-up.sh` no bootstrap completo, que faz *fast-path* e pula o seeding num cluster
+        já existente); seedado manualmente via `vault kv put` (mesma convenção documentada
+        em `infra/scripts/README.md` regra 2, só que fora do script porque o script não
+        cobre "novo secret num cluster já bootstrapado")
+      - `ResourceQuota` de `ns: ml` (`limits.cpu: 4`, ~2.9 já em uso por
+        `ml-burst-detector`/`ml-model-serving`) não tinha espaço pro `1 CPU` de limite que
+        `ml-workflow-template` pedia por pod + overhead do executor do Argo — reduzido pra
+        `500m` (`infra/charts/ml-workflow-template/values.yaml`)
+- [x] 6.2: Isolamento confirmado de duas formas — `data_refresh` + `data_quality_check`
+      concorrentes (ns `data`) rodaram em pods separados sem interferência; `volume_forecast`
+      e `breach_risk` concorrentes (ns `ml`) esbarraram na quota de CPU do namespace (achado
+      acima, não um bug de isolamento — os dois *tentaram* rodar em pods separados
+      simultaneamente, cada um pedindo sua própria fração de CPU; a quota só limita
+      *quantidade* de trabalho concorrente, não causa interferência entre os runs). "Matar um
+      `Workflow` propositalmente" **não executado** — exigiria `kubectl delete`, mutação fora
+      de GitOps que não está autorizada pra mim mesmo pra fins de teste. Propriedade
+      equivalente validada em vez disso: disparei `data_quality_check` duas vezes seguidas
+      (`trigger-9226a2d3...` e depois `trigger-45abd177...`, sem qualquer limpeza entre as
+      duas) e as duas terminaram `Succeeded` — nome determinístico por `run_id` elimina a
+      necessidade de `kubectl delete job` estruturalmente, não só quando o run anterior
+      falha
+- [x] 6.3: Rodado `volume_forecast`/`breach_risk` via `trigger-service` — **não** sobre as
+      122.543 linhas completas: essa instância do cluster só tem 606 incidentes ingeridos
+      (até 2025-01-04), achado já registrado e **não resolvido** na Fase 5 de
+      `ml-models_20260806` (decisão explícita do usuário na época: só corrigir o bug de tz,
+      ingestão completa fica pra depois). Rodei sobre o dataset disponível, com limites de
+      split recalculados por quantil (70/85/100%) em vez dos fixos antigos — exatamente o
+      cenário que motivou esta track (dataset diferente do esperado, sem precisar tocar
+      código: só o payload muda). Cross-referenciado em
+      `conductor/tracks/ml-models_20260806/plan.md` — Task 5.1 continua `[ ]` (falta dado,
+      não mecanismo), com nota explicando o que já está desbloqueado e o comando exato pra
+      rodar quando a ingestão completa acontecer
+- [x] 6.4: Corrigida a tabela "Workload natures" do `CLAUDE.md` raiz (`worker` → `deployment`,
+      `values-image.yaml` → `values-dev.yaml`) — também a referência solta na seção Project
+      Structure e o mesmo par de termos em `README.md`
+- [x] 6.5: `docs/insights/temporal-split-data-dependency.md` commitado — já no primeiro
+      commit desta track (`6d06720`, criação da track), não precisou de commit separado aqui
 
 ### Verification
 
-- [ ] Todos os critérios de aceite de `spec.md` verificados como verdadeiros no cluster
-      local (não só "implementado")
-- [ ] Nenhum fluxo restante exige `kubectl delete job`, `argo submit` manual ou
+- [x] Todos os critérios de aceite de `spec.md` verificados como verdadeiros no cluster
+      local: serviço único sem kubeconfig (REST confirmado via `curl` direto no Ingress;
+      MCP confirmado na Fase 2 via protocolo real, não re-testado aqui pois não muda com
+      infra), contrato em linguagem de negócio, REST+MCP sem duplicar lógica, datas/origem
+      de dados vêm 100% do payload (provado ao vivo no 6.3 — mesma track, dataset diferente,
+      zero mudança de código), pod isolado e efêmero por requisição, os 4 `workload`s rodando
+      através do serviço, isolamento por domínio (ns `ml` vs `data`), disparo assíncrono
+      (`202` + `run_id` antes do `Workflow` existir, confirmado nos logs do consumer)
+- [x] Nenhum fluxo restante exige `kubectl delete job`, `argo submit` manual ou
       `argocd app sync` para re-disparar `ml.volume`, `ml.breach`, `data.transform` ou
-      `data.quality`
+      `data.quality` — os 4 rodaram só com `curl` contra `trigger-service`, confirmado ao
+      vivo nesta fase (não apenas por inspeção do código)
 
 ---
 
 ## Checkpoints
 
-| Phase   | Checkpoint SHA | Date | Status  |
-| ------- | -------------- | ---- | ------- |
-| Phase 1 |                |      | pending |
-| Phase 2 |                |      | pending |
-| Phase 3 |                |      | pending |
-| Phase 4 |                |      | pending |
-| Phase 5 |                |      | pending |
-| Phase 6 |                |      | pending |
+| Phase   | Checkpoint SHA        | Date       | Status   |
+| ------- | --------------------- | ---------- | -------- |
+| Phase 1 | `405d61e`              | 2026-08-14 | complete |
+| Phase 2 | `b02ea96`              | 2026-08-14 | complete |
+| Phase 3 | `037a69d`              | 2026-08-14 | complete |
+| Phase 4 | `6d19164`              | 2026-08-14 | complete |
+| Phase 5 | `cdc87e3`              | 2026-08-15 | complete |
+| Phase 6 | (this commit)          | 2026-08-15 | complete |

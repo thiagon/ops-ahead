@@ -9,10 +9,15 @@ ml-trainer:
 train:
   resources:
     requests:
-      cpu: 250m
+      cpu: 200m
       memory: 512Mi
     limits:
-      cpu: "1"
+      # ns: ml's ResourceQuota (limits.cpu: 4) leaves little headroom once
+      # ml-burst-detector/ml-model-serving's own steady-state limits are
+      # already counted — 1 full CPU per on-demand training pod (plus Argo's
+      # own wait-container overhead) didn't fit. 500m is enough for
+      # LightGBM/Prophet/Optuna to make progress, just slower.
+      cpu: 500m
       memory: 1Gi
   env:
     clickhouseHost: clickhouse.data.svc.cluster.local

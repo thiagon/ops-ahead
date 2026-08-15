@@ -17,7 +17,7 @@ uv sync          # install all workspace dependencies
 
 ```
 apps/                        # one folder per image you build; chart/ overlay colocated
-  data-ingest/               # worker (ns: data) — Kafka consumer → ClickHouse + MinIO
+  data-ingest/               # deployment (ns: data) — Kafka consumer → ClickHouse + MinIO
   data-runner/               # pipeline-step (ns: data) — dbt-clickhouse marts + Great Expectations suites
   trigger-service/           # deployment (ns: data) — REST/MCP intake → Kafka → Argo Workflow dispatch
 pipelines/                   # config-only: order + values per pipeline (chart lives in infra)
@@ -42,15 +42,16 @@ docs/
 ## Workload natures
 
 One folder per image in `apps/`. Its **nature** — declared in `apps/<app>/chart/app.yaml`
-(`workload`, `namespace`), alongside the deploy overlay in the same `chart/` (`values-dev.yaml`,
-CI-written `values-image.yaml`) — decides how it runs:
+(`workload`, `namespace`) — decides how it runs. The deploy overlay lives alongside it in
+the same `chart/`, in `values-dev.yaml` — the same file the CI write-back pins
+`<app>.image.tag` into (there is no separate `values-image.yaml`):
 
 | `workload` | Runtime | Own ArgoCD App? | Image tag lives in |
 |------------|---------|-----------------|--------------------|
-| `worker` | Deployment (stays up) | yes | `apps/<app>/chart/values-image.yaml` |
+| `deployment` | Deployment (stays up) | yes | `apps/<app>/chart/values-dev.yaml` |
 | `cronjob` | native CronJob at schedule X | yes | same, plus `schedule` in the overlay |
 | `job` | Job, run once on demand | yes | same |
-| `pipeline-step` | a step of a pipeline; no standalone workload | no — a pipeline runs it | app-scoped key in its `values-image.yaml` |
+| `pipeline-step` | a step of a pipeline; no standalone workload | no — a pipeline runs it | app-scoped key in its `values-dev.yaml` |
 
 **Pipelines** (`pipelines/<ns>-<name>/`) own the *order* between images. The chart shape lives in
 `infra/charts/data-pipeline` (WorkflowTemplate + CronWorkflow); the pipeline folder holds config
