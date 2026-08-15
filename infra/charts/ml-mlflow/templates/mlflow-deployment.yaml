@@ -55,6 +55,7 @@ spec:
               --host 0.0.0.0
               --port 5000
               --allowed-hosts '*'
+              --cors-allowed-origins '*'
           env:
             - name: MLFLOW_BACKEND_STORE_URI
               value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "ml-mlflow.postgresHost" . }}:5432/$(POSTGRES_DB)"
