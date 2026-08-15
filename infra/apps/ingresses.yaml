@@ -208,3 +208,27 @@ spec:
                 name: argo-workflows-server
                 port:
                   number: 2746
+---
+# Single Ingress/Service for both REST (/trigger, /runs, /health) and the MCP
+# transport (/mcp) — same process/port (task 2.7), no separate host or Service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trigger-service
+  namespace: data
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: trigger.ops-ahead.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trigger-service-trigger-service
+                port:
+                  number: 80

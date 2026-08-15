@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "trigger-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trigger-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.deployment.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "trigger-service.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "trigger-service.fullname" . }}
+        {{- include "trigger-service.labels" . | nindent 8 }}
+    spec:
+      # RBAC from templates/rbac.yaml is only useful if the pod actually runs
+      # as this identity — the consumer creates Workflows via the in-cluster
+      # client, authenticated as this ServiceAccount's token.
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      containers:
+        - name: server
+          image: "{{ (index .Values "trigger-service").image.repository }}:{{ (index .Values "trigger-service").image.tag }}"
+          imagePullPolicy: {{ (index .Values "trigger-service").image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.deployment.env.httpPort }}
+          env:
+            - name: HTTP_PORT
+              value: {{ .Values.deployment.env.httpPort | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.deployment.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.deployment.env.kafkaTopic | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.deployment.env.kafkaGroupId | quote }}
+          resources:
+            {{- toYaml .Values.deployment.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.deployment.env.httpPort }}
+            # /health only answers once the Kafka broker connects (see
+            # src/app.py's lifespan) — generous headroom for a cold cluster
+            # bootstrap where data-kafka's pod may still be settling even
+            # though its Application already synced.
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.deployment.env.httpPort }}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.deployment.env.httpPort }}
+            periodSeconds: 20

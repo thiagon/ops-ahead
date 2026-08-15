@@ -223,25 +223,29 @@ pra pedidos de execução.
 
 ### Tasks
 
-- [ ] 4.1: `infra/charts/trigger-service/` (`Deployment` + `Service` + `HPA` + probes),
-      copiando o padrão de `infra/charts/ml-model-serving/`
-- [ ] 4.2: `apps/trigger-service/chart/app.yaml` (`workload: deployment`, `namespace: data`,
+- [x] 4.1: `infra/charts/trigger-service/` (`Deployment` + `Service` + `HPA` + probes),
+      copiando o padrão de `infra/charts/ml-model-serving/`. `serviceAccountName` no pod
+      spec aponta pro `ServiceAccount` da Fase 3 (RBAC sem pod nenhum não vale nada)
+- [x] 4.2: `apps/trigger-service/chart/app.yaml` (`workload: deployment`, `namespace: data`,
       `chart: infra/charts/trigger-service`) + `values-dev.yaml`
-- [ ] 4.3: `infra/apps/trigger-service.yaml` (`ArgoCD Application`, `syncPolicy.automated`,
-      sync-wave depois de `data-workflows`)
-- [ ] 4.4: `infra/apps/ingresses.yaml` — host `trigger.ops-ahead.localtest.me` (dev), mesmo
+- [x] 4.3: `infra/apps/trigger-service.yaml` (`ArgoCD Application`, `syncPolicy.automated`,
+      sync-wave `8` — depois de `data-workflows` (5) e `data-kafka` (6, o broker que o
+      lifespan do app conecta no startup))
+- [x] 4.4: `infra/apps/ingresses.yaml` — host `trigger.ops-ahead.localtest.me` (dev), mesmo
       padrão dos outros hosts `*.ops-ahead.localtest.me`; mesmo `Ingress`/`Service` expõe o
       path REST e o path do transport MCP (mesmo processo/porta da task 2.7, sem `Service`
-      nem host separado)
-- [ ] 4.5: Atualizar a matrix estática do CI (`.gitea/workflows/build.yaml` linha do
-      `strategy.matrix.app`) — remover as 4 apps antigas, adicionar `ml-trainer`,
+      nem host separado) — aponta pro Service `trigger-service-trigger-service` (confirmado
+      contra o padrão real dos outros apps `deployment` no cluster: `<app>-<app>`)
+- [x] 4.5: Atualizado a matrix estática do CI (`.gitea/workflows/build.yaml` linha do
+      `strategy.matrix.app`) — removidos os 4 apps antigos, adicionados `ml-trainer`,
       `data-runner`, `trigger-service`
 
 ### Verification
 
-- [ ] `helm template infra/charts/trigger-service` renderiza sem erro
-- [ ] Push dispara o CI e os 3 novos apps buildam/publicam imagem (verificar via `gh run
-      list` ou UI do Gitea Actions, não via cluster)
+- [x] `helm template infra/charts/trigger-service` renderiza sem erro
+- [ ] Push dispara o CI e os 3 novos apps buildam/publicam imagem — **adiado**: ainda não
+      fiz push da branch pro Gitea local nem pro GitHub; verificar via `gh run list` depois
+      do push (Fase 6, junto da validação ponta a ponta)
 
 ---
 

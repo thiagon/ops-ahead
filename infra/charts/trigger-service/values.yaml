@@ -1,7 +1,33 @@
-# RBAC-only for now (phase 3/6 of exec-trigger_20260807) — Deployment/Service/
-# HPA/probes and the trigger-service.image key arrive in phase 4/6, same chart.
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+trigger-service:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/trigger-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
 serviceAccountName: trigger-service
 
 # Cross-namespace: trigger-service (deployed in ns: data) also creates
 # ml.volume/ml.breach Workflows in ns: ml — see infra/charts/ml-workflow-template.
 mlNamespace: ml
+
+deployment:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    httpPort: "8080"
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: trigger.requests
+    kafkaGroupId: trigger-service
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
