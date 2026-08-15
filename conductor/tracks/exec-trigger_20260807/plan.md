@@ -111,49 +111,50 @@ fake/mock) — ver diagrama de `spec.md`.
 
 ### Tasks
 
-- [ ] 2.1: `apps/trigger-service/` — novo app FastAPI (`workload: deployment`, `ns: data`),
+- [x] 2.1: `apps/trigger-service/` — novo app FastAPI (`workload: deployment`, `ns: data`),
       seguindo o app-factory/lifespan de `apps/ml-model-serving/src/main.py` como referência;
       roda o servidor HTTP e o consumer Kafka (task 2.9) no mesmo processo (background task
       no lifespan), não como dois deploys
-- [ ] 2.2: Modelo Pydantic `TriggerRequest` — discriminado por `analysis`
+- [x] 2.2: Modelo Pydantic `TriggerRequest` — discriminado por `analysis`
       (`volume_forecast` | `breach_risk` | `data_refresh` | `data_quality_check`, em
       linguagem de negócio, sem termos de Argo/K8s no contrato — ver "Decisões de
       arquitetura"); campos comuns (`data_source`/`clickhouse_url` como override opcional,
       seguindo a convenção de URL única) e campos específicos de `volume_forecast`/
       `breach_risk` (`train_end`/`validation_end`/`holdout_end`, sem default — falha a
       validação se vierem sem datas)
-- [ ] 2.3: `POST /trigger` (intake) — valida o payload, gera `run_id` (UUID), publica no
+- [x] 2.3: `POST /trigger` (intake) — valida o payload, gera `run_id` (UUID), publica no
       tópico Kafka `trigger.requests` (evento = `TriggerRequest` + `run_id`), responde `202`
       com `{run_id}` na hora — não cria o `Workflow` inline, não espera o consumer
-- [ ] 2.4: `GET /runs/{run_id}` — tenta buscar `Workflow` chamado `trigger-{run_id}` em
+- [x] 2.4: `GET /runs/{run_id}` — tenta buscar `Workflow` chamado `trigger-{run_id}` em
       `ns: ml` e `ns: data`; `404` do K8s nas duas ⇒ responde `queued`; achou ⇒ devolve a fase
       (`Pending`/`Running`/`Succeeded`/`Failed`) — sem estado auxiliar (Redis/banco) próprio
-- [ ] 2.5: `GET /health`
-- [ ] 2.6: Testes unitários do intake (`TestClient` do FastAPI + producer Kafka fake
+- [x] 2.5: `GET /health`
+- [x] 2.6: Testes unitários do intake (`TestClient` do FastAPI + producer Kafka fake
       injetado) cobrindo: payload válido por `analysis`, payload inválido (ex:
       `volume_forecast` sem datas), `run_id` sempre gerado e devolvido em `202`
-- [ ] 2.7: Servidor MCP montado sobre o mesmo app FastAPI (mesma porta/processo) — avaliar
+- [x] 2.7: Servidor MCP montado sobre o mesmo app FastAPI (mesma porta/processo) — avaliar
       lib que derive as tools MCP direto das rotas `/trigger`/`/runs` (ex: `fastapi-mcp`) em
       vez de reimplementar o schema à mão; a tool MCP resultante usa o mesmo `TriggerRequest`
       (`analysis` + parâmetros) da task 2.2, publica no mesmo tópico Kafka do intake — nunca
       fala com Argo/K8s diretamente
-- [ ] 2.8: Teste de integração do servidor MCP: cliente MCP (ex: `mcp` SDK em modo teste, ou
+- [x] 2.8: Teste de integração do servidor MCP: cliente MCP (ex: `mcp` SDK em modo teste, ou
       chamada HTTP direta ao transport escolhido) invoca a tool de disparo e recebe o mesmo
       `{run_id}` que `POST /trigger` retornaria pro mesmo payload
-- [ ] 2.9: Consumer Kafka (grupo `trigger-service`, tópico `trigger.requests`) — resolve
+- [x] 2.9: Consumer Kafka (grupo `trigger-service`, tópico `trigger.requests`) — resolve
       `analysis` → `WorkflowTemplate` + `namespace` + `arguments.parameters` internos (mapa
       `analysis` → `ml.volume`/`ml.breach`/`data.transform`/`data.quality`, nunca exposto),
       cria o `Workflow` (nome `trigger-{run_id}`) via client Kubernetes
-- [ ] 2.10: Testes unitários do consumer (client Kubernetes fake injetado) cobrindo:
+- [x] 2.10: Testes unitários do consumer (client Kubernetes fake injetado) cobrindo:
       mapeamento `analysis`→template/namespace, nome determinístico do `Workflow`, e
       tratamento de evento malformado (não deve derrubar o consumer nem travar o tópico —
       publica em dead-letter ou loga e segue, decidir na implementação)
 
 ### Verification
 
-- [ ] `uv run --package ops-ahead-trigger-service pytest` passa
-- [ ] `POST /trigger` com payload malformado retorna `422`, nunca `500`
-- [ ] A tool MCP e o endpoint REST aceitam o mesmo payload, publicam no mesmo tópico Kafka e
+- [x] `uv run --package ops-ahead-trigger-service pytest` passa (via `pytest apps/trigger-service`
+      — mesma ressalva de path da Fase 1)
+- [x] `POST /trigger` com payload malformado retorna `422`, nunca `500`
+- [x] A tool MCP e o endpoint REST aceitam o mesmo payload, publicam no mesmo tópico Kafka e
       produzem o mesmo `run_id`/resultado (nenhuma lógica de validação/despacho duplicada
       entre as duas transports, e nenhuma delas cria o `Workflow` diretamente — só o consumer
       da task 2.9 faz isso)

@@ -1,0 +1,19 @@
+[project]
+name = "ops-ahead-trigger-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic-settings>=2.5",
+    "faststream[kafka]>=0.5",
+    "kubernetes>=31.0",
+    "fastapi-mcp>=0.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+]
