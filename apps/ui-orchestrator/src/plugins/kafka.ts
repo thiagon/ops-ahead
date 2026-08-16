@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import type { Admin, Consumer, Producer } from 'kafkajs';
@@ -179,7 +180,14 @@ async function kafkaPlugin(fastify: FastifyInstance) {
 
   const statusConsumer = needsStatusConsumer
     ? createStatusConsumer(
-        kafka.consumer({ groupId: `${fastify.env.SERVICE_NAME}-status` }),
+        // A fresh, per-boot group id — never shared across replicas or
+        // reused across restarts. trigger.status is compacted and read
+        // fromBeginning specifically so every replica rebuilds the same
+        // complete map independently; a stable groupId would instead split
+        // partitions across replicas (each seeing only part of the history)
+        // and, on restart, resume from a committed offset instead of
+        // replaying the backlog — silently breaking both guarantees.
+        kafka.consumer({ groupId: `${fastify.env.SERVICE_NAME}-status-${randomUUID()}` }),
         kafka.admin(),
         fastify.env.KAFKA_TOPIC_STATUS,
       )

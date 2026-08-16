@@ -1,6 +1,0 @@
-apiVersion: v2
-name: trigger-service
-description: On-demand execution service — REST/MCP intake, Kafka consumer, Argo Workflow dispatch
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

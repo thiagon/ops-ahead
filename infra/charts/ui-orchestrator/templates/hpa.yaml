@@ -1,15 +1,15 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "trigger-service.fullname" . }}
+  name: orchestrator
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "trigger-service.labels" . | nindent 4 }}
+    {{- include "ui-orchestrator.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "trigger-service.fullname" . }}
+    name: orchestrator
   minReplicas: {{ .Values.hpa.minReplicas }}
   maxReplicas: {{ .Values.hpa.maxReplicas }}
   metrics:

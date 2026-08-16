@@ -55,7 +55,7 @@ def temporal_split(
 def _raise_if_any_partition_empty(
     split: TemporalSplit, train_end: str, validation_end: str, holdout_end: str
 ) -> None:
-    """The split boundaries come from the trigger-service payload for the run —
+    """The split boundaries come from the trigger.ml event for the run —
     if they don't match the data's actual date range (dataset swap, ingestion
     bug, wrong parameter), a partition can silently come back empty and every
     metric downstream goes quietly wrong (NaN MAPE/AUC-PR, a LightGBM fit on

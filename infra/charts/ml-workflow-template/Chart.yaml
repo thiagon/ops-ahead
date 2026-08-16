@@ -1,6 +1,0 @@
-apiVersion: v2
-name: ml-workflow-template
-description: Argo WorkflowTemplate for on-demand ml-trainer runs (volume|breach), dispatched by trigger-service
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

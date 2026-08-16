@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     dataset_version: str = "unknown"
 
     # Temporal split boundaries — see src/split.py. No default: every run now
-    # comes from a trigger-service payload (see
+    # comes from a trigger.ml event (see
     # docs/insights/temporal-split-data-dependency.md); a fixed default here
-    # would silently reintroduce the dataset-specific coupling that payload
+    # would silently reintroduce the dataset-specific coupling that event
     # replaces. src/main.py enforces all three are present before training.
     train_end: str | None = None
     validation_end: str | None = None

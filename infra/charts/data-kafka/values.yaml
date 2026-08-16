@@ -59,9 +59,6 @@ kafkaTopics:
     config:
       cleanup.policy: compact
 
-argoWorkflows:
-  enabled: false
-
 monitoring:
   enabled: true
 

@@ -98,7 +98,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [data-ingest, data-runner, ui-gateway, ml-trainer, ml-burst-detector, ml-model-serving, trigger-service]
+        app: [data-ingest, data-runner, ui-gateway, ui-orchestrator, ml-trainer, ml-burst-detector, ml-model-serving]
     steps:
       - uses: actions/checkout@v4
 

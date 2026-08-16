@@ -197,34 +197,73 @@ Só fala Kafka — nunca K8s/Argo.
 
 ### Tasks
 
-- [ ] 10.1: `infra/charts/ui-orchestrator/` — `Deployment`+`Service`+`HPA`, `ns: ui`,
-      sem `ServiceAccount` customizada (usa o default do namespace, sem token
-      automontado — mesmo padrão de `ui-gateway`)
-- [ ] 10.2: `apps/ui-orchestrator/chart/app.yaml` (`workload: deployment`,
+- [x] 10.1: `infra/charts/ui-orchestrator/` — `Deployment`+`Service`+`HPA`, `ns: ui`,
+      sem RBAC própria — `ServiceAccount` dedicada (nome fixo, sem token automontado),
+      exatamente o padrão real de `ui-gateway` (que também não usa a `default` do
+      namespace literalmente, mas uma SA sua sem nenhuma permissão)
+- [x] 10.2: `apps/ui-orchestrator/chart/app.yaml` (`workload: deployment`,
       `namespace: ui`) + `values-dev.yaml`
-- [ ] 10.3: `infra/apps/ui-orchestrator.yaml` — Application automated, sync-wave depois
+- [x] 10.3: `infra/apps/ui-orchestrator.yaml` — Application automated, sync-wave depois
       de `data-kafka` e `infra-keda`
-- [ ] 10.4: `infra/apps/ingresses.yaml` — host `orchestrator.ops-ahead.localtest.me`
-      (dev), mesmo padrão dos outros hosts
-- [ ] 10.5: Hooks `PostSync` de health check — `Job` por serviço
+- [x] 10.4: `infra/apps/ingresses.yaml` — host `orchestrator.ops-ahead.localtest.me`
+      (dev), mesmo padrão dos outros hosts; removida a Ingress de `argo-workflows`
+      junto (chart saiu na 10.7)
+- [x] 10.5: Hooks `PostSync` de health check — `Job` por serviço
       (`ui-orchestrator`/`ml-trainer`/`data-runner`), valida conectividade Kafka
-      (+ClickHouse pros dois últimos), mesmo padrão do hook `PreSync` já usado na
-      esteira CI
-- [ ] 10.6: CI matrix (`.gitea/workflows/build.yaml`) — troca `trigger-service` por
+      (+ClickHouse pros dois últimos), mesmo padrão do hook `PreSync` já usado por
+      `data-ingest`
+- [x] 10.6: CI matrix (`.gitea/workflows/build.yaml`) — troca `trigger-service` por
       `ui-orchestrator`
-- [ ] 10.7: **Remove** `infra/charts/data-workflows`, `infra/apps/data-workflows.yaml`,
+- [x] 10.7: **Removido**: `infra/charts/data-workflows`, `infra/apps/data-workflows.yaml`,
       `infra/charts/ml-workflow-template`, `infra/apps/ml-workflow-template.yaml`,
       `apps/trigger-service/` (app inteiro), `infra/charts/trigger-service`,
-      `infra/apps/trigger-service.yaml`, `WorkflowTemplate`/`CronWorkflow` de
-      `infra/charts/data-pipeline` (chart todo, se não sobrar mais nada nele além do
-      que virou `ScaledJob`+`CronJob` das Fases 8/9)
+      `infra/apps/trigger-service.yaml`, `infra/charts/data-pipeline` (chart inteiro —
+      nada sobrou além do que virou `ScaledJob`+`CronJob`), `pipelines/data-itsm-daily/`
+      (órfão sem o chart), `infra/apps/pipelines-appset.yaml` (mecanismo geral também
+      era só pra esse um pipeline), stub morto `infra/charts/data-kafka/templates/
+      argo-rbac.yaml` e a chave `argoWorkflows` órfã em `data-kafka/values.yaml`
+
+### Bugs encontrados e corrigidos rodando de verdade no cluster local
+
+Validação ponta a ponta (`POST /trigger` real via Ingress, mensagem manual em
+`trigger.data`) pegou dois bugs que `helm template`/testes unitários não pegariam:
+
+- **`CLICKHOUSE_HOST`/`CLICKHOUSE_DATABASE` faltando no `ScaledJob` de `data-runner`** —
+  `profiles.yml` do dbt lê essas env vars discretas via Jinja (`env_var(...)`), não
+  `CLICKHOUSE_URL` — o `WorkflowTemplate` antigo já setava as duas, esqueci de portar.
+  `dbt run` falhava tentando conectar em `localhost:8123`. `Settings` (Python) continua
+  só com URL — isso é o dbt lendo direto do ambiente, fora do meu código.
+- **`groupId` fixo no consumer de `trigger.status` do `ui-orchestrator`** — um `groupId`
+  estável e compartilhado entre réplicas quebra dois jeitos: réplicas concorrentes
+  dividem as partições entre si (cada uma só vê parte do histórico) e, num restart,
+  o consumer resume do offset commitado em vez de reler o tópico do zero — o oposto do
+  que a Fase 7 pretendia. Fix: `groupId` único por boot (`orchestrator-status-<uuid>`),
+  nunca persistido. Efeito colateral descoberto junto: o timeout padrão de 10s do hook
+  `onReady` do Fastify é curto demais pro join do consumer group sob latência real —
+  subido pra 30s.
+- **`ResourceQuota` de `ns: ui` sem espaço pro rollout** — HPA do `ui-orchestrator`
+  (1-3 réplicas) mais `ui-gateway`/`ui-frontend` já rodando estourava o teto antigo de
+  2 CPU assim que um rolling update precisava de pod velho + novo ao mesmo tempo
+  (`FailedCreate`, `ReplicaFailure`). Subido pra 3 CPU / 3Gi — mesma classe de ajuste
+  que `infra-keda` já tinha exigido em `ns: infra` na Fase 9.
 
 ### Verification
 
-- [ ] `helm template infra/charts/ui-orchestrator` renderiza sem erro
-- [ ] Push dispara CI, `ui-orchestrator` builda e publica imagem
-- [ ] `kubectl get applications -n infra` não lista mais `data-workflows`,
-      `ml-workflow-template`, `trigger-service`
+- [x] `helm template infra/charts/ui-orchestrator` renderiza sem erro (+ `helm lint`)
+- [x] Push dispara CI, `ui-orchestrator` builda e publica imagem — confirmado, `ci: pin
+      image tags to <sha>` chegou no `gitea/main` e o `Deployment` foi atualizado
+- [x] `kubectl get applications -n infra` não lista mais `data-workflows`,
+      `ml-workflow-template`, `trigger-service` — confirmado, prunados pelo
+      `ops-ahead-root` depois da remoção dos manifests
+- [x] **Além do checklist original** — fluxo completo validado no cluster local real:
+      `POST /trigger` (via Ingress) → `trigger.data` → `ScaledJob` cria `Job` →
+      `data-runner` roda `data_quality_check` contra ClickHouse de verdade (1055 linhas)
+      → publica `Succeeded` em `trigger.status` → `GET /runs/{run_id}` reflete o
+      resultado. `analysis: full_pipeline` (disparado pelo `CronJob` nativo, que
+      calhou de bater 02:00 UTC durante o teste) também rodou ponta a ponta:
+      `dbt run` (8 modelos, 0 erro) → suite `critical` → `register_snapshot` logou no
+      MLflow (hash `36664b3e...`). Réplica nova do `ui-orchestrator` confirmada
+      reidratando o histórico completo do zero ao subir.
 
 ---
 
