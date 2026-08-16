@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
-import type { RunStatusMessage } from '../../src/plugins/kafka.ts';
+import type { RunStatus } from '../../src/modules/runs/schema.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
@@ -21,7 +21,7 @@ export function stubKafka(app: FastifyInstance): void {
     app.decorate('kafka', { publish: async () => undefined });
   }
   if (!app.hasDecorator('runStatus')) {
-    const store = new Map<string, RunStatusMessage>();
+    const store = new Map<string, RunStatus>();
     app.decorate('runStatus', { get: (runId: string) => store.get(runId) });
   }
 }

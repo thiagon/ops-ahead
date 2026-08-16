@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { topicForAnalysis, triggerAnalysis } from '../../../../src/modules/trigger/service.ts';
-import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 
 const env = { KAFKA_TOPIC_ML: 'trigger.ml', KAFKA_TOPIC_DATA: 'trigger.data' };
 
@@ -19,7 +18,7 @@ describe('topicForAnalysis', () => {
 });
 
 describe('triggerAnalysis', () => {
-  let publish: (topic: string, message: OutboundMessage) => Promise<void>;
+  let publish: (topic: string, message: { key: string; value: string }) => Promise<void>;
   let app: { env: typeof env; kafka: { publish: typeof publish } };
 
   beforeEach(() => {

@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { RunStatusMessage } from '../../../../src/plugins/kafka.ts';
+import type { RunStatus } from '../../../../src/modules/runs/schema.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
 describe('GET /runs/:run_id', () => {
   let app: FastifyInstance;
-  const store = new Map<string, RunStatusMessage>();
+  const store = new Map<string, RunStatus>();
 
   beforeAll(async () => {
     app = await createTestApp(instance =>

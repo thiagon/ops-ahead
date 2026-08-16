@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { FastifyInstance } from 'fastify';
 import type { TriggerRequest } from './schema.ts';
 
 interface TopicEnv {
@@ -36,7 +36,9 @@ export function topicForAnalysis(
  * event, done. Neither caller touches Kafka directly.
  */
 export async function triggerAnalysis(
-  app: { env: TopicEnv; kafka: EventPublisher },
+  // Typed off the ambient FastifyInstance (via `declare module 'fastify'` in
+  // src/plugins/kafka.ts) — never a direct import from the plugin itself.
+  app: { env: TopicEnv; kafka: FastifyInstance['kafka'] },
   request: TriggerRequest,
 ): Promise<TriggerResult> {
   const run_id = randomUUID();

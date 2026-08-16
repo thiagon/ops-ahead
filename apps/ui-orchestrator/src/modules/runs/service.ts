@@ -8,6 +8,5 @@ import type { RunStatus } from './schema.ts';
  */
 export function getRunStatus(app: Pick<FastifyInstance, 'runStatus'>, runId: string): RunStatus {
   const status = app.runStatus.get(runId);
-  if (!status) return { run_id: runId, status: 'queued' };
-  return status as RunStatus;
+  return status ?? { run_id: runId, status: 'queued' };
 }
