@@ -12,11 +12,7 @@ from .steps import STEPS as _STEPS
 
 LOGGER = logging.getLogger(__name__)
 
-# Local translation `analysis` → step, same idea as ml-trainer's
-# ANALYSIS_TRAINERS — a small table that lives next to the consumer that uses
-# it, not crossing a process boundary anymore (see
-# conductor/tracks/exec-trigger_20260807/payloads.md). `full_pipeline` isn't
-# here: it runs all three steps, not one.
+# full_pipeline isn't mapped here: it runs all three steps, not one.
 ANALYSIS_STEPS = {"data_refresh": "transform", "data_quality_check": "quality"}
 
 RegisterSnapshotFn = Callable[..., str]

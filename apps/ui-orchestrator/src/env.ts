@@ -10,9 +10,6 @@ export const envSchema = z.object({
   SERVICE_VERSION: z.string().default('0.1.0'),
 
   KAFKA_BOOTSTRAP_SERVERS: z.string().default('localhost:9092'),
-  // One topic per domain — ui-orchestrator only decides which one to publish
-  // to (routing), never translates `analysis` into another vocabulary. See
-  // conductor/tracks/exec-trigger_20260807/payloads.md.
   KAFKA_TOPIC_ML: z.string().default('trigger.ml'),
   KAFKA_TOPIC_DATA: z.string().default('trigger.data'),
   // Compacted — the source of truth GET /runs/{run_id} is rehydrated from.

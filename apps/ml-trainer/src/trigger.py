@@ -10,9 +10,6 @@ from src.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
-# Local translation `analysis` → domain — a small table that lives next to
-# the consumer that uses it, not crossing a process boundary anymore (see
-# conductor/tracks/exec-trigger_20260807/payloads.md).
 ANALYSIS_TRAINERS = {"volume_forecast": "volume", "breach_risk": "breach"}
 
 EXPERIMENT_NAMES = {"volume": "volume-forecast", "breach": "breach-risk"}

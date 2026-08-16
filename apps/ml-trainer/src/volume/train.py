@@ -199,11 +199,10 @@ def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str 
         mlflow.pyfunc.log_model(
             name="model",
             python_model=bundled_model,
-            # VolumeForecastModel.predict() calls back into src.features — both
-            # need to travel with the artifact, or unpickling it from a
-            # different process (ml-model-serving, in Phase 4) fails to
-            # resolve `src.model.VolumeForecastModel`. Resolved from this
-            # file's own location, not cwd — cwd differs between the Docker
+            # VolumeForecastModel.predict() calls back into src.features — both need
+            # to travel with the artifact, or unpickling it from another process
+            # fails to resolve `src.model.VolumeForecastModel`. Resolved from this
+            # file's own location, not cwd, which differs between the Docker
             # image (/app) and a local `pytest` run (repo root).
             code_paths=[str(Path(__file__).resolve().parent)],
             registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,

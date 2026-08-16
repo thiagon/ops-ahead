@@ -151,8 +151,7 @@ def train_and_log(
 
     bundled_model = BreachRiskModel(model, calibrator, features.FEATURE_COLUMNS, CATEGORICAL_COLUMNS)
     # Validate the bundled predict path — including SHAP — on a small real
-    # batch before it's ever registered (task 2.7: "validado num batch de
-    # exemplo antes de subir para serving").
+    # batch before it's ever registered.
     bundled_model.predict(None, split.holdout.head(min(5, len(split.holdout))))
 
     with mlflow.start_run() as run:
@@ -174,12 +173,11 @@ def train_and_log(
         mlflow.pyfunc.log_model(
             name="model",
             python_model=bundled_model,
-            # BreachRiskModel.predict() calls back into src.features — both
-            # need to travel with the artifact, or unpickling it from a
-            # different process (ml-model-serving, in Phase 4) fails to
-            # resolve `src.model.BreachRiskModel`. Resolved from this file's
-            # own location, not cwd — cwd differs between the Docker image
-            # (/app) and a local `pytest` run (repo root).
+            # BreachRiskModel.predict() calls back into src.features — both need
+            # to travel with the artifact, or unpickling it from another process
+            # fails to resolve `src.model.BreachRiskModel`. Resolved from this
+            # file's own location, not cwd, which differs between the Docker
+            # image (/app) and a local `pytest` run (repo root).
             code_paths=[str(Path(__file__).resolve().parent)],
             registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
         )
