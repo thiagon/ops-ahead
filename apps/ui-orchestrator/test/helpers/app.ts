@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
-import type { RunStatus } from '../../src/modules/runs/schema.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
@@ -13,15 +12,16 @@ export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
 }
 
 /**
- * No test reaches a broker: unless the test provided its own publisher/store,
- * the app gets ones that swallow publishes and start out empty.
+ * No test reaches a broker: unless the test provided its own publisher/
+ * consumers, the app gets ones that swallow publishes and never deliver a
+ * message — a run's status is seeded directly via `app.runsService`
+ * (decorated in modules/runs/index.ts) instead of through Kafka.
  */
 export function stubKafka(app: FastifyInstance): void {
   if (!app.hasDecorator('kafka')) {
     app.decorate('kafka', { publish: async () => undefined });
   }
-  if (!app.hasDecorator('runStatus')) {
-    const store = new Map<string, RunStatus>();
-    app.decorate('runStatus', { get: (runId: string) => store.get(runId) });
+  if (!app.hasDecorator('kafkaConsumers')) {
+    app.decorate('kafkaConsumers', { consumeWithBacklogReplay: async () => undefined });
   }
 }

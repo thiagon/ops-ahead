@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { runParamsSchema, runStatusSchema } from './schema.ts';
-import { getRunStatus } from './service.ts';
 
 export function registerRunRoutes(app: FastifyInstance): void {
   app.withTypeProvider<ZodTypeProvider>().get(
@@ -16,6 +15,6 @@ export function registerRunRoutes(app: FastifyInstance): void {
         response: { 200: runStatusSchema },
       },
     },
-    async request => getRunStatus(request.server, request.params.run_id),
+    async request => app.runsService.getStatus(request.params.run_id),
   );
 }

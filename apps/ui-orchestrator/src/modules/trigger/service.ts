@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
 import type { TriggerRequest } from './schema.ts';
 
-interface TopicEnv {
-  KAFKA_TOPIC_ML: string;
-  KAFKA_TOPIC_DATA: string;
+/** Resolved from `app.kafka` at the edge; this file never imports Fastify. */
+export interface EventPublisher {
+  publish(topic: string, message: { key: string; value: string }): Promise<void>;
+}
+
+export interface TriggerTopics {
+  ml: string;
+  data: string;
 }
 
 /**
@@ -26,9 +30,9 @@ export interface TriggerResult {
 
 export function topicForAnalysis(
   analysis: TriggerRequest['analysis'],
-  app: { env: TopicEnv },
+  topics: TriggerTopics,
 ): string {
-  return ANALYSIS_DOMAIN[analysis] === 'ml' ? app.env.KAFKA_TOPIC_ML : app.env.KAFKA_TOPIC_DATA;
+  return ANALYSIS_DOMAIN[analysis] === 'ml' ? topics.ml : topics.data;
 }
 
 /**
@@ -36,16 +40,15 @@ export function topicForAnalysis(
  * event, done. Neither caller touches Kafka directly.
  */
 export async function triggerAnalysis(
-  // Typed off the ambient FastifyInstance (via `declare module 'fastify'` in
-  // src/plugins/kafka.ts) — never a direct import from the plugin itself.
-  app: { env: TopicEnv; kafka: FastifyInstance['kafka'] },
+  publisher: EventPublisher,
+  topics: TriggerTopics,
   request: TriggerRequest,
 ): Promise<TriggerResult> {
   const run_id = randomUUID();
   const event = { run_id, ...request };
-  const topic = topicForAnalysis(request.analysis, app);
+  const topic = topicForAnalysis(request.analysis, topics);
 
-  await app.kafka.publish(topic, { key: run_id, value: JSON.stringify(event) });
+  await publisher.publish(topic, { key: run_id, value: JSON.stringify(event) });
 
   return { run_id };
 }

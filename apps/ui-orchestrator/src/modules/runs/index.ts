@@ -5,5 +5,5 @@ export default fp(
   async app => {
     registerRunRoutes(app);
   },
-  { name: 'runs', dependencies: ['env', 'kafka'] },
+  { name: 'runs', dependencies: ['env', 'run-status'] },
 );

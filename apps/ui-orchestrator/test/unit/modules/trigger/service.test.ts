@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { topicForAnalysis, triggerAnalysis } from '../../../../src/modules/trigger/service.ts';
 
-const env = { KAFKA_TOPIC_ML: 'trigger.ml', KAFKA_TOPIC_DATA: 'trigger.data' };
+const topics = { ml: 'trigger.ml', data: 'trigger.data' };
 
 describe('topicForAnalysis', () => {
   it.each([
@@ -12,22 +12,22 @@ describe('topicForAnalysis', () => {
   ] as const)(
     'routes %s to %s — no vocabulary translation, just topic choice',
     (analysis, topic) => {
-      expect(topicForAnalysis(analysis, { env })).toBe(topic);
+      expect(topicForAnalysis(analysis, topics)).toBe(topic);
     },
   );
 });
 
 describe('triggerAnalysis', () => {
   let publish: (topic: string, message: { key: string; value: string }) => Promise<void>;
-  let app: { env: typeof env; kafka: { publish: typeof publish } };
+  let publisher: { publish: typeof publish };
 
   beforeEach(() => {
     publish = vi.fn(async () => undefined);
-    app = { env, kafka: { publish } };
+    publisher = { publish };
   });
 
   it('mints a run_id and publishes the request, `analysis` intact, to the routed topic', async () => {
-    const result = await triggerAnalysis(app, { analysis: 'data_refresh' });
+    const result = await triggerAnalysis(publisher, topics, { analysis: 'data_refresh' });
 
     expect(result.run_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(publish).toHaveBeenCalledWith('trigger.data', {
@@ -37,8 +37,8 @@ describe('triggerAnalysis', () => {
   });
 
   it('mints a fresh run_id per call', async () => {
-    const first = await triggerAnalysis(app, { analysis: 'data_quality_check' });
-    const second = await triggerAnalysis(app, { analysis: 'data_quality_check' });
+    const first = await triggerAnalysis(publisher, topics, { analysis: 'data_quality_check' });
+    const second = await triggerAnalysis(publisher, topics, { analysis: 'data_quality_check' });
 
     expect(first.run_id).not.toBe(second.run_id);
   });
@@ -51,7 +51,7 @@ describe('triggerAnalysis', () => {
       holdout_end: '2026-01-31',
     };
 
-    const result = await triggerAnalysis(app, request);
+    const result = await triggerAnalysis(publisher, topics, request);
 
     expect(publish).toHaveBeenCalledWith('trigger.ml', {
       key: result.run_id,

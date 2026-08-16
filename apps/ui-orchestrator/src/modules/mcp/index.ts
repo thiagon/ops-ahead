@@ -1,4 +1,4 @@
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import { buildMcpServer } from './server.ts';
@@ -17,7 +17,7 @@ export default fp(
       reply.hijack();
 
       const server = buildMcpServer(app);
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
       reply.raw.on('close', () => {
         void transport.close();
@@ -28,5 +28,5 @@ export default fp(
       await transport.handleRequest(request.raw, reply.raw, request.body);
     });
   },
-  { name: 'mcp', dependencies: ['env', 'kafka'] },
+  { name: 'mcp', dependencies: ['env', 'kafka', 'run-status'] },
 );

@@ -1,16 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { RunStatus } from '../../../../src/modules/runs/schema.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
 describe('GET /runs/:run_id', () => {
   let app: FastifyInstance;
-  const store = new Map<string, RunStatus>();
 
   beforeAll(async () => {
-    app = await createTestApp(instance =>
-      instance.decorate('runStatus', { get: (id: string) => store.get(id) }),
-    );
+    app = await createTestApp();
   });
 
   afterAll(async () => {
@@ -25,7 +21,11 @@ describe('GET /runs/:run_id', () => {
   });
 
   it('reflects Running once the job has picked up the message', async () => {
-    store.set('run-1', { run_id: 'run-1', status: 'Running', started_at: '2026-08-15T12:30:00Z' });
+    app.runsService.recordStatus({
+      run_id: 'run-1',
+      status: 'Running',
+      started_at: '2026-08-15T12:30:00Z',
+    });
 
     const res = await app.inject({ method: 'GET', url: '/runs/run-1' });
 
@@ -37,7 +37,7 @@ describe('GET /runs/:run_id', () => {
   });
 
   it('reflects a terminal status with its detail, never touching Kubernetes', async () => {
-    store.set('run-2', {
+    app.runsService.recordStatus({
       run_id: 'run-2',
       status: 'Succeeded',
       started_at: '2026-08-15T12:30:00Z',

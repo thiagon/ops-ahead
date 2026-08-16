@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { Consumer, Producer } from '@platformatic/kafka';
+import { Consumer, type Message, Producer } from '@platformatic/kafka';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import type { RunStatus } from '../modules/runs/schema.ts';
 
 export interface OutboundMessage {
   key: string;
@@ -13,41 +12,27 @@ export interface EventPublisher {
   publish(topic: string, message: OutboundMessage): Promise<void>;
 }
 
-export interface RunStatusStore {
-  get(runId: string): RunStatus | undefined;
+export interface KafkaConsumers {
+  /**
+   * Hands every message, backlog and live alike, to `onMessage`, resolving
+   * once the backlog at call time (see `backlogTargets`) has been replayed.
+   * `groupId` is fresh per call — never shared across replicas or reused
+   * across restarts, or a restart would resume from a committed offset
+   * instead of replaying the backlog.
+   */
+  consumeWithBacklogReplay(topic: string, onMessage: (message: Message) => void): Promise<void>;
 }
 
 declare module 'fastify' {
   interface FastifyInstance {
     kafka: EventPublisher;
-    runStatus: RunStatusStore;
-  }
-}
-
-export function parseStatusMessage(raw: Buffer | undefined): RunStatus | undefined {
-  if (!raw) return undefined;
-  try {
-    const parsed = JSON.parse(raw.toString('utf8')) as unknown;
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      'run_id' in parsed &&
-      typeof (parsed as { run_id: unknown }).run_id === 'string'
-    ) {
-      return parsed as RunStatus;
-    }
-    return undefined;
-  } catch {
-    return undefined;
+    kafkaConsumers: KafkaConsumers;
   }
 }
 
 /**
- * The offset of the last message already written per partition, at the
- * moment we asked — everything up to here is "backlog" to replay before
- * ui-orchestrator answers traffic; anything after is "live". A partition
- * with a high watermark of 0 has never had a message, so it's excluded —
- * nothing will ever arrive to satisfy it.
+ * Last written offset per partition — the backlog to replay before "live".
+ * A watermark of 0 means the partition never had a message, so it's excluded.
  */
 export function backlogTargets(watermarks: readonly bigint[]): Map<number, bigint> {
   const targets = new Map<number, bigint>();
@@ -58,21 +43,17 @@ export function backlogTargets(watermarks: readonly bigint[]): Map<number, bigin
 }
 
 async function kafkaPlugin(fastify: FastifyInstance) {
-  // Whoever builds the app may hand in its own publisher/store — a test
-  // double, or a different transport later. Only the default wiring talks to
-  // a broker, and only for whichever half a test didn't already replace.
+  // A test may hand in its own publisher/consumers; only the missing half gets real Kafka wiring.
   const needsPublisher = !fastify.hasDecorator('kafka');
-  const needsStatusConsumer = !fastify.hasDecorator('runStatus');
-  if (!needsPublisher && !needsStatusConsumer) return;
+  const needsConsumers = !fastify.hasDecorator('kafkaConsumers');
+  if (!needsPublisher && !needsConsumers) return;
 
   const bootstrapBrokers = fastify.env.KAFKA_BOOTSTRAP_SERVERS.split(',').map(broker =>
     broker.trim(),
   );
 
   if (needsPublisher) {
-    // ui-orchestrator routes to trigger.ml/trigger.data by `analysis` — it
-    // never owns a fixed topic, so the topic travels per publish() call
-    // rather than living in the client config.
+    // Topic travels per publish() call, not the client config — ui-orchestrator never owns one fixed topic.
     const producer = new Producer({
       clientId: fastify.env.SERVICE_NAME,
       bootstrapBrokers,
@@ -91,58 +72,46 @@ async function kafkaPlugin(fastify: FastifyInstance) {
     });
   }
 
-  if (needsStatusConsumer) {
-    const store = new Map<string, RunStatus>();
-    fastify.decorate('runStatus', {
-      get: (runId: string) => store.get(runId),
-    });
+  if (needsConsumers) {
+    const openConsumers: Consumer[] = [];
 
-    const topic = fastify.env.KAFKA_TOPIC_STATUS;
-    const consumer = new Consumer({
-      clientId: fastify.env.SERVICE_NAME,
-      bootstrapBrokers,
-      // A fresh, per-boot group id — never shared across replicas or reused
-      // across restarts. trigger.status is compacted and read from the
-      // beginning specifically so every replica rebuilds the same complete
-      // map independently; a stable groupId would instead split partitions
-      // across replicas (each seeing only part of the history) and, on
-      // restart, resume from a committed offset instead of replaying the
-      // backlog — silently breaking both guarantees.
-      groupId: `${fastify.env.SERVICE_NAME}-status-${randomUUID()}`,
-    });
+    fastify.decorate('kafkaConsumers', {
+      async consumeWithBacklogReplay(topic, onMessage) {
+        const consumer = new Consumer({
+          clientId: fastify.env.SERVICE_NAME,
+          bootstrapBrokers,
+          groupId: `${fastify.env.SERVICE_NAME}-${topic}-${randomUUID()}`,
+        });
+        openConsumers.push(consumer);
 
-    fastify.addHook('onReady', async () => {
-      // GET /runs must never answer before the compacted topic's backlog is
-      // replayed — otherwise a fresh restart would report every past run as
-      // "queued" until its next status update happens to arrive.
-      const watermarks = (await consumer.listOffsets({ topics: [topic] })).get(topic) ?? [];
-      const pending = backlogTargets(watermarks);
+        const watermarks = (await consumer.listOffsets({ topics: [topic] })).get(topic) ?? [];
+        const pending = backlogTargets(watermarks);
 
-      const stream = await consumer.consume({
-        topics: [topic],
-        mode: 'earliest',
-        autocommit: false,
-      });
+        const stream = await consumer.consume({
+          topics: [topic],
+          mode: 'earliest',
+          autocommit: false,
+        });
 
-      await new Promise<void>((resolve, reject) => {
-        if (pending.size === 0) resolve();
+        await new Promise<void>((resolve, reject) => {
+          if (pending.size === 0) resolve();
 
-        (async () => {
-          for await (const message of stream) {
-            const status = parseStatusMessage(message.value);
-            if (status) store.set(status.run_id, status);
+          (async () => {
+            for await (const message of stream) {
+              onMessage(message);
 
-            if (pending.get(message.partition) === message.offset) {
-              pending.delete(message.partition);
-              if (pending.size === 0) resolve();
+              if (pending.get(message.partition) === message.offset) {
+                pending.delete(message.partition);
+                if (pending.size === 0) resolve();
+              }
             }
-          }
-        })().catch(reject);
-      });
+          })().catch(reject);
+        });
+      },
     });
 
     fastify.addHook('onClose', async () => {
-      await consumer.close();
+      await Promise.all(openConsumers.map(consumer => consumer.close()));
     });
   }
 }

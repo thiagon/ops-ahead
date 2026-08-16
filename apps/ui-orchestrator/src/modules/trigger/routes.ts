@@ -22,7 +22,8 @@ export function registerTriggerRoutes(app: FastifyInstance): void {
     },
     async (request, reply) => {
       try {
-        const result = await triggerAnalysis(request.server, request.body);
+        const topics = { ml: app.env.KAFKA_TOPIC_ML, data: app.env.KAFKA_TOPIC_DATA };
+        const result = await triggerAnalysis(app.kafka, topics, request.body);
         return reply.status(202).send(result);
       } catch (err) {
         request.log.error({ err }, 'failed to publish trigger event');
