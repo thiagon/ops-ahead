@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-trainer
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/ml-trainer/chart/values-dev.yaml) carries the CI-pinned
+  # image tag. Replaces ml-workflow-template.yaml — ml-trainer now owns a
+  # ScaledJob directly (exec-trigger_20260807 revision) instead of a
+  # WorkflowTemplate dispatched by trigger-service.
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/ml-trainer
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/ml-trainer/chart/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

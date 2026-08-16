@@ -1,0 +1,76 @@
+# KEDA scales this directly from trigger.ml's consumer lag — no application
+# code ever creates the Job; the KEDA operator (infra-keda, its own
+# ServiceAccount) does. No ServiceAccount here on purpose: the pod runs as
+# the namespace's default identity with its token unmounted (see
+# conductor/tracks/exec-trigger_20260807/spec.md, Princípio central #2).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: ml-trainer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-trainer.labels" . | nindent 4 }}
+spec:
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: {{ .Values.scaledJob.backoffLimit }}
+    activeDeadlineSeconds: {{ .Values.scaledJob.activeDeadlineSeconds }}
+    template:
+      metadata:
+        labels:
+          app: ml-trainer
+          {{- include "ml-trainer.labels" . | nindent 10 }}
+      spec:
+        restartPolicy: Never
+        automountServiceAccountToken: false
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - name: ml-trainer
+            image: {{ include "ml-trainer.image" . | quote }}
+            imagePullPolicy: {{ (index .Values "ml-trainer").image.pullPolicy }}
+            command: ["python", "-m", "src.main", "consume"]
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: [ALL]
+            env:
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                value: {{ .Values.train.env.kafkaBootstrapServers | quote }}
+              - name: KAFKA_TOPIC
+                value: {{ .Values.train.env.kafkaTopic | quote }}
+              - name: KAFKA_TOPIC_STATUS
+                value: {{ .Values.train.env.kafkaTopicStatus | quote }}
+              - name: KAFKA_GROUP_ID
+                value: {{ .Values.train.env.kafkaGroupId | quote }}
+              - name: KAFKA_CONSUMER_TIMEOUT_MS
+                value: {{ .Values.train.env.kafkaConsumerTimeoutMs | quote }}
+              - name: CLICKHOUSE_USER
+                value: {{ .Values.train.env.clickhouseUser | quote }}
+              - name: CLICKHOUSE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Values.train.secretName }}
+                    key: clickhouse-password
+              - name: CLICKHOUSE_URL
+                value: "clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.train.env.clickhouseHost }}:9000/{{ .Values.train.env.clickhouseDatabase }}"
+              - name: MLFLOW_TRACKING_URI
+                value: {{ .Values.train.env.mlflowTrackingUri | quote }}
+              - name: AUTO_PROMOTE
+                value: {{ .Values.train.env.autoPromote | quote }}
+            resources:
+              {{- toYaml .Values.train.resources | nindent 14 }}
+  pollingInterval: {{ .Values.scaledJob.pollingInterval }}
+  successfulJobsHistoryLimit: {{ .Values.scaledJob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.scaledJob.failedJobsHistoryLimit }}
+  maxReplicaCount: {{ .Values.scaledJob.maxReplicaCount }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.train.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.train.env.kafkaGroupId | quote }}
+        topic: {{ .Values.train.env.kafkaTopic | quote }}
+        lagThreshold: {{ .Values.scaledJob.lagThreshold | quote }}
+        offsetResetPolicy: earliest

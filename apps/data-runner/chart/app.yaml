@@ -1,10 +1,12 @@
 # Deploy identity for this app (documentation — see apps/data-ingest/chart/app.yaml).
-# A pipeline-step has no standalone workload: its image is consumed as a step of
-# the pipeline named below, not rendered into a Deployment/Job of its own.
-# Consumed twice by infra/charts/data-pipeline: the CronWorkflow-driven chain
-# (dbt-run → great-expectations → register-snapshot) AND, since
-# exec-trigger_20260807, the on-demand `single-step` entrypoint dispatched by
-# trigger-service (run transform | run quality).
-workload: pipeline-step
+# `scaledjob`: a KEDA ScaledJob is this app's own workload — own ArgoCD App,
+# same as `deployment`/`cronjob`/`job`, but the resource that actually
+# creates the Job is KEDA (platform infra), never an app process (see
+# conductor/tracks/exec-trigger_20260807/spec.md, Princípio central #2).
+# Replaces the old `pipeline-step` shape (infra/charts/data-pipeline's
+# WorkflowTemplate/CronWorkflow) now that the Argo Workflows engine is gone
+# from the stack — the daily chain moves to `analysis: full_pipeline`,
+# dispatched by the native CronJob (Fase 9) through this same ScaledJob.
+workload: scaledjob
 namespace: data
-pipeline: data-itsm-daily
+chart: infra/charts/data-runner

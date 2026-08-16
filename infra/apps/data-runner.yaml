@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data-runner
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/data-runner/chart/values-dev.yaml) carries the CI-pinned
+  # image tag. Replaces the data-itsm-daily pipeline's use of data-runner as
+  # a pipeline-step — data-runner now owns a ScaledJob directly
+  # (exec-trigger_20260807 revision), consuming trigger.data for both
+  # on-demand runs and the daily `full_pipeline` chain the native CronJob
+  # dispatches (Fase 9).
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/data-runner
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/data-runner/chart/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

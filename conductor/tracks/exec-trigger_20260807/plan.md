@@ -146,36 +146,50 @@ Só fala Kafka — nunca K8s/Argo.
 
 ### Tasks
 
-- [ ] 9.1: `infra/charts/infra-keda/` (novo) — wrap do chart oficial `kedacore/keda`,
+- [x] 9.1: `infra/charts/infra-keda/` (novo) — wrap do chart oficial `kedacore/keda`,
       mesmo padrão de `infra/charts/data-workflows` (que embrulha `argo-workflows`) ou
-      `infra/charts/infra-eso`. Instalado 1x, `ns: infra`
-- [ ] 9.2: `infra/apps/infra-keda.yaml` — Application automated, sync-wave anterior a
-      qualquer `ScaledJob`
-- [ ] 9.3: `infra/charts/ml-trainer` (novo, ao lado do app) — `ScaledJob` (trigger
+      `infra/charts/infra-eso`. Instalado 1x, `ns: infra`. `metricsServer.enabled: false`
+      (só usamos `ScaledJob`, nunca `ScaledObject`/HPA) e `resources.webhooks` reduzido —
+      a quota compartilhada de `ns: infra` (`limits.cpu: 16`) não tinha headroom pro
+      default de 1 CPU de cada componente
+- [x] 9.2: `infra/apps/infra-keda.yaml` — Application automated, sync-wave anterior a
+      qualquer `ScaledJob`. `ServerSideApply=true` — o CRD `ScaledJob` é grande o
+      bastante pra estourar o limite de 262144 bytes da anotação de client-side apply.
+      `AppProject` (`infra/apps/project.yaml`) ganhou `apiregistration.k8s.io/APIService`
+      no `clusterResourceWhitelist` (KEDA registra a métrica externa) e o repo do Helm
+      chart no `sourceRepos`
+- [x] 9.3: `infra/charts/ml-trainer` (novo, ao lado do app) — `ScaledJob` (trigger
       Kafka, tópico `trigger.ml`, `lagThreshold`), Job template rodando a imagem
       `ml-trainer` em modo `consume`. RBAC: nenhuma além do default — `ScaledJob` só
-      precisa que o KEDA operator (já tem sua própria RBAC de plataforma) crie `Job`s
-- [ ] 9.4: `infra/charts/data-runner` (novo) — mesmo padrão, tópico `trigger.data`
-- [ ] 9.5: `CronJob` nativo (`ns: data`, dentro do chart de `data-runner` ou um chart
-      próprio) — 02:00 UTC (config vem de `pipelines/data-itsm-daily/values.yaml`,
-      reaproveitado), container mínimo que publica 1 mensagem
+      precisa que o KEDA operator (já tem sua própria RBAC de plataforma) crie `Job`s.
+      `apps/ml-trainer/chart/app.yaml` migrou de `workload: pipeline-step` pra
+      `workload: scaledjob` (5ª natureza — ver nota na Fase 11); nova
+      `infra/apps/ml-trainer.yaml` substitui `ml-workflow-template.yaml`
+- [x] 9.4: `infra/charts/data-runner` (novo) — mesmo padrão, tópico `trigger.data`.
+      Mesma migração de `workload` em `apps/data-runner/chart/app.yaml`; nova
+      `infra/apps/data-runner.yaml`
+- [x] 9.5: `CronJob` nativo (`ns: data`, dentro do chart de `data-runner`) — 02:00 UTC
+      (`cron.schedule`/`cron.enabled` portados de `pipelines/data-itsm-daily/values.yaml`,
+      que fica órfão — removido na Fase 10 junto com `data-pipeline`), container
+      `edenhill/kcat:1.7.1` (sucessor do `cp-kafkacat`, descontinuado) publica 1 mensagem
       `{"run_id": "daily-<data>", "analysis": "full_pipeline"}` em `trigger.data` (`run_id`
-      determinístico pela data — dá pra consultar `GET /runs/daily-2026-08-16` sem
-      precisar descobrir o id em log nenhum, ver [`payloads.md`](./payloads.md)) e sai
-      (não precisa nem da imagem `data-runner` completa — pode ser um
-      `image: confluentinc/cp-kafkacat` ou equivalente, um `kafka-console-producer` de
-      uma linha)
-- [ ] 9.6: Tópicos Kafka `trigger.ml`, `trigger.data` (regular),
+      determinístico pela data) e sai
+- [x] 9.6: Tópicos Kafka `trigger.ml`, `trigger.data` (regular),
       `trigger.status` (`cleanup.policy: compact`) em
-      `infra/charts/data-kafka/values.yaml` **e** `values-dev.yaml`
+      `infra/charts/data-kafka/values.yaml` **e** `values-dev.yaml` — substituem o
+      `trigger.requests` da versão original
 
 ### Verification
 
-- [ ] `helm template infra/charts/infra-keda`, `infra/charts/ml-trainer`,
-      `infra/charts/data-runner` renderizam sem erro
-- [ ] `kubectl get scaledjob -A` mostra os 2 `ScaledJob`s depois do deploy
-- [ ] Nenhum `Role`/`RoleBinding` novo referenciando `workflows.argoproj.io` ou
-      qualquer recurso além do que o KEDA operator já tinha de fábrica
+- [x] `helm template infra/charts/infra-keda`, `infra/charts/ml-trainer`,
+      `infra/charts/data-runner` renderizam sem erro (+ `helm lint` limpo nos 3)
+- [x] `kubectl get scaledjob -A` mostra os 2 `ScaledJob`s depois do deploy — confirmado
+      no cluster local via `make sync` (`ml-trainer`/`data-runner`, ambos `READY: True`);
+      Vault precisou ser semeado na mão pros paths novos (`ml-trainer`, `data-runner` —
+      mesma pegadinha de [`project_new_app_local_deploy_gotchas`])
+- [x] Nenhum `Role`/`RoleBinding` novo referenciando `workflows.argoproj.io` ou
+      qualquer recurso além do que o KEDA operator já tinha de fábrica — confirmado por
+      `grep` nos charts e pela lista de recursos que o ArgoCD de fato sincronizou
 
 ---
 
