@@ -6,8 +6,9 @@ dependencies = []
 
 [tool.uv.workspace]
 members = ["scripts", "apps/*"]
-# apps/ui-gateway is a Node/TypeScript service (npm), not a uv member.
-exclude = ["apps/ui-gateway"]
+# apps/ui-gateway and apps/ui-orchestrator are Node/TypeScript services (npm),
+# not uv members.
+exclude = ["apps/ui-gateway", "apps/ui-orchestrator"]
 
 [dependency-groups]
 dev = [

@@ -1,373 +1,269 @@
-# Implementation Plan: Serviço de Execução Sob Demanda (Trigger Service)
+# Implementation Plan: Execução Sob Demanda (`ui-orchestrator` + KEDA)
 
 **Track ID:** exec-trigger_20260807
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-14
-**Status:** [x] Complete
+**Revisado:** 2026-08-15
+**Status:** Draft (revisão) — implementação original completa e mergeada, revisão de
+arquitetura aprovada, implementação da revisão ainda não iniciada
 
-## Overview
+## Por que este plano muda depois de "completo"
 
-Seis fases: primeiro elimina a duplicação de imagem (pré-requisito técnico das notas do
-spec), depois constrói o serviço em si, depois o mecanismo de execução por trás dele
-(WorkflowTemplates parametrizados + RBAC), depois o deploy do serviço, depois a migração/corte
-do fluxo manual antigo, e por fim a validação ponta a ponta — que é também o que destrava a
-Task 5.1 da track `ml-models_20260806` (rodar os treinos sobre o dataset completo), hoje
-pendente exatamente pela falta deste mecanismo.
-
-Maior que o track "ideal" (2-4 fases) porque toca 6 apps/charts existentes além de criar 3
-novos — justificado pelo escopo real: não dá para separar "consolidar imagens" de "construir o
-serviço que as dispara" em tracks independentes sem deixar uma delas com metade do valor.
-
-### Decisões de arquitetura (não estão no spec.md, resolvidas aqui)
-
-- **Execução via cliente Kubernetes, não via API REST do `argo-server`.** O consumer do
-  `trigger-service` (task 2.9) cria o recurso `Workflow` (CR `argoproj.io`) diretamente via
-  `kubernetes` client Python, autenticado com sua própria `ServiceAccount` + RBAC. Evita
-  depender do modo de auth do `argo-server` (`authModes: [server]` em prod = bearer token
-  a gerenciar como segredo extra) — o `workflow-controller` reconcilia o `Workflow` do
-  mesmo jeito não importa quem o criou.
-- **Intake (REST/MCP) desacoplado da criação do `Workflow` via Kafka.** `POST /trigger`/tool
-  MCP só valida o payload e publica em `trigger.requests`; quem fala com o K8s é um consumer
-  desse tópico, no mesmo processo. Evita a rota HTTP ficar bloqueada numa chamada ao K8s
-  (timeout de API, throttling), reaproveita o Kafka que a plataforma já usa pra tudo mais
-  (`data-ingest`, `ml-burst-detector`), e o nome determinístico do `Workflow`
-  (`trigger-{run_id}`) elimina a necessidade de um estado auxiliar (Redis/banco) só pra
-  responder `GET /runs/{run_id}` antes do `Workflow` existir.
-- **Um `WorkflowTemplate` por domínio, não um genérico.** `ml-workflow-template` (`ns: ml`)
-  e uma extensão do `data-pipeline` existente (`ns: data`) com um segundo entrypoint de
-  step único — mantém `ml` e `data` isolados (RBAC e imagem não se cruzam) e preserva o
-  entrypoint de cadeia completa que o `CronWorkflow` de `data-pipeline` já usa.
-- **`trigger-service` roda em `ns: data`**, co-locado com o motor Argo (`data-workflows`,
-  já instalado nesse namespace) e a `ServiceAccount argo-workflow-executor` existente. Ganha
-  uma `Role`/`RoleBinding` adicional em `ns: ml` para poder criar `Workflow`s lá também —
-  em vez de introduzir `ns: infra` (reservado a componentes privilegiados de cluster) para
-  um serviço de aplicação.
-- **Payload Pydantic fica local ao `trigger-service`**, seguindo o precedente de
-  `ml-model-serving/src/schemas.py` — `contracts/` hoje só guarda JSON Schema
-  cross-linguagem (Node↔Python) para o evento Kafka; não há outro consumidor do payload
-  HTTP além do próprio serviço.
-- **O contrato exposto não usa vocabulário de Argo/K8s** (princípio agora explícito em
-  `spec.md`). O campo discriminador do payload se chama `analysis` (não `workload` — esse é
-  jargão de K8s, inclusive usado nesse sentido na tabela "Workload natures" do `CLAUDE.md`
-  raiz), com valores em linguagem de negócio: `volume_forecast`, `breach_risk`,
-  `data_refresh`, `data_quality_check`. O mapeamento `analysis` → `WorkflowTemplate` +
-  `namespace` + `arguments.parameters` (os identificadores internos `ml.volume`/`ml.breach`/
-  `data.transform`/`data.quality`) é resolvido dentro do serviço, nunca aparece no contrato
-  HTTP nem na resposta.
-- **Nomes dos apps consolidados**: `apps/ml-trainer` (substitui `ml-volume-model` +
-  `ml-breach-model`) e `apps/data-runner` (substitui `data-transform` + `data-quality`),
-  cada um despachando por `command`/`args` (`train volume|breach`, `run transform|quality`).
-- **Resposta assíncrona**: `POST /trigger` retorna `202` com o nome do `Workflow` criado;
-  `GET /runs/{name}` consulta a fase atual — sem isso, quem chama ainda precisaria de
-  `kubectl`/Argo UI pra saber se o run terminou, o que violaria o próprio critério de
-  aceite ("sem exigir... conhecimento de Argo").
+A implementação original (commits `b76666d`..`b9c3034`, PR #53) completou as 6 fases
+abaixo e passou pela validação E2E. Uma revisão pós-implementação (2026-08-15) encontrou
+que o desenho violava o próprio princípio que a track se propunha a seguir — ver
+"Histórico da revisão" no `spec.md`. Este plano documenta **o que já foi construído**
+(Fases 1–6 originais, com seus checkpoints) e **o que a revisão substitui** (Fases 7–11,
+novas) — não reescreve a história, adiciona a próxima etapa.
 
 ---
 
-## Phase 1: Consolidação de imagens (`ml-trainer`, `data-runner`)
+## Fases originais (completas, PR #53)
 
-Pré-requisito técnico: o serviço só faz sentido despachando 2 imagens (uma por domínio), não
-4. Resolve de quebra a duplicação de `split.py` já documentada na track `ml-models_20260806`.
+Resumo — detalhe task-a-task no histórico do git (`conductor/tracks/exec-trigger_20260807/`
+antes desta revisão, recuperável via `git log -p -- conductor/tracks/exec-trigger_20260807/plan.md`).
 
-### Tasks
+| Fase | Entregou | Checkpoint |
+|---|---|---|
+| 1 | `apps/ml-trainer`, `apps/data-runner` — consolidação de 4 apps em 2, elimina duplicação de `split.py` | `405d61e` |
+| 2 | `apps/trigger-service` — intake REST/MCP + consumer Kafka, 1 processo FastAPI | `b02ea96` |
+| 3 | `ml-workflow-template`, extensão de `data-pipeline`, RBAC, tópico `trigger.requests` | `037a69d` |
+| 4 | Deploy do `trigger-service` (chart, Application, Ingress, CI matrix) | `6d19164` |
+| 5 | Remoção do fluxo `Job` manual antigo, documentação | `cdc87e3` |
+| 6 | Validação ponta a ponta no cluster local | `b9c3034` |
 
-- [x] 1.1: `apps/ml-trainer/` — novo app Python consolidando `apps/ml-volume-model` +
-      `apps/ml-breach-model`; `src/split.py` único (elimina a duplicação byte-a-byte);
-      dispatch via `sys.argv`/subcomando (`train volume` / `train breach`); `Settings`
-      mantém os mesmos nomes de env var das duas apps atuais (`TRAIN_END`,
-      `VALIDATION_END`, `HOLDOUT_END`, `CLICKHOUSE_URL`, `MLFLOW_TRACKING_URI`, etc.), sem
-      default hardcoded para as datas de corte — passam a ser obrigatórias via payload
-- [x] 1.2: `apps/data-runner/` — novo app consolidando `apps/data-transform` (dbt) +
-      `apps/data-quality` (Great Expectations); dispatch via subcomando (`run transform`
-      roda `dbt run --profiles-dir /dbt`, `run quality` roda o `runner.py` existente com
-      `--suite`); projeto dbt de `data-transform` migra para dentro deste app
-- [x] 1.3: `Dockerfile` dos dois novos apps seguindo o padrão uv multi-stage já usado nos
-      outros 4 (`uv sync --frozen --no-install-workspace` → `COPY .` → `uv sync --locked
-      --package <pkg>`)
-- [x] 1.4: Remover `apps/ml-volume-model/`, `apps/ml-breach-model/`, `apps/data-transform/`,
-      `apps/data-quality/` (código já migrado nas tasks 1.1/1.2)
-- [x] 1.5: Migrar testes unitários existentes das 4 apps antigas para os 2 novos apps (split
-      temporal, filtro de elegibilidade KPI, feature engineering, suíte GE, dbt tests)
+**O que sobrevive intacto da Fase 1:** a consolidação de imagens em si (`ml-trainer`
+rodando `train volume`/`train breach`, `data-runner` rodando `run transform`/
+`run quality`, `split.py` único, testes migrados). A Fase 1 ganha tasks novas na Fase 7
+abaixo — não é substituída, é estendida.
 
-### Verification
-
-- [x] `uv run --package ops-ahead-ml-trainer pytest` e `uv run --package ops-ahead-data-runner
-      pytest` passam — via `pytest apps/<app>` explícito; o comando sem path já falhava
-      *antes* desta track (colisão do módulo `tests` entre apps quando coletado a partir da
-      raiz do repo — achado registrado, não é regressão desta track)
-- [x] `docker build -f apps/ml-trainer/Dockerfile .` e `docker build -f
-      apps/data-runner/Dockerfile .` completam sem erro (exigiu criar `.dockerignore` na
-      raiz — inexistente antes, quebrava qualquer build local com `.data/` populado)
-- [x] `apps/ml-volume-model`, `apps/ml-breach-model`, `apps/data-transform`,
-      `apps/data-quality` não existem mais no working tree
+**O que a revisão substitui por completo:** Fases 2, 3, 4 — o `trigger-service` (app),
+o `ml-workflow-template` (chart), a extensão `single-step` de `data-pipeline`, e o RBAC
+de criação de `Workflow`. Fase 5 e 6 são refeitas contra a arquitetura nova.
 
 ---
 
-## Phase 2: `trigger-service` — payload, intake e consumer
+## Fase 7: `ui-orchestrator` — intake Fastify (substitui a Fase 2)
 
-Um app só, duas metades testáveis em isolamento: o intake (REST/MCP → Kafka, testável com
-um producer fake) e o consumer (Kafka → Workflow, testável com um client Kubernetes
-fake/mock) — ver diagrama de `spec.md`.
+Fronteira HTTP em Node/TypeScript, mesmo padrão de `apps/ui-gateway`: `zod` pra schema,
+`kafkajs` pra publish, `@fastify/autoload` + `fastify-plugin` pra estrutura de módulos.
+Só fala Kafka — nunca K8s/Argo.
 
 ### Tasks
 
-- [x] 2.1: `apps/trigger-service/` — novo app FastAPI (`workload: deployment`, `ns: data`),
-      seguindo o app-factory/lifespan de `apps/ml-model-serving/src/main.py` como referência;
-      roda o servidor HTTP e o consumer Kafka (task 2.9) no mesmo processo (background task
-      no lifespan), não como dois deploys
-- [x] 2.2: Modelo Pydantic `TriggerRequest` — discriminado por `analysis`
-      (`volume_forecast` | `breach_risk` | `data_refresh` | `data_quality_check`, em
-      linguagem de negócio, sem termos de Argo/K8s no contrato — ver "Decisões de
-      arquitetura"); campos comuns (`data_source`/`clickhouse_url` como override opcional,
-      seguindo a convenção de URL única) e campos específicos de `volume_forecast`/
-      `breach_risk` (`train_end`/`validation_end`/`holdout_end`, sem default — falha a
-      validação se vierem sem datas)
-- [x] 2.3: `POST /trigger` (intake) — valida o payload, gera `run_id` (UUID), publica no
-      tópico Kafka `trigger.requests` (evento = `TriggerRequest` + `run_id`), responde `202`
-      com `{run_id}` na hora — não cria o `Workflow` inline, não espera o consumer
-- [x] 2.4: `GET /runs/{run_id}` — tenta buscar `Workflow` chamado `trigger-{run_id}` em
-      `ns: ml` e `ns: data`; `404` do K8s nas duas ⇒ responde `queued`; achou ⇒ devolve a fase
-      (`Pending`/`Running`/`Succeeded`/`Failed`) — sem estado auxiliar (Redis/banco) próprio
-- [x] 2.5: `GET /health`
-- [x] 2.6: Testes unitários do intake (`TestClient` do FastAPI + producer Kafka fake
-      injetado) cobrindo: payload válido por `analysis`, payload inválido (ex:
-      `volume_forecast` sem datas), `run_id` sempre gerado e devolvido em `202`
-- [x] 2.7: Servidor MCP montado sobre o mesmo app FastAPI (mesma porta/processo) — avaliar
-      lib que derive as tools MCP direto das rotas `/trigger`/`/runs` (ex: `fastapi-mcp`) em
-      vez de reimplementar o schema à mão; a tool MCP resultante usa o mesmo `TriggerRequest`
-      (`analysis` + parâmetros) da task 2.2, publica no mesmo tópico Kafka do intake — nunca
-      fala com Argo/K8s diretamente
-- [x] 2.8: Teste de integração do servidor MCP: cliente MCP (ex: `mcp` SDK em modo teste, ou
-      chamada HTTP direta ao transport escolhido) invoca a tool de disparo e recebe o mesmo
-      `{run_id}` que `POST /trigger` retornaria pro mesmo payload
-- [x] 2.9: Consumer Kafka (grupo `trigger-service`, tópico `trigger.requests`) — resolve
-      `analysis` → `WorkflowTemplate` + `namespace` + `arguments.parameters` internos (mapa
-      `analysis` → `ml.volume`/`ml.breach`/`data.transform`/`data.quality`, nunca exposto),
-      cria o `Workflow` (nome `trigger-{run_id}`) via client Kubernetes
-- [x] 2.10: Testes unitários do consumer (client Kubernetes fake injetado) cobrindo:
-      mapeamento `analysis`→template/namespace, nome determinístico do `Workflow`, e
-      tratamento de evento malformado (não deve derrubar o consumer nem travar o tópico —
-      publica em dead-letter ou loga e segue, decidir na implementação)
+- [x] 7.1: `apps/ui-orchestrator/` — scaffold Fastify seguindo `apps/ui-gateway` como
+      template (`package.json`, `tsconfig.json`, `biome.json`, `vitest.config.ts` com
+      projects unit/integration/e2e, `src/server.ts`, `src/app.ts` com autoload de
+      `plugins/`+`modules/`)
+- [x] 7.2: `src/env.ts` — schema zod de config (porta, Kafka bootstrap, nomes dos 3
+      tópicos: `trigger.ml`, `trigger.data`, `trigger.status`)
+- [x] 7.3: `src/plugins/kafka.ts` — producer (publica em `trigger.ml`/`trigger.data`
+      conforme `analysis`) **e** consumer (`trigger.status`, compactado) no mesmo
+      plugin — decorators `fastify.kafkaPublish`/estado interno do mapa `run_id→status`
+- [x] 7.4: `src/modules/trigger/schema.ts` — `TriggerRequest` discriminado por
+      `analysis` (`volume_forecast`|`breach_risk`|`data_refresh`|`data_quality_check`),
+      zod, campos: `train_end`/`validation_end`/`holdout_end` obrigatórios pros dois
+      primeiros, nenhum campo pros outros dois. **Sem `data_source`/override de origem
+      de dado** — removido nesta revisão por risco de SSRF e vazamento de credencial
+      (payload → Kafka → possível log de erro); ver [`payloads.md`](./payloads.md)
+- [x] 7.5: `src/modules/trigger/service.ts` — mapa `analysis → tópico` (`ml`/`data`,
+      só roteamento — `analysis` viaja intacto na mensagem, sem tradução pra vocabulário
+      interno; ver [`payloads.md`](./payloads.md) sobre por que isso mudou de desenho)
+      + geração de `run_id` (`crypto.randomUUID()`)
+- [x] 7.6: `src/modules/trigger/routes.ts` — `POST /trigger`: valida, gera `run_id`,
+      publica, responde `202 {run_id}`
+- [x] 7.7: `src/modules/runs/routes.ts` — `GET /runs/{run_id}`: lookup no mapa em
+      memória (populado pelo consumer de `trigger.status`); ausente ⇒ `queued`
+- [x] 7.8: `src/modules/health/index.ts` — `GET /health`, mesmo padrão de
+      `apps/ui-gateway`
+- [x] 7.9: MCP — servidor hand-wired com `@modelcontextprotocol/sdk`, duas tools
+      (`trigger_analysis`, `get_run_status`) chamando as mesmas funções de
+      `modules/trigger/service.ts`/`modules/runs/service.ts` que as rotas REST usam
+- [x] 7.10: Testes — mirror da estrutura de `apps/ui-gateway/test/` (unit: schema,
+      service; e2e: rotas via `.inject()`, kafka fake/mock igual
+      `test/unit/plugins/kafka.test.ts` já faz hoje)
+- [x] 7.11: `Dockerfile` — mirror exato do `apps/ui-gateway/Dockerfile` (multi-stage
+      `node:24-trixie-slim`)
 
 ### Verification
 
-- [x] `uv run --package ops-ahead-trigger-service pytest` passa (via `pytest apps/trigger-service`
-      — mesma ressalva de path da Fase 1)
-- [x] `POST /trigger` com payload malformado retorna `422`, nunca `500`
-- [x] A tool MCP e o endpoint REST aceitam o mesmo payload, publicam no mesmo tópico Kafka e
-      produzem o mesmo `run_id`/resultado (nenhuma lógica de validação/despacho duplicada
-      entre as duas transports, e nenhuma delas cria o `Workflow` diretamente — só o consumer
-      da task 2.9 faz isso)
+- [x] `npm test` (via `apps/ui-orchestrator`) passa — 43/43 (unit + e2e, incluindo
+      roundtrip MCP real via SSE)
+- [x] `POST /trigger` com payload malformado retorna `400`/`422`, nunca `500`
+- [x] MCP e REST produzem o mesmo `run_id`/comportamento pro mesmo payload — ambos
+      chamam `triggerAnalysis`/`getRunStatus`, sem lógica duplicada
+- [ ] `ServiceAccount` do pod (quando existir, Fase 9) não tem nenhuma RBAC de K8s além
+      do default — confirmado por inspeção do chart, não só por não ter código que
+      chame a API
 
 ---
 
-## Phase 3: WorkflowTemplates parametrizados + RBAC + Kafka
-
-O mecanismo de execução de verdade — hoje nenhum `WorkflowTemplate` do repo aceita
-parâmetro vindo de fora do `values.yaml` renderizado pelo Helm, e não existe tópico Kafka
-pra pedidos de execução.
+## Fase 8: `ml-trainer`/`data-runner` — modo consumidor (estende a Fase 1)
 
 ### Tasks
 
-- [x] 3.1: `infra/charts/ml-workflow-template/` (novo, `ns: ml`) — `WorkflowTemplate` com
-      um entrypoint parametrizado (`workload`: `volume`|`breach`, mais as datas de corte e
-      `clickhouse_url`) que roda a imagem `ml-trainer` com `command`/`args` resolvidos a
-      partir do parâmetro; `serviceAccountName` análogo a `argo-workflow-executor`, criado
-      em `ns: ml` (não existe RBAC de executor lá hoje). Também criado
-      `infra/apps/ml-workflow-template.yaml` (Application, automated) — sem ele o chart
-      nunca sincroniza; e `apps/ml-trainer/chart/app.yaml` + `values-dev.yaml` (deferidos da
-      Fase 1, necessários pro CI write-back ter onde escrever a tag)
-- [x] 3.2: Estendido `infra/charts/data-pipeline/templates/workflowtemplate.yaml` com um
-      segundo entrypoint de step único (`step`: `transform`|`quality`) usando a imagem
-      `data-runner` consolidada — preserva o entrypoint de cadeia completa
-      (`dbt-run → great-expectations → register-snapshot`) que o `CronWorkflow` existente
-      (`templates/cronworkflow.yaml`) continua referenciando sem mudança. Também trocado
-      `data-transform`/`data-quality` → `data-runner` nas imagens do `dbt-run`/
-      `great-expectations` (Fase 1 já tinha removido as imagens antigas — sem isso o
-      pipeline diário já estaria quebrado) e `pipelines/data-itsm-daily/appset.yaml`
-      (`extraValueFiles` apontava pros dois apps removidos); criado
-      `apps/data-runner/chart/app.yaml` + `values-dev.yaml` (mesmo motivo do ml-trainer acima)
-- [x] 3.3: Tópico Kafka `trigger.requests` em `infra/charts/data-kafka/values.yaml` **e**
-      `values-dev.yaml` (a segunda lista sobrescreve a primeira por completo — Helm não
-      faz merge de listas; sem editar as duas o tópico nunca existiria em dev). Sem
-      `ExternalSecret`/credencial nova: Kafka neste cluster não tem auth (nenhum app
-      existente injeta senha de Kafka — conferido em `data-ingest`/`ml-burst-detector`),
-      então não há segredo real pra buscar
-- [x] 3.4: RBAC do `trigger-service`: `ServiceAccount` + `Role`/`RoleBinding` em `ns: data`
-      (criar/ler `workflows.argoproj.io`) e um `Role`/`RoleBinding` equivalente em `ns: ml`
-      (cross-namespace) — escopo mínimo: `create`/`get`/`list`/`watch` em
-      `workflows.argoproj.io`, `get`/`watch` em `workflowtaskresults`. Vive em
-      `infra/charts/trigger-service/templates/rbac.yaml`, mesmo chart que a Fase 4
-      completa com Deployment/Service/HPA — ainda sem `infra/apps/trigger-service.yaml`
-      (Fase 4), então nada disso está sincronizado no cluster ainda
-- [x] 3.5: Nenhum manifesto novo — `infra/apps/namespaces.yaml` já libera ingress em
-      `ns: data` pra mesmo-namespace + `infra` (e mais: `ml`, `ui:9092`) via a
-      `allow-ingress` default do namespace, e egress já é livre por estratégia do cluster
-      ("Egress não é restrito... não agrega valor em dev local") — checado antes de criar
-      qualquer coisa redundante
+- [ ] 8.1: `apps/ml-trainer/src/main.py` — novo modo `consume` (além do `train` já
+      existente): conecta em `trigger.ml`, lê 1 mensagem
+      (`analysis`/`train_end`/`validation_end`/`holdout_end` — sem override de fonte de
+      dado, ver [`payloads.md`](./payloads.md)), traduz `analysis → volume`/`breach`
+      **localmente** (tabela pequena dentro do próprio app, não em `ui-orchestrator`),
+      publica `status: Running` em `trigger.status` ao começar, chama o mesmo
+      `TRAINERS[...]` que o modo `train` já usa, publica o resultado final
+      (`Succeeded`/`Failed` + `detail`) em `trigger.status` ao terminar
+- [ ] 8.2: `apps/data-runner/src/main.py` — novo modo `consume`: conecta em
+      `trigger.data`, lê 1 mensagem (`analysis: data_refresh`/`data_quality_check`/
+      `full_pipeline`), traduz `analysis → transform`/`quality` localmente, publica
+      `status: Running` ao começar, despacha pro `STEPS[...]` existente **ou**, se
+      `analysis: full_pipeline` (mensagem publicada pelo `CronJob` da Fase 9), roda os
+      3 passos em sequência (`dbt run` → `great_expectations` suite `critical` →
+      `register-snapshot`, este último portado do script inline que hoje vive em
+      `infra/charts/data-pipeline/templates/workflowtemplate.yaml`); publica o
+      resultado final em `trigger.status` ao terminar
+- [ ] 8.3: `register-snapshot` como código Python de verdade dentro de
+      `apps/data-runner/src/` (hoje é um script inline no `WorkflowTemplate` que sai
+      na Fase 10) — mesma lógica (hash SHA-256 dos counts dos 6 marts, log no MLflow)
+- [ ] 8.4: Testes novos: modo `consume` de cada app (kafka fake injetado, mesmo padrão
+      de `apps/trigger-service/tests/test_consumer.py` — que será removido na Fase 10,
+      mas serve de referência de como mockar o client Kafka)
 
 ### Verification
 
-- [x] `helm template infra/charts/ml-workflow-template`, `helm template
-      infra/charts/data-pipeline` (com os values reais da pipeline + `data-runner`) e
-      `helm template infra/charts/data-kafka` (com `values-dev.yaml`, onde o tópico
-      precisou ser adicionado separadamente) renderizam sem erro
-- [ ] `kubectl auth can-i create workflows.argoproj.io --as=system:serviceaccount:data:trigger-service -n ml`
-      retorna `yes` — **adiado pra Fase 6**: exige `infra/apps/trigger-service.yaml`
-      (Fase 4) sincronizado no cluster; o RBAC em si já está commitado, só falta o
-      Application que o aplica
+- [ ] `uv run --package ops-ahead-ml-trainer pytest` e
+      `uv run --package ops-ahead-data-runner pytest` passam
+- [ ] Mensagem malformada no tópico não derruba o processo (loga e sai com erro,
+      KEDA cria um novo `Job` pra próxima mensagem)
+- [ ] Modo `analysis: full_pipeline` do `data-runner` produz o mesmo resultado (mesmos marts,
+      mesmo snapshot no MLflow) que o `WorkflowTemplate` antigo produzia
 
 ---
 
-## Phase 4: Deploy do `trigger-service`
+## Fase 9: KEDA + `ScaledJob`s + `CronJob` (substitui a Fase 3)
 
 ### Tasks
 
-- [x] 4.1: `infra/charts/trigger-service/` (`Deployment` + `Service` + `HPA` + probes),
-      copiando o padrão de `infra/charts/ml-model-serving/`. `serviceAccountName` no pod
-      spec aponta pro `ServiceAccount` da Fase 3 (RBAC sem pod nenhum não vale nada)
-- [x] 4.2: `apps/trigger-service/chart/app.yaml` (`workload: deployment`, `namespace: data`,
-      `chart: infra/charts/trigger-service`) + `values-dev.yaml`
-- [x] 4.3: `infra/apps/trigger-service.yaml` (`ArgoCD Application`, `syncPolicy.automated`,
-      sync-wave `8` — depois de `data-workflows` (5) e `data-kafka` (6, o broker que o
-      lifespan do app conecta no startup))
-- [x] 4.4: `infra/apps/ingresses.yaml` — host `trigger.ops-ahead.localtest.me` (dev), mesmo
-      padrão dos outros hosts `*.ops-ahead.localtest.me`; mesmo `Ingress`/`Service` expõe o
-      path REST e o path do transport MCP (mesmo processo/porta da task 2.7, sem `Service`
-      nem host separado) — aponta pro Service `trigger-service-trigger-service` (confirmado
-      contra o padrão real dos outros apps `deployment` no cluster: `<app>-<app>`)
-- [x] 4.5: Atualizado a matrix estática do CI (`.gitea/workflows/build.yaml` linha do
-      `strategy.matrix.app`) — removidos os 4 apps antigos, adicionados `ml-trainer`,
-      `data-runner`, `trigger-service`
+- [ ] 9.1: `infra/charts/infra-keda/` (novo) — wrap do chart oficial `kedacore/keda`,
+      mesmo padrão de `infra/charts/data-workflows` (que embrulha `argo-workflows`) ou
+      `infra/charts/infra-eso`. Instalado 1x, `ns: infra`
+- [ ] 9.2: `infra/apps/infra-keda.yaml` — Application automated, sync-wave anterior a
+      qualquer `ScaledJob`
+- [ ] 9.3: `infra/charts/ml-trainer` (novo, ao lado do app) — `ScaledJob` (trigger
+      Kafka, tópico `trigger.ml`, `lagThreshold`), Job template rodando a imagem
+      `ml-trainer` em modo `consume`. RBAC: nenhuma além do default — `ScaledJob` só
+      precisa que o KEDA operator (já tem sua própria RBAC de plataforma) crie `Job`s
+- [ ] 9.4: `infra/charts/data-runner` (novo) — mesmo padrão, tópico `trigger.data`
+- [ ] 9.5: `CronJob` nativo (`ns: data`, dentro do chart de `data-runner` ou um chart
+      próprio) — 02:00 UTC (config vem de `pipelines/data-itsm-daily/values.yaml`,
+      reaproveitado), container mínimo que publica 1 mensagem
+      `{"run_id": "daily-<data>", "analysis": "full_pipeline"}` em `trigger.data` (`run_id`
+      determinístico pela data — dá pra consultar `GET /runs/daily-2026-08-16` sem
+      precisar descobrir o id em log nenhum, ver [`payloads.md`](./payloads.md)) e sai
+      (não precisa nem da imagem `data-runner` completa — pode ser um
+      `image: confluentinc/cp-kafkacat` ou equivalente, um `kafka-console-producer` de
+      uma linha)
+- [ ] 9.6: Tópicos Kafka `trigger.ml`, `trigger.data` (regular),
+      `trigger.status` (`cleanup.policy: compact`) em
+      `infra/charts/data-kafka/values.yaml` **e** `values-dev.yaml`
 
 ### Verification
 
-- [x] `helm template infra/charts/trigger-service` renderiza sem erro
-- [ ] Push dispara o CI e os 3 novos apps buildam/publicam imagem — **adiado**: ainda não
-      fiz push da branch pro Gitea local nem pro GitHub; verificar via `gh run list` depois
-      do push (Fase 6, junto da validação ponta a ponta)
+- [ ] `helm template infra/charts/infra-keda`, `infra/charts/ml-trainer`,
+      `infra/charts/data-runner` renderizam sem erro
+- [ ] `kubectl get scaledjob -A` mostra os 2 `ScaledJob`s depois do deploy
+- [ ] Nenhum `Role`/`RoleBinding` novo referenciando `workflows.argoproj.io` ou
+      qualquer recurso além do que o KEDA operator já tinha de fábrica
 
 ---
 
-## Phase 5: Migração e corte do fluxo manual antigo
+## Fase 10: Deploy do `ui-orchestrator` + remoção do Argo Workflow (substitui a Fase 4)
 
 ### Tasks
 
-- [x] 5.1: Removido `infra/charts/ml-volume-model/`, `infra/charts/ml-breach-model/`,
-      `infra/apps/ml-volume-model.yaml`, `infra/apps/ml-breach-model.yaml` (substituídos
-      pelo `WorkflowTemplate` da Fase 3, disparado pelo `trigger-service`). Corrigido também
-      o comentário de `infra/apps/ml-model-serving.yaml` que citava as duas Applications
-      removidas como referência de sync-wave
-- [x] 5.2: Removido `infra/apps/ml-temporal-split-values.yaml` — as datas de corte deixam de
-      ter fonte fixa em `values.yaml`; passam a vir sempre do payload de cada requisição
-- [x] 5.3: Reescrito `docs/data-pipeline.md`: nova seção "Rerodar um step isolado (via
-      trigger-service)" — cobre exatamente o caso que o documento antigo dizia ser
-      *impossível* ("Argo Workflows não reinicia um step isolado... um argo submit sempre
-      roda a sequência inteira"). Mantida, mas movida para "raro", a instrução `argo submit`
-      pra rodar a **cadeia completa** (`dbt-run → great-expectations → register-snapshot`) —
-      `trigger-service` não cobre esse caso de propósito (não existe "analysis" pra cadeia
-      inteira, só por domínio). `kubectl delete job`/`argocd app sync ml-` já não aparecem
-      em lugar nenhum (eram só do fluxo Job removido na 5.1). Também corrigidas referências
-      a `data-transform`/`data-quality` em `CLAUDE.md`, `README.md` e
-      `infra/scripts/README.md`
-- [x] 5.4: Documentado o payload dos 4 tipos de `analysis` em
-      `apps/trigger-service/README.md` (tabela campo obrigatório/opcional por tipo +
-      exemplos de `curl`), referenciado a partir de `docs/data-pipeline.md`
+- [ ] 10.1: `infra/charts/ui-orchestrator/` — `Deployment`+`Service`+`HPA`, `ns: ui`,
+      sem `ServiceAccount` customizada (usa o default do namespace, sem token
+      automontado — mesmo padrão de `ui-gateway`)
+- [ ] 10.2: `apps/ui-orchestrator/chart/app.yaml` (`workload: deployment`,
+      `namespace: ui`) + `values-dev.yaml`
+- [ ] 10.3: `infra/apps/ui-orchestrator.yaml` — Application automated, sync-wave depois
+      de `data-kafka` e `infra-keda`
+- [ ] 10.4: `infra/apps/ingresses.yaml` — host `orchestrator.ops-ahead.localtest.me`
+      (dev), mesmo padrão dos outros hosts
+- [ ] 10.5: Hooks `PostSync` de health check — `Job` por serviço
+      (`ui-orchestrator`/`ml-trainer`/`data-runner`), valida conectividade Kafka
+      (+ClickHouse pros dois últimos), mesmo padrão do hook `PreSync` já usado na
+      esteira CI
+- [ ] 10.6: CI matrix (`.gitea/workflows/build.yaml`) — troca `trigger-service` por
+      `ui-orchestrator`
+- [ ] 10.7: **Remove** `infra/charts/data-workflows`, `infra/apps/data-workflows.yaml`,
+      `infra/charts/ml-workflow-template`, `infra/apps/ml-workflow-template.yaml`,
+      `apps/trigger-service/` (app inteiro), `infra/charts/trigger-service`,
+      `infra/apps/trigger-service.yaml`, `WorkflowTemplate`/`CronWorkflow` de
+      `infra/charts/data-pipeline` (chart todo, se não sobrar mais nada nele além do
+      que virou `ScaledJob`+`CronJob` das Fases 8/9)
 
 ### Verification
 
-- [x] `grep -r` por `argo submit --from workflowtemplate`, `kubectl delete job` e
-      `argocd app sync ml-` fora de `git log`/`docs/insights/`: `kubectl delete job` e
-      `argocd app sync ml-` não retornam nada; `argo submit --from workflowtemplate`
-      retorna uma ocorrência **deliberada** em `docs/data-pipeline.md`, sob "raro" — é o
-      único caso que `trigger-service` não substitui (cadeia completa com
-      `register-snapshot`), não um resquício do fluxo antigo
+- [ ] `helm template infra/charts/ui-orchestrator` renderiza sem erro
+- [ ] Push dispara CI, `ui-orchestrator` builda e publica imagem
+- [ ] `kubectl get applications -n infra` não lista mais `data-workflows`,
+      `ml-workflow-template`, `trigger-service`
 
 ---
 
-## Phase 6: Validação ponta a ponta
-
-Fecha os critérios de aceite do `spec.md` e destrava a Task 5.1 da track
-`ml-models_20260806` (rodar os treinos sobre o dataset completo — hoje pendente
-justamente pela falta deste mecanismo).
+## Fase 11: Docs + validação E2E (substitui as Fases 5 e 6)
 
 ### Tasks
 
-- [x] 6.1: Disparado os 4 `workload`s via `trigger-service` no cluster local — todos
-      completaram sem erro:
-      - `data_quality_check` → `trigger-9226a2d3...` `Succeeded`
-      - `data_refresh` → `trigger-2301a62f...` `Succeeded`
-      - `volume_forecast` → `trigger-0aeeb69e...` `Succeeded` (após corrigir as datas, ver
-        6.3 abaixo) — registrou e promoveu `volume-forecast` v1 no MLflow
-      - `breach_risk` → `trigger-49c8b8af...` `Succeeded` — registrou e promoveu
-        `breach-risk` v1 no MLflow
-
-      Sincronizar isso no cluster expôs 3 gaps de infra fora do código da track, corrigidos
-      no processo (nenhum na spec original):
-      - `.dockerignore` inexistente (achado já na Fase 1)
-      - Vault sem o path `ml-workflow-template` — `dev-sync.sh` não semeia Vault (só
-        `dev-up.sh` no bootstrap completo, que faz *fast-path* e pula o seeding num cluster
-        já existente); seedado manualmente via `vault kv put` (mesma convenção documentada
-        em `infra/scripts/README.md` regra 2, só que fora do script porque o script não
-        cobre "novo secret num cluster já bootstrapado")
-      - `ResourceQuota` de `ns: ml` (`limits.cpu: 4`, ~2.9 já em uso por
-        `ml-burst-detector`/`ml-model-serving`) não tinha espaço pro `1 CPU` de limite que
-        `ml-workflow-template` pedia por pod + overhead do executor do Argo — reduzido pra
-        `500m` (`infra/charts/ml-workflow-template/values.yaml`)
-- [x] 6.2: Isolamento confirmado de duas formas — `data_refresh` + `data_quality_check`
-      concorrentes (ns `data`) rodaram em pods separados sem interferência; `volume_forecast`
-      e `breach_risk` concorrentes (ns `ml`) esbarraram na quota de CPU do namespace (achado
-      acima, não um bug de isolamento — os dois *tentaram* rodar em pods separados
-      simultaneamente, cada um pedindo sua própria fração de CPU; a quota só limita
-      *quantidade* de trabalho concorrente, não causa interferência entre os runs). "Matar um
-      `Workflow` propositalmente" **não executado** — exigiria `kubectl delete`, mutação fora
-      de GitOps que não está autorizada pra mim mesmo pra fins de teste. Propriedade
-      equivalente validada em vez disso: disparei `data_quality_check` duas vezes seguidas
-      (`trigger-9226a2d3...` e depois `trigger-45abd177...`, sem qualquer limpeza entre as
-      duas) e as duas terminaram `Succeeded` — nome determinístico por `run_id` elimina a
-      necessidade de `kubectl delete job` estruturalmente, não só quando o run anterior
-      falha
-- [x] 6.3: Rodado `volume_forecast`/`breach_risk` via `trigger-service` — **não** sobre as
-      122.543 linhas completas: essa instância do cluster só tem 606 incidentes ingeridos
-      (até 2025-01-04), achado já registrado e **não resolvido** na Fase 5 de
-      `ml-models_20260806` (decisão explícita do usuário na época: só corrigir o bug de tz,
-      ingestão completa fica pra depois). Rodei sobre o dataset disponível, com limites de
-      split recalculados por quantil (70/85/100%) em vez dos fixos antigos — exatamente o
-      cenário que motivou esta track (dataset diferente do esperado, sem precisar tocar
-      código: só o payload muda). Cross-referenciado em
-      `conductor/tracks/ml-models_20260806/plan.md` — Task 5.1 continua `[ ]` (falta dado,
-      não mecanismo), com nota explicando o que já está desbloqueado e o comando exato pra
-      rodar quando a ingestão completa acontecer
-- [x] 6.4: Corrigida a tabela "Workload natures" do `CLAUDE.md` raiz (`worker` → `deployment`,
-      `values-image.yaml` → `values-dev.yaml`) — também a referência solta na seção Project
-      Structure e o mesmo par de termos em `README.md`
-- [x] 6.5: `docs/insights/temporal-split-data-dependency.md` commitado — já no primeiro
-      commit desta track (`6d06720`, criação da track), não precisou de commit separado aqui
+- [ ] 11.1: `docs/data-pipeline.md` reescrito — a seção "Rerodar um step isolado"
+      passa a descrever o `ui-orchestrator`; a cadeia completa deixa de ter uma seção
+      "via Argo CLI" (não existe mais `argo submit` nem UI do Argo) e ganha "via
+      `CronJob`" (automático) + "manual" (publicar direto no tópico, ou reusar o
+      endpoint do `ui-orchestrator` se ele vier a expor uma `analysis: full_pipeline`
+      — decidir na implementação se vale a pena)
+- [ ] 11.2: `apps/ui-orchestrator/README.md` — mesmo conteúdo que
+      `apps/trigger-service/README.md` tinha, nomes/exemplos atualizados
+- [ ] 11.3: `CLAUDE.md` raiz — seção "Pipelines" reescrita (Kafka+KEDA no lugar de
+      Argo Workflows), nota na tabela "Workload natures" sobre o caso `ScaledJob`
+- [ ] 11.4: `README.md`, `infra/scripts/README.md` — remove referências a
+      `trigger-service`/`data-workflows`, adiciona `ui-orchestrator`/`infra-keda`
+- [ ] 11.5: `domain/ubiquitous-language.md` + `domain/context-map.md` — ver seção
+      própria abaixo, feito nesta revisão de spec (não depende do código)
+- [ ] 11.6: Disparar os 4 tipos de `analysis` via `ui-orchestrator` no cluster local,
+      confirmar `GET /runs/{run_id}` reflete o status publicado, confirmar isolamento
+      de runs concorrentes (mesma validação que a Fase 6 original fez, contra a
+      arquitetura nova)
+- [ ] 11.7: Confirmar o `CronJob` dispara a cadeia completa no horário e produz o
+      mesmo snapshot no MLflow que o `CronWorkflow` antigo produzia
 
 ### Verification
 
-- [x] Todos os critérios de aceite de `spec.md` verificados como verdadeiros no cluster
-      local: serviço único sem kubeconfig (REST confirmado via `curl` direto no Ingress;
-      MCP confirmado na Fase 2 via protocolo real, não re-testado aqui pois não muda com
-      infra), contrato em linguagem de negócio, REST+MCP sem duplicar lógica, datas/origem
-      de dados vêm 100% do payload (provado ao vivo no 6.3 — mesma track, dataset diferente,
-      zero mudança de código), pod isolado e efêmero por requisição, os 4 `workload`s rodando
-      através do serviço, isolamento por domínio (ns `ml` vs `data`), disparo assíncrono
-      (`202` + `run_id` antes do `Workflow` existir, confirmado nos logs do consumer)
-- [x] Nenhum fluxo restante exige `kubectl delete job`, `argo submit` manual ou
-      `argocd app sync` para re-disparar `ml.volume`, `ml.breach`, `data.transform` ou
-      `data.quality` — os 4 rodaram só com `curl` contra `trigger-service`, confirmado ao
-      vivo nesta fase (não apenas por inspeção do código)
+- [ ] Todos os critérios de aceite do `spec.md` revisado verificados no cluster local
+- [ ] `grep -r` por `argo submit`, `WorkflowTemplate`, `CronWorkflow` fora de
+      `docs/insights/`/`conductor/`/histórico do git: nenhuma ocorrência
+
+---
+
+## domain/ e contracts/ (feito nesta sessão, direto nos arquivos — não depende do código)
+
+- `domain/ubiquitous-language.md` — termo `analysis` e os 4 valores de negócio
+  (`full_pipeline` não entra aqui — nunca é escolhido por um caller, é vocabulário só do
+  `CronJob`).
+- `domain/context-map.md` — tipo de integração request/response sob demanda + tópicos
+  `trigger.ml`/`trigger.data`/`trigger.status`.
+- `contracts/trigger-ml.schema.json`, `contracts/trigger-data.schema.json`,
+  `contracts/trigger-status.schema.json` — JSON Schema formal dos 3 tópicos, mesmo
+  padrão de `contracts/incident-event.schema.json`. Fonte de verdade; `payloads.md` é a
+  leitura narrada com exemplos.
 
 ---
 
 ## Checkpoints
 
-| Phase   | Checkpoint SHA        | Date       | Status   |
-| ------- | --------------------- | ---------- | -------- |
-| Phase 1 | `405d61e`              | 2026-08-14 | complete |
-| Phase 2 | `b02ea96`              | 2026-08-14 | complete |
-| Phase 3 | `037a69d`              | 2026-08-14 | complete |
-| Phase 4 | `6d19164`              | 2026-08-14 | complete |
-| Phase 5 | `cdc87e3`              | 2026-08-15 | complete |
-| Phase 6 | (this commit)          | 2026-08-15 | complete |
+| Fase | Checkpoint SHA | Data | Status |
+|---|---|---|---|
+| 1 | `405d61e` | 2026-08-14 | completa |
+| 2 | `b02ea96` | 2026-08-14 | completa, **substituída pela Fase 7** |
+| 3 | `037a69d` | 2026-08-14 | completa, **substituída pela Fase 9** |
+| 4 | `6d19164` | 2026-08-14 | completa, **substituída pela Fase 10** |
+| 5 | `cdc87e3` | 2026-08-15 | completa, **refeita na Fase 11** |
+| 6 | `b9c3034` | 2026-08-15 | completa, **refeita na Fase 11** |
+| 7–11 | — | — | não iniciadas |
