@@ -4,11 +4,10 @@ import logging
 import sys
 
 from src.settings import Settings
+from src.trigger import configure_experiment
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
-
-EXPERIMENT_NAMES = {"volume": "volume-forecast", "breach": "breach-risk"}
 
 
 def _train_volume(settings: Settings) -> str:
@@ -57,18 +56,20 @@ def _require_split_boundaries(settings: Settings) -> None:
 
 
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "consume":
+        from src.trigger import consume_one
+
+        consume_one(Settings(), TRAINERS)
+        return
+
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m src.main train <volume|breach>")
+        LOGGER.error("Usage: python -m src.main train <volume|breach> | consume")
         sys.exit(2)
 
     domain = sys.argv[2]
     settings = Settings()
     _require_split_boundaries(settings)
-
-    if settings.mlflow_experiment_name is None:
-        settings.mlflow_experiment_name = EXPERIMENT_NAMES[domain]
-    if settings.mlflow_registered_model_name is None:
-        settings.mlflow_registered_model_name = EXPERIMENT_NAMES[domain]
+    configure_experiment(settings, domain)
 
     run_id = TRAINERS[domain](settings)
     LOGGER.info("Training complete. MLflow run_id=%s", run_id)

@@ -102,7 +102,7 @@ Só fala Kafka — nunca K8s/Argo.
 
 ### Tasks
 
-- [ ] 8.1: `apps/ml-trainer/src/main.py` — novo modo `consume` (além do `train` já
+- [x] 8.1: `apps/ml-trainer/src/main.py` — novo modo `consume` (além do `train` já
       existente): conecta em `trigger.ml`, lê 1 mensagem
       (`analysis`/`train_end`/`validation_end`/`holdout_end` — sem override de fonte de
       dado, ver [`payloads.md`](./payloads.md)), traduz `analysis → volume`/`breach`
@@ -110,7 +110,7 @@ Só fala Kafka — nunca K8s/Argo.
       publica `status: Running` em `trigger.status` ao começar, chama o mesmo
       `TRAINERS[...]` que o modo `train` já usa, publica o resultado final
       (`Succeeded`/`Failed` + `detail`) em `trigger.status` ao terminar
-- [ ] 8.2: `apps/data-runner/src/main.py` — novo modo `consume`: conecta em
+- [x] 8.2: `apps/data-runner/src/main.py` — novo modo `consume`: conecta em
       `trigger.data`, lê 1 mensagem (`analysis: data_refresh`/`data_quality_check`/
       `full_pipeline`), traduz `analysis → transform`/`quality` localmente, publica
       `status: Running` ao começar, despacha pro `STEPS[...]` existente **ou**, se
@@ -119,21 +119,26 @@ Só fala Kafka — nunca K8s/Argo.
       `register-snapshot`, este último portado do script inline que hoje vive em
       `infra/charts/data-pipeline/templates/workflowtemplate.yaml`); publica o
       resultado final em `trigger.status` ao terminar
-- [ ] 8.3: `register-snapshot` como código Python de verdade dentro de
+- [x] 8.3: `register-snapshot` como código Python de verdade dentro de
       `apps/data-runner/src/` (hoje é um script inline no `WorkflowTemplate` que sai
-      na Fase 10) — mesma lógica (hash SHA-256 dos counts dos 6 marts, log no MLflow)
-- [ ] 8.4: Testes novos: modo `consume` de cada app (kafka fake injetado, mesmo padrão
+      na Fase 10) — mesma lógica (hash SHA-256 dos counts dos marts, log no MLflow)
+- [x] 8.4: Testes novos: modo `consume` de cada app (kafka fake injetado, mesmo padrão
       de `apps/trigger-service/tests/test_consumer.py` — que será removido na Fase 10,
       mas serve de referência de como mockar o client Kafka)
 
 ### Verification
 
-- [ ] `uv run --package ops-ahead-ml-trainer pytest` e
-      `uv run --package ops-ahead-data-runner pytest` passam
-- [ ] Mensagem malformada no tópico não derruba o processo (loga e sai com erro,
-      KEDA cria um novo `Job` pra próxima mensagem)
-- [ ] Modo `analysis: full_pipeline` do `data-runner` produz o mesmo resultado (mesmos marts,
-      mesmo snapshot no MLflow) que o `WorkflowTemplate` antigo produzia
+- [x] `uv run --package ops-ahead-ml-trainer pytest apps/ml-trainer/tests` e
+      `uv run --package ops-ahead-data-runner pytest apps/data-runner/tests` passam
+      (29 e 21 testes respectivamente; rodar com o path explícito — sem ele o pytest
+      descobre `tests/` de todos os apps a partir da raiz do repo e colide os
+      namespaces `tests.*`, um problema pré-existente do monorepo, não desta track)
+- [x] Mensagem malformada no tópico não derruba o processo (loga e sai com erro,
+      KEDA cria um novo `Job` pra próxima mensagem) — `process_message` trata
+      `KeyError`/`TypeError` sem propagar
+- [x] Modo `analysis: full_pipeline` do `data-runner` produz o mesmo resultado (mesmos marts,
+      mesmo snapshot no MLflow) que o `WorkflowTemplate` antigo produzia — lógica
+      portada 1:1, testada contra um tracking store MLflow real (sqlite efêmero)
 
 ---
 

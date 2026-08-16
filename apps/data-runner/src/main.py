@@ -1,37 +1,31 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 import sys
+
+from src.steps import STEPS
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 
 
-def _run_transform() -> None:
-    subprocess.run(["dbt", "run", "--profiles-dir", "/dbt"], check=True)
-
-
-def _run_quality(argv: list[str]) -> None:
-    from src.runner import main as runner_main
-
-    sys.argv = ["src.runner", *argv]
-    runner_main()
-
-
-STEPS = {"transform": _run_transform, "quality": _run_quality}
-
-
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "consume":
+        from src.settings import Settings
+        from src.trigger import consume_one
+
+        consume_one(Settings())
+        return
+
     if len(sys.argv) < 3 or sys.argv[1] != "run" or sys.argv[2] not in STEPS:
-        LOGGER.error("Usage: python -m src.main run <transform|quality> [args...]")
+        LOGGER.error("Usage: python -m src.main run <transform|quality> [args...] | consume")
         sys.exit(2)
 
     step, extra_args = sys.argv[2], sys.argv[3:]
     if step == "transform":
-        _run_transform()
+        STEPS["transform"]()
     else:
-        _run_quality(extra_args)
+        STEPS["quality"](extra_args)
 
 
 if __name__ == "__main__":
