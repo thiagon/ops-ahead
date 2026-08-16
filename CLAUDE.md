@@ -41,6 +41,14 @@ docs/
 
 ## Workload natures
 
+> **Em revisão (`exec-trigger_20260807`):** esta seção descreve o estado **atual** do
+> repo (Argo Workflows como motor de pipeline, `trigger-service` como ponto de entrada
+> sob demanda). Uma revisão de arquitetura aprovada — spec em
+> `conductor/tracks/exec-trigger_20260807/spec.md` — substitui isso por Kafka + KEDA
+> (`ScaledJob`/`CronJob` nativo), remove o motor Argo Workflows do stack, e introduz uma
+> 5ª natureza de workload que a tabela abaixo ainda não cobre. Implementação pendente
+> — atualizar esta seção quando ela aterrissar, não antes.
+
 One folder per image in `apps/`. Its **nature** — declared in `apps/<app>/chart/app.yaml`
 (`workload`, `namespace`) — decides how it runs. The deploy overlay lives alongside it in
 the same `chart/`, in `values-dev.yaml` — the same file the CI write-back pins

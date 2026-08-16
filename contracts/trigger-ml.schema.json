@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "trigger-ml/v1",
+  "title": "TriggerMlEvent",
+  "description": "Message published to the trigger.ml Kafka topic by ui-orchestrator, consumed by ml-trainer's `consume` mode. Discriminated by `analysis` — the same business-language value ui-orchestrator received on POST /trigger, never translated into a separate internal vocabulary (see conductor/tracks/exec-trigger_20260807/payloads.md).",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/volumeForecast" },
+    { "$ref": "#/definitions/breachRisk" }
+  ],
+  "definitions": {
+    "volumeForecast": {
+      "type": "object",
+      "required": ["run_id", "analysis", "train_end", "validation_end", "holdout_end"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "analysis": { "const": "volume_forecast" },
+        "train_end": { "$ref": "#/definitions/splitDate" },
+        "validation_end": { "$ref": "#/definitions/splitDate" },
+        "holdout_end": { "$ref": "#/definitions/splitDate" }
+      }
+    },
+    "breachRisk": {
+      "type": "object",
+      "required": ["run_id", "analysis", "train_end", "validation_end", "holdout_end"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "analysis": { "const": "breach_risk" },
+        "train_end": { "$ref": "#/definitions/splitDate" },
+        "validation_end": { "$ref": "#/definitions/splitDate" },
+        "holdout_end": { "$ref": "#/definitions/splitDate" }
+      }
+    },
+    "runId": {
+      "type": "string",
+      "description": "Same run_id ui-orchestrator returned in the 202 response to POST /trigger."
+    },
+    "splitDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Temporal split boundary, YYYY-MM-DD. Always required — no hardcoded default (see docs/insights/temporal-split-data-dependency.md)."
+    }
+  }
+}

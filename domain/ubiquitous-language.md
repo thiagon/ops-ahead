@@ -77,6 +77,27 @@ Um incident **contado no KPI** pode ou não ter sofrido breach — são duas per
 diferentes, e confundi-las inverte o indicador. As regras completas estão no
 [dicionário de dados](../docs/context/data-dictionary.md).
 
+### analysis
+
+O que se pede quando se dispara uma execução sob demanda — a pergunta de negócio, não o
+mecanismo por trás dela. É o único campo discriminador do payload que entra pelo ponto de
+entrada único (`ui-orchestrator`, ver [Context Map](./context-map.md)).
+
+Valores hoje:
+
+- **`volume_forecast`** — treinar o modelo de previsão de volume de incidentes.
+- **`breach_risk`** — treinar o modelo de risco de breach de OLA.
+- **`data_refresh`** — rematerializar os marts a partir do dado recebido.
+- **`data_quality_check`** — rodar a suite de qualidade sobre os marts.
+
+`analysis` nunca é um nome de `Job`, tópico ou imagem — é vocabulário de quem pede a
+execução, não de quem a executa. A tradução para o mecanismo interno (qual tópico
+publicar, qual app consome) é responsabilidade exclusiva do `ui-orchestrator`; nenhum
+outro contexto precisa conhecer essa tradução.
+
+*Não use:* workload, job, trigger. São termos de infraestrutura — o que a execução *é*
+por baixo, não o que foi pedido.
+
 ## Como nomear um estágio
 
 Um estágio se chama pelo **que aconteceu com o dado**, não pelo que ele ainda não passou.

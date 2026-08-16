@@ -69,6 +69,21 @@ fala com o mundo externo, nas duas direções.
 Fechar o ciclo pela mesma fronteira que o abriu é o que mantém autenticação, assinatura e
 formato externo em um lugar só.
 
+### Execução sob demanda — um segundo tipo de fronteira
+
+Todas as integrações acima são pub/sub assíncrono: um contexto publica, outro consome,
+sem saber quem está do outro lado. A execução sob demanda (`ui-orchestrator`, ver
+[`analysis`](./ubiquitous-language.md#analysis)) é um padrão diferente — quem chama
+(dev, N1, agente de IA) pede uma ação específica de **Predição** ou **Acervo** e recebe
+de volta um identificador pra acompanhar o resultado. Não é Integração: não traduz
+vocabulário de um sistema externo, é uma fronteira pra chamador **interno**, autenticado
+implicitamente pelo próprio acesso à rede da plataforma.
+
+Igual à Integração, é a única porta de entrada pra esse tipo de pedido — Predição e
+Acervo nunca são acionados sob demanda por nenhum outro caminho. Ao contrário da
+Integração, não fica no meio do fluxo pub/sub principal (`incidents.received` e o resto
+continuam fluindo sem passar por ela).
+
 ## O que os pontos de integração carregam
 
 | Ponto | Entre | Carrega |
@@ -78,6 +93,10 @@ formato externo em um lugar só.
 | `alerts.burst` | Detecção → Copiloto | rajada reconhecida numa entity |
 | `recommendations` | Copiloto → Integração | recomendação explicável, pronta para sair |
 | `actions.taken` | Integração → Acervo | o que o operador decidiu, para avaliar o Copiloto |
+| `trigger.ml` / `trigger.data` | execução sob demanda → Predição / Acervo | `analysis` + parâmetros de um pedido validado, um tópico por domínio |
+| `trigger.status` | Predição / Acervo → execução sob demanda | estado atual de um pedido (`run_id` como key, log compactado — só a última mensagem por run sobrevive) |
 
-Só `incidents.received` tem tráfego hoje. Os outros existem como ponto de integração
-reservado — declará-los cedo é o que permite implementar os contextos em qualquer ordem.
+Só `incidents.received` tem tráfego hoje entre os pontos pub/sub; `trigger.ml`/
+`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`.
+Os demais continuam reservados — declará-los cedo é o que permite implementar os
+contextos em qualquer ordem.

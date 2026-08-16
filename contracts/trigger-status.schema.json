@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "trigger-status/v1",
+  "title": "TriggerStatusEvent",
+  "description": "Message published to the compacted trigger.status Kafka topic (cleanup.policy=compact, key=run_id) by ml-trainer/data-runner's `consume` mode. ui-orchestrator consumes this to answer GET /runs/{run_id} without ever touching Kubernetes — see conductor/tracks/exec-trigger_20260807/spec.md. Two messages per run: `Running` when the Job picks up its message, then a terminal status when it finishes.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/running" },
+    { "$ref": "#/definitions/succeeded" },
+    { "$ref": "#/definitions/failed" }
+  ],
+  "definitions": {
+    "running": {
+      "type": "object",
+      "required": ["run_id", "status", "started_at"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "status": { "const": "Running" },
+        "started_at": { "$ref": "#/definitions/timestamp" }
+      }
+    },
+    "succeeded": {
+      "type": "object",
+      "required": ["run_id", "status", "started_at", "finished_at"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "status": { "const": "Succeeded" },
+        "started_at": { "$ref": "#/definitions/timestamp" },
+        "finished_at": { "$ref": "#/definitions/timestamp" },
+        "detail": { "$ref": "#/definitions/detail" }
+      }
+    },
+    "failed": {
+      "type": "object",
+      "required": ["run_id", "status", "started_at", "finished_at"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "status": { "const": "Failed" },
+        "started_at": { "$ref": "#/definitions/timestamp" },
+        "finished_at": { "$ref": "#/definitions/timestamp" },
+        "detail": { "$ref": "#/definitions/detail" }
+      }
+    },
+    "runId": { "type": "string" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC, ISO 8601."
+    },
+    "detail": {
+      "type": "object",
+      "description": "App- and status-specific context (e.g. mlflow_run_id/model_version on success, error message on failure) — deliberately not rigidly typed, see payloads.md."
+    }
+  }
+}
