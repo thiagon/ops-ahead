@@ -4,8 +4,9 @@
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-14
 **Revisado:** 2026-08-15
-**Status:** Draft (revisão) — implementação original completa e mergeada, revisão de
-arquitetura aprovada, implementação da revisão ainda não iniciada
+**Status:** Completo — implementação original (Fases 1–6) e revisão de arquitetura
+(Fases 7–11, Kafka+KEDA no lugar de Argo Workflows) implementadas, verificadas no
+cluster local e commitadas. 2026-08-16.
 
 ## Por que este plano muda depois de "completo"
 
@@ -271,32 +272,63 @@ Validação ponta a ponta (`POST /trigger` real via Ingress, mensagem manual em
 
 ### Tasks
 
-- [ ] 11.1: `docs/data-pipeline.md` reescrito — a seção "Rerodar um step isolado"
+- [x] 11.1: `docs/data-pipeline.md` reescrito — a seção "Rerodar um step isolado"
       passa a descrever o `ui-orchestrator`; a cadeia completa deixa de ter uma seção
-      "via Argo CLI" (não existe mais `argo submit` nem UI do Argo) e ganha "via
-      `CronJob`" (automático) + "manual" (publicar direto no tópico, ou reusar o
-      endpoint do `ui-orchestrator` se ele vier a expor uma `analysis: full_pipeline`
-      — decidir na implementação se vale a pena)
-- [ ] 11.2: `apps/ui-orchestrator/README.md` — mesmo conteúdo que
+      "via Argo CLI" e ganha "via `CronJob`" (automático) + "manual" (publicar direto
+      no tópico — `full_pipeline` não é exposto por `POST /trigger`, é vocabulário só
+      do `CronJob`)
+- [x] 11.2: `apps/ui-orchestrator/README.md` — mesmo conteúdo que
       `apps/trigger-service/README.md` tinha, nomes/exemplos atualizados
-- [ ] 11.3: `CLAUDE.md` raiz — seção "Pipelines" reescrita (Kafka+KEDA no lugar de
-      Argo Workflows), nota na tabela "Workload natures" sobre o caso `ScaledJob`
-- [ ] 11.4: `README.md`, `infra/scripts/README.md` — remove referências a
+- [x] 11.3: `CLAUDE.md` raiz — seção "Workload natures" reescrita (5ª natureza
+      `scaledjob`, remove `pipeline-step`/`pipelines/`, explica o caminho sob demanda
+      e a cadeia diária como o mesmo mecanismo); nota adicional sobre o `groupId`
+      único por boot (achado real da validação) e correção do exemplo de `uv run
+      --package` (não escopa `pytest` sozinho — path explícito é necessário)
+- [x] 11.4: `README.md`, `infra/scripts/README.md` — remove referências a
       `trigger-service`/`data-workflows`, adiciona `ui-orchestrator`/`infra-keda`
-- [ ] 11.5: `domain/ubiquitous-language.md` + `domain/context-map.md` — ver seção
-      própria abaixo, feito nesta revisão de spec (não depende do código)
-- [ ] 11.6: Disparar os 4 tipos de `analysis` via `ui-orchestrator` no cluster local,
-      confirmar `GET /runs/{run_id}` reflete o status publicado, confirmar isolamento
-      de runs concorrentes (mesma validação que a Fase 6 original fez, contra a
-      arquitetura nova)
-- [ ] 11.7: Confirmar o `CronJob` dispara a cadeia completa no horário e produz o
-      mesmo snapshot no MLflow que o `CronWorkflow` antigo produzia
+- [x] 11.5: `domain/ubiquitous-language.md` + `domain/context-map.md` — confirmado sem
+      nenhuma referência residual a `trigger-service`/`data-workflows`/Argo (já feito
+      na revisão de spec, commit `a07d932`)
+- [x] 11.6: Disparados os 4 tipos de `analysis` via `ui-orchestrator` no cluster local
+      (REST, pela Ingress real) — `data_quality_check`, `data_refresh`,
+      `volume_forecast`, `breach_risk`, todos com `run_id` próprio. `GET /runs/{run_id}`
+      refletiu o status publicado em todos; `volume_forecast`/`breach_risk` rodaram em
+      `Job`s separados e concorrentes (`ml-trainer-k6g87`/`ml-trainer-nmmhk`),
+      confirmando isolamento. Os dois falharam — `ValueError: temporal_split produced
+      empty partition(s)` — mas isso é o dataset local não cobrir as datas de exemplo
+      de `payloads.md`, não um bug: o mecanismo (roteamento, `Job` isolado, captura de
+      exceção, `status: Failed` com `detail` publicado, saída limpa) funcionou
+      exatamente como desenhado. Ver `docs/insights/temporal-split-data-dependency.md`
+      — problema pré-existente e fora do escopo desta track
+- [x] 11.7: `CronJob` confirmado — bateu 02:00 UTC durante a própria validação
+      (`data-runner-daily-29780760`, coincidência de horário) e rodou a cadeia
+      completa: `dbt run` (8 modelos, 0 erro) → suite `critical` → `register_snapshot`
+      logou no MLflow real (hash `36664b3e5afe3162ff1e967c91b0309d9913c24f6dc4b0031ffb72504b042080`)
 
 ### Verification
 
-- [ ] Todos os critérios de aceite do `spec.md` revisado verificados no cluster local
-- [ ] `grep -r` por `argo submit`, `WorkflowTemplate`, `CronWorkflow` fora de
-      `docs/insights/`/`conductor/`/histórico do git: nenhuma ocorrência
+- [x] Critérios de aceite do `spec.md` revisado verificados no cluster local — ponto a
+      ponto:
+  - [x] Ponto de entrada único (REST+MCP, mesmo contrato) sem kubeconfig/Argo/K8s
+  - [x] Payload em linguagem de negócio (`analysis` + parâmetros), nunca infra
+  - [x] `ServiceAccount` de `ui-orchestrator`/`ml-trainer`/`data-runner` sem RBAC além
+        do default — confirmado por inspeção dos charts (nenhum `Role`/`RoleBinding`
+        renderizado) e pelos recursos que o ArgoCD de fato sincronizou
+  - [x] Parâmetros só do payload, nada hardcoded em `values.yaml`
+  - [x] `Job` isolado por requisição via KEDA — confirmado (dois `Job`s concorrentes,
+        um falhando sem afetar o outro)
+  - [x] Os 4 tipos de `analysis` rodam pelo mecanismo, nunca mais `argo submit`
+  - [x] Disparo diário usa o mesmo caminho do disparo sob demanda — confirmado
+        (`full_pipeline` via `CronJob`, mesmo `ScaledJob`/consumer que o sob demanda)
+  - [x] Assíncrono ponta a ponta — `202 {run_id}` na hora, `GET /runs` reflete o que o
+        job publica
+  - [x] `GET /runs/{run_id}` sobrevive a restart — confirmado: réplica nova do
+        `ui-orchestrator` (rollout do fix de `groupId`) reidratou o histórico completo
+        do zero antes de responder tráfego
+- [x] `grep -r` por `argo submit`, `WorkflowTemplate`, `CronWorkflow` fora de
+      `docs/insights/`/`conductor/`/histórico do git: só comentários de código
+      explicando proveniência (o que foi portado/removido e por quê) — nenhuma
+      referência funcional viva
 
 ---
 

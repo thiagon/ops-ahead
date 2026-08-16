@@ -1,103 +1,123 @@
 # Pipeline de Dados — Operação
 
-Como disparar a DAG `data-pipeline` (cadeia completa ou um step isolado) e inspecionar
-falhas. Detalhes de schema e nomenclatura estão em [`contracts/`](../contracts/) e
+Como disparar a cadeia de dados (completa ou um step isolado) e inspecionar falhas.
+Detalhes de schema e nomenclatura estão em [`contracts/`](../contracts/) e
 [`domain/`](../domain/) — este documento é só operação.
 
-## O que a DAG faz
+> Revisado em `exec-trigger_20260807`: o motor Argo Workflows saiu do stack. A cadeia
+> completa é hoje um script sequencial dentro do `Job` de `data-runner`
+> (`apps/data-runner/src/trigger.py`), disparado por Kafka + KEDA — nunca `argo submit`
+> nem UI do Argo, que não existem mais neste projeto.
 
-`WorkflowTemplate` chamada `data-pipeline`, definida em
-[`infra/charts/data-pipeline/templates/workflowtemplate.yaml`](../infra/charts/data-pipeline/templates/workflowtemplate.yaml),
-rodando no `ns: data`:
+## O que a cadeia faz
+
+`analysis: full_pipeline` no modo `consume` de `data-runner`
+([`apps/data-runner/src/trigger.py`](../apps/data-runner/src/trigger.py)):
 
 ```
 dbt-run  →  great-expectations  →  register-snapshot
 ```
 
-- **`dbt-run`** — `dbt run --profiles-dir /dbt` na imagem `data-runner` (`run transform`).
+- **`dbt-run`** — `dbt run --profiles-dir /dbt` (`src/steps.py::run_transform`).
   Materializa `staging → marts` sobre `incidents_received`.
-- **`great-expectations`** — mesma imagem `data-runner` (`run quality`), roda a suite
-  `critical` (`--suite critical --upload-docs`). Falha crítica interrompe a DAG antes do
-  próximo step — `register-snapshot` nunca roda sobre dado que não passou na suite.
-- **`register-snapshot`** — script Python inline: soma `SELECT count()` dos 6 marts, tira SHA-256 do dicionário de contagens e registra um MLflow run no experiment `data-pipeline-snapshots` (params `hash`/`dag_run_id`, tag `source`, uma métrica por mart).
+- **`great-expectations`** — mesmo processo, suite `critical`
+  (`src/steps.py::run_quality`, `--suite critical --upload-docs`). Falha crítica
+  interrompe a cadeia antes do próximo passo — `register-snapshot` nunca roda sobre dado
+  que não passou na suite.
+- **`register-snapshot`** — [`apps/data-runner/src/register_snapshot.py`](../apps/data-runner/src/register_snapshot.py):
+  soma `SELECT count()` de cada mart configurado, tira SHA-256 do dicionário de
+  contagens e registra um MLflow run no experiment `data-pipeline-snapshots` (params
+  `hash`/`dag_run_id`, tag `source`, uma métrica por mart).
 
-A pipeline é configurada em [`pipelines/data-itsm-daily/`](../pipelines/data-itsm-daily/)
-(`values.yaml` — source, marts do snapshot, cron; `appset.yaml` — chart base + overlays de
-imagem). Em dev, `cron.enabled: false`. Em prod, `CronWorkflow` `data-pipeline-daily`
-dispara a cadeia completa às 02:00 UTC.
+A pipeline é configurada em [`infra/charts/data-runner/values.yaml`](../infra/charts/data-runner/values.yaml)
+(`run.env.source`, `run.env.snapshotMarts`, `cron.enabled`/`cron.schedule`) — os mesmos
+valores que antes viviam em `pipelines/data-itsm-daily/`, agora parte do próprio chart do
+app, já que `data-runner` deixou de ser um passo de uma `pipelines/` genérica e passou a
+ter workload (`ScaledJob`) próprio. Em dev e prod, um `CronJob` nativo (`ns: data`,
+02:00 UTC) publica `{"run_id": "daily-<data>", "analysis": "full_pipeline"}` em
+`trigger.data` — o `run_id` é determinístico pela data, então dá pra consultar
+`GET /runs/daily-2026-08-16` sem procurar o id em log nenhum.
 
-## Rerodar um step isolado (via `trigger-service`)
+## Rerodar um step isolado (via `ui-orchestrator`)
 
-Até a track `exec-trigger_20260807`, Argo Workflows não permitia reiniciar um único step de
-um `Workflow` já finalizado — só rodar a cadeia inteira de novo. O
-`trigger-service` (`https://trigger.ops-ahead.localtest.me`) cobre exatamente esse caso via
-um segundo entrypoint (`single-step`) do mesmo `WorkflowTemplate`, sem exigir kubeconfig,
-`argo` CLI nem conhecimento de Argo:
+`ui-orchestrator` (`https://orchestrator.ops-ahead.localtest.me`) é o único ponto de
+entrada — REST ou MCP, sem kubeconfig nem conhecimento de Kafka/KEDA por parte de quem
+chama:
 
 ```bash
 # só dbt (staging → marts)
-curl -X POST https://trigger.ops-ahead.localtest.me/trigger \
+curl -X POST https://orchestrator.ops-ahead.localtest.me/trigger \
   -H 'content-type: application/json' \
   -d '{"analysis": "data_refresh"}'
 
 # só a suite Great Expectations
-curl -X POST https://trigger.ops-ahead.localtest.me/trigger \
+curl -X POST https://orchestrator.ops-ahead.localtest.me/trigger \
   -H 'content-type: application/json' \
   -d '{"analysis": "data_quality_check"}'
 ```
 
-Resposta `202 {"run_id": "..."}` na hora — o `Workflow` ainda não existe nesse momento
-(publicado em Kafka, criado pelo consumer logo em seguida). Consultar o resultado:
+Resposta `202 {"run_id": "..."}` na hora — o `Job` ainda não existe nesse momento
+(publicado em `trigger.data`; KEDA cria o `Job` assim que detecta a mensagem na fila).
+Consultar o resultado:
 
 ```bash
-curl https://trigger.ops-ahead.localtest.me/runs/<run_id>
-# {"run_id": "...", "status": "queued" | "Pending" | "Running" | "Succeeded" | "Failed"}
+curl https://orchestrator.ops-ahead.localtest.me/runs/<run_id>
+# {"run_id": "...", "status": "queued" | "Running" | "Succeeded" | "Failed", ...}
 ```
 
-Nenhum dos dois dispara `register-snapshot` — esse step só roda como parte da cadeia
-completa (abaixo), já que o hash do snapshot é sobre o estado dos 6 marts *depois* de
-dbt+GE terem rodado juntos.
+Nenhum dos dois dispara `register-snapshot` — esse passo só roda como parte da cadeia
+completa (`analysis: full_pipeline`), já que o hash do snapshot é sobre o estado dos
+marts *depois* de dbt+GE terem rodado juntos, e `full_pipeline` nunca é escolhido por um
+caller (é vocabulário só do `CronJob` — ver
+[`conductor/tracks/exec-trigger_20260807/payloads.md`](../conductor/tracks/exec-trigger_20260807/payloads.md)).
 
-Ver payload completo dos 4 tipos de análise aceitos (`volume_forecast`, `breach_risk`,
-`data_refresh`, `data_quality_check`) em [`apps/trigger-service/README.md`](../apps/trigger-service/README.md).
+Contrato completo dos 4 tipos de análise aceitos (`volume_forecast`, `breach_risk`,
+`data_refresh`, `data_quality_check`) em
+[`apps/ui-orchestrator/README.md`](../apps/ui-orchestrator/README.md).
 
 ## Rodar a cadeia completa manualmente (raro)
 
-Fora do cron, a cadeia inteira (`dbt-run → great-expectations → register-snapshot`) ainda se
-dispara do jeito de sempre — `trigger-service` não cobre esse caso (não existe um "analysis"
-pra "cadeia completa": o objetivo dele é a execução pontual e parametrizada de um domínio por
-vez, não reimplementar o `CronWorkflow`).
-
-**Via Argo Workflows UI** — `https://argo-workflows.ops-ahead.localtest.me`, aba Workflow
-Templates → `data-pipeline` → Submit.
-
-**Via CLI** (precisa do `argo` CLI e contexto apontando pro cluster local):
+Fora do horário do `CronJob`, publicar `analysis: full_pipeline` direto no tópico
+`trigger.data` roda a cadeia inteira sob demanda — `ui-orchestrator` não expõe isso via
+`POST /trigger` (não existe um "analysis" pra "cadeia completa" no vocabulário do
+caller: o objetivo dele é a execução pontual e parametrizada de um domínio por vez, não
+reimplementar o `CronJob`). Publicar manualmente, com um `run_id` à sua escolha:
 
 ```bash
-argo submit --from workflowtemplate/data-pipeline -n data --watch
+kubectl exec -n data ops-ahead-kafka-0 -c kafka -- sh -c '
+echo "manual-run-1:{\"run_id\":\"manual-run-1\",\"analysis\":\"full_pipeline\"}" | \
+bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic trigger.data \
+  --property "parse.key=true" --property "key.separator=:"
+'
 ```
 
-`--watch` acompanha os steps em tempo real; sem ele, `argo list -n data` mostra o run e
-`argo get <workflow-name> -n data` traz o status pontual.
+KEDA cria o `Job` assim que detecta a mensagem (`pollingInterval`, ver
+[`infra/charts/data-runner/values.yaml`](../infra/charts/data-runner/values.yaml)).
 
 ## Inspecionar uma falha
 
 ```bash
-argo list -n data                              # runs recentes e status
-argo get <workflow-name> -n data                # detalhe dos steps, qual falhou
-argo logs <workflow-name> -n data -c <step>      # logs do container do step (dbt-run | great-expectations | register-snapshot | single-step)
+kubectl get jobs -n data -l app=data-runner --sort-by=.metadata.creationTimestamp
+kubectl logs -n data <pod-do-job>
 ```
 
-Falha em `great-expectations` (ou em `single-step` com `data_quality_check`) — a suite
-`critical` imprime `describe_dict()` da validação (JSON com cada expectation e se passou)
-antes de sair com código != 0; os Data Docs completos ficam em
-`s3://ops-ahead-lake/ge-docs/` (console MinIO em `https://minio.ops-ahead.localtest.me`).
+Falha em `great-expectations` (ou em `data_quality_check` isolado) — a suite `critical`
+imprime `describe_dict()` da validação (JSON com cada expectation e se passou) antes de
+sair com código != 0; os Data Docs completos ficam em `s3://ops-ahead-lake/ge-docs/`
+(console MinIO em `https://minio.ops-ahead.localtest.me`).
 
-Falha em `register-snapshot` — o step só roda depois da suite `critical` passar, então uma
-falha aqui é infra (ClickHouse ou MLflow inacessíveis a partir do pod), não dado sujo.
+Falha em `register-snapshot` — o passo só roda depois da suite `critical` passar, então
+uma falha aqui é infra (ClickHouse ou MLflow inacessíveis a partir do pod), não dado
+sujo.
 
 ## Ver o resultado
 
-- **Marts:** ClickHouse, `SELECT count() FROM <mart>` — ver [`scripts/audit.sql`](../scripts/audit.sql) para as queries de auditoria completas (ingestão → marts, OLA compliance, sequências P4).
-- **Snapshot:** MLflow UI, `https://mlflow.ops-ahead.localtest.me`, experiment `data-pipeline-snapshots` — um run por execução da DAG, nomeado com o `dag-run-id` (nome do Workflow). Só existe pra runs da cadeia completa.
+- **Marts:** ClickHouse, `SELECT count() FROM <mart>` — ver
+  [`scripts/audit.sql`](../scripts/audit.sql) para as queries de auditoria completas
+  (ingestão → marts, OLA compliance, sequências P4).
+- **Snapshot:** MLflow UI, `https://mlflow.ops-ahead.localtest.me`, experiment
+  `data-pipeline-snapshots` — um run por execução de `full_pipeline`, nomeado com o
+  `run_id`. Só existe pra runs da cadeia completa.
 - **Data Docs (GE):** console MinIO, bucket `ops-ahead-lake`, prefixo `ge-docs/`.
+- **Status de um run:** `GET /runs/<run_id>` no `ui-orchestrator`, sempre — reflete o
+  que o próprio `Job` publicou em `trigger.status`, nunca consulta o Kubernetes.

@@ -1,21 +1,24 @@
 {
   "id": "exec-trigger_20260807",
-  "title": "Serviço de Execução Sob Demanda (Trigger Service)",
+  "title": "Execução Sob Demanda (ui-orchestrator + KEDA)",
   "type": "feature",
   "status": "complete",
   "created": "2026-08-07T00:00:00Z",
-  "updated": "2026-08-15T02:00:00Z",
-  "current_phase": 6,
+  "updated": "2026-08-16T02:00:00Z",
+  "current_phase": 11,
   "current_task": null,
   "phases": {
-    "total": 6,
-    "completed": 6
+    "total": 11,
+    "completed": 11
   },
   "tasks": {
-    "total": 35,
-    "completed": 35
+    "total": 70,
+    "completed": 70
   },
   "github_issue": 52,
   "github_pr": 53,
-  "commits": ["b76666d", "405d61e", "b02ea96", "037a69d", "6d19164", "cdc87e3"]
+  "commits": [
+    "b76666d", "405d61e", "b02ea96", "037a69d", "6d19164", "cdc87e3",
+    "a07d932", "dfece07", "fed4547", "305d5dd", "36a08ff"
+  ]
 }

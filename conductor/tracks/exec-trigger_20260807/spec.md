@@ -4,7 +4,7 @@
 **Type:** Feature
 **Created:** 2026-08-07
 **Revised:** 2026-08-15 — redesenho pós-revisão, ver "Histórico da revisão" abaixo
-**Status:** Draft (revisão)
+**Status:** Implementado — ver [plan.md](./plan.md) Fases 7–11
 
 ## Summary
 
