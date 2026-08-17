@@ -1,0 +1,90 @@
+# Specification: Qualidade da Camada 2 (detector de rajada e serving)
+
+**Track ID:** ml-layer2-gaps_20260817
+**Type:** Feature
+**Created:** 2026-08-17
+**Status:** Draft
+
+## Summary
+
+Fechar as pendências de qualidade da Camada 2 que não dependem da carga completa do dataset: a
+avaliação e a calibração do `ml-burst-detector`, e a verificação do `ml-model-serving` contra dado
+real. As duas foram agrupadas por engano no adiamento de "medir qualidade preditiva", que vale
+apenas para AUC-PR e MAPE.
+
+## Context
+
+A track `ml-models_20260806` entregou os quatro componentes da Camada 2 e foi fechada com validação
+estrutural. O adiamento acordado para a Sprint 4 cobre as métricas que dependem de ingerir as
+122.543 linhas do `incidents.csv` — AUC-PR do breach e MAPE do volume. Duas pendências ficaram
+dentro desse adiamento sem pertencer a ele:
+
+**O `ml-burst-detector` já tem número real e o número é ruim.** O backtest
+(`apps/ml-burst-detector/scripts/backtest.py`) replaya o CSV completo em memória, sem tocar Kafka,
+Redis ou ClickHouse — roda hoje, com ou sem cluster. Ele mede precision de 0,103 e lead-time
+mediano de 9 segundos antes do P1/P2. Nove segundos não dão tempo de ação humana nenhuma: na
+prática o detector está sinalizando a rajada que já contém o incidente grave, em vez de antecipá-lo.
+Isso importa além do próprio componente — o detector é o gatilho que invoca o copiloto, então um
+gatilho ruim contamina o blind review, que é a evidência central do MVP.
+
+**O `ml-model-serving` nunca foi chamado com dado real.** O serviço está no ar em `ns: ml`
+carregando `models:/volume-forecast/Production` e `models:/breach-risk/Production`, mas só foi
+exercitado por smoke test com modelo mockado. O carregamento cross-processo dos artefatos — que
+motivou o fix de `code_paths` nos dois `train.py` — nunca foi verificado de ponta a ponta. A task
+5.4 da track `ml-models_20260806` ficou em `[~]` por isso.
+
+## User Story
+
+Como operador N1/N2, quero que o alerta de rajada chegue com antecedência suficiente para eu agir
+antes do incidente grave, em vez de junto com ele, para que o aviso tenha valor operacional.
+
+## Acceptance Criteria
+
+- [ ] O backtest mede recall além de precision: que fração dos P1/P2 do histórico foi precedida de alerta
+- [ ] O true positive passa a exigir um lead-time mínimo útil, definido e justificado — alerta que dispara
+      junto do incidente grave não conta como acerto
+- [ ] Hiperparâmetros calibrados numa janela temporal e avaliados em outra, sem tuning contra a janela
+      de avaliação
+- [ ] Existe um operating point escolhido com justificativa, ou a constatação registrada de que nenhum
+      ponto da curva sustenta o gatilho
+- [ ] Se o detector não sustentar o papel de gatilho primário, a consequência para o desenho do fluxo
+      está registrada e refletida no doc da sprint
+- [ ] `POST /predict/breach` e `POST /predict/volume` respondem contra os modelos `Production` reais com
+      incidentes do lote ingerido, com score calibrado e SHAP top-5 conferidos
+- [ ] Task 5.4 da track `ml-models_20260806` fechada
+
+## Dependencies
+
+- Camada 2 em `main` — atendido
+- `ml-model-serving` no ar com os artefatos `Production` carregados — atendido
+- PR #56 altera `docs/sprints/sprint-3-mvp.md` e `conductor/tracks.md`; a atualização de doc desta track
+  deve ser sincronizada depois do merge dele para evitar conflito
+
+## Out of Scope
+
+- Carga completa do `incidents.csv` e as métricas que dependem dela (AUC-PR, MAPE, recall@top-k) — Sprint 4
+- Camadas 3 e 4: copiloto, RAG, painel e Slack — track `mvp-closeout_20260817` (PR #56)
+- Retreino dos modelos de volume e breach
+
+## Technical Notes
+
+**O ground truth do backtest tem um viés a corrigir.** Hoje um alerta conta como acerto se qualquer
+P1/P2 aparecer no mesmo IC dentro de 1 hora, sem piso de antecedência. Como o alerta é levantado ao
+processar um evento que muitas vezes pertence à mesma rajada do incidente grave, o acerto acontece com
+segundos de diferença. Medir antecipação exige exigir antecipação na definição.
+
+**Precision sozinha não decide nada.** Sem recall, 0,103 pode significar tanto "dispara muito e acerta
+pouco" quanto "dispara pouco mas cobre os casos que importam". A curva precision × recall em função de
+`Z_SCORE_THRESHOLD` responde; um ponto único não.
+
+**Tuning contra o próprio backtest é overfitting.** Foi por isso que os hiperparâmetros ficaram nos
+valores iniciais (`CUSUM_K=0.5`, `CUSUM_H=5.0`, `MIN_ROBUST_STD=1.0`, `Z_SCORE_THRESHOLD=3.5`). A saída
+é separar janela de calibração e janela de avaliação no próprio CSV, cronologicamente.
+
+**Resultado negativo é resultado.** Se nenhum operating point sustentar o gatilho, isso é um achado
+legítimo do MVP e muda o desenho do fluxo — o copiloto passaria a ser invocado por score de breach
+acima de limiar, com a rajada como sinal auxiliar. O que não é aceitável é entregar o gatilho sem saber.
+
+---
+
+_Generated by Conductor. Review and edit as needed._
