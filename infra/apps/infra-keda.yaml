@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-keda
+  namespace: infra
+  annotations:
+    # Platform infra, installed once — same wave family as infra-eso. Must
+    # land before any ScaledObject (ns:ml/ns:data, wave 7+) that references
+    # its CRD.
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  source:
+    repoURL: https://github.com/thiagon/ops-ahead
+    targetRevision: main
+    path: infra/charts/infra-keda
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # KEDA's ScaledJob CRD is large enough that client-side apply's
+      # last-applied-configuration annotation blows the 256KiB etcd limit —
+      # server-side apply avoids storing that annotation at all.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -42,9 +42,22 @@ kafkaTopics:
   - name: actions.taken
     partitions: 3
     replicas: 2
-
-argoWorkflows:
-  enabled: false
+  # One topic per domain — KEDA's ScaledObject scales by queue volume, not
+  # message content, so it can't route by `analysis` itself (see
+  # conductor/tracks/exec-trigger_20260807/spec.md).
+  - name: trigger.ml
+    partitions: 3
+    replicas: 2
+  - name: trigger.data
+    partitions: 3
+    replicas: 2
+  # Compacted — ui-orchestrator rehydrates GET /runs/{run_id} from this on
+  # startup; key=run_id keeps only the latest status per run.
+  - name: trigger.status
+    partitions: 3
+    replicas: 2
+    config:
+      cleanup.policy: compact
 
 monitoring:
   enabled: true

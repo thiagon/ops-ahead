@@ -9,7 +9,10 @@ data-ingest:
 migration:
   image: migrate/migrate:v4.18.1
   pullPolicy: IfNotPresent
-  secretName: clickhouse-secret
+  # data-ingest's own secret, not data-clickhouse's — an app's migration job
+  # should never depend on another chart's Secret object staying named and
+  # shaped the way it happens to be today.
+  secretName: data-ingest-secret
 
 consumer:
   replicaCount: 1
@@ -32,3 +35,12 @@ consumer:
     batchMaxSize: "1000"
     batchMaxSeconds: "5"
   secretName: data-ingest-secret
+
+scaledObject:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  # Batch consumer (batchMaxSize above) — no need to scale on every message,
+  # only once real backlog builds up.
+  lagThreshold: "1000"
+  minReplicaCount: 0
+  maxReplicaCount: 5

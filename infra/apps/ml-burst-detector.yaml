@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-burst-detector
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  revisionHistoryLimit: 3
+  project: ops-ahead
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/ml-burst-detector/chart/values-dev.yaml) carries the
+  # CI-pinned image tag.
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/ml-burst-detector
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/ml-burst-detector/chart/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ml
+  # Unlike the training Jobs, this is a long-running consumer — automated
+  # sync keeps it current the same way data-ingest does.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  # KEDA's ScaledObject manages this Deployment's replica count directly
+  # (down to 0 when idle) — without ignoring it here, selfHeal would keep
+  # reverting it to the chart's static replicaCount, fighting KEDA forever.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.replicas

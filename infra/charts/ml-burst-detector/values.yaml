@@ -1,0 +1,34 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ml-burst-detector:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ml-burst-detector
+    tag: latest
+    pullPolicy: IfNotPresent
+
+consumer:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: incidents.received
+    kafkaGroupId: burst-detector
+    alertTopic: alerts.burst
+    redisHost: redis.ml.svc.cluster.local
+  secretName: ml-burst-detector-secret
+
+scaledObject:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  # Lower than data-ingest's 1000 — this app's whole job is reacting fast to
+  # a burst on the same topic, so it should scale up well before a real
+  # backlog forms.
+  lagThreshold: "50"
+  minReplicaCount: 0
+  maxReplicaCount: 5

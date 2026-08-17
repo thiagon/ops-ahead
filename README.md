@@ -62,8 +62,9 @@ Monorepo com workspaces `uv` para Python. Cada app em `apps/` gera sua própria 
 ```
 apps/                              # serviços e jobs que vão para o K8s
   data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO
-  data-transform/                  # Job       — dbt-clickhouse (marts)
-  data-quality/                    # Job       — Great Expectations (suites de qualidade)
+  data-runner/                     # Deployment (KEDA ScaledObject) — dbt-clickhouse (marts) + Great Expectations, consome trigger.data
+  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach, consome trigger.ml
+  ui-orchestrator/                 # Deployment — REST/MCP → Kafka (trigger.ml/trigger.data) sob demanda
 
 contracts/                         # JSON Schemas compartilhados entre apps
   incidents-raw.schema.json        # schema híbrido do tópico incidents.raw
@@ -81,7 +82,7 @@ infra/
     data-minio/                    # MinIO object storage
     data-clickhouse/               # ClickHouse (Altinity operator)
     data-strimzi/                  # Strimzi operator
-    data-workflows/                # Argo Workflows engine
+    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
     ml-mlflow/                     # MLflow tracking + AI Gateway
     ml-postgres/                   # Postgres (ns: ml)
     ml-redis/                      # Redis (ns: ml)
@@ -147,7 +148,7 @@ Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomín
 | MLflow | http://mlflow.ops-ahead.localtest.me | `MLFLOW_ADMIN_USERNAME` / `MLFLOW_ADMIN_PASSWORD` |
 | Gitea | http://gitea.ops-ahead.localtest.me | `GITEA_ADMIN_USERNAME` / `GITEA_ADMIN_PASSWORD` |
 | Prometheus | http://prometheus.ops-ahead.localtest.me | — |
-| Argo Workflows | http://argo-workflows.ops-ahead.localtest.me | — |
+| Orchestrator | http://orchestrator.ops-ahead.localtest.me | — |
 | Gateway | http://gateway.ops-ahead.localtest.me | — |
 | UI | http://ui.ops-ahead.localtest.me | — |
 

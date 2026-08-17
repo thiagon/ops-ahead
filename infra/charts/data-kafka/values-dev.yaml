@@ -40,3 +40,14 @@ kafkaTopics:
   - name: actions.taken
     partitions: 1
     replicas: 1
+  - name: trigger.ml
+    partitions: 1
+    replicas: 1
+  - name: trigger.data
+    partitions: 1
+    replicas: 1
+  - name: trigger.status
+    partitions: 1
+    replicas: 1
+    config:
+      cleanup.policy: compact

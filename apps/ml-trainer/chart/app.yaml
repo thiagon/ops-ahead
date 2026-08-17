@@ -1,0 +1,8 @@
+# Deploy identity for this app (documentation — see apps/data-ingest/chart/app.yaml).
+# A Deployment whose replica count KEDA scales via a ScaledObject on
+# trigger.ml's consumer lag (down to zero when idle) — the app process
+# itself loops over messages (src/trigger.py's consume_forever), so the
+# KEDA-managed resource is pod replicas, not a Job per message.
+workload: deployment
+namespace: ml
+chart: infra/charts/ml-trainer

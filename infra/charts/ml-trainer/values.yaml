@@ -1,0 +1,48 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app — layered in by infra/apps/ml-trainer.yaml via
+# apps/ml-trainer/chart/values-dev.yaml.
+ml-trainer:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ml-trainer
+    tag: ""
+    pullPolicy: IfNotPresent
+
+scaledObject:
+  pollingInterval: 15
+  # How long to wait after lag hits 0 before scaling back to minReplicaCount
+  # — training (LightGBM/Prophet/Optuna) can run long, give it real headroom
+  # before KEDA scales it away mid-run.
+  cooldownPeriod: 300
+  # 1 message ready ⇒ scale up. KEDA doesn't filter by content, only lag —
+  # see conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
+  # trigger.data are split by domain in the first place.
+  lagThreshold: "1"
+  minReplicaCount: 0
+  maxReplicaCount: 5
+
+train:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      # ns: ml's ResourceQuota (limits.cpu: 4) leaves little headroom once
+      # ml-burst-detector/ml-model-serving's own steady-state limits are
+      # already counted — 1 full CPU per on-demand training pod (plus some
+      # concurrency headroom from maxReplicaCount) didn't fit. 500m is enough
+      # for LightGBM/Prophet/Optuna to make progress, just slower.
+      cpu: 500m
+      memory: 1Gi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: trigger.ml
+    kafkaTopicStatus: trigger.status
+    kafkaGroupId: ml-trainer
+    kafkaConsumerTimeoutMs: "30000"
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
+    autoPromote: "true"
+  secretName: ml-trainer-secret

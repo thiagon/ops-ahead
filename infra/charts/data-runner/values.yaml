@@ -1,0 +1,68 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app — layered in by infra/apps/data-runner.yaml via
+# apps/data-runner/chart/values-dev.yaml.
+data-runner:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-runner
+    tag: ""
+    pullPolicy: IfNotPresent
+
+scaledObject:
+  pollingInterval: 15
+  # How long to wait after lag hits 0 before scaling back to minReplicaCount
+  # — full_pipeline chains dbt run → great_expectations → register-snapshot
+  # in one process, give it real headroom before KEDA scales it away mid-run.
+  cooldownPeriod: 300
+  # 1 message ready ⇒ scale up. KEDA doesn't filter by content, only lag —
+  # see conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
+  # trigger.data are split by domain in the first place.
+  lagThreshold: "1"
+  minReplicaCount: 0
+  maxReplicaCount: 5
+
+run:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: trigger.data
+    kafkaTopicStatus: trigger.status
+    kafkaGroupId: data-runner
+    kafkaConsumerTimeoutMs: "30000"
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    minioEndpoint: http://minio.data.svc.cluster.local:9000
+    minioBucket: ops-ahead-lake
+    mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
+    # Tags register_snapshot's MLflow run — which pipeline config produced
+    # it. Overridden per-pipeline the same way pipelines/data-itsm-daily's
+    # `source: itsm` used to configure the old WorkflowTemplate.
+    source: itsm
+    # Marts register_snapshot.py counts and fingerprints for full_pipeline —
+    # same list pipelines/data-itsm-daily/values.yaml carried for the old
+    # WorkflowTemplate's inline script.
+    snapshotMarts:
+      - incidents_by_ic
+      - p4_sequences_by_ci
+      - first_touch_duration
+      - priority_changes_log
+      - daily_anomaly_features
+      - kpi_monthly_state
+  secretName: data-runner-secret
+
+# Native CronJob — publishes {run_id: daily-<date>, analysis: full_pipeline}
+# to trigger.data at the scheduled time, consumed by the Deployment above
+# (no parallel execution path — see spec.md). schedule/enabled ported
+# from pipelines/data-itsm-daily/values.yaml, which is removed in Fase 10
+# along with the data-pipeline chart/ApplicationSet path it depended on.
+cron:
+  enabled: true
+  schedule: "0 2 * * *"
+  image: edenhill/kcat:1.7.1

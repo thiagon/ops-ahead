@@ -1,0 +1,30 @@
+# KEDA already defaults to watching every namespace (watchNamespace: "") and
+# 1 replica per component. The operator's own ServiceAccount is what scales
+# Deployments (ScaledObject) in ns:ml/ns:data — platform infra, never
+# application code (see conductor/tracks/exec-trigger_20260807/spec.md).
+keda:
+  # ScaledObject scales via a HorizontalPodAutoscaler under the hood, and the
+  # HPA reads the Kafka-lag metric through the external.metrics.k8s.io API —
+  # this component serves that API. Unlike ScaledJob (which never needed it,
+  # KEDA manages the Job queue directly with no HPA involved), every
+  # Kafka-consuming app here is now a ScaledObject-scaled Deployment, so this
+  # can't be disabled.
+  metricsServer:
+    enabled: true
+  # Both components' 1-CPU default limit is more than this dev cluster can
+  # spare — sized down the same way for both.
+  resources:
+    metricServer:
+      limits:
+        cpu: 250m
+        memory: 250Mi
+      requests:
+        cpu: 50m
+        memory: 50Mi
+    webhooks:
+      limits:
+        cpu: 250m
+        memory: 250Mi
+      requests:
+        cpu: 50m
+        memory: 50Mi

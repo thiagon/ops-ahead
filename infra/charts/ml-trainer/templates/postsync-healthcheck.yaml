@@ -1,0 +1,52 @@
+# Same PreSync-hook pattern data-ingest's migration Job already uses, applied
+# PostSync here: catches a misconfigured host/port (typo'd values.yaml, a
+# broker/ClickHouse not actually up yet) as a failed ArgoCD sync instead of a
+# Deployment that silently never becomes ready.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ml-trainer-healthcheck
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-trainer.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 60
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: ml-trainer-healthcheck
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check-connectivity
+          image: busybox:1.36
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              HOST="${KAFKA_BOOTSTRAP_SERVERS%%:*}"
+              PORT="${KAFKA_BOOTSTRAP_SERVERS##*:}"
+              echo "checking Kafka at ${HOST}:${PORT}..."
+              nc -z -w5 "$HOST" "$PORT"
+              echo "Kafka reachable"
+              echo "checking ClickHouse at ${CLICKHOUSE_HOST}:9000..."
+              nc -z -w5 "$CLICKHOUSE_HOST" 9000
+              echo "ClickHouse reachable"
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.train.env.kafkaBootstrapServers | quote }}
+            - name: CLICKHOUSE_HOST
+              value: {{ .Values.train.env.clickhouseHost | quote }}

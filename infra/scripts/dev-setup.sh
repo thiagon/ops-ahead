@@ -54,6 +54,7 @@ helm repo add bitnami              https://charts.bitnami.com/bitnami           
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
 helm repo add grafana              https://grafana.github.io/helm-charts              2>/dev/null || true
 helm repo add hashicorp            https://helm.releases.hashicorp.com                2>/dev/null || true
+helm repo add kedacore             https://kedacore.github.io/charts                  2>/dev/null || true
 helm repo update > /dev/null
 info "OK"
 

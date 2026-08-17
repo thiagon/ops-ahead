@@ -1,0 +1,30 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ui-orchestrator:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-orchestrator
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# Fixed at 1 — see run-status.ts's RunsService: GET /runs/{run_id} answers
+# from an in-process Map, not a shared store, so a second replica would
+# answer inconsistently depending on which pod the Service happens to route
+# a request to.
+orchestrator:
+  replicaCount: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    appEnv: dev
+    logLevel: info
+    serviceName: orchestrator
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopicMl: trigger.ml
+    kafkaTopicData: trigger.data
+    kafkaTopicStatus: trigger.status

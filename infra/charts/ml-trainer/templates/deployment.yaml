@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-trainer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-trainer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.train.replicaCount }}
+  selector:
+    matchLabels:
+      app: ml-trainer
+  template:
+    metadata:
+      labels:
+        app: ml-trainer
+        {{- include "ml-trainer.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ml-trainer
+          image: {{ include "ml-trainer.image" . | quote }}
+          imagePullPolicy: {{ (index .Values "ml-trainer").image.pullPolicy }}
+          command: ["python", "-m", "src.main", "consume"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: metrics
+              containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.train.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.train.env.kafkaTopic | quote }}
+            - name: KAFKA_TOPIC_STATUS
+              value: {{ .Values.train.env.kafkaTopicStatus | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.train.env.kafkaGroupId | quote }}
+            - name: KAFKA_CONSUMER_TIMEOUT_MS
+              value: {{ .Values.train.env.kafkaConsumerTimeoutMs | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.train.env.clickhouseUser | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.train.secretName }}
+                  key: clickhouse-password
+            - name: CLICKHOUSE_URL
+              value: "clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.train.env.clickhouseHost }}:9000/{{ .Values.train.env.clickhouseDatabase }}"
+            - name: MLFLOW_TRACKING_URI
+              value: {{ .Values.train.env.mlflowTrackingUri | quote }}
+            - name: AUTO_PROMOTE
+              value: {{ .Values.train.env.autoPromote | quote }}
+          resources:
+            {{- toYaml .Values.train.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
