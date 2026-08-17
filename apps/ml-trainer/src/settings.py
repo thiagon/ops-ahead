@@ -25,6 +25,18 @@ class Settings(BaseSettings):
     p4_precursor_window_hours: int = 24
     optuna_trials: int = 50
 
+    # kpi-projection only (Monte Carlo).
+    kpi_projection_n_simulations: int = 2000
+    kpi_projection_seed: int = 42
+    kpi_projection_holdout_days: int = 14
+    # PPR targets are Locaweb business input, never derivable from the
+    # dataset — left unset until an operator supplies them. P(fechar mês)
+    # comes back as None for a dimension whose target is unset.
+    kpi_target_volume_p2: int | None = None
+    kpi_target_volume_p3: int | None = None
+    kpi_target_breaches_p2: int | None = None
+    kpi_target_breaches_p3: int | None = None
+
     auto_promote: bool = True
 
     kafka_bootstrap_servers: str = "localhost:9092"

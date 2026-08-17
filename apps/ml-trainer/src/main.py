@@ -41,6 +41,19 @@ def _train_breach(settings: Settings) -> str:
 TRAINERS = {"volume": _train_volume, "breach": _train_breach}
 
 
+def _analyze_kpi_projection(settings: Settings) -> dict:
+    from src.kpi_projection.data import fetch_kpi_monthly_state
+    from src.kpi_projection.run import run_kpi_projection
+    from src.volume.data import fetch_daily_anomaly_features
+
+    daily = fetch_daily_anomaly_features(settings)
+    kpi_state = fetch_kpi_monthly_state(settings)
+    return run_kpi_projection(settings, daily, kpi_state)
+
+
+ANALYSES = {"kpi-projection": _analyze_kpi_projection}
+
+
 def _require_split_boundaries(settings: Settings) -> None:
     missing = [
         name
@@ -65,8 +78,16 @@ def main() -> None:
         consume_forever(settings, TRAINERS)
         return
 
+    if len(sys.argv) == 3 and sys.argv[1] == "analyze" and sys.argv[2] in ANALYSES:
+        settings = Settings()
+        if settings.mlflow_experiment_name is None:
+            settings.mlflow_experiment_name = "kpi-monthly-projection"
+        result = ANALYSES[sys.argv[2]](settings)
+        LOGGER.info("Analysis complete. MLflow run_id=%s", result["run_id"])
+        return
+
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m src.main train <volume|breach> | consume")
+        LOGGER.error("Usage: python -m src.main train <volume|breach> | analyze kpi-projection | consume")
         sys.exit(2)
 
     domain = sys.argv[2]

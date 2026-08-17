@@ -48,18 +48,18 @@ Responde a pergunta do gestor, que é probabilística: "vou fechar o mês em 100
 
 ### Tasks
 
-- [ ] 2.1: Análise no `ml-trainer` consumindo `kpi_monthly_state` e a distribuição preditiva do volume
-- [ ] 2.2: Para cada dia restante do mês, sortear volume da preditiva do LightGBM × taxa de breach de uma
+- [x] 2.1: Análise no `ml-trainer` consumindo `kpi_monthly_state` e a distribuição preditiva do volume
+- [x] 2.2: Para cada dia restante do mês, sortear volume da preditiva do LightGBM × taxa de breach de uma
       Beta posterior por prioridade, e agregar
-- [ ] 2.3: Produzir as 4 projeções independentes do PPR: volume P2, volume P3, OLA P2, OLA P3
-- [ ] 2.4: Calcular `P(fechar o mês)` por projeção, com intervalo de confiança de 80%
-- [ ] 2.5: Registrar params, métricas e artefatos no MLflow como qualquer outro experimento
-- [ ] 2.6: Testes da agregação e da amostragem com semente fixa
+- [x] 2.3: Produzir as 4 projeções independentes do PPR: volume P2, volume P3, OLA P2, OLA P3
+- [x] 2.4: Calcular `P(fechar o mês)` por projeção, com intervalo de confiança de 80%
+- [x] 2.5: Registrar params, métricas e artefatos no MLflow como qualquer outro experimento
+- [x] 2.6: Testes da agregação e da amostragem com semente fixa
 
 ### Verification
 
-- [ ] As 4 projeções saem com intervalo, sobre o dado disponível
-- [ ] Rodar duas vezes com a mesma semente produz o mesmo resultado
+- [x] As 4 projeções saem com intervalo, sobre o dado disponível
+- [x] Rodar duas vezes com a mesma semente produz o mesmo resultado
 
 ---
 
