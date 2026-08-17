@@ -6,6 +6,10 @@ ui-orchestrator:
     tag: latest
     pullPolicy: IfNotPresent
 
+# Fixed at 1 — see run-status.ts's RunsService: GET /runs/{run_id} answers
+# from an in-process Map, not a shared store, so a second replica would
+# answer inconsistently depending on which pod the Service happens to route
+# a request to.
 orchestrator:
   replicaCount: 1
   port: 3000
@@ -24,8 +28,3 @@ orchestrator:
     kafkaTopicMl: trigger.ml
     kafkaTopicData: trigger.data
     kafkaTopicStatus: trigger.status
-
-hpa:
-  minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 70

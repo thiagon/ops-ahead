@@ -119,10 +119,9 @@ spec:
   hard:
     requests.cpu: "1500m"
     requests.memory: 1536Mi
-    # ui-orchestrator's HPA (1-3 replicas, 500m limit each) alongside
-    # ui-gateway/ui-frontend's own steady-state limits didn't fit in the
-    # previous 2 CPU — a rolling update needing old+new pods simultaneously
-    # got stuck in FailedCreate against the old ceiling.
+    # ui-orchestrator/ui-gateway/ui-frontend's steady-state limits didn't fit
+    # in the previous 2 CPU — a rolling update needing old+new pods
+    # simultaneously got stuck in FailedCreate against the old ceiling.
     limits.cpu: "3"
     limits.memory: 3Gi
     pods: "10"
