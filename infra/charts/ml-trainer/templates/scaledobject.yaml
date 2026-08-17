@@ -1,0 +1,26 @@
+# KEDA scales this Deployment's replica count directly from trigger.ml's
+# consumer lag, down to zero when idle — the app process itself now loops
+# over messages (src/trigger.py's consume_forever) instead of exiting after
+# one, so it's the replica count that grows/shrinks, not the object count.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ml-trainer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-trainer.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: ml-trainer
+  pollingInterval: {{ .Values.scaledObject.pollingInterval }}
+  cooldownPeriod: {{ .Values.scaledObject.cooldownPeriod }}
+  minReplicaCount: {{ .Values.scaledObject.minReplicaCount }}
+  maxReplicaCount: {{ .Values.scaledObject.maxReplicaCount }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.train.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.train.env.kafkaGroupId | quote }}
+        topic: {{ .Values.train.env.kafkaTopic | quote }}
+        lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
+        offsetResetPolicy: earliest

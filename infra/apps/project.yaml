@@ -19,6 +19,7 @@ spec:
     - https://charts.external-secrets.io
     - https://strimzi.io/charts/
     - https://docs.altinity.com/clickhouse-operator/
+    - https://kedacore.github.io/charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: infra
@@ -48,6 +49,10 @@ spec:
       kind: MutatingWebhookConfiguration
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
+    # KEDA's metrics-server registers itself as the external.metrics.k8s.io
+    # API — cluster-scoped, so it needs its own whitelist entry.
+    - group: apiregistration.k8s.io
+      kind: APIService
     - group: argoproj.io
       kind: Application
     - group: argoproj.io

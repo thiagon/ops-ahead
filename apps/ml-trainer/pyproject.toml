@@ -1,0 +1,25 @@
+[project]
+name = "ops-ahead-ml-trainer"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "clickhouse-driver>=0.2.9",
+    "pandas>=2.2,<3",
+    "numpy>=1.26",
+    "lightgbm>=4.5",
+    "prophet>=1.1.6",
+    "mlflow>=2.17",
+    "holidays>=0.60",
+    "optuna>=4.0",
+    "shap>=0.46",
+    "scikit-learn>=1.5",
+    "pydantic-settings>=2.5",
+    "matplotlib>=3.9",
+    "kafka-python>=3.0",
+    "prometheus-client>=0.21",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]

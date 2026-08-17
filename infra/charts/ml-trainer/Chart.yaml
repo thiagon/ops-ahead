@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ml-trainer
+description: ml-trainer's own workload — Deployment scaled by a KEDA ScaledObject consuming trigger.ml (ns:ml)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

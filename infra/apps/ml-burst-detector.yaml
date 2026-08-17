@@ -42,3 +42,11 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
+  # KEDA's ScaledObject manages this Deployment's replica count directly
+  # (down to 0 when idle) — without ignoring it here, selfHeal would keep
+  # reverting it to the chart's static replicaCount, fighting KEDA forever.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.replicas

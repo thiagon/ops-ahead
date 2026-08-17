@@ -1,0 +1,17 @@
+# Ingress lives in infra/apps/ingresses.yaml (shared file), same pattern as
+# trigger-service — not colocated in this chart like ui-gateway's.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: orchestrator
+    {{- include "ui-orchestrator.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: orchestrator
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

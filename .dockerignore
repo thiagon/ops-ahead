@@ -1,0 +1,12 @@
+# Build context is always the repo root (see Makefile's build-local target
+# and CI's per-app docker build step) — exclude everything a Dockerfile never
+# COPYs, so local builds don't choke on unreadable/huge dirs like .data/
+# (k3d PVC bind-mounts, root-owned) and CI doesn't ship dead weight.
+.git/
+.data/
+.venv/
+node_modules/
+**/__pycache__/
+**/*.py[oc]
+**/.pytest_cache/
+mlruns/

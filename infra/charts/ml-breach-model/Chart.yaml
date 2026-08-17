@@ -1,6 +1,0 @@
-apiVersion: v2
-name: ml-breach-model
-description: OLA-breach risk training job — LightGBM + isotonic calibration + SHAP, registered in MLflow (ns:ml)
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

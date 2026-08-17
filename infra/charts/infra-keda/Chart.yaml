@@ -1,0 +1,10 @@
+apiVersion: v2
+name: infra-keda
+description: KEDA — event-driven autoscaler; scales Kafka-consuming Deployments (ScaledObject) from lag
+type: application
+version: 0.1.0
+appVersion: "2.20.2"
+dependencies:
+  - name: keda
+    version: "2.20.2"
+    repository: "https://kedacore.github.io/charts"

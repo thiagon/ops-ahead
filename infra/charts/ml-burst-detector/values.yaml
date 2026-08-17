@@ -22,3 +22,13 @@ consumer:
     alertTopic: alerts.burst
     redisHost: redis.ml.svc.cluster.local
   secretName: ml-burst-detector-secret
+
+scaledObject:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  # Lower than data-ingest's 1000 — this app's whole job is reacting fast to
+  # a burst on the same topic, so it should scale up well before a real
+  # backlog forms.
+  lagThreshold: "50"
+  minReplicaCount: 0
+  maxReplicaCount: 5

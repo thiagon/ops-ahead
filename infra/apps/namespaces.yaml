@@ -56,7 +56,11 @@ spec:
   hard:
     requests.cpu: "8"
     requests.memory: 16Gi
-    limits.cpu: "16"
+    # Steady-state usage sits around 15.3 CPU across the infra stack (ArgoCD,
+    # Prometheus, Loki, Vault, KEDA, Gitea...) — a rolling update needs old+new
+    # pod simultaneously, so the ceiling needs headroom above steady-state for
+    # at least one surge pod. Node has 20 CPU capacity, so this isn't scarce.
+    limits.cpu: "20"
     limits.memory: 32Gi
     pods: "50"
 ---
@@ -113,10 +117,13 @@ metadata:
   namespace: ui
 spec:
   hard:
-    requests.cpu: "1"
-    requests.memory: 1Gi
-    limits.cpu: "2"
-    limits.memory: 2Gi
+    requests.cpu: "1500m"
+    requests.memory: 1536Mi
+    # ui-orchestrator/ui-gateway/ui-frontend's steady-state limits didn't fit
+    # in the previous 2 CPU — a rolling update needing old+new pods
+    # simultaneously got stuck in FailedCreate against the old ceiling.
+    limits.cpu: "3"
+    limits.memory: 3Gi
     pods: "10"
 ---
 # ─── LimitRanges — defaults para containers sem requests/limits explícitos ───

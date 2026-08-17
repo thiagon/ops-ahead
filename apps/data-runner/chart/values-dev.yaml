@@ -1,0 +1,7 @@
+# Per-environment overlay for this pipeline step. Every app follows the same
+# rule — <app>.image.tag — pinned by the Gitea Actions write-back. The registry
+# repository lives in the chart defaults; keying by app name keeps distinct
+# top-level keys so the pipeline App layers several steps without colliding.
+data-runner:
+  image:
+    tag: "latest"
