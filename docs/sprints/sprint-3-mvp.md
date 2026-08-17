@@ -180,6 +180,11 @@ O limiar adaptativo por IC é a decisão de design mais importante aqui. Um limi
 
 A combinação z-score + CUSUM cobre dois casos distintos: pico pontual alto (z-score pega) e mudança de regime gradual onde nenhum ponto individual cruza o threshold mas a série toda sobe (CUSUM pega). Os dois juntos são mais robustos do que qualquer um sozinho.
 
+**Status (2026-08-17):** os quatro componentes estão implementados, mergeados em `main` (PR #51) e
+validados estruturalmente contra dado real do cluster — detalhes em `docs/insights/ml_models_baseline.md`.
+Os números de qualidade preditiva (MAPE, AUC-PR, recall@top-k) sobre o dataset completo dependem de uma
+ingestão que ainda não rodou até o fim nesta instância; ficam como follow-up, não bloqueiam o MVP.
+
 ### 4.3 Camada 3 — Copiloto IA
 
 **O que o MVP precisa testar no copiloto:**
