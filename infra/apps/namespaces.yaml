@@ -56,7 +56,11 @@ spec:
   hard:
     requests.cpu: "8"
     requests.memory: 16Gi
-    limits.cpu: "16"
+    # Steady-state usage sits around 15.3 CPU across the infra stack (ArgoCD,
+    # Prometheus, Loki, Vault, KEDA, Gitea...) — a rolling update needs old+new
+    # pod simultaneously, so the ceiling needs headroom above steady-state for
+    # at least one surge pod. Node has 20 CPU capacity, so this isn't scarce.
+    limits.cpu: "20"
     limits.memory: 32Gi
     pods: "50"
 ---
