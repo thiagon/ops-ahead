@@ -1,4 +1,4 @@
-# Track: Qualidade da Camada 2 (detector de rajada e serving)
+# Track: Conformidade da Camada 2 com a arquitetura da Sprint 2
 
 **ID:** ml-layer2-gaps_20260817
 **Status:** Pending
@@ -10,8 +10,8 @@
 
 ## Progress
 
-- Phases: 0/4 complete
-- Tasks: 0/20 complete
+- Phases: 0/7 complete
+- Tasks: 0/41 complete
 
 ## Quick Links
 

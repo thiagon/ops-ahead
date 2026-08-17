@@ -1,4 +1,4 @@
-# Implementation Plan: Qualidade da Camada 2 (detector de rajada e serving)
+# Implementation Plan: Conformidade da Camada 2 com a arquitetura da Sprint 2
 
 **Track ID:** ml-layer2-gaps_20260817
 **Spec:** [spec.md](./spec.md)
@@ -7,57 +7,120 @@
 
 ## Overview
 
-Quatro fases. A metodologia de avaliação vem antes do tuning porque calibrar contra uma métrica
-enviesada só produz um número melhor, não um detector melhor: enquanto o acerto não exigir
-antecedência e o recall não for medido, não há como saber se um operating point é bom. Só depois
-disso a varredura de hiperparâmetros tem sentido, e ela precisa de janelas separadas de calibração e
-avaliação para não virar overfitting no backtest. O `ml-model-serving` é independente das duas
-primeiras fases e pode ser feito em paralelo por outra pessoa. A documentação fecha, depois do merge
-do PR #56 para não conflitar no mesmo doc.
+Sete fases. A auditoria vem primeiro e produz a lista fechada de divergências entre a seção 3.2 da
+Sprint 2 e o código — sem ela, "seguir todo o doc" fica na intenção. Os dois modelos ausentes vêm
+logo depois, porque são entrega de dados que o resto consome e o insumo deles já está nos marts. A
+qualidade do detector vem em seguida, com a metodologia antes do tuning: calibrar contra uma métrica
+enviesada produz número melhor, não detector melhor. A feature de recategorização e o serving são
+independentes e podem correr em paralelo por outra pessoa. A documentação fecha, depois do merge do
+PR #56 para não conflitar no mesmo arquivo.
 
-Nenhuma app nova entra nesta track. As mudanças ficam em `apps/ml-burst-detector/` (detector e
-backtest) e em documentação.
+Nenhuma app nova. As mudanças ficam em `apps/ml-trainer/` (dois modelos novos e uma feature),
+`apps/ml-burst-detector/` (detector e backtest) e documentação.
 
 ---
 
-## Phase 1: Metodologia de avaliação do detector
+## Phase 1: Auditoria de conformidade
+
+Produz a lista fechada do que falta, para que nada mais fique de fora por agrupamento errado.
+
+### Tasks
+
+- [ ] 1.1: Percorrer a seção 3.2 da Sprint 2 linha a linha — os cinco modelos, as métricas de produção
+      de cada um, as quatro features de domínio cross-modelo e os componentes de plataforma — e
+      classificar cada item em implementado, ausente ou divergente
+- [ ] 1.2: Para cada item ausente ou divergente, decidir entre implementar nesta track ou registrar
+      desvio consciente com justificativa
+- [ ] 1.3: Decidir o destino de **Evidently AI** (drift PSI/KS → métrica Prometheus), que a Sprint 2
+      lista e nenhum doc do MVP excluiu
+- [ ] 1.4: Decidir o destino de **BentoML** no empacotamento do `model-serving`, hoje FastAPI puro
+- [ ] 1.5: Registrar a tabela de conformidade em `docs/insights/` como saída da fase
+
+### Verification
+
+- [ ] Nenhum item da seção 3.2 fica sem destino declarado
+
+---
+
+## Phase 2: Projeção KPI mensal (Monte Carlo)
+
+Responde a pergunta do gestor, que é probabilística: "vou fechar o mês em 100%?".
+
+### Tasks
+
+- [ ] 2.1: Análise no `ml-trainer` consumindo `kpi_monthly_state` e a distribuição preditiva do volume
+- [ ] 2.2: Para cada dia restante do mês, sortear volume da preditiva do LightGBM × taxa de breach de uma
+      Beta posterior por prioridade, e agregar
+- [ ] 2.3: Produzir as 4 projeções independentes do PPR: volume P2, volume P3, OLA P2, OLA P3
+- [ ] 2.4: Calcular `P(fechar o mês)` por projeção, com intervalo de confiança de 80%
+- [ ] 2.5: Registrar params, métricas e artefatos no MLflow como qualquer outro experimento
+- [ ] 2.6: Testes da agregação e da amostragem com semente fixa
+
+### Verification
+
+- [ ] As 4 projeções saem com intervalo, sobre o dado disponível
+- [ ] Rodar duas vezes com a mesma semente produz o mesmo resultado
+
+---
+
+## Phase 3: Detector de evento externo (Isolation Forest)
+
+Marca o dia anômalo para excluir do treino e sinalizar investigação fora da Locaweb.
+
+### Tasks
+
+- [ ] 3.1: Treino sobre `daily_anomaly_features` — volume total, share de P1, % de abertura manual,
+      dispersão de ICs, taxa de "Sem Intervenção"
+- [ ] 3.2: Levantar os outliers conhecidos do histórico para servir de referência de recall
+- [ ] 3.3: Medir recall nesses outliers, precisão entre os marcados e falso positivo em dias normais
+- [ ] 3.4: Registrar no MLflow e promover se o resultado sustentar
+- [ ] 3.5: Expor o resultado como marcação de dia/janela, consumível pelo filtro de treino dos outros
+      modelos
+- [ ] 3.6: Testes da montagem de features e do formato da marcação
+
+### Verification
+
+- [ ] Outliers conhecidos do histórico aparecem marcados
+- [ ] Dias normais não são marcados em massa
+
+---
+
+## Phase 4: Metodologia de avaliação do detector de rajada
 
 Corrige o que a métrica mede antes de tentar melhorar o número.
 
 ### Tasks
 
-- [ ] 1.1: Exigir lead-time mínimo para contar true positive — alerta que dispara junto do P1/P2 deixa de
-      ser acerto. Definir o piso a partir do que é tempo de ação plausível para o N1 e justificar a escolha
-- [ ] 1.2: Medir recall: fração dos P1/P2 do histórico precedida por alerta dentro da janela
-- [ ] 1.3: Reportar a curva precision × recall em função de `Z_SCORE_THRESHOLD`, não um ponto único
-- [ ] 1.4: Separar o CSV em janela de calibração e janela de avaliação, cronologicamente, e expor a
-      escolha por parâmetro do backtest
-- [ ] 1.5: Distinguir no relatório os alertas vindos de z-score dos vindos de CUSUM — hoje os dois somem
-      dentro do mesmo total e não dá para saber qual detector carrega o resultado
-- [ ] 1.6: Testes das métricas novas contra séries sintéticas com ground truth conhecido
+- [ ] 4.1: Exigir lead-time mínimo para contar true positive — alerta que dispara junto do P1/P2 deixa de
+      ser acerto. Definir o piso a partir do tempo de ação plausível para o N1 e justificar
+- [ ] 4.2: Medir recall: fração dos P1/P2 do histórico precedida por alerta dentro da janela
+- [ ] 4.3: Reportar a curva precision × recall em função de `Z_SCORE_THRESHOLD`, não um ponto único
+- [ ] 4.4: Separar o CSV em janela de calibração e janela de avaliação, cronologicamente
+- [ ] 4.5: Distinguir no relatório os alertas vindos de z-score dos vindos de CUSUM
+- [ ] 4.6: Testes das métricas novas contra séries sintéticas com ground truth conhecido
 
 ### Verification
 
-- [ ] Backtest roda sobre o CSV completo e reporta precision, recall, lead-time e a curva, por janela
-- [ ] Uma série sintética com antecipação conhecida produz o lead-time esperado
+- [ ] Backtest reporta precision, recall, lead-time e a curva, por janela
+- [ ] Série sintética com antecipação conhecida produz o lead-time esperado
 
 ---
 
-## Phase 2: Calibração e decisão sobre o gatilho
+## Phase 5: Calibração e decisão sobre o gatilho
 
 Com a métrica corrigida, descobrir se existe operating point utilizável.
 
 ### Tasks
 
-- [ ] 2.1: Varredura de `Z_SCORE_THRESHOLD`, `CUSUM_K`, `CUSUM_H`, `MIN_ROBUST_STD` e das janelas
-      (15min/1h/6h) na janela de calibração
-- [ ] 2.2: Definir o piso de utilidade — que combinação de precision, recall e lead-time torna o gatilho
-      defensável para o operador — antes de olhar o resultado da varredura
-- [ ] 2.3: Escolher o operating point e justificar o trade-off
-- [ ] 2.4: Reavaliar o ponto escolhido na janela de avaliação, sem retuning
-- [ ] 2.5: Aplicar os parâmetros escolhidos em `apps/ml-burst-detector/src/detector.py`
-- [ ] 2.6: Se nenhum ponto atingir o piso de 2.2, registrar o achado e a consequência de desenho: o
-      copiloto passa a ser invocado por score de breach acima de limiar e a rajada vira sinal auxiliar
+- [ ] 5.1: Varredura de `Z_SCORE_THRESHOLD`, `CUSUM_K`, `CUSUM_H`, `MIN_ROBUST_STD` e das janelas na
+      janela de calibração
+- [ ] 5.2: Definir o piso de utilidade — que combinação de precision, recall e lead-time torna o gatilho
+      defensável — antes de olhar o resultado da varredura
+- [ ] 5.3: Escolher o operating point e justificar o trade-off
+- [ ] 5.4: Reavaliar o ponto escolhido na janela de avaliação, sem retuning
+- [ ] 5.5: Aplicar os parâmetros escolhidos em `apps/ml-burst-detector/src/detector.py`
+- [ ] 5.6: Se nenhum ponto atingir o piso, registrar o achado e a consequência: o copiloto passa a ser
+      invocado por score de breach acima de limiar e a rajada vira sinal auxiliar
 
 ### Verification
 
@@ -66,42 +129,44 @@ Com a métrica corrigida, descobrir se existe operating point utilizável.
 
 ---
 
-## Phase 3: `ml-model-serving` contra dado real
+## Phase 6: Feature de recategorização e serving com dado real
 
-Primeira chamada real ao serviço desde que ele subiu.
+Duas pendências independentes das anteriores.
 
 ### Tasks
 
-- [ ] 3.1: Montar o payload de `POST /predict/breach` a partir de incidentes reais do lote ingerido,
-      usando as colunas de `ml-breach-model/src/features.py::FEATURE_COLUMNS`
-- [ ] 3.2: Conferir o score calibrado e o SHAP top-5 da resposta contra o esperado para aqueles incidentes
-- [ ] 3.3: `POST /predict/volume` com lags e rolling reais; conferir D+1, D+7 e o intervalo de confiança
-- [ ] 3.4: Confirmar que os artefatos `Production` carregam de fato no processo do serving — é o
-      caminho que motivou o `code_paths` nos dois `train.py` e nunca foi exercido fora do smoke test
-- [ ] 3.5: Registrar o resultado e fechar a task 5.4 de `ml-models_20260806`
+- [ ] 6.1: `historico_recategorizacao` no `FEATURE_COLUMNS` do breach, a partir de `priority_changes_log`
+- [ ] 6.2: Confirmar que a feature não vaza futuro — a transição usada tem que ser anterior ao instante
+      da predição
+- [ ] 6.3: Testes da feature, incluindo o caso de incidente sem transição nenhuma
+- [ ] 6.4: `POST /predict/breach` com incidentes reais do lote, conferindo score calibrado e SHAP top-5
+- [ ] 6.5: `POST /predict/volume` com lags e rolling reais, conferindo D+1, D+7 e o intervalo
+- [ ] 6.6: Confirmar o carregamento cross-processo dos artefatos `Production` — caminho que motivou o
+      `code_paths` nos `train.py` e nunca foi exercido fora do smoke test
+- [ ] 6.7: Fechar a task 5.4 de `ml-models_20260806`
 
 ### Verification
 
+- [ ] Retreino do breach com a feature nova conclui e registra no MLflow
 - [ ] Os dois endpoints respondem com payload íntegro contra os modelos `Production`
-- [ ] Nenhum erro de unpickle no carregamento cross-processo
 
 ---
 
-## Phase 4: Documentação e fechamento
+## Phase 7: Documentação e fechamento
 
 Roda depois do merge do PR #56, que altera os mesmos arquivos.
 
 ### Tasks
 
-- [ ] 4.1: Atualizar `docs/insights/ml_models_baseline.md` com precision, recall, lead-time e o operating
-      point escolhido, e com o resultado do serving
-- [ ] 4.2: Atualizar a seção 4.2 de `docs/sprints/sprint-3-mvp.md` — e a 4.4 e a 5, se a decisão de 2.6
-      mudar quem invoca o copiloto
-- [ ] 4.3: Fechar as pendências correspondentes no `plan.md` de `ml-models_20260806`
+- [ ] 7.1: Atualizar `docs/insights/ml_models_baseline.md` com os resultados das fases 2 a 6
+- [ ] 7.2: Atualizar a seção 4.2 de `docs/sprints/sprint-3-mvp.md` — e as seções 4.4 e 5 se a decisão de
+      5.6 mudar quem invoca o copiloto
+- [ ] 7.3: Refletir no doc os desvios conscientes decididos na Fase 1
+- [ ] 7.4: Fechar as pendências correspondentes no `plan.md` de `ml-models_20260806`
 
 ### Verification
 
-- [ ] Doc da sprint e baseline contam os mesmos números
+- [ ] Doc da sprint, baseline e tabela de conformidade contam os mesmos números
 - [ ] Nenhuma task de `ml-models_20260806` fica em `[~]` sem dono
 
 ---
@@ -109,8 +174,8 @@ Roda depois do merge do PR #56, que altera os mesmos arquivos.
 ## Final Verification
 
 - [ ] Todos os acceptance criteria da spec atendidos
-- [ ] Testes de `ml-burst-detector` verdes
-- [ ] ArgoCD reconciliando `ml-burst-detector` com os parâmetros novos
+- [ ] Testes de `ml-trainer` e `ml-burst-detector` verdes
+- [ ] ArgoCD reconciliando `ml-burst-detector` e `ml-trainer` sem drift
 - [ ] PR mergeado em `main` com revisão
 
 ---
