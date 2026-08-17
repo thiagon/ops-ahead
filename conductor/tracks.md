@@ -8,6 +8,6 @@
 | [x] | domain-spec_20260803 | Camada de Domínio (Spec-Driven Development) | 2026-08-03 | 2026-08-03 |
 | [~] | ml-models_20260806 | Modelos de ML (Camada 2 — Inteligência) | 2026-08-06 | 2026-08-07 |
 | [x] | exec-trigger_20260807 | Execução Sob Demanda (ui-orchestrator + KEDA) | 2026-08-07 | 2026-08-16 |
-| [ ] | ml-layer2-gaps_20260817 | Conformidade da Camada 2 com a arquitetura da Sprint 2 | 2026-08-17 | 2026-08-17 |
+| [~] | ml-layer2-gaps_20260817 | Conformidade da Camada 2 com a arquitetura da Sprint 2 | 2026-08-17 | 2026-08-17 |
 
 <!-- Tracks registered by /conductor:new-track -->

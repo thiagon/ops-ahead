@@ -26,19 +26,19 @@ Produz a lista fechada do que falta, para que nada mais fique de fora por agrupa
 
 ### Tasks
 
-- [ ] 1.1: Percorrer a seção 3.2 da Sprint 2 linha a linha — os cinco modelos, as métricas de produção
+- [x] 1.1: Percorrer a seção 3.2 da Sprint 2 linha a linha — os cinco modelos, as métricas de produção
       de cada um, as quatro features de domínio cross-modelo e os componentes de plataforma — e
       classificar cada item em implementado, ausente ou divergente
-- [ ] 1.2: Para cada item ausente ou divergente, decidir entre implementar nesta track ou registrar
+- [x] 1.2: Para cada item ausente ou divergente, decidir entre implementar nesta track ou registrar
       desvio consciente com justificativa
-- [ ] 1.3: Decidir o destino de **Evidently AI** (drift PSI/KS → métrica Prometheus), que a Sprint 2
+- [x] 1.3: Decidir o destino de **Evidently AI** (drift PSI/KS → métrica Prometheus), que a Sprint 2
       lista e nenhum doc do MVP excluiu
-- [ ] 1.4: Decidir o destino de **BentoML** no empacotamento do `model-serving`, hoje FastAPI puro
-- [ ] 1.5: Registrar a tabela de conformidade em `docs/insights/` como saída da fase
+- [x] 1.4: Decidir o destino de **BentoML** no empacotamento do `model-serving`, hoje FastAPI puro
+- [x] 1.5: Registrar a tabela de conformidade em `docs/insights/` como saída da fase
 
 ### Verification
 
-- [ ] Nenhum item da seção 3.2 fica sem destino declarado
+- [x] Nenhum item da seção 3.2 fica sem destino declarado
 
 ---
 
