@@ -3,7 +3,9 @@
 **Track ID:** ml-models_20260806
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-06
-**Status:** [ ] Not Started
+**Status:** [x] Complete — merged to `main` via PR #51 (squash, 2026-08-16). Phase 5 closed with light
+validation (606-incident sample); full-dataset validation is a follow-up, not a blocker (decisão do
+usuário, 2026-08-17)
 
 ## Overview
 
@@ -132,23 +134,41 @@ Confere os critérios de aceite da spec contra o dado real e documenta os númer
 3. **Dataset real no cluster é uma amostra, não o histórico completo** — `default.daily_anomaly_features`/`first_touch_duration` no ClickHouse local têm só 606 incidentes (até 2025-01-04), contra as 122.543 linhas (até 2025-12-31) de `assets/incidents.csv`. `scripts/incident_producer.py` nunca rodou até o fim nesta instância do cluster. Sem ingestão completa, as partições de validação/holdout do split ficam vazias para os limites fixos (`train_end=2025-09-30` etc.) — o guard de `split.py` pega isso e falha alto, como projetado. **Não resolvido nesta sessão** — decisão explícita do usuário foi corrigir só o bug de tz agora; ingestão completa (rodar o producer contra o gateway, ~5-20min dependendo da latência) fica pendente antes de a task 5.1 poder concluir.
 4. **Update (track `exec-trigger_20260807`, Fase 6):** o bloqueio de *mecanismo* deste achado (`Job`s de nome fixo, `kubectl delete job` manual pra re-disparar, datas hardcoded em `values.yaml`) está resolvido — `ml-volume-model`/`ml-breach-model` (`Job`) não existem mais, substituídos por `ml-trainer` disparado sob demanda via `trigger-service` (`POST /trigger {"analysis": "volume_forecast"|"breach_risk", "train_end", "validation_end", "holdout_end"}` — ver `apps/trigger-service/README.md`). Validado ao vivo contra os mesmos 606 incidentes (`2024-09-09`/`2024-11-10`/`2025-01-04` pro volume, `2024-12-26`/`2025-01-02`/`2025-01-04` pro breach — quantis 70/85/100% do dataset disponível, não os limites fixos antigos): as duas execuções terminaram, registraram e promoveram `volume-forecast`/`breach-risk` v1 no MLflow sem tocar em código ou infra. O bloqueio de *dado* (achado #3 acima) continua igual — ingestão completa ainda não rodou nesta instância. Task 5.1 abaixo permanece `[ ]` até isso acontecer; quando rodar, é só repetir o mesmo `POST /trigger` com `train_end=2025-09-30`/`validation_end=2025-10-31`/`holdout_end=2026-01-31` (os limites já validados contra o CSV completo — ver `infra/apps/ml-temporal-split-values.yaml` no histórico do git, removido nesta mesma track por não ter mais fonte fixa).
 
+**Decisão de fechamento (2026-08-17):** a validação contra o dataset completo (122.543 linhas) fica
+fora do escopo desta track — decisão explícita do usuário, não limitação técnica. O que já existe
+(achado #4 acima: `ml-trainer` disparado via `ui-orchestrator` contra os 606 incidentes disponíveis no
+cluster, com splits por quantil 70/85/100%; `volume-forecast`/`breach-risk` v1 registrados e promovidos
+a `Production` no MLflow sem tocar em código/infra) é aceito como evidência suficiente de que o
+mecanismo fim-a-fim funciona. Ingestão completa e a leitura de métricas de qualidade real (AUC-PR,
+MAPE) contra o dataset cheio ficam como follow-up — não bloqueiam o fechamento desta track.
+
 ### Tasks
 
-- [ ] 5.1: Rodar `ml-trainer` (via `trigger-service`, `analysis: volume_forecast`/`breach_risk`) sobre o
-      dataset completo (122.543 linhas — exige rodar `scripts/incident_producer.py` até o fim primeiro,
-      achado #3 acima) e confirmar conclusão sem erro
-- [ ] 5.2: Coletar do MLflow: MAPE/MAE/IC 80% do volume por prioridade, AUC-PR/Brier/recall@top-k do breach, e registrar em `docs/insights/ml_models_baseline.md`
-- [ ] 5.3: Rodar `burst-detector` contra o histórico via simulador e confirmar precision, lead-time mediano e FP/IC documentados
-- [ ] 5.4: Testar `model-serving` com incidentes reais do hold-out (chamadas diretas aos dois endpoints) e conferir SHAP/score fazem sentido
-- [ ] 5.5: Atualizar `docs/sprints/sprint-3-mvp.md` com os resultados reais dos modelos (seção 5, substituindo os placeholders)
+- [x] 5.1: Rodar `ml-trainer` (via `ui-orchestrator`, `analysis: volume_forecast`/`breach_risk`) e
+      confirmar conclusão sem erro — feito contra a amostra disponível (606 incidentes, achado #4);
+      o run contra o dataset completo (122.543 linhas) fica como follow-up, não bloqueia esta track
+- [x] 5.2: Registrar o estado da validação em `docs/insights/ml_models_baseline.md` — números de
+      MAPE/AUC-PR/Brier em dado real ficam para quando a ingestão completa rodar; o documento aponta
+      isso explicitamente em vez de reportar métricas calculadas sobre uma amostra de 606 linhas
+- [x] 5.3: Precision/lead-time/FP por IC do `burst-detector` — já cobertos pelo backtest offline contra
+      o CSV real (122.543 linhas) da task 3.10; não depende de simulador live nem do cluster
+- [~] 5.4: Testar `model-serving` com incidentes reais do hold-out — não executado nesta sessão (só
+      smoke test com modelo mockado, Fase 4); serviço está no ar no cluster carregando os artefatos
+      `Production` reais, mas a chamada aos endpoints com dado de hold-out real fica como follow-up
+- [x] 5.5: Nota de status adicionada em `docs/sprints/sprint-3-mvp.md` (seção 4.2) — sem números finais
+      de qualidade, que dependem do follow-up de ingestão completa
 
 ### Final Verification
 
-- [ ] Todos os acceptance criteria da spec atendidos
-- [ ] AUC-PR do breach > 0,60 confirmado com dado real (ou risco documentado se não bater)
-- [ ] Testes unitários das 4 apps verdes em CI
-- [ ] ArgoCD reconciliando `ml-volume-model`, `ml-breach-model`, `ml-burst-detector`, `ml-model-serving` sem drift
-- [ ] PR mergeado em `main` com revisão
+- [x] Acceptance criteria estruturais da spec atendidos (treino, registro, promoção, serving, detector);
+      os critérios de qualidade contra dado real (AUC-PR > 0,60 etc.) ficam pendentes do follow-up de
+      ingestão completa — risco aceito e documentado, não um critério silenciosamente ignorado
+- [ ] AUC-PR do breach > 0,60 confirmado com dado real — **não coberto por esta track**; ver follow-up
+- [x] Testes unitários das 4 apps verdes em CI
+- [x] ArgoCD reconciliando `ml-volume-model`, `ml-breach-model`, `ml-burst-detector`, `ml-model-serving`
+      sem drift (os dois primeiros como `Job` descontinuados pela track `exec-trigger_20260807` — ver
+      nota 4 acima; `ml-burst-detector`/`ml-model-serving` como `Deployment` seguem no ar)
+- [x] PR mergeado em `main` com revisão (#51, squash, 2026-08-16)
 
 ---
 

@@ -37,6 +37,13 @@ Como operador N1/N2 (via copiloto e painel, consumidores futuros), quero que cad
 - [ ] `model-serving` com schemas Pydantic V2 em request/response, `/health` e métricas Prometheus em `/metrics`, deploy `Deployment + HPA` em `ns: ml`
 - [ ] `burst-detector` como `Deployment` em `ns: ml` (worker puro, sem HTTP)
 
+**Nota de fechamento (2026-08-17):** os critérios estruturais acima foram atendidos e validados contra
+dado real do cluster — ver `docs/insights/ml_models_baseline.md`. O critério de qualidade preditiva
+(`AUC-PR > 0,60` em hold-out temporal com o dataset completo) segue **não confirmado**: a validação
+disponível rodou contra uma amostra de 606 incidentes, insuficiente para o breach (desbalanceamento
+extremo, ~1% de violação no dataset completo). Decisão explícita do usuário: essa lacuna não bloqueia o
+fechamento da track; fica como follow-up quando a ingestão completa rodar.
+
 ## Dependencies
 
 - **`data-pipeline_20260529`** (completo) — marts `incidents_by_ic`, `p4_sequences_by_ci`, `first_touch_duration`, `daily_anomaly_features` em ClickHouse

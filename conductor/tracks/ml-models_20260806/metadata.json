@@ -2,22 +2,23 @@
   "id": "ml-models_20260806",
   "title": "Modelos de ML (Camada 2 — Inteligência)",
   "type": "feature",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-08-06T00:00:00Z",
-  "updated": "2026-08-07T21:00:00Z",
+  "updated": "2026-08-17T00:00:00Z",
   "sprint": 3,
   "milestone": 3,
   "github_issue": 50,
   "github_pr": 51,
   "branch": "feat/ml-models",
   "current_phase": 5,
-  "current_task": "5.1",
+  "current_task": null,
   "phases": {
     "total": 5,
-    "completed": 0
+    "completed": 5
   },
   "tasks": {
     "total": 46,
-    "completed": 36
-  }
+    "completed": 45
+  },
+  "note": "Merged to main via PR #51 (squash, 2026-08-16). Phase 5 closed with light validation only (606-incident sample, see docs/insights/ml_models_baseline.md) — user decision (2026-08-17): full-dataset validation (AUC-PR>0.60 etc.) is an accepted follow-up, not a blocker. Task 5.4 (model-serving against real hold-out) also deferred to that follow-up."
 }
