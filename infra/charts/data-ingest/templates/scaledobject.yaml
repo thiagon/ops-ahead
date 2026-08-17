@@ -1,0 +1,24 @@
+# KEDA scales this Deployment's replica count from incidents.received's
+# consumer lag, down to zero when idle.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: data-ingest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-ingest.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "data-ingest.fullname" . }}
+  pollingInterval: {{ .Values.scaledObject.pollingInterval }}
+  cooldownPeriod: {{ .Values.scaledObject.cooldownPeriod }}
+  minReplicaCount: {{ .Values.scaledObject.minReplicaCount }}
+  maxReplicaCount: {{ .Values.scaledObject.maxReplicaCount }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.consumer.env.kafkaGroupId | quote }}
+        topic: {{ .Values.consumer.env.kafkaTopic | quote }}
+        lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
+        offsetResetPolicy: earliest

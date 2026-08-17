@@ -11,10 +11,13 @@ LOGGER = logging.getLogger(__name__)
 
 def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "consume":
+        from src import metrics
         from src.settings import Settings
-        from src.trigger import consume_one
+        from src.trigger import consume_forever
 
-        consume_one(Settings())
+        settings = Settings()
+        metrics.start(settings.metrics_port)
+        consume_forever(settings)
         return
 
     if len(sys.argv) < 3 or sys.argv[1] != "run" or sys.argv[2] not in STEPS:

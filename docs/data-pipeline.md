@@ -33,7 +33,7 @@ A pipeline é configurada em [`infra/charts/data-runner/values.yaml`](../infra/c
 (`run.env.source`, `run.env.snapshotMarts`, `cron.enabled`/`cron.schedule`) — os mesmos
 valores que antes viviam em `pipelines/data-itsm-daily/`, agora parte do próprio chart do
 app, já que `data-runner` deixou de ser um passo de uma `pipelines/` genérica e passou a
-ter workload (`ScaledJob`) próprio. Em dev e prod, um `CronJob` nativo (`ns: data`,
+ter workload (`Deployment` escalado por `ScaledObject`) próprio. Em dev e prod, um `CronJob` nativo (`ns: data`,
 02:00 UTC) publica `{"run_id": "daily-<data>", "analysis": "full_pipeline"}` em
 `trigger.data` — o `run_id` é determinístico pela data, então dá pra consultar
 `GET /runs/daily-2026-08-16` sem procurar o id em log nenhum.
@@ -56,9 +56,9 @@ curl -X POST https://orchestrator.ops-ahead.localtest.me/trigger \
   -d '{"analysis": "data_quality_check"}'
 ```
 
-Resposta `202 {"run_id": "..."}` na hora — o `Job` ainda não existe nesse momento
-(publicado em `trigger.data`; KEDA cria o `Job` assim que detecta a mensagem na fila).
-Consultar o resultado:
+Resposta `202 {"run_id": "..."}` na hora — o pod ainda não subiu nesse momento
+(publicado em `trigger.data`; KEDA escala o `data-runner` de 0 pra 1 assim que detecta a
+mensagem na fila). Consultar o resultado:
 
 ```bash
 curl https://orchestrator.ops-ahead.localtest.me/runs/<run_id>
@@ -91,8 +91,8 @@ bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic trigger.
 '
 ```
 
-KEDA cria o `Job` assim que detecta a mensagem (`pollingInterval`, ver
-[`infra/charts/data-runner/values.yaml`](../infra/charts/data-runner/values.yaml)).
+KEDA escala o `data-runner` de 0 pra 1 assim que detecta a mensagem (`pollingInterval`,
+ver [`infra/charts/data-runner/values.yaml`](../infra/charts/data-runner/values.yaml)).
 
 ## Inspecionar uma falha
 

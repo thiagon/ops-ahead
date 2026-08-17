@@ -1,11 +1,8 @@
 # Deploy identity for this app (documentation — see apps/data-ingest/chart/app.yaml).
-# `scaledjob`: a KEDA ScaledJob is this app's own workload — own ArgoCD App,
-# same as `deployment`/`cronjob`/`job`, but the resource that actually
-# creates the Job is KEDA (platform infra), never an app process (see
-# conductor/tracks/exec-trigger_20260807/spec.md, Princípio central #2).
-# Replaces the old `pipeline-step` shape (bespoke WorkflowTemplate,
-# infra/charts/ml-workflow-template) now that the Argo Workflows engine is
-# gone from the stack.
-workload: scaledjob
+# A Deployment whose replica count KEDA scales via a ScaledObject on
+# trigger.ml's consumer lag (down to zero when idle) — the app process
+# itself loops over messages (src/trigger.py's consume_forever), so the
+# KEDA-managed resource is pod replicas, not a Job per message.
+workload: deployment
 namespace: ml
 chart: infra/charts/ml-trainer

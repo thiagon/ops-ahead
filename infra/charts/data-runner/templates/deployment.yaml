@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-runner
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-runner.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.run.replicaCount }}
+  selector:
+    matchLabels:
+      app: data-runner
+  template:
+    metadata:
+      labels:
+        app: data-runner
+        {{- include "data-runner.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: data-runner
+          image: {{ include "data-runner.image" . | quote }}
+          imagePullPolicy: {{ (index .Values "data-runner").image.pullPolicy }}
+          command: ["python", "-m", "src.main", "consume"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: metrics
+              containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.run.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.run.env.kafkaTopic | quote }}
+            - name: KAFKA_TOPIC_STATUS
+              value: {{ .Values.run.env.kafkaTopicStatus | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.run.env.kafkaGroupId | quote }}
+            - name: KAFKA_CONSUMER_TIMEOUT_MS
+              value: {{ .Values.run.env.kafkaConsumerTimeoutMs | quote }}
+            - name: CLICKHOUSE_HOST
+              value: {{ .Values.run.env.clickhouseHost | quote }}
+            - name: CLICKHOUSE_DATABASE
+              value: {{ .Values.run.env.clickhouseDatabase | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.run.env.clickhouseUser | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.run.secretName }}
+                  key: clickhouse-password
+            - name: CLICKHOUSE_URL
+              value: "clickhouse+http://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.run.env.clickhouseHost }}:8123/{{ .Values.run.env.clickhouseDatabase }}"
+            - name: CLICKHOUSE_NATIVE_URL
+              value: "clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.run.env.clickhouseHost }}:9000/{{ .Values.run.env.clickhouseDatabase }}"
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.run.env.minioEndpoint | quote }}
+            - name: MINIO_BUCKET
+              value: {{ .Values.run.env.minioBucket | quote }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.run.secretName }}
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.run.secretName }}
+                  key: minio-secret-key
+            - name: MLFLOW_TRACKING_URI
+              value: {{ .Values.run.env.mlflowTrackingUri | quote }}
+            - name: SOURCE
+              value: {{ .Values.run.env.source | quote }}
+            - name: SNAPSHOT_MARTS
+              value: {{ .Values.run.env.snapshotMarts | toJson | quote }}
+          resources:
+            {{- toYaml .Values.run.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

@@ -62,8 +62,8 @@ Monorepo com workspaces `uv` para Python. Cada app em `apps/` gera sua própria 
 ```
 apps/                              # serviços e jobs que vão para o K8s
   data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO
-  data-runner/                     # ScaledJob (KEDA) — dbt-clickhouse (marts) + Great Expectations, consome trigger.data
-  ml-trainer/                      # ScaledJob (KEDA) — treino volume/breach, consome trigger.ml
+  data-runner/                     # Deployment (KEDA ScaledObject) — dbt-clickhouse (marts) + Great Expectations, consome trigger.data
+  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach, consome trigger.ml
   ui-orchestrator/                 # Deployment — REST/MCP → Kafka (trigger.ml/trigger.data) sob demanda
 
 contracts/                         # JSON Schemas compartilhados entre apps
@@ -82,7 +82,7 @@ infra/
     data-minio/                    # MinIO object storage
     data-clickhouse/               # ClickHouse (Altinity operator)
     data-strimzi/                  # Strimzi operator
-    infra-keda/                    # KEDA — escala os ScaledJobs a partir do lag do Kafka
+    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
     ml-mlflow/                     # MLflow tracking + AI Gateway
     ml-postgres/                   # Postgres (ns: ml)
     ml-redis/                      # Redis (ns: ml)

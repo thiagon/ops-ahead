@@ -12,11 +12,9 @@ spec:
   project: ops-ahead
   # Multi-source: base chart from infra/charts; the app's colocated per-env
   # overlay (apps/data-runner/chart/values-dev.yaml) carries the CI-pinned
-  # image tag. Replaces the data-itsm-daily pipeline's use of data-runner as
-  # a pipeline-step — data-runner now owns a ScaledJob directly
-  # (exec-trigger_20260807 revision), consuming trigger.data for both
-  # on-demand runs and the daily `full_pipeline` chain the native CronJob
-  # dispatches (Fase 9).
+  # image tag. A Deployment scaled by KEDA (ScaledObject on trigger.data's
+  # lag, down to zero when idle), consuming both on-demand runs and the
+  # daily `full_pipeline` chain the native CronJob dispatches.
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead
       targetRevision: main
@@ -44,3 +42,11 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
+  # KEDA's ScaledObject manages this Deployment's replica count directly
+  # (down to 0 when idle) — without ignoring it here, selfHeal would keep
+  # reverting it to the chart's static replicaCount, fighting KEDA forever.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.replicas

@@ -7,21 +7,21 @@ ml-trainer:
     tag: ""
     pullPolicy: IfNotPresent
 
-scaledJob:
+scaledObject:
   pollingInterval: 15
-  # 1 message ready ⇒ 1 Job. KEDA doesn't filter by content, only lag — see
-  # conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
+  # How long to wait after lag hits 0 before scaling back to minReplicaCount
+  # — training (LightGBM/Prophet/Optuna) can run long, give it real headroom
+  # before KEDA scales it away mid-run.
+  cooldownPeriod: 300
+  # 1 message ready ⇒ scale up. KEDA doesn't filter by content, only lag —
+  # see conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
   # trigger.data are split by domain in the first place.
   lagThreshold: "1"
+  minReplicaCount: 0
   maxReplicaCount: 5
-  backoffLimit: 1
-  # Training (LightGBM/Prophet/Optuna) can run long; give it real headroom
-  # before KEDA/K8s considers the Job stuck.
-  activeDeadlineSeconds: 1800
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
 
 train:
+  replicaCount: 1
   resources:
     requests:
       cpu: 200m

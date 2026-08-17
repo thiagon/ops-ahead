@@ -57,9 +57,12 @@ def _require_split_boundaries(settings: Settings) -> None:
 
 def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "consume":
-        from src.trigger import consume_one
+        from src import metrics
+        from src.trigger import consume_forever
 
-        consume_one(Settings(), TRAINERS)
+        settings = Settings()
+        metrics.start(settings.metrics_port)
+        consume_forever(settings, TRAINERS)
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:

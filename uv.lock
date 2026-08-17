@@ -2616,6 +2616,7 @@ dependencies = [
     { name = "great-expectations" },
     { name = "kafka-python" },
     { name = "mlflow" },
+    { name = "prometheus-client" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
 ]
@@ -2635,6 +2636,7 @@ requires-dist = [
     { name = "great-expectations", specifier = ">=1.2" },
     { name = "kafka-python", specifier = ">=3.0" },
     { name = "mlflow", specifier = ">=2.17" },
+    { name = "prometheus-client", specifier = ">=0.21" },
     { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
@@ -2731,6 +2733,7 @@ dependencies = [
     { name = "numpy" },
     { name = "optuna" },
     { name = "pandas" },
+    { name = "prometheus-client" },
     { name = "prophet" },
     { name = "pydantic-settings" },
     { name = "scikit-learn" },
@@ -2753,6 +2756,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "optuna", specifier = ">=4.0" },
     { name = "pandas", specifier = ">=2.2,<3" },
+    { name = "prometheus-client", specifier = ">=0.21" },
     { name = "prophet", specifier = ">=1.1.6" },
     { name = "pydantic-settings", specifier = ">=2.5" },
     { name = "scikit-learn", specifier = ">=1.5" },

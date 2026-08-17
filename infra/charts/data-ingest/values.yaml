@@ -35,3 +35,12 @@ consumer:
     batchMaxSize: "1000"
     batchMaxSeconds: "5"
   secretName: data-ingest-secret
+
+scaledObject:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  # Batch consumer (batchMaxSize above) — no need to scale on every message,
+  # only once real backlog builds up.
+  lagThreshold: "1000"
+  minReplicaCount: 0
+  maxReplicaCount: 5

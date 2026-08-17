@@ -5,8 +5,8 @@ metadata:
   namespace: infra
   annotations:
     # Platform infra, installed once — same wave family as infra-eso. Must
-    # land before any ScaledJob (ns:ml/ns:data, wave 7+) that references its
-    # ScaledObject/ScaledJob CRDs.
+    # land before any ScaledObject (ns:ml/ns:data, wave 7+) that references
+    # its CRD.
     argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io

@@ -1,0 +1,24 @@
+# KEDA scales this Deployment's replica count from incidents.received's
+# consumer lag, down to zero when idle.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ml-burst-detector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ml-burst-detector.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "ml-burst-detector.fullname" . }}
+  pollingInterval: {{ .Values.scaledObject.pollingInterval }}
+  cooldownPeriod: {{ .Values.scaledObject.cooldownPeriod }}
+  minReplicaCount: {{ .Values.scaledObject.minReplicaCount }}
+  maxReplicaCount: {{ .Values.scaledObject.maxReplicaCount }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.consumer.env.kafkaGroupId | quote }}
+        topic: {{ .Values.consumer.env.kafkaTopic | quote }}
+        lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
+        offsetResetPolicy: earliest

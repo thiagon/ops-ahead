@@ -83,12 +83,17 @@ def process_message(
         )
 
 
-def consume_one(settings: Settings, trainers: dict[str, Callable[[Settings], str]]) -> None:
-    """Real Kafka wiring: connects, reads exactly one message off trigger.ml
-    (or times out), and delegates to process_message. This is what the
-    KEDA-triggered Job runs — one message in, a Running/terminal status pair
-    out, then exit."""
+def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings], str]]) -> None:
+    """Real Kafka wiring: connects and processes trigger.ml messages one at a
+    time until SIGTERM. The Deployment's replica count (KEDA ScaledObject,
+    scaling on the same topic's lag) is what grows/shrinks with load now —
+    this loop itself never exits on its own. consumer_timeout_ms just bounds
+    each poll so the loop wakes up to check for SIGTERM while idle."""
+    import signal
+
     from kafka import KafkaConsumer, KafkaProducer
+
+    from src import metrics
 
     consumer = KafkaConsumer(
         settings.kafka_topic,
@@ -101,13 +106,14 @@ def consume_one(settings: Settings, trainers: dict[str, Callable[[Settings], str
     )
     producer = KafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
 
-    try:
-        record = next(iter(consumer))
-    except StopIteration:
-        LOGGER.info("no message available on %s before timeout", settings.kafka_topic)
-        consumer.close()
-        producer.close()
-        return
+    stopping = False
+
+    def _stop(signum: int, frame: object) -> None:
+        nonlocal stopping
+        LOGGER.info("SIGTERM received, finishing current message then stopping")
+        stopping = True
+
+    signal.signal(signal.SIGTERM, _stop)
 
     def publish_status(payload: dict[str, Any]) -> None:
         producer.send(
@@ -118,8 +124,15 @@ def consume_one(settings: Settings, trainers: dict[str, Callable[[Settings], str
         producer.flush()
 
     try:
-        process_message(settings, trainers, record.value, publish_status)
+        while not stopping:
+            for record in consumer:
+                metrics.messages_consumed.labels(
+                    analysis=record.value.get("analysis", "unknown")
+                ).inc()
+                process_message(settings, trainers, record.value, publish_status)
+                consumer.commit()
+                if stopping:
+                    break
     finally:
-        consumer.commit()
         consumer.close()
         producer.close()

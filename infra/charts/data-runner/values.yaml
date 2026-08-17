@@ -7,21 +7,21 @@ data-runner:
     tag: ""
     pullPolicy: IfNotPresent
 
-scaledJob:
+scaledObject:
   pollingInterval: 15
-  # 1 message ready ⇒ 1 Job. KEDA doesn't filter by content, only lag — see
-  # conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
+  # How long to wait after lag hits 0 before scaling back to minReplicaCount
+  # — full_pipeline chains dbt run → great_expectations → register-snapshot
+  # in one process, give it real headroom before KEDA scales it away mid-run.
+  cooldownPeriod: 300
+  # 1 message ready ⇒ scale up. KEDA doesn't filter by content, only lag —
+  # see conductor/tracks/exec-trigger_20260807/spec.md on why trigger.ml/
   # trigger.data are split by domain in the first place.
   lagThreshold: "1"
+  minReplicaCount: 0
   maxReplicaCount: 5
-  backoffLimit: 1
-  # full_pipeline chains dbt run → great_expectations → register-snapshot in
-  # one process; give it real headroom before KEDA/K8s considers it stuck.
-  activeDeadlineSeconds: 1800
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
 
 run:
+  replicaCount: 1
   resources:
     requests:
       cpu: 100m
@@ -58,8 +58,8 @@ run:
   secretName: data-runner-secret
 
 # Native CronJob — publishes {run_id: daily-<date>, analysis: full_pipeline}
-# to trigger.data at the scheduled time, consumed through the same ScaledJob
-# above (no parallel execution path — see spec.md). schedule/enabled ported
+# to trigger.data at the scheduled time, consumed by the Deployment above
+# (no parallel execution path — see spec.md). schedule/enabled ported
 # from pipelines/data-itsm-daily/values.yaml, which is removed in Fase 10
 # along with the data-pipeline chart/ApplicationSet path it depended on.
 cron:

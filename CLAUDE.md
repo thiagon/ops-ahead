@@ -18,8 +18,8 @@ uv sync          # install all workspace dependencies
 ```
 apps/                        # one folder per image you build; chart/ overlay colocated
   data-ingest/               # deployment (ns: data) — Kafka consumer → ClickHouse + MinIO
-  data-runner/                # scaledjob (ns: data) — dbt-clickhouse marts + Great Expectations, consumes trigger.data
-  ml-trainer/                 # scaledjob (ns: ml) — volume/breach training, consumes trigger.ml
+  data-runner/                # deployment (ns: data) — dbt-clickhouse marts + Great Expectations, consumes trigger.data
+  ml-trainer/                 # deployment (ns: ml) — volume/breach training, consumes trigger.ml
   ui-orchestrator/            # deployment (ns: ui) — REST/MCP intake → Kafka (trigger.ml/trigger.data)
 contracts/                   # shared JSON Schemas (incident-event.schema.json, trigger-*.schema.json)
 domain/                      # domain specs (SDD): language, contexts, ACLs
@@ -50,27 +50,36 @@ the same `chart/`, in `values-dev.yaml` — the same file the CI write-back pins
 | `deployment` | Deployment (stays up) | yes | `apps/<app>/chart/values-dev.yaml` |
 | `cronjob` | native CronJob at schedule X | yes | same, plus `schedule` in the overlay |
 | `job` | Job, run once on demand | yes | same |
-| `scaledjob` | KEDA `ScaledJob` — scales 0→N off a Kafka topic's consumer lag, one `Job` per message | yes | same |
 
 There is no `pipeline-step` nature anymore, and no `pipelines/` folder — both existed
 only to configure the Argo Workflows engine (`infra/charts/data-workflows`), removed in
-`exec-trigger_20260807`. Ordering between steps that used to be "a pipeline's job" is now
-either sequential code inside one `scaledjob`'s consume handler (`data-runner`'s
-`analysis: full_pipeline`, see below) or simply doesn't exist (`ml-trainer` trains one
-model per message, no chaining).
+`exec-trigger_20260807`. There is also no `scaledjob` nature anymore: a `Job`-shaped
+object minted per message has no owner that outlives the controller managing it, so it
+can leak indefinitely if that controller is ever decommissioned. Every Kafka-consuming
+app is a plain `deployment` instead, and a KEDA `ScaledObject` (not `ScaledJob`) scales
+its **replica count** — down to `minReplicaCount: 0` when idle, same as before, but the
+unit that scales is pods of one long-running consumer process, never a new object minted
+per message. Ordering between
+steps that used to be "a pipeline's job" is now either sequential code inside one
+consumer's message handler (`data-runner`'s `analysis: full_pipeline`, see below) or simply
+doesn't exist (`ml-trainer` trains one model per message, no chaining).
 
 **On-demand execution** goes through `ui-orchestrator` (`deployment`, `ns: ui`) — the
 single REST/MCP entry point. It validates a business-language payload (`analysis` +
 parameters), mints a `run_id`, and publishes to `trigger.ml` or `trigger.data` (Kafka,
-`ns: data`) — never touches Kubernetes. `ml-trainer`/`data-runner` (`scaledjob`) each own
-a KEDA `ScaledJob` that scales from that topic's lag: **no application process ever
-creates a Kubernetes resource** — only the KEDA operator (`infra/charts/infra-keda`,
-installed once, `ns: infra`) does, which is platform infra, not code this team writes.
-Each `scaledjob` publishes `Running` then a terminal status to the compacted
-`trigger.status` topic; `ui-orchestrator` answers `GET /runs/{run_id}` from an in-memory
-map rehidrated from that topic on startup — a Kafka consumer group used for this must be
-unique per process boot (never a fixed/shared id), or replicas split partitions and a
-restart resumes from a stale committed offset instead of replaying the backlog.
+`ns: data`) — never touches Kubernetes. `ml-trainer`/`data-runner` (`deployment`) each own
+a KEDA `ScaledObject` that scales their replica count from that topic's lag: **no
+application process ever creates a Kubernetes resource** — only the KEDA operator
+(`infra/charts/infra-keda`, installed once, `ns: infra`) does, which is platform infra, not
+code this team writes. Each message handler publishes `Running` then a terminal status to
+the compacted `trigger.status` topic; `ui-orchestrator` answers `GET /runs/{run_id}` from
+an in-memory map rehidrated from that topic on startup — a Kafka consumer group used for
+this must be unique per process boot (never a fixed/shared id), or replicas split
+partitions and a restart resumes from a stale committed offset instead of replaying the
+backlog. This is the opposite of `data-runner`/`ml-trainer`'s own consumer group on
+`trigger.data`/`trigger.ml`, which must stay fixed and shared across replicas — that's
+what makes Kafka split partitions between however many pods KEDA has scaled up, instead of
+every replica reading the same messages.
 
 The **daily data chain** (`dbt run → great_expectations → register-snapshot`) is the same
 mechanism, not a parallel one: a native `CronJob` (`ns: data`, part of `data-runner`'s own
@@ -149,6 +158,16 @@ Quick reference; `docs/context/data-dictionary.md` is authoritative.
 - **Commit messages**: always in English, following Conventional Commits
 - **Code and comments**: English
 - **Docs and specs** (`conductor/`, `docs/`): Portuguese
+- **Comment scope**: only for something genuinely hard to understand — a library quirk, a
+  non-obvious invariant, a subtle mechanism of a tool (e.g. ArgoCD's PreSync phase always
+  running before any Sync-phase resource, wave number included). Never repeat naming or
+  convention already centralized in `domain/`, `CLAUDE.md`, or another doc — reference it
+  instead. Never narrate the bug, incident, or investigation that motivated the change
+  ("X got stuck because of Y", "this is what happened when Z was removed") — a comment
+  describes the invariant that holds going forward, not the history of how it was found.
+  Never reference a conductor task/phase number. If the same explanation would apply to
+  many files of the same kind (e.g. why each Application sits at a given sync-wave), it
+  belongs in one reference doc for that directory, not repeated per file.
 
 ## Sprint Deadlines
 

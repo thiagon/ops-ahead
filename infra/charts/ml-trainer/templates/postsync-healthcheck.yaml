@@ -1,7 +1,7 @@
 # Same PreSync-hook pattern data-ingest's migration Job already uses, applied
 # PostSync here: catches a misconfigured host/port (typo'd values.yaml, a
 # broker/ClickHouse not actually up yet) as a failed ArgoCD sync instead of a
-# ScaledJob that silently never produces a healthy Job.
+# Deployment that silently never becomes ready.
 apiVersion: batch/v1
 kind: Job
 metadata:

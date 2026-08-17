@@ -8,8 +8,8 @@ existe Kubernetes, Kafka ou KEDA por trás — ver
 ## `POST /trigger`
 
 Corpo discriminado pelo campo `analysis`. Responde `202 {"run_id": "<uuid>"}` na hora —
-o `Job` ainda não existe nesse momento (publicado em Kafka; KEDA cria o `Job` assim que
-detecta a mensagem na fila).
+o pod ainda não subiu nesse momento (publicado em Kafka; KEDA escala o consumer de 0 pra
+1 assim que detecta a mensagem na fila).
 
 | `analysis` | Campos obrigatórios | O que roda |
 |---|---|---|
@@ -21,7 +21,7 @@ detecta a mensagem na fila).
 Sem override de origem de dado no payload — a origem é sempre a padrão do cluster,
 resolvida server-side a partir de um `Secret`, nunca do payload (risco de SSRF/vazamento
 de credencial; ver `conductor/tracks/exec-trigger_20260807/payloads.md`). Nenhum outro
-campo de infraestrutura (namespace, tópico, nome do `Job`) é aceito ou exposto — esse
+campo de infraestrutura (namespace, tópico, nome do consumer) é aceito ou exposto — esse
 roteamento é interno (`src/modules/trigger/service.ts`).
 
 ### Exemplos

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: infra-keda
-description: KEDA — event-driven autoscaler; scales ml-trainer/data-runner ScaledJobs from Kafka lag
+description: KEDA — event-driven autoscaler; scales Kafka-consuming Deployments (ScaledObject) from lag
 type: application
 version: 0.1.0
 appVersion: "2.20.2"

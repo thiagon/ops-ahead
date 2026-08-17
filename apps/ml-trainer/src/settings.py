@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     kafka_topic: str = "trigger.ml"
     kafka_topic_status: str = "trigger.status"
     kafka_group_id: str = "ml-trainer"
-    # Bounds consume_one() so a Job doesn't hang if KEDA fires on a topic
-    # that's already empty by the time it polls.
+    # Bounds how long consume_forever() blocks per poll before checking for
+    # SIGTERM — not a hang-prevention timeout anymore, the loop never exits
+    # on an empty topic.
     kafka_consumer_timeout_ms: int = 30_000
+    metrics_port: int = 8000
