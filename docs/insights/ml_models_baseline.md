@@ -11,9 +11,10 @@ funciona (trigger → treino → registro → promoção → serving) contra dad
 qualidade preditiva (MAPE, AUC-PR, Brier, recall@top-k) sobre o dataset completo **não fazem parte
 deste documento** — calculá-los contra uma amostra de 606 linhas seria enganoso, especialmente para o
 breach (desbalanceamento extremo: ~1% de violação no dataset completo, a amostra atual pode ter zero ou
-poucas violações). Ficam como follow-up quando `scripts/incident_producer.py` rodar até o fim nesta
-instância. Decisão explícita do usuário: essa ingestão completa não bloqueia o fechamento da track
-`ml-models_20260806`.
+poucas violações). São escopo da Sprint 4, quando `scripts/incident_producer.py` rodar até o fim nesta
+instância. Decisão explícita do usuário (2026-08-17): a Sprint 3 prioriza a interface na reta final, e a
+medição de qualidade preditiva abre a sprint seguinte — com o mecanismo de treino pronto, ela custa um
+`POST /trigger`.
 
 ## Treino (via `ui-orchestrator` → `trigger.ml` → `ml-trainer`)
 
@@ -51,5 +52,4 @@ validação. Fica como follow-up junto da ingestão completa.
 
 O mecanismo fim-a-fim (Camada 2 inteira: volume, breach, burst-detector, model-serving) funciona contra
 dado real. A pergunta que a track original se propunha a responder — "o sinal preditivo existe no dado
-real, com AUC-PR > 0,60?" — continua em aberto até a ingestão completa rodar; não é respondida por este
-documento.
+real, com AUC-PR > 0,60?" — continua em aberto e abre a Sprint 4; não é respondida por este documento.

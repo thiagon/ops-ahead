@@ -1,0 +1,18 @@
+{
+  "id": "mvp-closeout_20260817",
+  "title": "Fechamento do MVP (Camadas 3 e 4)",
+  "type": "feature",
+  "status": "pending",
+  "created": "2026-08-17T00:00:00Z",
+  "updated": "2026-08-17T00:00:00Z",
+  "phases": {
+    "total": 6,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 46,
+    "completed": 0
+  },
+  "github_issue": 55,
+  "github_pr": 56
+}
