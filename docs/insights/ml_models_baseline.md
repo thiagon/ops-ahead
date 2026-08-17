@@ -40,6 +40,37 @@ janelas no dado real, porque a maioria das ICs tem 0-1 incidente por bucket de 1
 mínimo no desvio robusto. Precision ainda baixa mesmo pós-fix; hiperparâmetros (`CUSUM_K`/`CUSUM_H`/
 `MIN_ROBUST_STD`) não foram tunados contra o próprio backtest para evitar overfitting nele.
 
+## Detector de evento externo (Isolation Forest) — backtest offline
+
+Assim como o `burst-detector`, este backtest (`apps/ml-trainer/scripts/external_event_backtest.py`) roda
+direto contra `assets/incidents.csv` — não depende do estado de ingestão do cluster, já reflete o
+dataset completo (644 dias). Não existe rótulo externo de verdade no dataset, então a referência de
+"outlier conhecido" é construída de forma objetiva: dia cujo z-score robusto (mediana + MAD, mesmo
+método do `burst-detector`) do volume total, contra uma janela **móvel** de 60 dias anteriores (não o
+histórico inteiro — testado primeiro, um z-score global marcava 19% dos dias como "outlier" só por
+capturar a tendência de crescimento do volume ao longo do tempo, não eventos), cruza 3,5.
+
+| Métrica | Valor |
+|---------|-------|
+| Dias com features completas | 644 |
+| Dias "outlier conhecido" (referência) | 65 (10,1%) |
+| Dias marcados pelo Isolation Forest (`contamination=0.05`) | 33 (5,1%) |
+| Recall | 0,123 |
+| Precisão | 0,242 |
+| Falso positivo em dias normais | 0,043 |
+
+**O pico de setembro/2025 citado na mentoria aparece na referência e é parcialmente capturado.** A
+janela de referência marca 2025-09-01 a 2025-09-23 quase inteira como outlier; o Isolation Forest marca
+7 desses dias (02, 04, 07, 11, 22, 23, 24/09) — confirma que o método de referência captura um evento
+real documentado (`docs/insights/03-mentoria-insights.md`), não ruído, e que o detector tem sinal real,
+ainda que incompleto.
+
+**Como consumir a marcação.** `ExternalEventModel.predict()` (registrado em MLflow como
+`external-event-detection`) retorna, por dia, `is_external_event` (0/1) e `anomaly_score`. Esta track
+expõe a interface — carregar o modelo `Production` e filtrar dias marcados antes de montar o dataset de
+treino de volume/breach é decisão de uma track futura, fora de escopo aqui (nenhum dos dois trainers foi
+alterado).
+
 ## `model-serving`
 
 Serviço no ar em `ns: ml`, carregando `models:/volume-forecast/Production` e `models:/breach-risk/Production`

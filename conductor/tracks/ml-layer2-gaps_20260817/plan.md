@@ -69,19 +69,19 @@ Marca o dia anômalo para excluir do treino e sinalizar investigação fora da L
 
 ### Tasks
 
-- [ ] 3.1: Treino sobre `daily_anomaly_features` — volume total, share de P1, % de abertura manual,
+- [x] 3.1: Treino sobre `daily_anomaly_features` — volume total, share de P1, % de abertura manual,
       dispersão de ICs, taxa de "Sem Intervenção"
-- [ ] 3.2: Levantar os outliers conhecidos do histórico para servir de referência de recall
-- [ ] 3.3: Medir recall nesses outliers, precisão entre os marcados e falso positivo em dias normais
-- [ ] 3.4: Registrar no MLflow e promover se o resultado sustentar
-- [ ] 3.5: Expor o resultado como marcação de dia/janela, consumível pelo filtro de treino dos outros
+- [x] 3.2: Levantar os outliers conhecidos do histórico para servir de referência de recall
+- [x] 3.3: Medir recall nesses outliers, precisão entre os marcados e falso positivo em dias normais
+- [x] 3.4: Registrar no MLflow e promover se o resultado sustentar
+- [x] 3.5: Expor o resultado como marcação de dia/janela, consumível pelo filtro de treino dos outros
       modelos
-- [ ] 3.6: Testes da montagem de features e do formato da marcação
+- [x] 3.6: Testes da montagem de features e do formato da marcação
 
 ### Verification
 
-- [ ] Outliers conhecidos do histórico aparecem marcados
-- [ ] Dias normais não são marcados em massa
+- [x] Outliers conhecidos do histórico aparecem marcados
+- [x] Dias normais não são marcados em massa
 
 ---
 

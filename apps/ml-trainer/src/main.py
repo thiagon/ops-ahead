@@ -38,7 +38,19 @@ def _train_breach(settings: Settings) -> str:
     )
 
 
-TRAINERS = {"volume": _train_volume, "breach": _train_breach}
+def _train_external_event(settings: Settings) -> str:
+    from src.external_event.data import dataset_version, fetch_daily_anomaly_features
+    from src.external_event.train import train_and_log
+
+    daily = fetch_daily_anomaly_features(settings)
+    return train_and_log(settings, daily, dataset_version=dataset_version(daily))
+
+
+TRAINERS = {"volume": _train_volume, "breach": _train_breach, "external_event": _train_external_event}
+
+# volume/breach are also reachable via trigger.ml (Kafka); external_event
+# isn't (see src/trigger.py) — CLI-only for now.
+SPLIT_REQUIRED_DOMAINS = {"volume", "breach"}
 
 
 def _analyze_kpi_projection(settings: Settings) -> dict:
@@ -87,12 +99,15 @@ def main() -> None:
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m src.main train <volume|breach> | analyze kpi-projection | consume")
+        LOGGER.error(
+            "Usage: python -m src.main train <volume|breach|external_event> | analyze kpi-projection | consume"
+        )
         sys.exit(2)
 
     domain = sys.argv[2]
     settings = Settings()
-    _require_split_boundaries(settings)
+    if domain in SPLIT_REQUIRED_DOMAINS:
+        _require_split_boundaries(settings)
     configure_experiment(settings, domain)
 
     run_id = TRAINERS[domain](settings)

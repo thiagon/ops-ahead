@@ -12,7 +12,11 @@ LOGGER = logging.getLogger(__name__)
 
 ANALYSIS_TRAINERS = {"volume_forecast": "volume", "breach_risk": "breach"}
 
-EXPERIMENT_NAMES = {"volume": "volume-forecast", "breach": "breach-risk"}
+# external_event has no trigger.ml counterpart (contracts/trigger-ml.schema.json
+# is unchanged by this track) — it's CLI-only ("train external_event"), so it
+# never appears in ANALYSIS_TRAINERS, only here so configure_experiment can
+# still resolve its default experiment/model name for that CLI path.
+EXPERIMENT_NAMES = {"volume": "volume-forecast", "breach": "breach-risk", "external_event": "external-event-detection"}
 
 
 def configure_experiment(settings: Settings, domain: str) -> None:

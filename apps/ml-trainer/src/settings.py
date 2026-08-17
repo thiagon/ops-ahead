@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     p4_precursor_window_hours: int = 24
     optuna_trials: int = 50
 
+    # external-event (Isolation Forest) only. Expected share of days flagged
+    # anomalous — not tuned against a labeled set (none exists), a starting
+    # point consistent with the mentoria's account of external events being
+    # rare (docs/insights/03-mentoria-insights.md).
+    external_event_contamination: float = 0.05
+
     # kpi-projection only (Monte Carlo).
     kpi_projection_n_simulations: int = 2000
     kpi_projection_seed: int = 42
