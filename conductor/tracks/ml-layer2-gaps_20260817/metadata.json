@@ -12,5 +12,7 @@
   "tasks": {
     "total": 20,
     "completed": 0
-  }
+  },
+  "github_issue": 57,
+  "github_pr": 58
 }
