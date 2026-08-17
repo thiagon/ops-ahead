@@ -4,8 +4,8 @@
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-06
 **Status:** [x] Complete — merged to `main` via PR #51 (squash, 2026-08-16). Phase 5 closed with light
-validation (606-incident sample); full-dataset validation is a follow-up, not a blocker (decisão do
-usuário, 2026-08-17)
+validation (606-incident sample); full-dataset validation is **out of scope for Sprint 3** — the team
+prioritized the interface for the remainder of the sprint (decisão do usuário, 2026-08-17)
 
 ## Overview
 
@@ -135,12 +135,14 @@ Confere os critérios de aceite da spec contra o dado real e documenta os númer
 4. **Update (track `exec-trigger_20260807`, Fase 6):** o bloqueio de *mecanismo* deste achado (`Job`s de nome fixo, `kubectl delete job` manual pra re-disparar, datas hardcoded em `values.yaml`) está resolvido — `ml-volume-model`/`ml-breach-model` (`Job`) não existem mais, substituídos por `ml-trainer` disparado sob demanda via `trigger-service` (`POST /trigger {"analysis": "volume_forecast"|"breach_risk", "train_end", "validation_end", "holdout_end"}` — ver `apps/trigger-service/README.md`). Validado ao vivo contra os mesmos 606 incidentes (`2024-09-09`/`2024-11-10`/`2025-01-04` pro volume, `2024-12-26`/`2025-01-02`/`2025-01-04` pro breach — quantis 70/85/100% do dataset disponível, não os limites fixos antigos): as duas execuções terminaram, registraram e promoveram `volume-forecast`/`breach-risk` v1 no MLflow sem tocar em código ou infra. O bloqueio de *dado* (achado #3 acima) continua igual — ingestão completa ainda não rodou nesta instância. Task 5.1 abaixo permanece `[ ]` até isso acontecer; quando rodar, é só repetir o mesmo `POST /trigger` com `train_end=2025-09-30`/`validation_end=2025-10-31`/`holdout_end=2026-01-31` (os limites já validados contra o CSV completo — ver `infra/apps/ml-temporal-split-values.yaml` no histórico do git, removido nesta mesma track por não ter mais fonte fixa).
 
 **Decisão de fechamento (2026-08-17):** a validação contra o dataset completo (122.543 linhas) fica
-fora do escopo desta track — decisão explícita do usuário, não limitação técnica. O que já existe
+fora do escopo desta track **e da Sprint 3** — decisão explícita do usuário, não limitação técnica: o
+esforço restante da sprint vai para a interface, que é onde a avaliação do MVP acontece, e a medição de
+qualidade preditiva abre a Sprint 4 (a essa altura ela custa um `POST /trigger`). O que já existe
 (achado #4 acima: `ml-trainer` disparado via `ui-orchestrator` contra os 606 incidentes disponíveis no
 cluster, com splits por quantil 70/85/100%; `volume-forecast`/`breach-risk` v1 registrados e promovidos
 a `Production` no MLflow sem tocar em código/infra) é aceito como evidência suficiente de que o
 mecanismo fim-a-fim funciona. Ingestão completa e a leitura de métricas de qualidade real (AUC-PR,
-MAPE) contra o dataset cheio ficam como follow-up — não bloqueiam o fechamento desta track.
+MAPE) contra o dataset cheio são escopo da Sprint 4 — ver `docs/sprints/sprint-3-mvp.md`, seção 5.
 
 ### Tasks
 
