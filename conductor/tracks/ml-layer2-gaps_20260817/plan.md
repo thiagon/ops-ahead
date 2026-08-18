@@ -91,18 +91,18 @@ Corrige o que a métrica mede antes de tentar melhorar o número.
 
 ### Tasks
 
-- [ ] 4.1: Exigir lead-time mínimo para contar true positive — alerta que dispara junto do P1/P2 deixa de
+- [x] 4.1: Exigir lead-time mínimo para contar true positive — alerta que dispara junto do P1/P2 deixa de
       ser acerto. Definir o piso a partir do tempo de ação plausível para o N1 e justificar
-- [ ] 4.2: Medir recall: fração dos P1/P2 do histórico precedida por alerta dentro da janela
-- [ ] 4.3: Reportar a curva precision × recall em função de `Z_SCORE_THRESHOLD`, não um ponto único
-- [ ] 4.4: Separar o CSV em janela de calibração e janela de avaliação, cronologicamente
-- [ ] 4.5: Distinguir no relatório os alertas vindos de z-score dos vindos de CUSUM
-- [ ] 4.6: Testes das métricas novas contra séries sintéticas com ground truth conhecido
+- [x] 4.2: Medir recall: fração dos P1/P2 do histórico precedida por alerta dentro da janela
+- [x] 4.3: Reportar a curva precision × recall em função de `Z_SCORE_THRESHOLD`, não um ponto único
+- [x] 4.4: Separar o CSV em janela de calibração e janela de avaliação, cronologicamente
+- [x] 4.5: Distinguir no relatório os alertas vindos de z-score dos vindos de CUSUM
+- [x] 4.6: Testes das métricas novas contra séries sintéticas com ground truth conhecido
 
 ### Verification
 
-- [ ] Backtest reporta precision, recall, lead-time e a curva, por janela
-- [ ] Série sintética com antecipação conhecida produz o lead-time esperado
+- [x] Backtest reporta precision, recall, lead-time e a curva, por janela
+- [x] Série sintética com antecipação conhecida produz o lead-time esperado
 
 ---
 

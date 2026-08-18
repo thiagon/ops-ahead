@@ -38,12 +38,10 @@ def _month_to_date_state(kpi_state: pd.DataFrame, month_start: pd.Timestamp, sev
 def _fit_lgb_and_residual_std(
     daily: pd.DataFrame, group: str, holdout_days: int
 ) -> tuple[object, float]:
-    """Fits a fresh D+1 LightGBM on all history for `group` except the
-    trailing `holdout_days`, then measures residual std on that holdout —
-    the LightGBM's own empirical predictive spread, used as the Monte Carlo
-    noise scale. Decoupled from the volume trainer's train/validation/holdout
-    split boundaries: this analysis always forecasts from "now" forward, not
-    a fixed historical backtest window."""
+    """Fits a fresh D+1 LightGBM on `group`'s history minus the trailing
+    `holdout_days`, then measures residual std on that holdout as the Monte
+    Carlo noise scale. Decoupled from the volume trainer's split boundaries
+    — this always forecasts from "now" forward, not a fixed backtest window."""
     frame = volume_features.build_feature_frame(daily, horizon=1)
     group_frame = frame.loc[frame["priority_group"] == group].sort_values("date").reset_index(drop=True)
     if len(group_frame) <= holdout_days:

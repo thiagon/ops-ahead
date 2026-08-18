@@ -77,6 +77,24 @@ Um incident **contado no KPI** pode ou não ter sofrido breach — são duas per
 diferentes, e confundi-las inverte o indicador. As regras completas estão no
 [dicionário de dados](../docs/context/data-dictionary.md).
 
+### no_intervention
+
+Incident encerrado sem nenhuma ação humana — o monitoramento abriu e o próprio evento se
+resolveu sozinho. Fica de fora do KPI. Tradução para a Ubiquitous Language do status ITSM
+"Sem Intervenção" — vocabulário de origem que não deveria aparecer em nome de campo além
+do adapter ([`acl/itsm.md`](./acl/itsm.md)).
+
+*Não use:* sem_intervencao, em nome de campo novo. `sem_intervencao_count` em
+`incidents_by_ic` é dívida anterior a este termo, não um padrão a repetir.
+
+### external event
+
+Anomalia num dia ou janela — não num incident individual — que não é sinal do domínio: um
+evento fora da Locaweb (AWS, registro.br, CrowdStrike) que se parece com pico de
+incidentes mas contaminaria o treino se entrasse como se fosse comportamento normal.
+Marcado por dia (`is_external_event`, `anomaly_score`), consumido como filtro de treino
+pelos outros modelos da Predição — nunca pelo Copiloto diretamente.
+
 ### analysis
 
 O que se pede quando se dispara uma execução sob demanda — a pergunta de negócio, não o

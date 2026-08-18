@@ -40,6 +40,11 @@ janelas no dado real, porque a maioria das ICs tem 0-1 incidente por bucket de 1
 mínimo no desvio robusto. Precision ainda baixa mesmo pós-fix; hiperparâmetros (`CUSUM_K`/`CUSUM_H`/
 `MIN_ROBUST_STD`) não foram tunados contra o próprio backtest para evitar overfitting nele.
 
+**A tabela acima tem um viés de metodologia** — corrigido na track `ml-layer2-gaps_20260817`:
+lead-time de 9s é um "acerto" simultâneo à rajada, não antecipação. Números corrigidos (piso de
+lead-time, recall, janela de calibração/avaliação separada) em
+`docs/insights/burst_detector_methodology.md`.
+
 ## Detector de evento externo (Isolation Forest) — backtest offline
 
 Assim como o `burst-detector`, este backtest (`apps/ml-trainer/scripts/external_event_backtest.py`) roda

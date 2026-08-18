@@ -19,7 +19,7 @@ def _synthetic_daily(days: int = 60) -> pd.DataFrame:
                 "total_incidents": total if i != days - 1 else 400,  # spike on the last day
                 "p1_share": 0.1,
                 "manual_open_share": 0.15,
-                "sem_intervencao_share": 0.6,
+                "no_intervention_share": 0.6,
                 "unique_entities": 5,
             }
         )

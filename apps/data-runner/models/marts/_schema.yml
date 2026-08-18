@@ -70,7 +70,7 @@ models:
         tests: [not_null]
       - name: manual_open_share
         tests: [not_null]
-      - name: sem_intervencao_share
+      - name: no_intervention_share
         tests: [not_null]
 
   - name: kpi_monthly_state

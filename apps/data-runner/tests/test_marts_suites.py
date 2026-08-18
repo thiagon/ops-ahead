@@ -64,7 +64,7 @@ def test_daily_anomaly_features_passes_on_clean_snapshot(sqlite_engine, gx_conte
                 "p1_share": 0.1,
                 "breach_rate": 0.05,
                 "manual_open_share": 0.14,
-                "sem_intervencao_share": 0.65,
+                "no_intervention_share": 0.65,
             }
         ],
     )
@@ -86,7 +86,7 @@ def test_daily_anomaly_features_fails_on_breach_rate_out_of_range(sqlite_engine,
                 "p1_share": 0.1,
                 "breach_rate": 1.5,
                 "manual_open_share": 0.14,
-                "sem_intervencao_share": 0.65,
+                "no_intervention_share": 0.65,
             }
         ],
     )
@@ -108,7 +108,7 @@ def test_daily_anomaly_features_fails_on_manual_open_share_out_of_range(sqlite_e
                 "p1_share": 0.1,
                 "breach_rate": 0.05,
                 "manual_open_share": 1.2,
-                "sem_intervencao_share": 0.65,
+                "no_intervention_share": 0.65,
             }
         ],
     )

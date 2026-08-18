@@ -3,21 +3,16 @@ historical dataset.
 
 Usage: uv run --package ops-ahead-ml-trainer python scripts/external_event_backtest.py
 
-Replays assets/incidents.csv (real ITSM history) into the same daily feature
-shape the live detector trains on (src/external_event/features.py), fits an
-Isolation Forest on it, and measures recall/precision/false-positive-rate
-against a "known outliers" reference built independently from the same CSV
-— days whose total-volume robust z-score (median + MAD, same method
-apps/ml-burst-detector/src/detector.py uses) crosses a threshold. No
-externally-labeled ground truth exists in this dataset, so this is the
-objective reference available; it's checked against the one independent
-fact known about the dataset — the September/2025 spike Douglas described
-in the mentoria as a real, unexplained external event
-(docs/insights/03-mentoria-insights.md) — to confirm it isn't just noise.
+Replays assets/incidents.csv into the same daily feature shape the live
+detector trains on (src/external_event/features.py), fits an Isolation
+Forest on it, and measures recall/precision/false-positive-rate against a
+"known outliers" reference built independently from the same CSV — no
+externally-labeled ground truth exists in this dataset (see
+docs/insights/ml_models_baseline.md for results and the September/2025
+sanity check against docs/insights/03-mentoria-insights.md).
 
-This never touches ClickHouse/MLflow — pure replay over the CSV, so it runs
-anywhere assets/incidents.csv and this package's deps are available, cluster
-or no cluster (same shape as apps/ml-burst-detector/scripts/backtest.py).
+Pure replay over the CSV — no ClickHouse/MLflow — same shape as
+apps/ml-burst-detector/scripts/backtest.py.
 """
 
 from __future__ import annotations
@@ -47,27 +42,23 @@ def build_daily_features(df: pd.DataFrame) -> pd.DataFrame:
         total_incidents=("numero", "count"),
         p1_count=("prioridade_codigo", lambda s: (s == 1).sum()),
         manual_open_count=("aberto_por", lambda s: (s == "Manual").sum()),
-        sem_intervencao_count=("status", lambda s: (s == "Sem Intervenção").sum()),
+        no_intervention_count=("status", lambda s: (s == "Sem Intervenção").sum()),
         unique_entities=("item_configuracao", "nunique"),
     )
     daily["p1_share"] = daily["p1_count"] / daily["total_incidents"]
     daily["manual_open_share"] = daily["manual_open_count"] / daily["total_incidents"]
-    daily["sem_intervencao_share"] = daily["sem_intervencao_count"] / daily["total_incidents"]
+    daily["no_intervention_share"] = daily["no_intervention_count"] / daily["total_incidents"]
 
     return daily.reset_index()[["date", *FEATURE_COLUMNS]]
 
 
 def known_outliers(daily: pd.DataFrame) -> pd.Series:
     """Days whose total-volume robust z-score, against a *trailing* window
-    of recent history (not the full dataset), crosses Z_SCORE_THRESHOLD.
-
-    A single global median/MAD over the whole ~1.8-year history mistakes the
-    dataset's overall volume trend for anomalies in every later period —
-    tried first, it flagged 19% of all days, clearly not "known outliers".
-    A trailing window controls for that trend; the day itself is excluded
-    from its own baseline (`shift(1)`), same no-self-leakage rule the rest
-    of this codebase applies to expanding/rolling features
-    (`breach/features.add_historical_group_severity_features`)."""
+    of recent history (not the full dataset), crosses Z_SCORE_THRESHOLD — a
+    global median/MAD would read the dataset's overall volume trend as
+    anomalies in every later period. The day itself is excluded from its
+    own baseline (`shift(1)`), same no-self-leakage rule as
+    `breach/features.add_historical_group_severity_features`."""
     counts = daily["total_incidents"]
     history = counts.shift(1)
 

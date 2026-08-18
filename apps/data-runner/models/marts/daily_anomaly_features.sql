@@ -25,7 +25,7 @@ select
     countIf(has_parent_incident = 0)                                as standalone_count,
     countIf(has_parent_incident = 0) / count()                      as standalone_share,
     countIf(opened_by = 'Manual') / count()                         as manual_open_share,
-    countIf(status = 'Sem Intervenção') / count()                   as sem_intervencao_share,
+    countIf(status = 'Sem Intervenção') / count()                   as no_intervention_share,
     avg(opened_hour)                                                as avg_opened_hour,
     avg(duration_seconds)                                           as avg_duration_seconds,
     quantile(0.5)(duration_seconds)                                 as median_duration_seconds,

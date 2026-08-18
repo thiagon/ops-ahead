@@ -13,7 +13,7 @@ def test_collapses_multiple_sources_into_one_row_per_date():
                 "total_incidents": 20,
                 "p1_share": 0.1,
                 "manual_open_share": 0.15,
-                "sem_intervencao_share": 0.6,
+                "no_intervention_share": 0.6,
                 "unique_entities": 5,
             },
             {
@@ -22,7 +22,7 @@ def test_collapses_multiple_sources_into_one_row_per_date():
                 "total_incidents": 10,
                 "p1_share": 0.2,
                 "manual_open_share": 0.05,
-                "sem_intervencao_share": 0.4,
+                "no_intervention_share": 0.4,
                 "unique_entities": 3,
             },
         ]
@@ -47,7 +47,7 @@ def test_output_has_expected_columns_and_is_sorted_by_date():
                 "total_incidents": 5,
                 "p1_share": 0.0,
                 "manual_open_share": 0.0,
-                "sem_intervencao_share": 0.0,
+                "no_intervention_share": 0.0,
                 "unique_entities": 1,
             },
             {
@@ -56,7 +56,7 @@ def test_output_has_expected_columns_and_is_sorted_by_date():
                 "total_incidents": 5,
                 "p1_share": 0.0,
                 "manual_open_share": 0.0,
-                "sem_intervencao_share": 0.0,
+                "no_intervention_share": 0.0,
                 "unique_entities": 1,
             },
         ]

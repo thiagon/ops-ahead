@@ -18,11 +18,9 @@ def sample_breach_rate_posterior(
     breaches_so_far: int, eligible_so_far: int, n_sims: int, rng: np.random.Generator
 ) -> np.ndarray:
     """One draw per simulation of the month's "true" breach rate, from a
-    Beta(1,1) uniform prior updated with month-to-date eligible/breached
-    counts. Held constant across a simulation's remaining days — this models
-    uncertainty about the rate itself, not day-to-day rate fluctuation, which
-    is the standard Beta-Binomial formulation for this kind of aggregate
-    projection."""
+    Beta(1,1) prior updated with month-to-date eligible/breached counts —
+    held constant across a simulation's remaining days (rate uncertainty,
+    not day-to-day fluctuation)."""
     alpha = 1 + breaches_so_far
     beta = 1 + max(eligible_so_far - breaches_so_far, 0)
     return rng.beta(alpha, beta, size=n_sims)
@@ -31,13 +29,10 @@ def sample_breach_rate_posterior(
 def sample_volume_paths(
     daily_means: Sequence[float], residual_std: float, n_sims: int, rng: np.random.Generator
 ) -> np.ndarray:
-    """(n_sims, len(daily_means)) array of simulated daily incident counts —
-    each day's mean comes from the LightGBM recursive point forecast
-    (`forecast.recursive_lgb_forecast`), with independent Normal(mean,
-    residual_std) noise per day and simulation, clipped at 0 and rounded to
-    whole incidents. `residual_std` is the empirical std of D+1 residuals on
-    a held-out tail of real history — the LightGBM model's own predictive
-    spread, not a modeling assumption."""
+    """(n_sims, len(daily_means)) simulated daily counts: `daily_means` from
+    `forecast.recursive_lgb_forecast`, `residual_std` from the D+1 holdout
+    residuals (the model's own predictive spread), independent Normal noise
+    per day/sim, clipped at 0 and rounded."""
     n_days = len(daily_means)
     means = np.asarray(daily_means, dtype=float)
     noise = rng.normal(loc=0.0, scale=max(residual_std, 0.0), size=(n_sims, n_days))

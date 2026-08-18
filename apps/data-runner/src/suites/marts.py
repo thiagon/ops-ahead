@@ -50,7 +50,7 @@ def register_daily_anomaly_features(context: AbstractDataContext) -> ValidationD
         gxe.ExpectColumnValuesToBeBetween(column="manual_open_share", min_value=0, max_value=1)
     )
     suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="sem_intervencao_share", min_value=0, max_value=1)
+        gxe.ExpectColumnValuesToBeBetween(column="no_intervention_share", min_value=0, max_value=1)
     )
 
     return context.validation_definitions.add(

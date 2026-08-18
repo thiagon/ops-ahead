@@ -13,7 +13,7 @@ DAILY_ANOMALY_FEATURES_COLUMNS = [
     "total_incidents",
     "p1_share",
     "manual_open_share",
-    "sem_intervencao_share",
+    "no_intervention_share",
     "unique_entities",
 ]
 

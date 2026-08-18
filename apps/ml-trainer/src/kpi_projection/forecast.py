@@ -14,19 +14,15 @@ def recursive_lgb_forecast(
     avg_opened_hour: float,
     target_dates: Sequence[pd.Timestamp],
 ) -> list[float]:
-    """Point forecast for each of `target_dates` (consecutive future days) for
-    one `priority_group`, using only the horizon=1 LightGBM model — the
-    bundled `VolumeForecastModel` has no model for horizons between 2 and 6,
-    so a Monte Carlo run covering an arbitrary number of remaining days in
-    the month has to fall back to standard recursive multi-step forecasting:
-    each day's own forecast is fed back as if it were the actual observed
-    count when computing the next day's lag/rolling features.
+    """Point forecast for each of `target_dates` for one `priority_group`,
+    using only the horizon=1 LightGBM model — `VolumeForecastModel` has no
+    model for horizons 2-6, so covering an arbitrary number of remaining
+    days in the month means standard recursive multi-step forecasting: each
+    day's own forecast feeds the next day's lag/rolling features.
 
-    `history_counts` must be a date-indexed Series of real daily counts,
-    sorted ascending, with at least 30 trailing days ending the day before
-    `target_dates[0]`. `avg_opened_hour` is held constant across the horizon
-    — a stable seasonal feature, not something a day-ahead recursion can
-    predict on its own.
+    `history_counts`: date-indexed Series, sorted ascending, ≥30 trailing
+    days ending the day before `target_dates[0]`. `avg_opened_hour` is held
+    constant across the horizon.
     """
     counts = history_counts.copy()
     forecasts: list[float] = []

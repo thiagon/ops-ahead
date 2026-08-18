@@ -11,7 +11,7 @@ def _daily_frame_with_one_spike(n_normal: int = 40) -> pd.DataFrame:
             "p1_share": 0.1,
             "manual_open_share": 0.15,
             "unique_entities": 5,
-            "sem_intervencao_share": 0.6,
+            "no_intervention_share": 0.6,
         }
         for i in range(n_normal)
     ]
@@ -21,7 +21,7 @@ def _daily_frame_with_one_spike(n_normal: int = 40) -> pd.DataFrame:
             "p1_share": 0.9,
             "manual_open_share": 0.02,
             "unique_entities": 40,
-            "sem_intervencao_share": 0.05,
+            "no_intervention_share": 0.05,
         }
     )
     return pd.DataFrame(rows)
