@@ -3,7 +3,7 @@
 **Track ID:** ml-layer2-gaps_20260817
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-17
-**Status:** [x] Complete
+**Status:** [~] Reaberta em 2026-08-17 — fases 8 a 10 acrescentadas na revisão do usuário
 
 ## Overview
 
@@ -178,6 +178,76 @@ Roda depois do merge do PR #56, que altera os mesmos arquivos.
 
 - [x] Doc da sprint, baseline e tabela de conformidade contam os mesmos números
 - [x] Nenhuma task de `ml-models_20260806` fica em `[~]` sem dono
+
+---
+
+## Phase 8: Vocabulário de fronteira
+
+O ACL do ITSM (`domain/acl/itsm.md`) determina que o vocabulário original existe em exatamente dois
+lugares: a base histórica e o mock que a lê. Hoje ele atravessa a fronteira: o valor `'Sem Intervenção'`
+chega ao mart, ao treino e ao modelo, e o nome `sem_intervencao_count` chegou ao schema público do
+`ml-model-serving`. O mesmo conceito já se chama `no_intervention_share` no mart vizinho.
+
+### Tasks
+
+- [ ] 8.1: `status` vira enum do domínio em `contracts/incident-event.schema.json` — `no_intervention`,
+      `auto_closed`, `closed`, `awaiting_problem`, mais o caso desconhecido
+- [ ] 8.2: Tradução no adapter (`ui-gateway`), que é a ACL propriamente dita: mapa dos quatro valores do
+      ITSM para o domínio, com o valor original preservado em `payload_raw`
+- [ ] 8.3: `stg_incidents` e marts passam a comparar contra o valor do domínio; coluna
+      `sem_intervencao_count` de `incidents_by_ic` vira `no_intervention_count`
+- [ ] 8.4: Features do breach renomeadas para `no_intervention_count_1h`/`_6h`; filtro de elegibilidade
+      ao KPI passa a testar o valor do domínio
+- [ ] 8.5: Schema público do `ml-model-serving` renomeado — é contrato que o copiloto e o painel
+      consomem, e ainda não há consumidor a quebrar
+- [ ] 8.6: Retreinar o breach com os nomes novos e repromover a `Production`
+- [ ] 8.7: Testes do adapter (os quatro valores e o desconhecido), dos marts e das features
+- [ ] 8.8: Remover de `domain/ubiquitous-language.md` a nota que registra `sem_intervencao_count` como
+      dívida — a dívida deixa de existir
+
+### Verification
+
+- [ ] Nenhum nome de campo em português fora de `assets/` e `scripts/incident_producer.py`
+- [ ] Breach retreinado e promovido, `POST /predict/breach` respondendo com os campos novos
+
+---
+
+## Phase 9: `model-serving` — empacotamento e A/B entre versões
+
+A Sprint 2 especifica FastAPI + BentoML com "A/B entre versões via header". Nenhum dos dois existe: o
+serviço carrega apenas `models:/<nome>/Production`.
+
+### Tasks
+
+- [ ] 9.1: Empacotamento BentoML dos dois modelos, preservando o carregamento a partir do MLflow
+- [ ] 9.2: A/B entre versões por header — requisição sem header segue no `Production`
+- [ ] 9.3: Métrica Prometheus por versão servida, para a comparação ter leitura
+- [ ] 9.4: Testes dos dois caminhos, com e sem header
+- [ ] 9.5: Chart e deploy atualizados
+
+### Verification
+
+- [ ] Requisição sem header responde pelo `Production`; com header, pela versão pedida
+- [ ] As duas versões aparecem separadas na métrica
+
+---
+
+## Phase 10: Monitoramento de drift (Evidently AI)
+
+A Sprint 2 pede PSI/KS entre a janela de treino e a janela atual por feature, virando métrica Prometheus.
+
+### Tasks
+
+- [ ] 10.1: Cálculo de PSI/KS por feature entre a janela de treino do modelo em `Production` e a janela
+      atual dos marts
+- [ ] 10.2: Resultado exposto como métrica Prometheus
+- [ ] 10.3: Registro do relatório no MLflow junto do run correspondente
+- [ ] 10.4: Testes com distribuições sintéticas — uma estável e uma deslocada
+
+### Verification
+
+- [ ] Uma feature deliberadamente deslocada aparece com PSI alto
+- [ ] A métrica é raspada pelo Prometheus
 
 ---
 

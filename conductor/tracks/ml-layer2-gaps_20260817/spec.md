@@ -3,7 +3,7 @@
 **Track ID:** ml-layer2-gaps_20260817
 **Type:** Feature
 **Created:** 2026-08-17
-**Status:** Complete
+**Status:** In Progress — reaberta em 2026-08-17
 
 ## Summary
 
@@ -69,6 +69,9 @@ especificado e não por uma versão reduzida sem justificativa registrada.
       ponto da curva sustenta o gatilho — e, nesse caso, a consequência para o desenho do fluxo
 - [x] `POST /predict/breach` e `POST /predict/volume` respondem contra os modelos `Production` reais
 - [x] Task 5.4 de `ml-models_20260806` fechada
+- [ ] Nenhum nome de campo em português fora da base histórica e do mock que a lê, como o ACL determina
+- [ ] `model-serving` empacotado com BentoML e servindo A/B entre versões por header
+- [ ] Drift PSI/KS por feature exposto como métrica Prometheus
 
 ## Dependencies
 
@@ -83,6 +86,11 @@ especificado e não por uma versão reduzida sem justificativa registrada.
 - Carga completa do `incidents.csv` e as métricas que dependem dela (AUC-PR, MAPE, recall@top-k) — Sprint 4
 - Servir Monte Carlo e Isolation Forest como endpoint — Sprint 4, conforme o MVP já registra
 - Feast como feature store — excluído do MVP com justificativa registrada
+
+**Revisão do usuário (2026-08-17):** BentoML, o A/B entre versões por header e o Evidently AI foram
+propostos como desvio consciente e **recusados** — os três entram nas fases 9 e 10. O detector de
+rajada permanece como o gatilho do fluxo apesar do resultado da calibração: o componente e seu papel
+vêm da arquitetura, e o número mede o sinal disponível, não a validade do desenho.
 - Camadas 3 e 4: copiloto, RAG, painel e Slack — track `mvp-closeout_20260817` (PR #56)
 - Tratamento de recategorização ponta a ponta (`gateway` detecta transição → re-inferência →
   `incidents.scored`) — a Camada 2 entrega a feature e o endpoint; o gatilho é da track do gateway
