@@ -70,6 +70,11 @@ def create_app(registry: ModelRegistry, load_on_startup: bool = True) -> FastAPI
             raise HTTPException(status_code=503, detail="breach model not loaded")
 
         model_input = pd.DataFrame([request.model_dump()])
+        # A single-row frame infers `object` dtype for a column whose only
+        # value is None (the legitimate "no prior history" case) instead of
+        # float64+NaN — LightGBM rejects object dtypes outright.
+        nullable_float_columns = ["group_severity_historical_ola_ratio", "group_severity_historical_over_25pct_rate"]
+        model_input[nullable_float_columns] = model_input[nullable_float_columns].apply(pd.to_numeric)
         result = registry.breach_model.predict(model_input)
         row = result.iloc[0]
 
