@@ -48,24 +48,27 @@ def _train_external_event(settings: Settings) -> str:
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
 
 
-TRAINERS = {"volume": _train_volume, "breach": _train_breach, "external_event": _train_external_event}
-
-# volume/breach are also reachable via trigger.ml (Kafka); external_event
-# isn't (see src/trigger.py) — CLI-only for now.
-SPLIT_REQUIRED_DOMAINS = {"volume", "breach"}
-
-
-def _analyze_kpi_projection(settings: Settings) -> dict:
+def _train_kpi_projection(settings: Settings) -> str:
     from kpi_projection.data import fetch_kpi_monthly_state
     from kpi_projection.run import run_kpi_projection
     from volume.data import fetch_daily_anomaly_features
 
     daily = fetch_daily_anomaly_features(settings)
     kpi_state = fetch_kpi_monthly_state(settings)
-    return run_kpi_projection(settings, daily, kpi_state)
+    return run_kpi_projection(settings, daily, kpi_state)["run_id"]
 
 
-ANALYSES = {"kpi-projection": _analyze_kpi_projection}
+TRAINERS = {
+    "volume": _train_volume,
+    "breach": _train_breach,
+    "external_event": _train_external_event,
+    "kpi_projection": _train_kpi_projection,
+}
+
+# volume/breach need a hold-out window to evaluate against; kpi_projection
+# always forecasts from "now" forward and external_event trains unsupervised
+# on all available history — neither takes split boundaries.
+SPLIT_REQUIRED_DOMAINS = {"volume", "breach"}
 
 
 def _require_split_boundaries(settings: Settings) -> None:
@@ -92,18 +95,8 @@ def main() -> None:
         consume_forever(settings, TRAINERS)
         return
 
-    if len(sys.argv) == 3 and sys.argv[1] == "analyze" and sys.argv[2] in ANALYSES:
-        settings = Settings()
-        if settings.mlflow_experiment_name is None:
-            settings.mlflow_experiment_name = "kpi-monthly-projection"
-        result = ANALYSES[sys.argv[2]](settings)
-        LOGGER.info("Analysis complete. MLflow run_id=%s", result["run_id"])
-        return
-
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error(
-            "Usage: python -m main train <volume|breach|external_event> | analyze kpi-projection | consume"
-        )
+        LOGGER.error("Usage: python -m main train <volume|breach|external_event|kpi_projection> | consume")
         sys.exit(2)
 
     domain = sys.argv[2]

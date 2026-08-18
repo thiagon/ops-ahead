@@ -20,6 +20,8 @@ export interface TriggerTopics {
 const ANALYSIS_DOMAIN: Record<TriggerRequest['analysis'], 'ml' | 'data'> = {
   volume_forecast: 'ml',
   breach_risk: 'ml',
+  kpi_projection: 'ml',
+  external_event_detection: 'ml',
   data_refresh: 'data',
   data_quality_check: 'data',
 };

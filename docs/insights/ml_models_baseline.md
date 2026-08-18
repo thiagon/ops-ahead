@@ -32,7 +32,8 @@ retreinados como v2/v4 respectivamente sob a correção da colisão de pacote de
 
 ## Projeção KPI mensal (Monte Carlo) — execução real
 
-`python -m main analyze kpi-projection`, contra `daily_anomaly_features`/`kpi_monthly_state` reais do
+`python -m main train kpi_projection` (invocação atual — rodou como `analyze kpi-projection` antes do
+`analysis: kpi_projection` ser ligado ao `trigger.ml`), contra `daily_anomaly_features`/`kpi_monthly_state` reais do
 cluster (283 dias com feature completa, `as_of_date=2025-01-04`, 27 dias restantes no mês, 2000
 simulações, seed 42). Sem target configurado nesta instância (PPR é input de negócio da Locaweb — ver
 `kpi_projection/run.py`), então `P(fechar o mês)` não é reportado; mediana e IC 80% sim:

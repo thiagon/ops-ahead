@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     clickhouse_url: str = "clickhouse://default:@localhost:9000/default"
 
     mlflow_tracking_uri: str = "http://mlflow-tracking.ml.svc.cluster.local:5000"
-    # Falls back to src/main.py's EXPERIMENT_NAMES ("volume-forecast"/
-    # "breach-risk") when unset; a caller can still override either via env.
+    # Falls back to trigger.py's EXPERIMENT_NAMES when unset; a caller can
+    # still override either via env.
     mlflow_experiment_name: str | None = None
     mlflow_registered_model_name: str | None = None
 
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # rare (docs/insights/03-mentoria-insights.md).
     external_event_contamination: float = 0.05
 
-    # kpi-projection only (Monte Carlo).
+    # kpi_projection only (Monte Carlo).
     kpi_projection_n_simulations: int = 2000
     kpi_projection_seed: int = 42
     kpi_projection_holdout_days: int = 14

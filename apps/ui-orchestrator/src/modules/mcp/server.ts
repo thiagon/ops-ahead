@@ -20,7 +20,7 @@ export function buildMcpServer(app: FastifyInstance): McpServer {
     {
       title: 'Trigger analysis',
       description:
-        'Runs a business analysis (volume_forecast, breach_risk, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns a run_id immediately; poll get_run_status for progress.',
+        'Runs a business analysis (volume_forecast, breach_risk, kpi_projection, external_event_detection, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns a run_id immediately; poll get_run_status for progress.',
       // The same discriminated union the REST route validates against — a
       // caller that skips a required split date for volume_forecast/
       // breach_risk gets rejected by the SDK before the handler even runs.

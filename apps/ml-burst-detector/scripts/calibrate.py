@@ -7,8 +7,11 @@ feed detection, all against the calibration window `scripts/backtest.py`
 already carves out (chronological, first 70%) — never the evaluation window,
 which Phase 5's task is to check the chosen point on once, without retuning.
 
-USEFULNESS_FLOOR is fixed before this script is ever run against real
-results — see docs/insights/burst_detector_calibration.md.
+The usefulness floor (CalibrationSettings.usefulness_floor_*) is fixed before
+this script is ever run against real results — see
+docs/insights/burst_detector_calibration.md. Every floor/grid value is
+env-overridable (CalibrationSettings/BacktestSettings below) instead of a
+module constant, so a rerun with different values doesn't need a code edit.
 """
 
 from __future__ import annotations
@@ -20,31 +23,47 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.backtest_metrics import (
-    MIN_LEAD_TIME_SECONDS,
-    Alert,
-    chronological_split,
-    evaluate_alerts,
-    group_p1_p2_by_entity,
-)
+from src.backtest_metrics import Alert, BacktestSettings, chronological_split, evaluate_alerts, group_p1_p2_by_entity
 from src.detector import HISTORY_LENGTH, WINDOWS_SECONDS, CusumState, median_absolute_deviation, update_cusum
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATASET = REPO_ROOT / "assets" / "incidents.csv"
 
-LEAD_TIME_WINDOW_SECONDS = 3600
-CALIBRATION_FRACTION = 0.7
 
-# Fixed before looking at any sweep result (task 5.2).
-USEFULNESS_FLOOR = {"precision": 0.15, "recall": 0.10, "median_lead_time_seconds": MIN_LEAD_TIME_SECONDS}
+class CalibrationSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
+
+    # Fixed before looking at any sweep result (task 5.2). The lead-time leg
+    # of the floor is BacktestSettings.min_lead_time_seconds — one N1-window
+    # value, not duplicated here.
+    usefulness_floor_precision: float = 0.15
+    usefulness_floor_recall: float = 0.10
+
+    grid_z_score_threshold: list[float] = [2.5, 3.5, 4.5]
+    grid_cusum_k: list[float] = [0.5, 1.0]
+    grid_cusum_h: list[float] = [3.0, 5.0]
+    grid_min_robust_std: list[float] = [1.0, 2.0]
+    # Comma-joined window names per combination, e.g. "15m,1h,6h" or "15m".
+    grid_windows: list[str] = ["15m,1h,6h", "15m", "1h", "6h"]
+
+
+BACKTEST_SETTINGS = BacktestSettings()
+CALIBRATION_SETTINGS = CalibrationSettings()
+
+USEFULNESS_FLOOR = {
+    "precision": CALIBRATION_SETTINGS.usefulness_floor_precision,
+    "recall": CALIBRATION_SETTINGS.usefulness_floor_recall,
+    "median_lead_time_seconds": BACKTEST_SETTINGS.min_lead_time_seconds,
+}
 
 GRID = {
-    "z_score_threshold": [2.5, 3.5, 4.5],
-    "cusum_k": [0.5, 1.0],
-    "cusum_h": [3.0, 5.0],
-    "min_robust_std": [1.0, 2.0],
-    "windows": [("15m", "1h", "6h"), ("15m",), ("1h",), ("6h",)],
+    "z_score_threshold": CALIBRATION_SETTINGS.grid_z_score_threshold,
+    "cusum_k": CALIBRATION_SETTINGS.grid_cusum_k,
+    "cusum_h": CALIBRATION_SETTINGS.grid_cusum_h,
+    "min_robust_std": CALIBRATION_SETTINGS.grid_min_robust_std,
+    "windows": [tuple(w.split(",")) for w in CALIBRATION_SETTINGS.grid_windows],
 }
 
 
@@ -131,7 +150,7 @@ def main() -> None:
     df["aberto_em"] = pd.to_datetime(df["aberto_em"])
     df = df.sort_values("aberto_em").reset_index(drop=True)
 
-    calibration_df, _ = chronological_split(df, "aberto_em", CALIBRATION_FRACTION)
+    calibration_df, _ = chronological_split(df, "aberto_em", BACKTEST_SETTINGS.calibration_fraction)
     p1_p2 = calibration_df[calibration_df["prioridade_codigo"].isin([1, 2])]
     p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
 
@@ -141,7 +160,9 @@ def main() -> None:
     results = []
     for z_score_threshold, cusum_k, cusum_h, min_robust_std, windows in combos:
         alerts = raise_alerts(calibration_df, z_score_threshold, cusum_k, cusum_h, min_robust_std, windows)
-        metrics = evaluate_alerts(alerts, p1_p2_by_entity, MIN_LEAD_TIME_SECONDS, LEAD_TIME_WINDOW_SECONDS)
+        metrics = evaluate_alerts(
+            alerts, p1_p2_by_entity, BACKTEST_SETTINGS.min_lead_time_seconds, BACKTEST_SETTINGS.lead_time_window_seconds
+        )
         results.append(
             {
                 "z_score_threshold": z_score_threshold,

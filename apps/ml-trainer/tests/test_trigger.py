@@ -126,7 +126,57 @@ class TestProcessMessage:
         )
 
         assert experiment_names_seen == ["breach-risk", "volume-forecast"]
-        assert settings.mlflow_registered_model_name == "volume-forecast"
+        # The shared settings instance itself is never mutated — each message
+        # works off its own model_copy(), so it stays at its construction-time
+        # defaults regardless of how many messages have been processed.
+        assert settings.mlflow_registered_model_name is None
+
+    def test_kpi_projection_message_carries_its_payload_fields_and_falls_back_to_defaults(
+        self, settings, published, publish_status
+    ):
+        calls: list[Settings] = []
+
+        def _train_kpi_projection(s: Settings) -> str:
+            calls.append(s)
+            return "mlflow-run-kpi"
+
+        process_message(
+            settings,
+            {"kpi_projection": _train_kpi_projection},
+            {
+                "run_id": "run-6",
+                "analysis": "kpi_projection",
+                "n_simulations": 5000,
+                "kpi_target_volume_p2": 514,
+            },
+            publish_status,
+        )
+
+        assert len(calls) == 1
+        assert calls[0].kpi_projection_n_simulations == 5000
+        assert calls[0].kpi_target_volume_p2 == 514
+        # Omitted in the payload — falls back to Settings' own default, not None.
+        assert calls[0].kpi_projection_seed == settings.kpi_projection_seed
+        assert calls[0].mlflow_experiment_name == "kpi-monthly-projection"
+        assert published[1]["detail"] == {"mlflow_run_id": "mlflow-run-kpi"}
+
+    def test_external_event_detection_message_carries_contamination(self, settings, published, publish_status):
+        calls: list[Settings] = []
+
+        def _train_external_event(s: Settings) -> str:
+            calls.append(s)
+            return "mlflow-run-ext"
+
+        process_message(
+            settings,
+            {"external_event": _train_external_event},
+            {"run_id": "run-7", "analysis": "external_event_detection", "contamination": 0.1},
+            publish_status,
+        )
+
+        assert len(calls) == 1
+        assert calls[0].external_event_contamination == 0.1
+        assert calls[0].mlflow_experiment_name == "external-event-detection"
 
     def test_publishes_failed_with_error_detail_when_the_trainer_raises(
         self, settings, published, publish_status

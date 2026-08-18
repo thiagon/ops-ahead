@@ -25,8 +25,8 @@ import numpy as np
 import pandas as pd
 
 from src.backtest_metrics import (
-    MIN_LEAD_TIME_SECONDS,
     Alert,
+    BacktestSettings,
     chronological_split,
     evaluate_alerts,
     group_p1_p2_by_entity,
@@ -47,13 +47,7 @@ from src.detector import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATASET = REPO_ROOT / "assets" / "incidents.csv"
 
-# An alert "predicts" an escalation if a P1/P2 at the same IC follows within
-# this many seconds of the alert firing — the outer bound; MIN_LEAD_TIME_SECONDS
-# (imported from src.backtest_metrics) is the inner bound.
-LEAD_TIME_WINDOW_SECONDS = 3600
-
-CALIBRATION_FRACTION = 0.7
-CURVE_THRESHOLDS = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+SETTINGS = BacktestSettings()
 
 
 @dataclass
@@ -124,7 +118,9 @@ def _print_window_report(name: str, df: pd.DataFrame) -> None:
     p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
 
     alerts = raise_alerts(df)
-    metrics = evaluate_alerts(alerts, p1_p2_by_entity, MIN_LEAD_TIME_SECONDS, LEAD_TIME_WINDOW_SECONDS)
+    metrics = evaluate_alerts(
+        alerts, p1_p2_by_entity, SETTINGS.min_lead_time_seconds, SETTINGS.lead_time_window_seconds
+    )
 
     print(f"\n=== {name} window ({len(df):,} rows) ===")
     print(f"Total alerts: {metrics['total_alerts']:,}")
@@ -149,11 +145,11 @@ def _print_curve(calibration_df: pd.DataFrame) -> None:
     p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
 
     curve = precision_recall_curve(
-        CURVE_THRESHOLDS,
+        SETTINGS.curve_thresholds,
         lambda threshold: raise_alerts(calibration_df, threshold),
         p1_p2_by_entity,
-        MIN_LEAD_TIME_SECONDS,
-        LEAD_TIME_WINDOW_SECONDS,
+        SETTINGS.min_lead_time_seconds,
+        SETTINGS.lead_time_window_seconds,
     )
 
     print("\n=== Precision × recall curve (calibration window, by Z_SCORE_THRESHOLD) ===")
@@ -171,11 +167,11 @@ def main() -> None:
     df["aberto_em"] = pd.to_datetime(df["aberto_em"])
     df = df.sort_values("aberto_em").reset_index(drop=True)
 
-    calibration_df, evaluation_df = chronological_split(df, "aberto_em", CALIBRATION_FRACTION)
+    calibration_df, evaluation_df = chronological_split(df, "aberto_em", SETTINGS.calibration_fraction)
 
     print(f"Rows replayed: {len(df):,}")
-    print(f"Min lead time floor: {MIN_LEAD_TIME_SECONDS}s (N1's 15-minute escalation window)")
-    print(f"Lead time window: {LEAD_TIME_WINDOW_SECONDS}s")
+    print(f"Min lead time floor: {SETTINGS.min_lead_time_seconds}s (N1's 15-minute escalation window)")
+    print(f"Lead time window: {SETTINGS.lead_time_window_seconds}s")
 
     _print_window_report("calibration", calibration_df)
     _print_window_report("evaluation", evaluation_df)

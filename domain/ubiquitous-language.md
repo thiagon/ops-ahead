@@ -105,6 +105,8 @@ Valores hoje:
 
 - **`volume_forecast`** — treinar o modelo de previsão de volume de incidentes.
 - **`breach_risk`** — treinar o modelo de risco de breach de OLA.
+- **`kpi_projection`** — projetar o fechamento mensal dos 4 KPIs do PPR (Monte Carlo).
+- **`external_event_detection`** — treinar o detector de evento externo (Isolation Forest).
 - **`data_refresh`** — rematerializar os marts a partir do dado recebido.
 - **`data_quality_check`** — rodar a suite de qualidade sobre os marts.
 

@@ -6,12 +6,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pandas as pd
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# N1's real escalation window (docs/insights/03-mentoria-insights.md, "Regra de
-# Escalonamento Interno do N1") — the floor a true positive has to clear, or
-# "alert fired before the P1/P2" can't be told apart from "alert fired because
-# of the P1/P2's own burst".
-MIN_LEAD_TIME_SECONDS = 15 * 60
+
+class BacktestSettings(BaseSettings):
+    """Tunable backtest/calibration knobs — env-overridable like every other
+    Settings class in this app, instead of module constants a rerun with
+    different values would need a code edit for."""
+
+    model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
+
+    # N1's real escalation window (docs/insights/03-mentoria-insights.md,
+    # "Regra de Escalonamento Interno do N1") — the floor a true positive has
+    # to clear, or "alert fired before the P1/P2" can't be told apart from
+    # "alert fired because of the P1/P2's own burst".
+    min_lead_time_seconds: int = 15 * 60
+    # Outer bound: how far ahead an alert can still count as predicting a P1/P2.
+    lead_time_window_seconds: int = 3600
+    # Share of the chronologically-ordered dataset used for calibration —
+    # the rest is the evaluation window, never used for tuning.
+    calibration_fraction: float = 0.7
+    # Z_SCORE_THRESHOLD values the precision x recall curve sweeps.
+    curve_thresholds: list[float] = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
 
 @dataclass(frozen=True)
