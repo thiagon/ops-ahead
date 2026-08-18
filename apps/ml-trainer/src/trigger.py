@@ -60,6 +60,14 @@ def process_message(
     settings.train_end = event.get("train_end")
     settings.validation_end = event.get("validation_end")
     settings.holdout_end = event.get("holdout_end")
+    # consume_forever reuses one Settings instance for the process's whole
+    # lifetime, across messages of different domains — configure_experiment
+    # only fills these in "if None", so without resetting them here first, a
+    # later message inherits whatever an earlier one already set (e.g. a
+    # volume_forecast run registered under breach-risk's name because a
+    # breach_risk message set it first).
+    settings.mlflow_experiment_name = None
+    settings.mlflow_registered_model_name = None
     configure_experiment(settings, domain)
 
     try:
