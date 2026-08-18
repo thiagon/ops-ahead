@@ -19,9 +19,12 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.deployment.env.httpPort | quote }}
         prometheus.io/path: "/metrics"
-        # Models load once at startup (models_loader.py), not on a timer — a
-        # newly promoted Production version needs this bumped to be picked up.
-        ops-ahead.io/restarted-for: "ml-layer2-gaps-phase6-2026-08-18T01-32"
+        {{- with .Values.deployment.restartedAt }}
+        # Models load once at startup (models_loader.py), not on a timer — set
+        # deployment.restartedAt to any new value to force a rollout and pick
+        # up a newly promoted Production version.
+        ops-ahead.io/restarted-at: {{ . | quote }}
+        {{- end }}
     spec:
       containers:
         - name: server

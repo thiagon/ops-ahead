@@ -8,6 +8,10 @@ ml-model-serving:
 
 deployment:
   replicaCount: 1
+  # Bump to any new value (e.g. a date) to force a rollout — see the
+  # annotation this feeds in templates/deployment.yaml. Empty by default:
+  # no annotation, no unnecessary diff on every sync.
+  restartedAt: ""
   resources:
     requests:
       cpu: 200m
