@@ -13,7 +13,7 @@ const itsmEvent = {
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
-  status: 'Resolvido',
+  status: 'Encerrado',
   payload: { ticket_number: 'INC0012345', duration_seconds: '9120', kpi_breached: '1' },
 };
 
@@ -40,7 +40,7 @@ describe('toIncidentEvent', () => {
       opened_at: '2025-12-31T23:45:18.000Z',
       severity: 2,
       entity_id: 'srv-web-04',
-      status: 'Resolvido',
+      status: 'closed',
     });
   });
 
@@ -87,7 +87,7 @@ describe('webhookBodySchema', () => {
 
     expect(normalizeWebhook(webhookBodySchema.parse(withoutOptionals))).toMatchObject({
       entity_id: '',
-      status: '',
+      status: 'unknown',
     });
   });
 });

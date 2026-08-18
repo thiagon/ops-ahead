@@ -139,12 +139,12 @@ class TestGroupP1P2ByEntity:
     def test_groups_and_sorts_by_time(self):
         df = pd.DataFrame(
             {
-                "item_configuracao": ["IC1", "IC1", "IC2"],
-                "aberto_em": [_ts(200), _ts(100), _ts(50)],
+                "entity_id": ["IC1", "IC1", "IC2"],
+                "opened_at": [_ts(200), _ts(100), _ts(50)],
             }
         )
 
-        grouped = group_p1_p2_by_entity(df, "item_configuracao", "aberto_em")
+        grouped = group_p1_p2_by_entity(df, "entity_id", "opened_at")
 
         assert grouped["IC1"] == [_ts(100), _ts(200)]
         assert grouped["IC2"] == [_ts(50)]

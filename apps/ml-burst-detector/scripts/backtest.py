@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -45,7 +46,10 @@ from src.detector import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DATASET = REPO_ROOT / "assets" / "incidents.csv"
+# The historical base is read through the repo-level reader so the origin's
+# vocabulary stays confined to it (domain/acl/itsm.md).
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import historical_dataset  # noqa: E402
 
 SETTINGS = BacktestSettings()
 
@@ -91,8 +95,8 @@ def raise_alerts(df: pd.DataFrame, z_threshold: float = Z_SCORE_THRESHOLD) -> li
     alerts: list[Alert] = []
 
     for row in df.itertuples():
-        entity_id = row.item_configuracao or "unknown"
-        opened_at: pd.Timestamp = row.aberto_em
+        entity_id = row.entity_id or "unknown"
+        opened_at: pd.Timestamp = row.opened_at
         event_epoch = opened_at.timestamp()
 
         for window_name, window_seconds in WINDOWS_SECONDS.items():
@@ -114,8 +118,8 @@ def raise_alerts(df: pd.DataFrame, z_threshold: float = Z_SCORE_THRESHOLD) -> li
 
 
 def _print_window_report(name: str, df: pd.DataFrame) -> None:
-    p1_p2 = df[df["prioridade_codigo"].isin([1, 2])]
-    p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
+    p1_p2 = df[df["severity"].isin([1, 2])]
+    p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "entity_id", "opened_at")
 
     alerts = raise_alerts(df)
     metrics = evaluate_alerts(
@@ -141,8 +145,8 @@ def _print_window_report(name: str, df: pd.DataFrame) -> None:
 
 
 def _print_curve(calibration_df: pd.DataFrame) -> None:
-    p1_p2 = calibration_df[calibration_df["prioridade_codigo"].isin([1, 2])]
-    p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
+    p1_p2 = calibration_df[calibration_df["severity"].isin([1, 2])]
+    p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "entity_id", "opened_at")
 
     curve = precision_recall_curve(
         SETTINGS.curve_thresholds,
@@ -163,11 +167,10 @@ def _print_curve(calibration_df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    df = pd.read_csv(DATASET, usecols=["item_configuracao", "aberto_em", "prioridade_codigo"])
-    df["aberto_em"] = pd.to_datetime(df["aberto_em"])
-    df = df.sort_values("aberto_em").reset_index(drop=True)
+    df = historical_dataset.load(["entity_id", "opened_at", "severity"])
+    df = df.sort_values("opened_at").reset_index(drop=True)
 
-    calibration_df, evaluation_df = chronological_split(df, "aberto_em", SETTINGS.calibration_fraction)
+    calibration_df, evaluation_df = chronological_split(df, "opened_at", SETTINGS.calibration_fraction)
 
     print(f"Rows replayed: {len(df):,}")
     print(f"Min lead time floor: {SETTINGS.min_lead_time_seconds}s (N1's 15-minute escalation window)")

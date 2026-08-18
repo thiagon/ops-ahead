@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { incidentStatusSchema } from './status.ts';
 
 /**
  * Output contract — mirrors contracts/incident-event.schema.json (draft-07).
@@ -13,7 +14,7 @@ export const incidentEventSchema = z
     opened_at: z.iso.datetime().meta({ description: 'When the incident was opened, ISO 8601 UTC' }),
     severity: z.int().min(1).max(5).meta({ description: '1 critical … 5 very low' }),
     entity_id: z.string().meta({ description: 'Affected configuration item' }),
-    status: z.string().meta({ description: 'Incident status as the origin words it' }),
+    status: incidentStatusSchema,
     payload_raw: z.string().meta({ description: 'The origin event, verbatim, as a JSON string' }),
   })
   .strict()

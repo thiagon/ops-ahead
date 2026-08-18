@@ -12,7 +12,7 @@ const itsmEvent = {
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
-  status: 'Resolvido',
+  status: 'Encerrado',
   payload: { ticket_number: 'INC0012345' },
 };
 

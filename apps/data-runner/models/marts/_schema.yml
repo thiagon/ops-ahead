@@ -14,7 +14,7 @@ models:
         tests: [not_null]
       - name: incident_count
         tests: [not_null]
-      - name: sem_intervencao_count
+      - name: no_intervention_count
         tests: [not_null]
 
   - name: group_load_by_window

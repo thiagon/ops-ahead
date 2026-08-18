@@ -17,6 +17,7 @@ apps/ml-burst-detector/scripts/backtest.py.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +27,10 @@ from external_event.features import FEATURE_COLUMNS
 from external_event.train import fit_isolation_forest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DATASET = REPO_ROOT / "assets" / "incidents.csv"
+# The historical base is read through the repo-level reader so the origin's
+# vocabulary stays confined to it (domain/acl/itsm.md).
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import historical_dataset  # noqa: E402
 
 Z_SCORE_THRESHOLD = 3.5
 CONTAMINATION = 0.05
@@ -36,14 +40,14 @@ ROLLING_MIN_PERIODS = 30
 
 def build_daily_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["date"] = df["aberto_em"].dt.floor("D")
+    df["date"] = df["opened_at"].dt.floor("D")
 
     daily = df.groupby("date").agg(
-        total_incidents=("numero", "count"),
-        p1_count=("prioridade_codigo", lambda s: (s == 1).sum()),
-        manual_open_count=("aberto_por", lambda s: (s == "Manual").sum()),
-        no_intervention_count=("status", lambda s: (s == "Sem Intervenção").sum()),
-        unique_entities=("item_configuracao", "nunique"),
+        total_incidents=("ticket_number", "count"),
+        p1_count=("severity", lambda s: (s == 1).sum()),
+        manual_open_count=("opened_by", lambda s: (s == "manual").sum()),
+        no_intervention_count=("status", lambda s: (s == "no_intervention").sum()),
+        unique_entities=("entity_id", "nunique"),
     )
     daily["p1_share"] = daily["p1_count"] / daily["total_incidents"]
     daily["manual_open_share"] = daily["manual_open_count"] / daily["total_incidents"]
@@ -94,11 +98,9 @@ def evaluate(daily: pd.DataFrame, flagged: pd.Series, reference: pd.Series) -> d
 
 
 def main() -> None:
-    df = pd.read_csv(
-        DATASET,
-        usecols=["numero", "aberto_em", "prioridade_codigo", "status", "aberto_por", "item_configuracao"],
+    df = historical_dataset.load(
+        ["ticket_number", "opened_at", "severity", "status", "opened_by", "entity_id"]
     )
-    df["aberto_em"] = pd.to_datetime(df["aberto_em"])
 
     daily = build_daily_features(df)
     reference = known_outliers(daily)

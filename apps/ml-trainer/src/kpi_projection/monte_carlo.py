@@ -48,7 +48,7 @@ def simulate_breach_counts(
 ) -> np.ndarray:
     """(n_sims, n_days) simulated breach counts: each day's simulated volume
     is scaled by the month-to-date KPI-eligibility rate (P1–P3 incidents
-    minus parent/"Sem Intervenção" exclusions), then a Binomial draw applies
+    minus parent/no-intervention exclusions), then a Binomial draw applies
     that simulation's own sampled breach rate."""
     eligible_volume = np.clip(np.round(volume_paths * eligibility_rate), a_min=0, a_max=None).astype(int)
     p = np.clip(breach_rate_samples[:, np.newaxis], 0.0, 1.0)

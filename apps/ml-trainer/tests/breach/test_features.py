@@ -14,12 +14,12 @@ from breach.features import (
 )
 
 
-def test_eligibility_filter_drops_p4_p5_parent_and_sem_intervencao():
+def test_eligibility_filter_drops_p4_p5_parent_and_no_intervention():
     df = pd.DataFrame(
         {
             "severity": [1, 4, 2, 3],
             "has_parent_incident": [0, 0, 1, 0],
-            "status": ["Encerrado", "Encerrado", "Encerrado", "Sem Intervenção"],
+            "status": ["closed", "closed", "closed", "no_intervention"],
         }
     )
 
@@ -72,13 +72,13 @@ def test_ic_window_feature_uses_prior_bucket_not_own_bucket():
             "entity_id": ["ic1", "ic1"],
             "window_hours": [1, 1],
             "window_start": [pd.Timestamp("2025-06-10 11:00:00"), pd.Timestamp("2025-06-10 12:00:00")],
-            "sem_intervencao_count": [2, 99],  # 99 is the incident's own bucket — must be ignored
+            "no_intervention_count": [2, 99],  # 99 is the incident's own bucket — must be ignored
         }
     )
 
     result = add_ic_window_features(incidents, ic_windows)
 
-    assert result.iloc[0]["sem_intervencao_count_1h"] == 2
+    assert result.iloc[0]["no_intervention_count_1h"] == 2
 
 
 def test_group_load_feature_uses_prior_bucket_not_own_bucket():
@@ -212,7 +212,7 @@ def test_build_feature_frame_has_no_nulls_and_no_leaky_columns():
         }
     )
     p4_sequences = pd.DataFrame(columns=["entity_id", "sequence_start", "sequence_end", "sequence_length"])
-    ic_windows = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "sem_intervencao_count"])
+    ic_windows = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "no_intervention_count"])
     group_load = pd.DataFrame(columns=["assignment_group", "window_start", "incidents_opened"])
     priority_changes = pd.DataFrame(columns=["ticket_number", "received_at", "severity_from", "severity_to"])
 

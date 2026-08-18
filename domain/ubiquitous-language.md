@@ -84,8 +84,9 @@ resolveu sozinho. Fica de fora do KPI. Tradução para a Ubiquitous Language do 
 "Sem Intervenção" — vocabulário de origem que não deveria aparecer em nome de campo além
 do adapter ([`acl/itsm.md`](./acl/itsm.md)).
 
-*Não use:* sem_intervencao, em nome de campo novo. `sem_intervencao_count` em
-`incidents_by_ic` é dívida anterior a este termo, não um padrão a repetir.
+*Não use:* sem_intervencao, em nome de campo nem em valor. O status chega do ITSM em
+português e é traduzido no adapter do `ui-gateway`, que é onde a ACL acontece — do contrato
+publicado em diante, `no_intervention` é o único nome.
 
 ### external event
 

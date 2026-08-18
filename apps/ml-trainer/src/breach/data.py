@@ -25,7 +25,7 @@ ELIGIBLE_INCIDENTS_COLUMNS = [
 
 P4_SEQUENCES_COLUMNS = ["entity_id", "sequence_start", "sequence_end", "sequence_length"]
 
-IC_WINDOWS_COLUMNS = ["entity_id", "window_hours", "window_start", "sem_intervencao_count"]
+IC_WINDOWS_COLUMNS = ["entity_id", "window_hours", "window_start", "no_intervention_count"]
 
 GROUP_LOAD_COLUMNS = ["assignment_group", "window_start", "incidents_opened"]
 
@@ -34,7 +34,7 @@ PRIORITY_CHANGES_COLUMNS = ["ticket_number", "received_at", "severity_from", "se
 
 def fetch_eligible_incidents(settings: Settings) -> pd.DataFrame:
     """`first_touch_duration` is already filtered to `counted_in_kpi = 1`, which
-    is exactly the P1–P3 / no-parent / not-"Sem Intervenção" population the
+    is exactly the P1–P3 / no-parent / not-"no_intervention" population the
     breach model trains on."""
     client = Client.from_url(settings.clickhouse_url)
     columns = ", ".join(ELIGIBLE_INCIDENTS_COLUMNS)

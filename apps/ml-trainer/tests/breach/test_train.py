@@ -56,7 +56,7 @@ def synthetic_settings(tmp_path) -> Settings:
 def test_train_and_log_completes_and_logs_a_run(synthetic_settings):
     incidents = _synthetic_incidents()
     empty_p4 = pd.DataFrame(columns=["entity_id", "sequence_start", "sequence_end", "sequence_length"])
-    empty_ic = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "sem_intervencao_count"])
+    empty_ic = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "no_intervention_count"])
     empty_group_load = pd.DataFrame(columns=["assignment_group", "window_start", "incidents_opened"])
     empty_priority_changes = pd.DataFrame(columns=["ticket_number", "received_at", "severity_from", "severity_to"])
 
