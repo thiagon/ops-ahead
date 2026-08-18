@@ -80,7 +80,7 @@ Essas três perguntas definem o escopo do MVP. **Tudo o que não responde a elas
 | Pipeline Argo: ingestão → dbt → GE | Sem pipeline funcionando, não há dado para treinar nem para o copiloto consultar |
 | Simulador de stream | Sem webhook real do ITSM, o simulador é o único jeito de rodar o fluxo E2E end-to-end |
 | Modelos de volume e breach treinados e servidos | São a hipótese central do projeto — se não funcionam no dado real, o projeto não vai pra frente |
-| Detector de rajada (`burst-detector`) | É o gatilho primário do fluxo — sem ele, o copiloto não é invocado |
+| Detector de rajada (`burst-detector`) | Sinal auxiliar de contexto na recomendação — o gatilho primário do fluxo é o score de breach acima de limiar (ver nota de 2026-08-17 na seção 4.2: a calibração do detector de rajada não encontrou operating point defensável) |
 | Copiloto com 3 ferramentas mínimas | Bastante para testar se a saída do LLM é acionável; não precisamos de 9 ferramentas para isso |
 | Painel N1/N2 com fila + drill-down | Necessário para a avaliação informal — o avaliador precisa ver a recomendação em contexto |
 | Fan-out Slack (Block Kit) | Testa o caminho real de entrega — Slack é onde o operador age |
@@ -93,6 +93,8 @@ Essas três perguntas definem o escopo do MVP. **Tudo o que não responde a elas
 | Authentik (SSO) | Header fixo de dev não é risco no MVP; autenticação real é Sprint 4 |
 | Projeção KPI Monte Carlo (endpoint) | A lógica Python pode ser validada como script antes de virar endpoint |
 | Detector de evento externo (Isolation Forest endpoint) | Modelo pode ser treinado no MVP; servir fica para Sprint 4 |
+| BentoML no empacotamento do `model-serving` | FastAPI puro já resolve carga de artefato MLflow e I/O; BentoML não traz funcionalidade que falte no MVP (A/B por header, model store) |
+| Evidently AI (monitoramento de drift) | Pressupõe uma janela de produção rodando por tempo suficiente para haver o que comparar — ainda não existe nesta fase |
 | 6 ferramentas restantes do copiloto | As 3 mínimas testam a hipótese de acionabilidade — as demais refinam |
 
 ---
@@ -185,6 +187,31 @@ validados estruturalmente contra dado real do cluster — detalhes em `docs/insi
 Os números de qualidade preditiva (MAPE, AUC-PR, recall@top-k) sobre o dataset completo dependem de uma
 ingestão que ainda não rodou até o fim nesta instância; ficam como follow-up, não bloqueiam o MVP.
 
+**Atualização (2026-08-17, track `ml-layer2-gaps_20260817`):** fecha a conformidade da Camada 2 com a
+seção 3.2 da Sprint 2 — tabela completa em `docs/insights/layer2_sprint2_conformance.md`.
+
+- **Projeção KPI mensal (Monte Carlo)** e **detector de evento externo (Isolation Forest)** — os dois
+  modelos que faltavam — implementados e treinados contra dado real do cluster, como análise/script no
+  `ml-trainer`, não endpoint (conforme já registrado neste documento). Resultados em
+  `docs/insights/ml_models_baseline.md`.
+- **`historico_recategorizacao`** entrou no `FEATURE_COLUMNS` do breach, a última das quatro features
+  de domínio cross-modelo da mentoria.
+- **`model-serving` verificado de verdade pela primeira vez.** `POST /predict/breach` e
+  `POST /predict/volume` nunca tinham sido chamados fora do smoke test com modelo mockado — a
+  verificação real encontrou e corrigiu 4 bugs que impediam qualquer predição real (colisão de nome de
+  pacote entre `ml-trainer`/`ml-model-serving`, dependências de terceiros ausentes no `model-serving`,
+  dtype inválido em campo nulo, timezone incompatível com o Prophet). Confirmado funcionando contra os
+  modelos `Production` reais.
+- **Detector de rajada recalibrado — e seu papel no fluxo mudou.** O backtest original (precision 0,103,
+  lead-time 9s) tinha viés de metodologia: contava como acerto um alerta simultâneo à própria rajada do
+  incidente grave, sem piso de antecedência. Corrigido (piso de 15min, recall, janela de
+  calibração/avaliação separada — `docs/insights/burst_detector_methodology.md`), a varredura de
+  parâmetros não encontrou nenhum operating point que sustente o detector como gatilho primário
+  (`docs/insights/burst_detector_calibration.md`). **O copiloto passa a ser invocado por score de breach
+  acima de limiar; a rajada vira sinal auxiliar de contexto na recomendação**, não mais o evento que
+  dispara o fluxo — muda a leitura da linha do detector de rajada na tabela de escopo do MVP acima e do
+  critério de validação "detector de rajada" na seção 5.
+
 ### 4.3 Camada 3 — Copiloto IA
 
 **O que o MVP precisa testar no copiloto:**
@@ -269,7 +296,11 @@ O MVP não é validado por demo bonita — é validado por evidência em dado re
 **Modelos:**
 - Modelo de volume: MAPE em hold-out por prioridade; cobertura do intervalo de confiança
 - Modelo de breach: AUC-PR e recall@top-10 e top-50 por hora em hold-out temporal
-- Detector de rajada: precision dos alertas e lead-time mediano antes do P2 (usando o histórico real do CSV como ground truth)
+- Detector de rajada: precision, recall e lead-time mediano antes do P2, com piso de antecedência
+  mínima (usando o histórico real do CSV como ground truth — ver
+  `docs/insights/burst_detector_methodology.md`). Nenhum operating point sustenta o detector como
+  gatilho primário (`docs/insights/burst_detector_calibration.md`); o critério de validação passa a ser
+  sinal auxiliar, não a decisão de invocar o copiloto
 
 **Fluxo E2E:**
 - Tempo total do simulador publicar o incidente até o Block Kit aparecer no Slack

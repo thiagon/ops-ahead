@@ -3,7 +3,7 @@
 **Track ID:** ml-layer2-gaps_20260817
 **Type:** Feature
 **Created:** 2026-08-17
-**Status:** Draft
+**Status:** Complete
 
 ## Summary
 
@@ -56,19 +56,19 @@ especificado e não por uma versão reduzida sem justificativa registrada.
 
 ## Acceptance Criteria
 
-- [ ] Toda linha da seção 3.2 da Sprint 2 tem destino explícito: implementada nesta track, ou desvio
+- [x] Toda linha da seção 3.2 da Sprint 2 tem destino explícito: implementada nesta track, ou desvio
       consciente registrado no doc com o porquê
-- [ ] Projeção KPI mensal roda como script validado, produzindo as 4 projeções do PPR (volume P2,
+- [x] Projeção KPI mensal roda como script validado, produzindo as 4 projeções do PPR (volume P2,
       volume P3, OLA P2, OLA P3) com intervalo de confiança
-- [ ] Detector de evento externo treinado sobre `daily_anomaly_features`, com os outliers conhecidos do
+- [x] Detector de evento externo treinado sobre `daily_anomaly_features`, com os outliers conhecidos do
       histórico usados como referência de recall
-- [ ] `historico_recategorizacao` entra no `FEATURE_COLUMNS` do breach, alimentada por
+- [x] `historico_recategorizacao` entra no `FEATURE_COLUMNS` do breach, alimentada por
       `priority_changes_log`
-- [ ] Backtest do detector mede recall além de precision, e exige lead-time mínimo para contar acerto
-- [ ] Existe operating point escolhido com justificativa, ou a constatação registrada de que nenhum
+- [x] Backtest do detector mede recall além de precision, e exige lead-time mínimo para contar acerto
+- [x] Existe operating point escolhido com justificativa, ou a constatação registrada de que nenhum
       ponto da curva sustenta o gatilho — e, nesse caso, a consequência para o desenho do fluxo
-- [ ] `POST /predict/breach` e `POST /predict/volume` respondem contra os modelos `Production` reais
-- [ ] Task 5.4 de `ml-models_20260806` fechada
+- [x] `POST /predict/breach` e `POST /predict/volume` respondem contra os modelos `Production` reais
+- [x] Task 5.4 de `ml-models_20260806` fechada
 
 ## Dependencies
 

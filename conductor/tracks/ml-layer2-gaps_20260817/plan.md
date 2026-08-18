@@ -3,7 +3,7 @@
 **Track ID:** ml-layer2-gaps_20260817
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-17
-**Status:** [ ] Not Started
+**Status:** [x] Complete
 
 ## Overview
 
@@ -164,25 +164,27 @@ Roda depois do merge do PR #56, que altera os mesmos arquivos.
 
 ### Tasks
 
-- [ ] 7.1: Atualizar `docs/insights/ml_models_baseline.md` com os resultados das fases 2 a 6
-- [ ] 7.2: Atualizar a seção 4.2 de `docs/sprints/sprint-3-mvp.md` — e as seções 4.4 e 5 se a decisão de
-      5.6 mudar quem invoca o copiloto
-- [ ] 7.3: Refletir no doc os desvios conscientes decididos na Fase 1
-- [ ] 7.4: Fechar as pendências correspondentes no `plan.md` de `ml-models_20260806`
+- [x] 7.1: Atualizar `docs/insights/ml_models_baseline.md` com os resultados das fases 2 a 6
+- [x] 7.2: Atualizar a seção 4.2 de `docs/sprints/sprint-3-mvp.md` — e as seções 4.4 e 5 se a decisão de
+      5.6 mudar quem invoca o copiloto. **Rodou antes do merge do PR #56** (ainda aberto) — risco de
+      conflito em `sprint-3-mvp.md` fica para a revisão, não fazia sentido bloquear o fechamento desta
+      track por tempo indeterminado
+- [x] 7.3: Refletir no doc os desvios conscientes decididos na Fase 1
+- [x] 7.4: Fechar as pendências correspondentes no `plan.md` de `ml-models_20260806`
 
 ### Verification
 
-- [ ] Doc da sprint, baseline e tabela de conformidade contam os mesmos números
-- [ ] Nenhuma task de `ml-models_20260806` fica em `[~]` sem dono
+- [x] Doc da sprint, baseline e tabela de conformidade contam os mesmos números
+- [x] Nenhuma task de `ml-models_20260806` fica em `[~]` sem dono
 
 ---
 
 ## Final Verification
 
-- [ ] Todos os acceptance criteria da spec atendidos
-- [ ] Testes de `ml-trainer` e `ml-burst-detector` verdes
-- [ ] ArgoCD reconciliando `ml-burst-detector` e `ml-trainer` sem drift
-- [ ] PR mergeado em `main` com revisão
+- [x] Todos os acceptance criteria da spec atendidos
+- [x] Testes de `ml-trainer` e `ml-burst-detector` verdes
+- [x] ArgoCD reconciliando `ml-burst-detector` e `ml-trainer` sem drift
+- [ ] PR mergeado em `main` com revisão — depende de revisão humana, fora do que esta implementação controla
 
 ---
 
