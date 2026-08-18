@@ -10,6 +10,15 @@ dependencies = [
     "prometheus-client>=0.21",
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
+    # Not called directly here — needed to unpickle the bundled MLflow
+    # PythonModel objects ml-trainer registers (LightGBM/Prophet/isotonic/
+    # SHAP artifacts). code_paths ships the model *code*, not its
+    # third-party imports.
+    "lightgbm>=4.5",
+    "prophet>=1.1.6",
+    "holidays>=0.60",
+    "shap>=0.46",
+    "scikit-learn>=1.5",
 ]
 
 [dependency-groups]
