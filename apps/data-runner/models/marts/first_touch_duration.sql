@@ -13,6 +13,7 @@ select
     event_id,
     entity_id,
     ticket_number,
+    received_at,
     opened_at,
     assignment_group,
     opened_by,

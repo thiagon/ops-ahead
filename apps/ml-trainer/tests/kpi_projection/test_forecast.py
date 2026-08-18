@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.kpi_projection.forecast import recursive_lgb_forecast
+from kpi_projection.forecast import recursive_lgb_forecast
 
 
 class _EchoLag1Model:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import mlflow.pyfunc
 import pandas as pd
 
-from src.volume import features
+from volume import features
 
 
 class VolumeForecastModel(mlflow.pyfunc.PythonModel):
@@ -12,7 +12,7 @@ class VolumeForecastModel(mlflow.pyfunc.PythonModel):
 
     `model_input` needs one row per `priority_group` with the *as-of* date and
     the LightGBM lag/rolling features computed up to that date (see
-    `src.features.add_lag_features`) — calendar features for the target date
+    `volume.features.add_lag_features`) — calendar features for the target date
     are computed internally per horizon, not supplied by the caller.
     """
 

@@ -5,7 +5,7 @@ import hashlib
 import pandas as pd
 from clickhouse_driver import Client
 
-from src.settings import Settings
+from settings import Settings
 
 DAILY_ANOMALY_FEATURES_COLUMNS = [
     "date",

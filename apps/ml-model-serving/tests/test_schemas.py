@@ -65,6 +65,8 @@ def test_breach_feature_input_rejects_severity_outside_p1_p3():
             sem_intervencao_count_1h=0,
             sem_intervencao_count_6h=0,
             group_load_1h=0,
+            was_recategorized=0,
+            recategorization_count=0,
         )
 
 
@@ -82,5 +84,7 @@ def test_breach_feature_input_allows_missing_historical_ratio():
         sem_intervencao_count_1h=1,
         sem_intervencao_count_6h=4,
         group_load_1h=2,
+        was_recategorized=1,
+        recategorization_count=2,
     )
     assert feature.group_severity_historical_ola_ratio is None

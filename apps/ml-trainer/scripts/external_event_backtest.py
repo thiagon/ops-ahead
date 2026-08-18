@@ -22,8 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.external_event.features import FEATURE_COLUMNS
-from src.external_event.train import fit_isolation_forest
+from external_event.features import FEATURE_COLUMNS
+from external_event.train import fit_isolation_forest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATASET = REPO_ROOT / "assets" / "incidents.csv"

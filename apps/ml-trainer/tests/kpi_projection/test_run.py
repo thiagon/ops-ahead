@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.kpi_projection.run import run_kpi_projection
-from src.settings import Settings
+from kpi_projection.run import run_kpi_projection
+from settings import Settings
 
 
 def _synthetic_daily(days: int = 75, start: str = "2025-01-01") -> pd.DataFrame:

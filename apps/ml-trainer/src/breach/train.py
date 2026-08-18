@@ -16,10 +16,10 @@ from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import average_precision_score, brier_score_loss
 
-from src.breach import features
-from src.breach.model import BreachRiskModel
-from src.settings import Settings
-from src.split import temporal_split
+from breach import features
+from breach.model import BreachRiskModel
+from settings import Settings
+from split import temporal_split
 
 LOGGER = logging.getLogger(__name__)
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -122,6 +122,7 @@ def train_and_log(
     p4_sequences: pd.DataFrame,
     ic_windows: pd.DataFrame,
     group_load: pd.DataFrame,
+    priority_changes: pd.DataFrame,
     dataset_version: str | None = None,
     n_trials: int | None = None,
 ) -> str:
@@ -129,7 +130,7 @@ def train_and_log(
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
     frame = features.build_feature_frame(
-        incidents, p4_sequences, ic_windows, group_load, settings.p4_precursor_window_hours
+        incidents, p4_sequences, ic_windows, group_load, priority_changes, settings.p4_precursor_window_hours
     )
     split = temporal_split(frame, "opened_at", settings.train_end, settings.validation_end, settings.holdout_end)
 
@@ -173,11 +174,11 @@ def train_and_log(
         mlflow.pyfunc.log_model(
             name="model",
             python_model=bundled_model,
-            # BreachRiskModel.predict() calls back into src.features — both need
-            # to travel with the artifact, or unpickling it from another process
-            # fails to resolve `src.model.BreachRiskModel`. Resolved from this
-            # file's own location, not cwd, which differs between the Docker
-            # image (/app) and a local `pytest` run (repo root).
+            # This app's own entrypoint runs from inside src/ (see Dockerfile) so
+            # the class pickles as breach.model.BreachRiskModel, not
+            # src.breach.model — a serving process with its own top-level `src`
+            # package (ml-model-serving) would otherwise shadow the bundled code
+            # and fail to unpickle it.
             code_paths=[str(Path(__file__).resolve().parent)],
             registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
         )

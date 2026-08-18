@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.settings import Settings
-from src.trigger import process_message
+from settings import Settings
+from trigger import process_message
 
 
 @pytest.fixture

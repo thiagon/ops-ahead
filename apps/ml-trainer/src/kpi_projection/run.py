@@ -6,11 +6,11 @@ import mlflow
 import numpy as np
 import pandas as pd
 
-from src.kpi_projection import monte_carlo
-from src.kpi_projection.forecast import recursive_lgb_forecast
-from src.settings import Settings
-from src.volume import features as volume_features
-from src.volume.train import train_lightgbm
+from kpi_projection import monte_carlo
+from kpi_projection.forecast import recursive_lgb_forecast
+from settings import Settings
+from volume import features as volume_features
+from volume.train import train_lightgbm
 
 LOGGER = logging.getLogger(__name__)
 

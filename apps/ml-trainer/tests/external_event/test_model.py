@@ -1,7 +1,7 @@
 import pandas as pd
 
-from src.external_event.model import ExternalEventModel
-from src.external_event.train import fit_isolation_forest
+from external_event.model import ExternalEventModel
+from external_event.train import fit_isolation_forest
 
 
 def _daily_frame_with_one_spike(n_normal: int = 40) -> pd.DataFrame:

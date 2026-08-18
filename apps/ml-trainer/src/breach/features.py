@@ -111,6 +111,40 @@ def add_group_load_feature(incidents: pd.DataFrame, group_load: pd.DataFrame) ->
     return incidents
 
 
+def add_recategorization_history_feature(incidents: pd.DataFrame, priority_changes: pd.DataFrame) -> pd.DataFrame:
+    """Whether this ticket had a severity transition logged strictly before
+    this row's own `received_at` — the "histórico de recategorização"
+    cross-model feature (Sprint 2 §3.2), from `priority_changes_log`.
+
+    Filtering to `change_received_at < received_at` is what keeps the
+    transition that produced *this* row's own severity from leaking into
+    its own feature — a ticket recategorized P3→P2 only counts once this
+    row is itself the P2 event or later.
+    """
+    incidents = incidents.copy()
+    incidents["received_at"] = pd.to_datetime(incidents["received_at"])
+
+    if priority_changes.empty:
+        incidents["recategorization_count"] = 0
+        incidents["was_recategorized"] = 0
+        return incidents
+
+    changes = priority_changes.copy()
+    changes["received_at"] = pd.to_datetime(changes["received_at"])
+
+    merged = incidents[["event_id", "ticket_number", "received_at"]].merge(
+        changes[["ticket_number", "received_at"]].rename(columns={"received_at": "change_received_at"}),
+        on="ticket_number",
+        how="left",
+    )
+    prior = merged.loc[merged["change_received_at"] < merged["received_at"]]
+    counts = prior.groupby("event_id").size()
+
+    incidents["recategorization_count"] = incidents["event_id"].map(counts).fillna(0).astype(int)
+    incidents["was_recategorized"] = (incidents["recategorization_count"] > 0).astype(int)
+    return incidents
+
+
 def add_historical_group_severity_features(df: pd.DataFrame) -> pd.DataFrame:
     """Expanding (leakage-free) history of how far past the 25%-of-OLA mark
     this assignment_group + severity combo has tended to run, using only
@@ -163,6 +197,8 @@ FEATURE_COLUMNS = [
     "sem_intervencao_count_1h",
     "sem_intervencao_count_6h",
     "group_load_1h",
+    "was_recategorized",
+    "recategorization_count",
     "group_severity_historical_ola_ratio",
     "group_severity_historical_over_25pct_rate",
 ]
@@ -175,6 +211,7 @@ def build_feature_frame(
     p4_sequences: pd.DataFrame,
     ic_windows: pd.DataFrame,
     group_load: pd.DataFrame,
+    priority_changes: pd.DataFrame,
     p4_precursor_window_hours: int = 24,
 ) -> pd.DataFrame:
     """Full pipeline from the raw eligible-incidents population to a
@@ -188,6 +225,7 @@ def build_feature_frame(
     frame = add_p4_precursor_features(frame, p4_sequences, p4_precursor_window_hours)
     frame = add_ic_window_features(frame, ic_windows)
     frame = add_group_load_feature(frame, group_load)
+    frame = add_recategorization_history_feature(frame, priority_changes)
     frame = add_historical_group_severity_features(frame)
 
     required = FEATURE_COLUMNS + [TARGET_COLUMN]

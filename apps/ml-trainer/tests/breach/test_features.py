@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
 
-from src.breach.features import (
+from breach.features import (
     FEATURE_COLUMNS,
     TARGET_COLUMN,
     add_group_load_feature,
     add_historical_group_severity_features,
     add_ic_window_features,
     add_p4_precursor_features,
+    add_recategorization_history_feature,
     build_feature_frame,
     eligibility_filter,
 )
@@ -124,6 +125,72 @@ def test_historical_group_severity_features_exclude_own_row():
     assert "over_25pct_ola" not in result.columns
 
 
+def test_recategorization_feature_counts_only_prior_transitions():
+    incidents = pd.DataFrame(
+        {
+            "event_id": ["e1", "e2"],
+            "ticket_number": ["INC1", "INC1"],
+            "received_at": [pd.Timestamp("2025-06-10 08:00:00"), pd.Timestamp("2025-06-10 10:00:00")],
+        }
+    )
+    priority_changes = pd.DataFrame(
+        {
+            "ticket_number": ["INC1", "INC1"],
+            "received_at": [
+                pd.Timestamp("2025-06-10 09:00:00"),  # between e1 and e2 — only e2 sees it
+                pd.Timestamp("2025-06-10 11:00:00"),  # after both — neither sees it
+            ],
+            "severity_from": [3, 2],
+            "severity_to": [2, 1],
+        }
+    )
+
+    result = add_recategorization_history_feature(incidents, priority_changes).set_index("event_id")
+
+    assert result.loc["e1", "recategorization_count"] == 0
+    assert result.loc["e1", "was_recategorized"] == 0
+    assert result.loc["e2", "recategorization_count"] == 1
+    assert result.loc["e2", "was_recategorized"] == 1
+
+
+def test_recategorization_feature_incident_with_no_transition_at_all():
+    incidents = pd.DataFrame(
+        {
+            "event_id": ["e1"],
+            "ticket_number": ["INC1"],
+            "received_at": [pd.Timestamp("2025-06-10 08:00:00")],
+        }
+    )
+    priority_changes = pd.DataFrame(columns=["ticket_number", "received_at", "severity_from", "severity_to"])
+
+    result = add_recategorization_history_feature(incidents, priority_changes)
+
+    assert result.iloc[0]["recategorization_count"] == 0
+    assert result.iloc[0]["was_recategorized"] == 0
+
+
+def test_recategorization_feature_ignores_other_tickets_transitions():
+    incidents = pd.DataFrame(
+        {
+            "event_id": ["e1"],
+            "ticket_number": ["INC1"],
+            "received_at": [pd.Timestamp("2025-06-10 08:00:00")],
+        }
+    )
+    priority_changes = pd.DataFrame(
+        {
+            "ticket_number": ["INC2"],
+            "received_at": [pd.Timestamp("2025-06-10 07:00:00")],
+            "severity_from": [3],
+            "severity_to": [2],
+        }
+    )
+
+    result = add_recategorization_history_feature(incidents, priority_changes)
+
+    assert result.iloc[0]["recategorization_count"] == 0
+
+
 def test_build_feature_frame_has_no_nulls_and_no_leaky_columns():
     n = 40
     dates = pd.date_range("2025-01-01", periods=n, freq="6h")
@@ -132,6 +199,7 @@ def test_build_feature_frame_has_no_nulls_and_no_leaky_columns():
             "event_id": [f"e{i}" for i in range(n)],
             "entity_id": [f"ic{i % 3}" for i in range(n)],
             "ticket_number": [f"INC{i}" for i in range(n)],
+            "received_at": dates,
             "opened_at": dates,
             "assignment_group": ["Team14" if i % 2 == 0 else "TeamX" for i in range(n)],
             "opened_by": ["Manual" if i % 5 == 0 else "Monitoramento" for i in range(n)],
@@ -146,8 +214,9 @@ def test_build_feature_frame_has_no_nulls_and_no_leaky_columns():
     p4_sequences = pd.DataFrame(columns=["entity_id", "sequence_start", "sequence_end", "sequence_length"])
     ic_windows = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "sem_intervencao_count"])
     group_load = pd.DataFrame(columns=["assignment_group", "window_start", "incidents_opened"])
+    priority_changes = pd.DataFrame(columns=["ticket_number", "received_at", "severity_from", "severity_to"])
 
-    frame = build_feature_frame(incidents, p4_sequences, ic_windows, group_load)
+    frame = build_feature_frame(incidents, p4_sequences, ic_windows, group_load, priority_changes)
 
     assert not frame.empty
     assert not frame[[c for c in FEATURE_COLUMNS if c != "assignment_group"]].isna().any().any()

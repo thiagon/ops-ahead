@@ -53,3 +53,16 @@ Auditoria linha a linha de `docs/sprints/sprint-2-architecture.md`, seção 3.2,
 | Desvio consciente registrado | 3 (Feast — já excluído no MVP; BentoML; Evidently AI) |
 
 Nenhum item da seção 3.2 fica sem destino declarado.
+
+## Achado adicional, fora da seção 3.2: `status`/`opened_by` nunca são traduzidos
+
+Investigado durante a Fase 6 desta track. `status` chega ao evento universal verbatim, por design —
+`schema.ts` documenta "Incident status as the origin words it". `opened_by` nem está no contrato
+universal, só em `payload_raw`. Consequência: `status = 'Sem Intervenção'`/`opened_by = 'Manual'`
+aparecem como comparação literal em português em `apps/data-runner` (`incidents_by_ic.sql`,
+`daily_anomaly_features.sql`) e `apps/ml-trainer` (`breach/features.py`).
+
+Decisão registrada nesta sessão: **próxima track**, não parte de `ml-layer2-gaps_20260817`. Escopo
+estimado: `contracts/incident-event.schema.json` (schema compartilhado TS+Python), `apps/ui-gateway`
+(tradução na fronteira), e ajuste dos consumidores em `apps/data-runner`/`apps/ml-trainer` para o valor
+traduzido. Maior que o escopo de arquivos desta track (`ml-trainer`/`ml-burst-detector`/docs).

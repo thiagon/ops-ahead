@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 from clickhouse_driver import Client
 
-from src.settings import Settings
+from settings import Settings
 
 KPI_MONTHLY_STATE_COLUMNS = ["month", "severity", "source", "total", "in_kpi", "breached"]
 

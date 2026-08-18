@@ -1,6 +1,6 @@
 """Manual promotion CLI — for a training run started with `AUTO_PROMOTE=false`.
 
-Usage: python -m src.promote <volume|breach> <run_id>
+Usage: python -m promote <volume|breach> <run_id>
 
 Registers the run's logged model (if not already registered) and transitions
 it to `Production`, archiving whatever version was there before.
@@ -12,8 +12,8 @@ import sys
 
 import mlflow
 
-from src.main import EXPERIMENT_NAMES
-from src.settings import Settings
+from main import EXPERIMENT_NAMES
+from settings import Settings
 
 
 def promote_run(settings: Settings, run_id: str) -> None:
@@ -41,7 +41,7 @@ def promote_run(settings: Settings, run_id: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] not in EXPERIMENT_NAMES:
-        print("Usage: python -m src.promote <volume|breach> <run_id>", file=sys.stderr)
+        print("Usage: python -m promote <volume|breach> <run_id>", file=sys.stderr)
         sys.exit(1)
 
     domain, run_id = sys.argv[1], sys.argv[2]

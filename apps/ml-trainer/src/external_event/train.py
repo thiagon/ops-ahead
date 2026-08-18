@@ -7,9 +7,9 @@ import mlflow
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 
-from src.external_event.features import FEATURE_COLUMNS, to_daily_frame
-from src.external_event.model import ExternalEventModel
-from src.settings import Settings
+from external_event.features import FEATURE_COLUMNS, to_daily_frame
+from external_event.model import ExternalEventModel
+from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,9 +39,9 @@ def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str 
         mlflow.pyfunc.log_model(
             name="model",
             python_model=bundled_model,
-            # ExternalEventModel.predict() calls back into src.features —
-            # both need to travel with the artifact, same reason
-            # breach/volume's train.py bundles code_paths this way.
+            # ExternalEventModel.predict() calls back into external_event.features
+            # — both need to travel with the artifact, same reason breach/volume's
+            # train.py bundles code_paths this way (see the comment there).
             code_paths=[str(Path(__file__).resolve().parent)],
             registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
         )

@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.kpi_projection.monte_carlo import (
+from kpi_projection.monte_carlo import (
     aggregate_projection,
     sample_breach_rate_posterior,
     sample_volume_paths,

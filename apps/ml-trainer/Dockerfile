@@ -33,4 +33,10 @@ COPY apps/ml-trainer/src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["python", "-m", "src.main"]
+# Running from inside src/ (not /app) means bundled MLflow model classes
+# pickle as volume.model.VolumeForecastModel, not src.volume.model — a
+# serving process with its own top-level `src` package (ml-model-serving)
+# would otherwise shadow the code and fail to unpickle it cross-process.
+WORKDIR /app/src
+
+CMD ["python", "-m", "main"]

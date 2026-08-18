@@ -106,6 +106,8 @@ def test_predict_breach_returns_calibrated_score_and_shap():
         "sem_intervencao_count_1h": 0,
         "sem_intervencao_count_6h": 1,
         "group_load_1h": 5,
+        "was_recategorized": 0,
+        "recategorization_count": 0,
     }
     response = client.post("/predict/breach", json=payload)
     assert response.status_code == 200
@@ -133,6 +135,8 @@ def test_predict_breach_503_when_model_not_loaded():
             "sem_intervencao_count_1h": 0,
             "sem_intervencao_count_6h": 0,
             "group_load_1h": 0,
+            "was_recategorized": 0,
+            "recategorization_count": 0,
         },
     )
     assert response.status_code == 503

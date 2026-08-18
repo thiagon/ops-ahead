@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from src.volume import features
+from volume import features
 
 
 def recursive_lgb_forecast(

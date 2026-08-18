@@ -3,7 +3,7 @@ from __future__ import annotations
 import mlflow.pyfunc
 import pandas as pd
 
-from src.external_event.features import FEATURE_COLUMNS
+from external_event.features import FEATURE_COLUMNS
 
 
 class ExternalEventModel(mlflow.pyfunc.PythonModel):

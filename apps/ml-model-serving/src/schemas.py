@@ -63,6 +63,8 @@ class BreachFeatureInput(BaseModel):
     sem_intervencao_count_1h: int = Field(ge=0)
     sem_intervencao_count_6h: int = Field(ge=0)
     group_load_1h: int = Field(ge=0)
+    was_recategorized: int = Field(ge=0, le=1)
+    recategorization_count: int = Field(ge=0)
     group_severity_historical_ola_ratio: float | None = None
     group_severity_historical_over_25pct_rate: float | None = None
 

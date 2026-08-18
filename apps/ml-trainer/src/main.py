@@ -3,44 +3,46 @@ from __future__ import annotations
 import logging
 import sys
 
-from src.settings import Settings
-from src.trigger import configure_experiment
+from settings import Settings
+from trigger import configure_experiment
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 
 
 def _train_volume(settings: Settings) -> str:
-    from src.volume.data import dataset_version, fetch_daily_anomaly_features
-    from src.volume.train import train_and_log
+    from volume.data import dataset_version, fetch_daily_anomaly_features
+    from volume.train import train_and_log
 
     daily = fetch_daily_anomaly_features(settings)
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
 
 
 def _train_breach(settings: Settings) -> str:
-    from src.breach.data import (
+    from breach.data import (
         dataset_version,
         fetch_eligible_incidents,
         fetch_group_load,
         fetch_ic_windows,
         fetch_p4_sequences,
+        fetch_priority_changes,
     )
-    from src.breach.train import train_and_log
+    from breach.train import train_and_log
 
     incidents = fetch_eligible_incidents(settings)
     p4_sequences = fetch_p4_sequences(settings)
     ic_windows = fetch_ic_windows(settings)
     group_load = fetch_group_load(settings)
-    version = dataset_version(incidents, p4_sequences, ic_windows, group_load)
+    priority_changes = fetch_priority_changes(settings)
+    version = dataset_version(incidents, p4_sequences, ic_windows, group_load, priority_changes)
     return train_and_log(
-        settings, incidents, p4_sequences, ic_windows, group_load, dataset_version=version
+        settings, incidents, p4_sequences, ic_windows, group_load, priority_changes, dataset_version=version
     )
 
 
 def _train_external_event(settings: Settings) -> str:
-    from src.external_event.data import dataset_version, fetch_daily_anomaly_features
-    from src.external_event.train import train_and_log
+    from external_event.data import dataset_version, fetch_daily_anomaly_features
+    from external_event.train import train_and_log
 
     daily = fetch_daily_anomaly_features(settings)
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
@@ -54,9 +56,9 @@ SPLIT_REQUIRED_DOMAINS = {"volume", "breach"}
 
 
 def _analyze_kpi_projection(settings: Settings) -> dict:
-    from src.kpi_projection.data import fetch_kpi_monthly_state
-    from src.kpi_projection.run import run_kpi_projection
-    from src.volume.data import fetch_daily_anomaly_features
+    from kpi_projection.data import fetch_kpi_monthly_state
+    from kpi_projection.run import run_kpi_projection
+    from volume.data import fetch_daily_anomaly_features
 
     daily = fetch_daily_anomaly_features(settings)
     kpi_state = fetch_kpi_monthly_state(settings)
@@ -82,8 +84,8 @@ def _require_split_boundaries(settings: Settings) -> None:
 
 def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "consume":
-        from src import metrics
-        from src.trigger import consume_forever
+        import metrics
+        from trigger import consume_forever
 
         settings = Settings()
         metrics.start(settings.metrics_port)
@@ -100,7 +102,7 @@ def main() -> None:
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
         LOGGER.error(
-            "Usage: python -m src.main train <volume|breach|external_event> | analyze kpi-projection | consume"
+            "Usage: python -m main train <volume|breach|external_event> | analyze kpi-projection | consume"
         )
         sys.exit(2)
 

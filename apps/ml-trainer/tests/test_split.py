@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from src.split import temporal_split
+from split import temporal_split
 
 
 def _daily_frame(start: str, periods: int) -> pd.DataFrame:

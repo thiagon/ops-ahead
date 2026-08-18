@@ -37,6 +37,8 @@ models:
     columns:
       - name: event_id
         tests: [not_null, unique]
+      - name: received_at
+        tests: [not_null]
       - name: severity
         tests:
           - not_null

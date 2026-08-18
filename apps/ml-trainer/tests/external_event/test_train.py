@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.external_event.train import train_and_log
-from src.settings import Settings
+from external_event.train import train_and_log
+from settings import Settings
 
 
 def _synthetic_daily(days: int = 60) -> pd.DataFrame:

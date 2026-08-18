@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from src.external_event.features import FEATURE_COLUMNS, to_daily_frame
+from external_event.features import FEATURE_COLUMNS, to_daily_frame
 
 
 def test_collapses_multiple_sources_into_one_row_per_date():

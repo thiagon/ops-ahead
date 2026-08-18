@@ -10,10 +10,10 @@ import pandas as pd
 from prophet import Prophet
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 
-from src.settings import Settings
-from src.split import temporal_split
-from src.volume import features
-from src.volume.model import VolumeForecastModel
+from settings import Settings
+from split import temporal_split
+from volume import features
+from volume.model import VolumeForecastModel
 
 HORIZONS = (1, 7)
 ENSEMBLE_WEIGHT_GRID = np.round(np.arange(0.0, 1.01, 0.1), 2)
@@ -199,11 +199,12 @@ def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str 
         mlflow.pyfunc.log_model(
             name="model",
             python_model=bundled_model,
-            # VolumeForecastModel.predict() calls back into src.features — both need
-            # to travel with the artifact, or unpickling it from another process
-            # fails to resolve `src.model.VolumeForecastModel`. Resolved from this
-            # file's own location, not cwd, which differs between the Docker
-            # image (/app) and a local `pytest` run (repo root).
+            # VolumeForecastModel.predict() calls back into volume.features — both
+            # need to travel with the artifact. This app's own entrypoint runs
+            # from inside src/ (see Dockerfile) so the class pickles as
+            # volume.model.VolumeForecastModel, not src.volume.model — a serving
+            # process with its own top-level `src` package (ml-model-serving)
+            # would otherwise shadow the bundled code and fail to unpickle it.
             code_paths=[str(Path(__file__).resolve().parent)],
             registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
         )

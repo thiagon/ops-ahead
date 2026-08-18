@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from src.settings import Settings
+from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
 
     from kafka import KafkaConsumer, KafkaProducer
 
-    from src import metrics
+    import metrics
 
     consumer = KafkaConsumer(
         settings.kafka_topic,
