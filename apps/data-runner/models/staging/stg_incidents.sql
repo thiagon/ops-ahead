@@ -25,7 +25,7 @@ select
     JSONExtractInt(payload_raw, 'duration_seconds')                                 as duration_seconds,
     JSONExtractString(payload_raw, 'close_code')                                    as close_code,
     JSONExtractString(payload_raw, 'resolution')                                    as resolution,
-    JSONExtractString(payload_raw, 'opened_by')                                     as opened_by,
+    opened_by,
     JSONExtractString(payload_raw, 'parent_incident')                               as parent_incident,
     JSONExtractInt(payload_raw, 'has_parent_incident')                              as has_parent_incident,
     JSONExtractString(payload_raw, 'short_description')                             as short_description,

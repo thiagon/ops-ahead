@@ -24,7 +24,7 @@ select
     count() / uniqExact(entity_id)                                  as incidents_per_entity,
     countIf(has_parent_incident = 0)                                as standalone_count,
     countIf(has_parent_incident = 0) / count()                      as standalone_share,
-    countIf(opened_by = 'Manual') / count()                         as manual_open_share,
+    countIf(opened_by = 'manual') / count()                         as manual_open_share,
     countIf(status = 'no_intervention') / count()                   as no_intervention_share,
     avg(opened_hour)                                                as avg_opened_hour,
     avg(duration_seconds)                                           as avg_duration_seconds,

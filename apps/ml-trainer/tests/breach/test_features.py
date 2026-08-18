@@ -7,11 +7,20 @@ from breach.features import (
     add_group_load_feature,
     add_historical_group_severity_features,
     add_ic_window_features,
+    add_manual_open_flag,
     add_p4_precursor_features,
     add_recategorization_history_feature,
     build_feature_frame,
     eligibility_filter,
 )
+
+
+def test_manual_open_flag_reads_the_domain_vocabulary():
+    """The origin says "Manual"/"Monitoramento"; the adapter translates before
+    this ever runs, so a pt-br value here means the boundary leaked."""
+    df = pd.DataFrame({"opened_by": ["manual", "monitoring", "unknown"]})
+    result = add_manual_open_flag(df)
+    assert result["is_manual_open"].tolist() == [1, 0, 0]
 
 
 def test_eligibility_filter_drops_p4_p5_parent_and_no_intervention():
@@ -202,9 +211,9 @@ def test_build_feature_frame_has_no_nulls_and_no_leaky_columns():
             "received_at": dates,
             "opened_at": dates,
             "assignment_group": ["Team14" if i % 2 == 0 else "TeamX" for i in range(n)],
-            "opened_by": ["Manual" if i % 5 == 0 else "Monitoramento" for i in range(n)],
+            "opened_by": ["manual" if i % 5 == 0 else "monitoring" for i in range(n)],
             "has_parent_incident": [0] * n,
-            "status": ["Encerrado"] * n,
+            "status": ["closed"] * n,
             "severity": [1 + (i % 3) for i in range(n)],
             "duration_seconds": [3600 + i * 60 for i in range(n)],
             "ola_limit_seconds": [14400] * n,

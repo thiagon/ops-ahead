@@ -29,7 +29,7 @@ def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_manual_open_flag(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["is_manual_open"] = (df["opened_by"] == "Manual").astype(int)
+    df["is_manual_open"] = (df["opened_by"] == "manual").astype(int)
     return df
 
 

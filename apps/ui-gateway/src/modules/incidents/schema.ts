@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { incidentStatusSchema } from './status.ts';
+import { incidentOpenedBySchema, incidentStatusSchema } from './status.ts';
 
 /**
  * Output contract — mirrors contracts/incident-event.schema.json (draft-07).
@@ -15,6 +15,7 @@ export const incidentEventSchema = z
     severity: z.int().min(1).max(5).meta({ description: '1 critical … 5 very low' }),
     entity_id: z.string().meta({ description: 'Affected configuration item' }),
     status: incidentStatusSchema,
+    opened_by: incidentOpenedBySchema,
     payload_raw: z.string().meta({ description: 'The origin event, verbatim, as a JSON string' }),
   })
   .strict()
@@ -42,6 +43,10 @@ export const itsmWebhookSchema = z
       .meta({ description: '1 critical … 5 very low' }),
     configuration_item: z.string().default('').meta({ description: 'Affected configuration item' }),
     status: z.string().default('').meta({ description: 'Incident status as the ITSM words it' }),
+    opened_by: z
+      .string()
+      .default('')
+      .meta({ description: 'What opened the incident, as the ITSM words it' }),
     payload: z
       .record(z.string(), z.unknown())
       .meta({ description: 'Every origin column, kept verbatim in payload_raw' }),

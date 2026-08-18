@@ -12,7 +12,8 @@
     "severity",
     "entity_id",
     "status",
-    "payload_raw"
+    "payload_raw",
+    "opened_by"
   ],
   "additionalProperties": false,
   "properties": {
@@ -60,6 +61,15 @@
         "unknown"
       ],
       "description": "Incident status in the Ubiquitous Language, translated from the origin by the adapter."
+    },
+    "opened_by": {
+      "type": "string",
+      "enum": [
+        "monitoring",
+        "manual",
+        "unknown"
+      ],
+      "description": "What opened the incident, translated from the origin by the adapter."
     },
     "payload_raw": {
       "type": "string",

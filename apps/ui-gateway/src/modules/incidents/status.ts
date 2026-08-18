@@ -26,3 +26,23 @@ export type IncidentStatus = z.infer<typeof incidentStatusSchema>;
 export function toIncidentStatus(raw: string): IncidentStatus {
   return ITSM_STATUS[raw.trim()] ?? 'unknown';
 }
+
+/**
+ * How the incident was opened. `Monitoramento` means the monitoring stack
+ * raised it; `Manual` means support typed it in — the observability gap the
+ * breach model reads as a signal.
+ */
+const ITSM_OPENED_BY: Record<string, IncidentOpenedBy> = {
+  Monitoramento: 'monitoring',
+  Manual: 'manual',
+};
+
+export const incidentOpenedBySchema = z
+  .enum(['monitoring', 'manual', 'unknown'])
+  .meta({ id: 'IncidentOpenedBy', description: 'What opened the incident' });
+
+export type IncidentOpenedBy = z.infer<typeof incidentOpenedBySchema>;
+
+export function toIncidentOpenedBy(raw: string): IncidentOpenedBy {
+  return ITSM_OPENED_BY[raw.trim()] ?? 'unknown';
+}

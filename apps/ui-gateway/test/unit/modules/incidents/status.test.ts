@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toIncidentStatus } from '../../../../src/modules/incidents/status.ts';
+import { toIncidentOpenedBy, toIncidentStatus } from '../../../../src/modules/incidents/status.ts';
 
 describe('toIncidentStatus', () => {
   it.each([
@@ -24,5 +24,19 @@ describe('toIncidentStatus', () => {
     for (const origin of ['Sem Intervenção', 'Encerrado', 'Qualquer Coisa']) {
       expect(toIncidentStatus(origin)).not.toBe(origin);
     }
+  });
+});
+
+describe('toIncidentOpenedBy', () => {
+  it.each([
+    ['Monitoramento', 'monitoring'],
+    ['Manual', 'manual'],
+  ])('translates %s to %s', (origin, expected) => {
+    expect(toIncidentOpenedBy(origin)).toBe(expected);
+  });
+
+  it('falls back to unknown for a blank or unmapped value', () => {
+    expect(toIncidentOpenedBy('')).toBe('unknown');
+    expect(toIncidentOpenedBy('Automático')).toBe('unknown');
   });
 });

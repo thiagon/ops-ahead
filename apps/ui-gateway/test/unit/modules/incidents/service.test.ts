@@ -14,6 +14,7 @@ const itsmEvent = {
   priority_code: 2,
   configuration_item: 'srv-web-04',
   status: 'Encerrado',
+  opened_by: 'Monitoramento',
   payload: { ticket_number: 'INC0012345', duration_seconds: '9120', kpi_breached: '1' },
 };
 

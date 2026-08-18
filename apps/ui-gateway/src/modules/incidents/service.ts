@@ -6,7 +6,7 @@ import {
   incidentEventSchema,
   itsmWebhookSchema,
 } from './schema.ts';
-import { toIncidentStatus } from './status.ts';
+import { toIncidentOpenedBy, toIncidentStatus } from './status.ts';
 
 /** The origins the gateway speaks, one variant each. */
 export const webhookBodySchema = z
@@ -48,6 +48,7 @@ export function toIncidentEvent(input: ItsmWebhook): IncidentEvent {
     severity: input.priority_code,
     entity_id: input.configuration_item,
     status: toIncidentStatus(input.status),
+    opened_by: toIncidentOpenedBy(input.opened_by),
     payload_raw: JSON.stringify(input.payload),
   });
 }
