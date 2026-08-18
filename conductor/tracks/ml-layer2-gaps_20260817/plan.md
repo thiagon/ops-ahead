@@ -122,8 +122,10 @@ Com a métrica corrigida, descobrir se existe operating point utilizável.
       (nenhum candidato os supera) já reportados na avaliação em `burst_detector_methodology.md`
 - [x] 5.5: Aplicar os parâmetros escolhidos em `apps/ml-burst-detector/src/detector.py` — **N/A**:
       parâmetros ficam congelados nos valores atuais, nenhuma mudança de código
-- [x] 5.6: Se nenhum ponto atingir o piso, registrar o achado e a consequência: o copiloto passa a ser
-      invocado por score de breach acima de limiar e a rajada vira sinal auxiliar
+- [x] 5.6: Se nenhum ponto atingir o piso, registrar o achado e a consequência — registrado em
+      `docs/insights/burst_detector_calibration.md`. **Decisão do usuário (2026-08-17):** o detector
+      permanece como o gatilho do fluxo definido na seção 4 da Sprint 2; o resultado é trabalho de
+      modelagem em aberto para a Sprint 4, não motivo para trocar o desenho
 
 ### Verification
 

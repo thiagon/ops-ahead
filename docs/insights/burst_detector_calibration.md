@@ -44,21 +44,32 @@ que já era visível na curva achatada da Fase 4.
 
 ## Decisão
 
-**Nenhum operating point sustenta o gatilho.** O detector de rajada, na configuração atual (z-score +
-CUSUM sobre contagem de "Sem Intervenção" por IC), não separa sinal de ruído o suficiente para disparar
-o copiloto sozinho — em qualquer ponto testado, a maioria dos alertas é falsa e a cobertura dos P1/P2
-reais é marginal.
+**Nenhum operating point atinge o piso.** O detector de rajada, na configuração atual (z-score +
+CUSUM sobre contagem de "Sem Intervenção" por IC), não separa sinal de ruído o suficiente nos
+parâmetros testados — em qualquer ponto da grade, a maioria dos alertas é falsa e a cobertura dos
+P1/P2 reais é marginal.
 
 **Parâmetros em produção ficam congelados nos valores atuais** (`Z_SCORE_THRESHOLD=3,5`, `CUSUM_K=0,5`,
 `CUSUM_H=5,0`, `MIN_ROBUST_STD=1,0`, três janelas) — não há candidato melhor para trocar. O resultado na
 janela de avaliação com esses parâmetros já está em `docs/insights/burst_detector_methodology.md`:
 precision 0,003, recall 0,006, lead-time mediano 1.506s.
 
-**Consequência para o fluxo:** o copiloto deixa de ser invocado pelo gatilho de rajada como sinal
-primário. Ele passa a ser invocado por **score de breach acima de um limiar** — o modelo de breach tem
-AUC-PR/recall@top-k como métrica de produção definida e, ao contrário do detector de rajada, é treinado
-supervisionado sobre o outcome que importa (`kpi_breached`). A rajada (`alerts.burst`) vira **sinal
-auxiliar**: quando presente, soma contexto à recomendação do copiloto (evidência de "Sem Intervenção"
-em série no IC), mas não é mais o que decide se o copiloto roda. Isso muda a seção 4.4 (Camada 3) e a
-seção 5 (fluxo end-to-end) de `docs/sprints/sprint-3-mvp.md` — atualização registrada na Fase 7 desta
-track.
+**Consequência para o fluxo: nenhuma.** O detector de rajada segue sendo o gatilho do fluxo que a
+seção 4 de `docs/sprints/sprint-2-architecture.md` define — decisão do usuário em 2026-08-17, ao
+revisar esta calibração. O resultado acima não diz que o componente não deve existir nem que o desenho
+está errado; diz que o sinal, na configuração e no dado disponíveis hoje, ainda não entrega a precisão
+que o produto promete. As duas leituras têm consequências diferentes: trocar o gatilho seria mudar a
+arquitetura por causa de um número; mantê-lo trata o número como o que ele é — trabalho de modelagem em
+aberto.
+
+**Caminhos para a Sprint 4**, em ordem de custo:
+
+1. **Contagem por IC é fraca demais como base.** 67,5% das janelas têm histórico flat (0-1 incidente por
+   bucket de 15min) — a estatística robusta não tem de onde extrair sinal. Agregar por grupo designado
+   ou por família de IC daria série mais densa.
+2. **O sinal pode não estar na contagem de "Sem Intervenção" isolada**, e sim na composição (share de
+   P4 crescente + abertura manual + carga do grupo). O modelo de breach já usa essas features e é
+   supervisionado sobre o outcome que importa — vale medir quanto o breach score sozinho antecipa P1/P2,
+   como referência de comparação para o detector.
+3. **A janela de 15min pode ser curta** para o fenômeno: se a rajada se desenvolve em horas, buckets
+   maiores com CUSUM captariam a mudança de regime melhor do que z-score sobre bucket curto.

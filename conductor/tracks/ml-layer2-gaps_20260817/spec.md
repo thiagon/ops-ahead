@@ -101,9 +101,11 @@ responde; um ponto único não.
 **Tuning contra o próprio backtest é overfitting** — foi por isso que os hiperparâmetros ficaram nos
 valores iniciais. A saída é separar janela de calibração e janela de avaliação no próprio CSV.
 
-**Resultado negativo é resultado.** Se nenhum operating point sustentar o gatilho, o achado é
-legítimo e muda o desenho: o copiloto passaria a ser invocado por score de breach acima de limiar,
-com a rajada como sinal auxiliar. O inaceitável é entregar o gatilho sem saber.
+**Resultado negativo é resultado.** Se nenhum operating point atingir o piso, o achado é legítimo e
+precisa estar registrado — o inaceitável é entregar o gatilho sem saber o que ele entrega. O que o
+resultado **não** decide sozinho é o desenho do fluxo: o componente e seu papel vêm da arquitetura da
+Sprint 2, e trocá-los é decisão de produto, não consequência automática de um número (decisão do
+usuário, 2026-08-17: o detector permanece como gatilho).
 
 **Monte Carlo e Isolation Forest entram como análise, não como serviço.** Rodam no `ml-trainer` sob
 demanda, com o resultado registrado no MLflow como qualquer outro experimento. Virar endpoint é
