@@ -138,20 +138,23 @@ Duas pendências independentes das anteriores.
 
 ### Tasks
 
-- [ ] 6.1: `historico_recategorizacao` no `FEATURE_COLUMNS` do breach, a partir de `priority_changes_log`
-- [ ] 6.2: Confirmar que a feature não vaza futuro — a transição usada tem que ser anterior ao instante
+- [x] 6.1: `historico_recategorizacao` no `FEATURE_COLUMNS` do breach, a partir de `priority_changes_log`
+      — nomeado `was_recategorized`/`recategorization_count` em inglês (ver achado de domínio abaixo)
+- [x] 6.2: Confirmar que a feature não vaza futuro — a transição usada tem que ser anterior ao instante
       da predição
-- [ ] 6.3: Testes da feature, incluindo o caso de incidente sem transição nenhuma
-- [ ] 6.4: `POST /predict/breach` com incidentes reais do lote, conferindo score calibrado e SHAP top-5
-- [ ] 6.5: `POST /predict/volume` com lags e rolling reais, conferindo D+1, D+7 e o intervalo
-- [ ] 6.6: Confirmar o carregamento cross-processo dos artefatos `Production` — caminho que motivou o
-      `code_paths` nos `train.py` e nunca foi exercido fora do smoke test
-- [ ] 6.7: Fechar a task 5.4 de `ml-models_20260806`
+- [x] 6.3: Testes da feature, incluindo o caso de incidente sem transição nenhuma
+- [x] 6.4: `POST /predict/breach` com incidentes reais do lote, conferindo score calibrado e SHAP top-5
+- [x] 6.5: `POST /predict/volume` com lags e rolling reais, conferindo D+1, D+7 e o intervalo
+- [x] 6.6: Confirmar o carregamento cross-processo dos artefatos `Production` — caminho que motivou o
+      `code_paths` nos `train.py` e nunca foi exercido fora do smoke test. Achou 4 bugs reais (colisão
+      de pacote `src`, dependências ausentes em `model-serving`, dtype `object` em campo nulo, timezone
+      no Prophet) — todos corrigidos, ver `docs/insights/ml_models_baseline.md`
+- [x] 6.7: Fechar a task 5.4 de `ml-models_20260806`
 
 ### Verification
 
-- [ ] Retreino do breach com a feature nova conclui e registra no MLflow
-- [ ] Os dois endpoints respondem com payload íntegro contra os modelos `Production`
+- [x] Retreino do breach com a feature nova conclui e registra no MLflow
+- [x] Os dois endpoints respondem com payload íntegro contra os modelos `Production`
 
 ---
 

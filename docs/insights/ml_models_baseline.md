@@ -78,10 +78,36 @@ alterado).
 
 ## `model-serving`
 
-Serviço no ar em `ns: ml`, carregando `models:/volume-forecast/Production` e `models:/breach-risk/Production`
-no startup. Testado apenas com smoke test e modelo mockado (Fase 4) — chamada real aos endpoints
-`POST /predict/volume`/`POST /predict/breach` com incidentes do hold-out **não foi executada** nesta
-validação. Fica como follow-up junto da ingestão completa.
+**Atualizado em 2026-08-17, track `ml-layer2-gaps_20260817` (Fase 6).** A chamada real aos endpoints
+nunca tinha sido exercida fora do smoke test com modelo mockado — quando finalmente testada, revelou
+quatro bugs que mantinham `model-serving` incapaz de servir qualquer predição real, apesar de reportar
+`status: ok`:
+
+1. **Colisão de nome de pacote.** `ml-model-serving` roda como `python -m src.main` — seu próprio
+   pacote se chama `src`. O MLflow tenta importar `src.volume.model.VolumeForecastModel` (o `__module__`
+   gravado no pickle, porque `ml-trainer` também rodava como `python -m src.main`), e o Python resolve
+   `src` para o pacote já carregado do `ml-model-serving`, nunca para o `code_paths` do artefato —
+   `ModuleNotFoundError: No module named 'src.volume'`. Corrigido fazendo `ml-trainer` rodar de dentro
+   de `src/` (`WORKDIR /app/src`, `python -m main`), então os modelos pickled como `volume.model.…`
+   não colidem com nada que `ml-model-serving` já tenha carregado.
+2. **Dependências de terceiros ausentes.** `code_paths` empacota o *código* dos modelos, não os imports
+   de terceiros que esse código usa — `ml-model-serving` não tinha `lightgbm`/`shap`/`prophet`/
+   `holidays`/`scikit-learn` instalados para desserializar os objetos.
+3. **Dtype `object` em campo nulo.** `pd.DataFrame([request.model_dump()])` com uma única linha infere
+   dtype `object` para `group_severity_historical_ola_ratio`/`_over_25pct_rate` quando o valor é `None`
+   (o caso legítimo de "sem histórico prévio") — o LightGBM real rejeita dtype `object` (o mock do smoke
+   test nunca validava isso).
+4. **Timezone no Prophet.** A API HTTP aceita `date` em ISO 8601 com `Z`/offset, que vira `Timestamp`
+   tz-aware — o Prophet rejeita `ds` tz-aware.
+
+Os quatro corrigidos (commits da Fase 6); `breach-risk` e `volume-forecast` retreinados sob a imagem
+corrigida (`breach-risk` v4, `volume-forecast` v2). Verificação real, contra os modelos `Production` no
+cluster local:
+
+```
+POST /predict/breach  → 200, breach_probability=0.038, shap_top5 com 5 features reais
+POST /predict/volume  → 200, D+1 e D+7 para "total" e "p2", com yhat_lower/yhat_upper
+```
 
 ## Conclusão
 
