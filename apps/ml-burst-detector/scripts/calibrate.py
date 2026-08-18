@@ -1,0 +1,181 @@
+"""Grid search the burst detector's parameters on the calibration window only.
+
+Usage: uv run --package ops-ahead-ml-burst-detector python scripts/calibrate.py
+
+Sweeps Z_SCORE_THRESHOLD, CUSUM_K, CUSUM_H, MIN_ROBUST_STD, and which window(s)
+feed detection, all against the calibration window `scripts/backtest.py`
+already carves out (chronological, first 70%) — never the evaluation window,
+which Phase 5's task is to check the chosen point on once, without retuning.
+
+USEFULNESS_FLOOR is fixed before this script is ever run against real
+results — see docs/insights/burst_detector_calibration.md.
+"""
+
+from __future__ import annotations
+
+import itertools
+import statistics
+from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import pandas as pd
+
+from src.backtest_metrics import (
+    MIN_LEAD_TIME_SECONDS,
+    Alert,
+    chronological_split,
+    evaluate_alerts,
+    group_p1_p2_by_entity,
+)
+from src.detector import HISTORY_LENGTH, WINDOWS_SECONDS, CusumState, median_absolute_deviation, update_cusum
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DATASET = REPO_ROOT / "assets" / "incidents.csv"
+
+LEAD_TIME_WINDOW_SECONDS = 3600
+CALIBRATION_FRACTION = 0.7
+
+# Fixed before looking at any sweep result (task 5.2).
+USEFULNESS_FLOOR = {"precision": 0.15, "recall": 0.10, "median_lead_time_seconds": MIN_LEAD_TIME_SECONDS}
+
+GRID = {
+    "z_score_threshold": [2.5, 3.5, 4.5],
+    "cusum_k": [0.5, 1.0],
+    "cusum_h": [3.0, 5.0],
+    "min_robust_std": [1.0, 2.0],
+    "windows": [("15m", "1h", "6h"), ("15m",), ("1h",), ("6h",)],
+}
+
+
+@dataclass
+class _BucketState:
+    bucket_id: int | None = None
+    count: int = 0
+    history: list[float] = field(default_factory=list)
+    cusum: CusumState = field(default_factory=CusumState)
+
+
+class InMemoryState:
+    def __init__(self) -> None:
+        self._buckets: dict[tuple[str, str], _BucketState] = defaultdict(_BucketState)
+
+    def record_event(self, entity_id, event_epoch, window_name, window_seconds):
+        state = self._buckets[(entity_id, window_name)]
+        bucket_id = int(event_epoch // window_seconds)
+        if state.bucket_id is not None and state.bucket_id != bucket_id:
+            state.history.insert(0, state.count)
+            del state.history[HISTORY_LENGTH:]
+            state.count = 0
+        state.bucket_id = bucket_id
+        state.count += 1
+        return state.count, list(state.history)
+
+    def cusum_for(self, entity_id, window_name):
+        return self._buckets[(entity_id, window_name)].cusum
+
+    def set_cusum(self, entity_id, window_name, cusum):
+        self._buckets[(entity_id, window_name)].cusum = cusum
+
+
+def _z_score(count: float, history: list[float], min_robust_std: float) -> tuple[float, float, float]:
+    """Same shape as `src.detector.robust_z_score`, with `MIN_ROBUST_STD`
+    exposed as a parameter instead of the module constant — needed to sweep
+    it here without touching the live detector's own default."""
+    if len(history) < 2:
+        return 0.0, (history[0] if history else 0.0), 0.0
+    median = statistics.median(history)
+    mad = median_absolute_deviation(history, median)
+    robust_std = max(1.4826 * mad, min_robust_std)
+    return (count - median) / robust_std, median, robust_std
+
+
+def raise_alerts(
+    df: pd.DataFrame, z_score_threshold: float, cusum_k: float, cusum_h: float, min_robust_std: float, windows: tuple[str, ...]
+) -> list[Alert]:
+    state = InMemoryState()
+    alerts: list[Alert] = []
+    active_windows = {name: WINDOWS_SECONDS[name] for name in windows}
+
+    for row in df.itertuples():
+        entity_id = row.item_configuracao or "unknown"
+        opened_at: pd.Timestamp = row.aberto_em
+        event_epoch = opened_at.timestamp()
+
+        for window_name, window_seconds in active_windows.items():
+            count, history = state.record_event(entity_id, event_epoch, window_name, window_seconds)
+            z, median, robust_std = _z_score(count, history, min_robust_std)
+            triggered_spike = z > z_score_threshold
+
+            cusum = state.cusum_for(entity_id, window_name)
+            new_cusum, triggered_cusum = update_cusum(cusum, count, median, robust_std, cusum_k, cusum_h)
+            state.set_cusum(entity_id, window_name, new_cusum)
+
+            if triggered_spike or triggered_cusum:
+                alert_type = "spike" if triggered_spike else "regime_change"
+                alerts.append(Alert(entity_id, opened_at, alert_type, window_name))
+
+    return alerts
+
+
+def meets_floor(metrics: dict) -> bool:
+    return (
+        metrics["precision"] >= USEFULNESS_FLOOR["precision"]
+        and metrics["recall"] >= USEFULNESS_FLOOR["recall"]
+        and metrics["median_lead_time_seconds"] >= USEFULNESS_FLOOR["median_lead_time_seconds"]
+    )
+
+
+def main() -> None:
+    df = pd.read_csv(DATASET, usecols=["item_configuracao", "aberto_em", "prioridade_codigo"])
+    df["aberto_em"] = pd.to_datetime(df["aberto_em"])
+    df = df.sort_values("aberto_em").reset_index(drop=True)
+
+    calibration_df, _ = chronological_split(df, "aberto_em", CALIBRATION_FRACTION)
+    p1_p2 = calibration_df[calibration_df["prioridade_codigo"].isin([1, 2])]
+    p1_p2_by_entity = group_p1_p2_by_entity(p1_p2, "item_configuracao", "aberto_em")
+
+    combos = list(itertools.product(*GRID.values()))
+    print(f"Sweeping {len(combos)} combinations on the calibration window ({len(calibration_df):,} rows)...")
+
+    results = []
+    for z_score_threshold, cusum_k, cusum_h, min_robust_std, windows in combos:
+        alerts = raise_alerts(calibration_df, z_score_threshold, cusum_k, cusum_h, min_robust_std, windows)
+        metrics = evaluate_alerts(alerts, p1_p2_by_entity, MIN_LEAD_TIME_SECONDS, LEAD_TIME_WINDOW_SECONDS)
+        results.append(
+            {
+                "z_score_threshold": z_score_threshold,
+                "cusum_k": cusum_k,
+                "cusum_h": cusum_h,
+                "min_robust_std": min_robust_std,
+                "windows": windows,
+                **metrics,
+            }
+        )
+
+    qualifying = [r for r in results if meets_floor(r)]
+
+    print(f"\n{len(qualifying)} / {len(results)} combinations meet the usefulness floor {USEFULNESS_FLOOR}\n")
+
+    results_by_recall = sorted(results, key=lambda r: (-r["recall"] if r["recall"] == r["recall"] else 0, -r["precision"]))
+    print("Top 10 by recall (regardless of floor):")
+    header = f"{'z':>5} {'k':>5} {'h':>5} {'std':>5} {'windows':>20} {'alerts':>8} {'precision':>10} {'recall':>8} {'lead_s':>8}"
+    print(header)
+    for r in results_by_recall[:10]:
+        lead = r["median_lead_time_seconds"]
+        lead_str = f"{lead:.0f}" if lead == lead else "nan"
+        print(
+            f"{r['z_score_threshold']:>5.1f} {r['cusum_k']:>5.1f} {r['cusum_h']:>5.1f} {r['min_robust_std']:>5.1f} "
+            f"{','.join(r['windows']):>20} {r['total_alerts']:>8,} {r['precision']:>10.3f} {r['recall']:>8.3f} {lead_str:>8}"
+        )
+
+    if qualifying:
+        print("\nCombinations meeting the floor:")
+        for r in qualifying:
+            print(r)
+    else:
+        print("\nNo combination meets the floor.")
+
+
+if __name__ == "__main__":
+    main()

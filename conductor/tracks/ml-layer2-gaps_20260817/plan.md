@@ -112,20 +112,23 @@ Com a métrica corrigida, descobrir se existe operating point utilizável.
 
 ### Tasks
 
-- [ ] 5.1: Varredura de `Z_SCORE_THRESHOLD`, `CUSUM_K`, `CUSUM_H`, `MIN_ROBUST_STD` e das janelas na
+- [x] 5.1: Varredura de `Z_SCORE_THRESHOLD`, `CUSUM_K`, `CUSUM_H`, `MIN_ROBUST_STD` e das janelas na
       janela de calibração
-- [ ] 5.2: Definir o piso de utilidade — que combinação de precision, recall e lead-time torna o gatilho
+- [x] 5.2: Definir o piso de utilidade — que combinação de precision, recall e lead-time torna o gatilho
       defensável — antes de olhar o resultado da varredura
-- [ ] 5.3: Escolher o operating point e justificar o trade-off
-- [ ] 5.4: Reavaliar o ponto escolhido na janela de avaliação, sem retuning
-- [ ] 5.5: Aplicar os parâmetros escolhidos em `apps/ml-burst-detector/src/detector.py`
-- [ ] 5.6: Se nenhum ponto atingir o piso, registrar o achado e a consequência: o copiloto passa a ser
+- [x] 5.3: Escolher o operating point e justificar o trade-off — **N/A**: nenhuma combinação atinge o
+      piso (ver 5.6)
+- [x] 5.4: Reavaliar o ponto escolhido na janela de avaliação, sem retuning — parâmetros atuais
+      (nenhum candidato os supera) já reportados na avaliação em `burst_detector_methodology.md`
+- [x] 5.5: Aplicar os parâmetros escolhidos em `apps/ml-burst-detector/src/detector.py` — **N/A**:
+      parâmetros ficam congelados nos valores atuais, nenhuma mudança de código
+- [x] 5.6: Se nenhum ponto atingir o piso, registrar o achado e a consequência: o copiloto passa a ser
       invocado por score de breach acima de limiar e a rajada vira sinal auxiliar
 
 ### Verification
 
-- [ ] Resultado na janela de avaliação reportado com os parâmetros congelados
-- [ ] Decisão sobre o papel do detector no fluxo registrada, seja ela qual for
+- [x] Resultado na janela de avaliação reportado com os parâmetros congelados
+- [x] Decisão sobre o papel do detector no fluxo registrada, seja ela qual for
 
 ---
 
