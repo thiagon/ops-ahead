@@ -190,24 +190,36 @@ chega ao mart, ao treino e ao modelo, e o nome `sem_intervencao_count` chegou ao
 
 ### Tasks
 
-- [ ] 8.1: `status` vira enum do domínio em `contracts/incident-event.schema.json` — `no_intervention`,
+- [x] 8.1: `status` vira enum do domínio em `contracts/incident-event.schema.json` — `no_intervention`,
       `auto_closed`, `closed`, `awaiting_problem`, mais o caso desconhecido
-- [ ] 8.2: Tradução no adapter (`ui-gateway`), que é a ACL propriamente dita: mapa dos quatro valores do
+- [x] 8.2: Tradução no adapter (`ui-gateway`), que é a ACL propriamente dita: mapa dos quatro valores do
       ITSM para o domínio, com o valor original preservado em `payload_raw`
-- [ ] 8.3: `stg_incidents` e marts passam a comparar contra o valor do domínio; coluna
+- [x] 8.3: `stg_incidents` e marts passam a comparar contra o valor do domínio; coluna
       `sem_intervencao_count` de `incidents_by_ic` vira `no_intervention_count`
-- [ ] 8.4: Features do breach renomeadas para `no_intervention_count_1h`/`_6h`; filtro de elegibilidade
+- [x] 8.4: Features do breach renomeadas para `no_intervention_count_1h`/`_6h`; filtro de elegibilidade
       ao KPI passa a testar o valor do domínio
-- [ ] 8.5: Schema público do `ml-model-serving` renomeado — é contrato que o copiloto e o painel
+- [x] 8.5: Schema público do `ml-model-serving` renomeado — é contrato que o copiloto e o painel
       consomem, e ainda não há consumidor a quebrar
-- [ ] 8.6: Retreinar o breach com os nomes novos e repromover a `Production`
-- [ ] 8.7: Testes do adapter (os quatro valores e o desconhecido), dos marts e das features
-- [ ] 8.8: Remover de `domain/ubiquitous-language.md` a nota que registra `sem_intervencao_count` como
+- [ ] 8.6: Retreinar o breach com os nomes novos e repromover a `Production` — **bloqueado até o
+      deploy**: o lote já ingerido tem `status`/`opened_by` em português, gravados antes da tradução
+      existir. Depende de CI publicar as imagens, ArgoCD sincronizar, o lote ser reingerido e os marts
+      rematerializados
+- [x] 8.7: Testes do adapter (os quatro valores e o desconhecido), dos marts e das features
+- [x] 8.8: Remover de `domain/ubiquitous-language.md` a nota que registra `sem_intervencao_count` como
       dívida — a dívida deixa de existir
+
+**Achado (8.2):** `opened_by` não estava no contrato universal — chegava aos marts e ao modelo por
+`JSONExtractString(payload_raw, ...)`, contornando o contrato publicado. Virou campo de primeira
+classe, traduzido pelo adapter como `status`, com migration acrescentando a coluna a
+`incidents_received`.
 
 ### Verification
 
-- [ ] Nenhum nome de campo em português fora de `assets/` e `scripts/incident_producer.py`
+- [x] Nenhum nome de campo nem valor em português fora da base histórica e dos três leitores dela
+      (`scripts/incident_producer.py`, `scripts/historical_dataset.py`, o dicionário do adapter e os
+      testes que simulam o ITSM postando)
+- [x] Suites verdes: `ui-gateway` 66, `ml-trainer` 64, `ml-burst-detector` 22, `ml-model-serving` 15,
+      `data-ingest` 13
 - [ ] Breach retreinado e promovido, `POST /predict/breach` respondendo com os campos novos
 
 ---
