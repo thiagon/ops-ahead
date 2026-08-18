@@ -26,6 +26,35 @@ Nenhum dos dois runs exigiu mudança de código ou infra — validam a correçã
 temporal introduzido na Fase 5 (falha alto se alguma partição sair vazia) e o fix de timezone descrito
 abaixo.
 
+**Atualização 2026-08-17 (`ml-layer2-gaps_20260817`):** `volume-forecast` v1 e `breach-risk` v1 foram
+retreinados como v2/v4 respectivamente sob a correção da colisão de pacote descrita na seção
+"`model-serving`" abaixo — os artefatos v1 nunca carregavam de verdade fora do processo de treino.
+
+## Projeção KPI mensal (Monte Carlo) — execução real
+
+`python -m main analyze kpi-projection`, contra `daily_anomaly_features`/`kpi_monthly_state` reais do
+cluster (283 dias com feature completa, `as_of_date=2025-01-04`, 27 dias restantes no mês, 2000
+simulações, seed 42). Sem target configurado nesta instância (PPR é input de negócio da Locaweb — ver
+`kpi_projection/run.py`), então `P(fechar o mês)` não é reportado; mediana e IC 80% sim:
+
+| Projeção | Mediana | IC 80% |
+|----------|---------|--------|
+| Volume P2 | 379 | [289, 483] |
+| Volume P3 | 290 | [224, 365] |
+| OLA P2 (breaches) | 4 | [1, 10,1] |
+| OLA P3 (breaches) | 8 | [4, 16] |
+
+Taxa de elegibilidade KPI usada: P2 21,7%, P3 100% (mês corrente, contagem pequena). Registrado em
+MLflow, experimento `kpi-monthly-projection`.
+
+## Detector de evento externo (Isolation Forest) — treino live
+
+`python -m main train external_event`, contra `daily_anomaly_features` real do cluster (283 dias):
+`external-event-detection` v1 registrado e promovido a `Production`, `contamination=0,05`,
+`flagged_share=0,053` (15 de 283 dias marcados — consistente com o parâmetro). Números de recall/
+precisão contra outliers conhecidos vêm do backtest offline abaixo, que reflete o dataset completo
+(122.543 linhas), não esta amostra parcial de 283 dias.
+
 ## `burst-detector` — backtest offline (contra o CSV completo, 122.543 linhas)
 
 Este componente **não depende do estado de ingestão do cluster** — o backtest (`apps/ml-burst-detector/scripts/backtest.py`) roda direto contra `assets/incidents.csv`, então já reflete o dataset completo:
@@ -111,7 +140,8 @@ POST /predict/volume  → 200, D+1 e D+7 para "total" e "p2", com yhat_lower/yha
 
 ## Conclusão
 
-O mecanismo fim-a-fim (Camada 2 inteira: volume, breach, burst-detector, model-serving) funciona contra
-dado real. A pergunta que a track original se propunha a responder — "o sinal preditivo existe no dado
-real, com AUC-PR > 0,60?" — continua em aberto até a ingestão completa rodar; não é respondida por este
-documento.
+O mecanismo fim-a-fim (Camada 2 inteira: volume, breach, projeção KPI, evento externo, burst-detector,
+model-serving) funciona contra dado real, incluindo os dois endpoints HTTP servindo os modelos
+`Production` — o que a track `ml-models_20260806` não tinha verificado. A pergunta que essa track
+original se propunha a responder — "o sinal preditivo existe no dado real, com AUC-PR > 0,60?" —
+continua em aberto até a ingestão completa rodar; não é respondida por este documento.
