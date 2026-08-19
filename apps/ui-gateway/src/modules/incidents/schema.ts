@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { incidentOpenedBySchema, incidentStatusSchema } from './status.ts';
+import { incidentOpenedBySchema, incidentStatusSchema } from './domain.ts';
 
 /**
  * Output contract — mirrors contracts/incident-event.schema.json (draft-07).
@@ -22,38 +22,6 @@ export const incidentEventSchema = z
   .meta({ id: 'IncidentEvent', description: 'The universal event published to the bus' });
 
 export type IncidentEvent = z.infer<typeof incidentEventSchema>;
-
-/**
- * Input contract for the ITSM source — the shape scripts/incident_producer.py
- * posts. `payload` carries the full set of origin columns and is kept verbatim.
- */
-export const itsmWebhookSchema = z
-  .object({
-    source: z.literal('itsm'),
-    ticket_number: z.string().min(1).meta({ description: 'Origin ticket number, e.g. INC0012345' }),
-    opened_at: z.string().min(1).meta({
-      description: 'Open datetime; a naive value is read as UTC',
-      example: '2025-12-31 23:45:18',
-    }),
-    priority_code: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(5)
-      .meta({ description: '1 critical … 5 very low' }),
-    configuration_item: z.string().default('').meta({ description: 'Affected configuration item' }),
-    status: z.string().default('').meta({ description: 'Incident status as the ITSM words it' }),
-    opened_by: z
-      .string()
-      .default('')
-      .meta({ description: 'What opened the incident, as the ITSM words it' }),
-    payload: z
-      .record(z.string(), z.unknown())
-      .meta({ description: 'Every origin column, kept verbatim in payload_raw' }),
-  })
-  .meta({ id: 'ItsmWebhook', description: 'Incident as the ITSM posts it' });
-
-export type ItsmWebhook = z.infer<typeof itsmWebhookSchema>;
 
 /** Signed-request header — required when HMAC_ENABLED=true, ignored otherwise. */
 export const webhookHeadersSchema = z.object({

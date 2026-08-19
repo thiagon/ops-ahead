@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeToIsoUtc,
   normalizeWebhook,
-  toIncidentEvent,
   webhookBodySchema,
 } from '../../../../src/modules/incidents/service.ts';
+import { toIncidentEvent } from '../../../../src/modules/incidents/sources/itsm.ts';
 
 // One row of assets/incidents.csv, as scripts/incident_producer.py posts it.
 const itsmEvent = {
