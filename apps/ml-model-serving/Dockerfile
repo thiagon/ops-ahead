@@ -31,5 +31,10 @@ COPY apps/ml-model-serving/src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
+# prometheus_client's multiprocess mode (BentoML's default `PrometheusClient`)
+# writes per-worker metric files here and refuses to serve `/metrics` at all
+# if the directory doesn't exist — required even with a single worker.
+ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus_multiproc_dir"
+RUN mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 
-CMD ["python", "-m", "main"]
+CMD ["bentoml", "serve", "service:ModelServing"]
