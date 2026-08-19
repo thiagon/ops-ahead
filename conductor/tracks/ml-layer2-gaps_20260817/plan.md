@@ -304,7 +304,8 @@ ao BentoML na Fase 9.
 
 ## Final Verification
 
-- [x] Todos os acceptance criteria da spec atendidos
+- [~] Todos os acceptance criteria da spec atendidos — 10 de 11; o restante (vocabulário em inglês) está
+      implementado e só falta o retreino/repromoção do breach, bloqueado até o deploy (task 8.6)
 - [x] Testes de `ml-trainer` e `ml-burst-detector` verdes
 - [x] ArgoCD reconciliando `ml-burst-detector` e `ml-trainer` sem drift
 - [ ] PR mergeado em `main` com revisão — depende de revisão humana, fora do que esta implementação controla
