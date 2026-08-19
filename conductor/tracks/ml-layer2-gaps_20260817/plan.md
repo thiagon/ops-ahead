@@ -271,16 +271,34 @@ A Sprint 2 pede PSI/KS entre a janela de treino e a janela atual por feature, vi
 
 ### Tasks
 
-- [ ] 10.1: Cálculo de PSI/KS por feature entre a janela de treino do modelo em `Production` e a janela
-      atual dos marts
-- [ ] 10.2: Resultado exposto como métrica Prometheus
-- [ ] 10.3: Registro do relatório no MLflow junto do run correspondente
-- [ ] 10.4: Testes com distribuições sintéticas — uma estável e uma deslocada
+- [x] 10.1: Cálculo de PSI/KS por feature entre a janela de treino do modelo em `Production` e a janela
+      atual dos marts — `apps/ml-trainer/src/drift/monitor.py` usa `evidently.Report`/`ValueDrift`
+      (`method="psi"` em toda feature, `method="ks"` só nas numéricas — `evidently` reporta o p-value
+      do KS, não a estatística D); `drift/run.py` resolve a janela de treino lendo o param `train_end`
+      do run `Production` via `MlflowClient`, novo domínio `drift` em `main.py`/`trigger.py`
+      (`analysis: "drift_monitoring"`), cobrindo volume e breach numa única execução
+- [x] 10.2: Resultado exposto como métrica Prometheus — `ml_trainer_feature_drift_psi`/
+      `_ks_pvalue` em `metrics.py`, `Gauge` (persiste entre execuções), sem mudança de chart: o
+      `ml-trainer` já expõe `/metrics` no mesmo processo (`prometheus.io/scrape` já configurado)
+- [x] 10.3: Registro do relatório no MLflow junto do run correspondente — `run_drift_monitoring` loga
+      `<domain>_train_end`, `_reference_rows`, `_current_rows` e `<domain>_<feature>_psi`/`_ks_pvalue`
+      como params/metrics de um run em `mlflow_experiment_name="drift-monitoring"`
+- [x] 10.4: Testes com distribuições sintéticas — uma estável e uma deslocada —
+      `tests/drift/test_monitor.py` (7 testes: numérica estável/deslocada, categórica
+      estável/com categoria dominante nova, mista, múltiplas features) e `tests/drift/test_run.py`
+      (3 testes: fim-a-fim contra MLflow sqlite local promovendo uma versão `Production` fake, janela
+      vazia, sem versão `Production`)
+
+**Decisão do usuário (2026-08-19):** a Fase 1 desta track havia proposto Evidently AI como desvio
+consciente (drift sem janela de produção real para comparar). Revisitado nesta fase: o usuário pediu
+a biblioteca de verdade, não uma reimplementação manual de PSI/KS — mesmo padrão de rigor já aplicado
+ao BentoML na Fase 9.
 
 ### Verification
 
-- [ ] Uma feature deliberadamente deslocada aparece com PSI alto
-- [ ] A métrica é raspada pelo Prometheus
+- [x] Uma feature deliberadamente deslocada aparece com PSI alto
+- [x] A métrica é raspada pelo Prometheus — mesmo endpoint `/metrics` que `ml_trainer_messages_consumed_total`
+      já usa, sem trabalho de infra novo
 
 ---
 
