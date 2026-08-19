@@ -28,6 +28,30 @@ export const breachRiskRequestSchema = z
   .strict()
   .meta({ id: 'BreachRiskRequest' });
 
+export const kpiProjectionRequestSchema = z
+  .object({
+    analysis: z.literal('kpi_projection'),
+    // All optional — the trainer's own configured defaults apply when omitted.
+    n_simulations: z.number().int().positive().optional(),
+    seed: z.number().int().optional(),
+    kpi_target_volume_p2: z.number().int().nonnegative().optional(),
+    kpi_target_volume_p3: z.number().int().nonnegative().optional(),
+    kpi_target_breaches_p2: z.number().int().nonnegative().optional(),
+    kpi_target_breaches_p3: z.number().int().nonnegative().optional(),
+  })
+  .strict()
+  .meta({ id: 'KpiProjectionRequest' });
+
+export const externalEventDetectionRequestSchema = z
+  .object({
+    analysis: z.literal('external_event_detection'),
+    // Expected share of days flagged anomalous — the trainer's own
+    // configured default applies when omitted.
+    contamination: z.number().min(0).max(0.5).optional(),
+  })
+  .strict()
+  .meta({ id: 'ExternalEventDetectionRequest' });
+
 export const dataRefreshRequestSchema = z
   .object({ analysis: z.literal('data_refresh') })
   .strict()
@@ -42,6 +66,8 @@ export const triggerRequestSchema = z
   .discriminatedUnion('analysis', [
     volumeForecastRequestSchema,
     breachRiskRequestSchema,
+    kpiProjectionRequestSchema,
+    externalEventDetectionRequestSchema,
     dataRefreshRequestSchema,
     dataQualityCheckRequestSchema,
   ])

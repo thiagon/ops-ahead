@@ -5,12 +5,13 @@ import hashlib
 import pandas as pd
 from clickhouse_driver import Client
 
-from src.settings import Settings
+from settings import Settings
 
 ELIGIBLE_INCIDENTS_COLUMNS = [
     "event_id",
     "entity_id",
     "ticket_number",
+    "received_at",
     "opened_at",
     "assignment_group",
     "opened_by",
@@ -24,14 +25,16 @@ ELIGIBLE_INCIDENTS_COLUMNS = [
 
 P4_SEQUENCES_COLUMNS = ["entity_id", "sequence_start", "sequence_end", "sequence_length"]
 
-IC_WINDOWS_COLUMNS = ["entity_id", "window_hours", "window_start", "sem_intervencao_count"]
+IC_WINDOWS_COLUMNS = ["entity_id", "window_hours", "window_start", "no_intervention_count"]
 
 GROUP_LOAD_COLUMNS = ["assignment_group", "window_start", "incidents_opened"]
+
+PRIORITY_CHANGES_COLUMNS = ["ticket_number", "received_at", "severity_from", "severity_to"]
 
 
 def fetch_eligible_incidents(settings: Settings) -> pd.DataFrame:
     """`first_touch_duration` is already filtered to `counted_in_kpi = 1`, which
-    is exactly the P1–P3 / no-parent / not-"Sem Intervenção" population the
+    is exactly the P1–P3 / no-parent / not-"no_intervention" population the
     breach model trains on."""
     client = Client.from_url(settings.clickhouse_url)
     columns = ", ".join(ELIGIBLE_INCIDENTS_COLUMNS)
@@ -60,6 +63,13 @@ def fetch_group_load(settings: Settings) -> pd.DataFrame:
     columns = ", ".join(GROUP_LOAD_COLUMNS)
     rows = client.execute(f"select {columns} from group_load_by_window order by assignment_group, window_start")
     return pd.DataFrame(rows, columns=GROUP_LOAD_COLUMNS)
+
+
+def fetch_priority_changes(settings: Settings) -> pd.DataFrame:
+    client = Client.from_url(settings.clickhouse_url)
+    columns = ", ".join(PRIORITY_CHANGES_COLUMNS)
+    rows = client.execute(f"select {columns} from priority_changes_log order by ticket_number, received_at")
+    return pd.DataFrame(rows, columns=PRIORITY_CHANGES_COLUMNS)
 
 
 def dataset_version(*frames: pd.DataFrame) -> str:

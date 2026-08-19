@@ -13,12 +13,12 @@ def run_transform() -> None:
 
 
 def run_quality(argv: list[str]) -> None:
-    from src.runner import main as runner_main
+    from runner import main as runner_main
 
-    sys.argv = ["src.runner", *argv]
+    sys.argv = ["runner", *argv]
     runner_main()
 
 
-# Shared by the CLI (`run <transform|quality>`, src/main.py) and the Kafka
-# consume mode (src/trigger.py) — one place each step's actual command lives.
+# Shared by the CLI (`run <transform|quality>`, main.py) and the Kafka
+# consume mode (trigger.py) — one place each step's actual command lives.
 STEPS = {"transform": run_transform, "quality": run_quality}

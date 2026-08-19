@@ -13,6 +13,7 @@ dependencies = [
     "optuna>=4.0",
     "shap>=0.46",
     "scikit-learn>=1.5",
+    "evidently>=0.7",
     "pydantic-settings>=2.5",
     "matplotlib>=3.9",
     "kafka-python>=3.0",
@@ -23,3 +24,10 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+# The container entrypoint runs with src/ on PYTHONPATH (see Dockerfile) so
+# bundled model classes pickle without a `src.` prefix — tests import the
+# same way (`from volume.train import ...`, not `from src.volume.train
+# import ...`), so this has to point at the same root.
+pythonpath = ["src"]

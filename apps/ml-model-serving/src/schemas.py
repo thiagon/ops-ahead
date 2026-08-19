@@ -44,7 +44,7 @@ class VolumePredictResponse(BaseModel):
 
 
 # ---- /predict/breach -------------------------------------------------------
-# Mirrors ml-breach-model's src.features.FEATURE_COLUMNS exactly — the caller
+# Mirrors ml-breach-model's breach.features.FEATURE_COLUMNS exactly — the caller
 # is responsible for assembling these (P4 precursor, group load, etc.); this
 # service is the model I/O boundary, not a feature-computation service (see
 # conductor/tracks/ml-models_20260806/plan.md, Phase 4 notes).
@@ -60,9 +60,11 @@ class BreachFeatureInput(BaseModel):
     is_manual_open: int = Field(ge=0, le=1)
     p4_precursor_present: int = Field(ge=0, le=1)
     p4_precursor_length: int = Field(ge=0)
-    sem_intervencao_count_1h: int = Field(ge=0)
-    sem_intervencao_count_6h: int = Field(ge=0)
+    no_intervention_count_1h: int = Field(ge=0)
+    no_intervention_count_6h: int = Field(ge=0)
     group_load_1h: int = Field(ge=0)
+    was_recategorized: int = Field(ge=0, le=1)
+    recategorization_count: int = Field(ge=0)
     group_severity_historical_ola_ratio: float | None = None
     group_severity_historical_over_25pct_rate: float | None = None
 

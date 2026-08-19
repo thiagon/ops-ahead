@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     clickhouse_url: str = "clickhouse://default:@localhost:9000/default"
 
     mlflow_tracking_uri: str = "http://mlflow-tracking.ml.svc.cluster.local:5000"
-    # Falls back to src/main.py's EXPERIMENT_NAMES ("volume-forecast"/
-    # "breach-risk") when unset; a caller can still override either via env.
+    # Falls back to trigger.py's EXPERIMENT_NAMES when unset; a caller can
+    # still override either via env.
     mlflow_experiment_name: str | None = None
     mlflow_registered_model_name: str | None = None
 
@@ -24,6 +24,24 @@ class Settings(BaseSettings):
     # breach-risk only.
     p4_precursor_window_hours: int = 24
     optuna_trials: int = 50
+
+    # external-event (Isolation Forest) only. Expected share of days flagged
+    # anomalous — not tuned against a labeled set (none exists), a starting
+    # point consistent with the mentoria's account of external events being
+    # rare (docs/insights/03-mentoria-insights.md).
+    external_event_contamination: float = 0.05
+
+    # kpi_projection only (Monte Carlo).
+    kpi_projection_n_simulations: int = 2000
+    kpi_projection_seed: int = 42
+    kpi_projection_holdout_days: int = 14
+    # PPR targets are Locaweb business input, never derivable from the
+    # dataset — left unset until an operator supplies them. P(fechar mês)
+    # comes back as None for a dimension whose target is unset.
+    kpi_target_volume_p2: int | None = None
+    kpi_target_volume_p3: int | None = None
+    kpi_target_breaches_p2: int | None = None
+    kpi_target_breaches_p3: int | None = None
 
     auto_promote: bool = True
 

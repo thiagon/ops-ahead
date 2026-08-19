@@ -16,3 +16,9 @@ dev = [
     "pytest-asyncio>=0.24",
     "pandas>=2.2,<3",
 ]
+
+[tool.pytest.ini_options]
+# The container entrypoint runs with src/ on PYTHONPATH (see Dockerfile), so
+# tests import the same way (`from detector import ...`, not `from
+# src.detector import ...`) — this has to point at the same root.
+pythonpath = ["src"]

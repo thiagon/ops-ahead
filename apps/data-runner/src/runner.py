@@ -7,9 +7,9 @@ import tempfile
 
 import boto3
 
-from .context import build_context
-from .settings import Settings
-from .suites import REGISTRY
+from context import build_context
+from settings import Settings
+from suites import REGISTRY
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

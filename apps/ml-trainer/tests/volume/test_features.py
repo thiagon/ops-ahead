@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from src.volume.features import (
+from volume.features import (
     add_fourier_features,
     add_holiday_flag,
     add_lag_features,

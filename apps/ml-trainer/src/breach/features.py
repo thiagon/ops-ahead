@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def eligibility_filter(df: pd.DataFrame) -> pd.DataFrame:
-    """P1–P3, no parent incident, not "Sem Intervenção" — the KPI-eligible
+    """P1–P3, no parent incident, not "no_intervention" — the KPI-eligible
     population. `first_touch_duration` (the mart `data.fetch_eligible_incidents`
     reads from) already applies `counted_in_kpi = 1`, which encodes exactly
     these three conditions upstream; this function re-checks them explicitly
@@ -14,7 +14,7 @@ def eligibility_filter(df: pd.DataFrame) -> pd.DataFrame:
     mask = (
         df["severity"].isin([1, 2, 3])
         & (df["has_parent_incident"] == 0)
-        & (df["status"] != "Sem Intervenção")
+        & (df["status"] != "no_intervention")
     )
     return df.loc[mask].reset_index(drop=True)
 
@@ -29,7 +29,7 @@ def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_manual_open_flag(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["is_manual_open"] = (df["opened_by"] == "Manual").astype(int)
+    df["is_manual_open"] = (df["opened_by"] == "manual").astype(int)
     return df
 
 
@@ -67,7 +67,7 @@ def add_p4_precursor_features(
 
 
 def add_ic_window_features(incidents: pd.DataFrame, ic_windows: pd.DataFrame) -> pd.DataFrame:
-    """Count of "Sem Intervenção" closures at the same IC in the trailing 1h/6h
+    """Count of "no_intervention" closures at the same IC in the trailing 1h/6h
     *before* this incident's own bucket — the bucket immediately preceding
     `opened_at`'s own, so the incident itself (and anything after it) can never
     leak into its own feature."""
@@ -75,16 +75,16 @@ def add_ic_window_features(incidents: pd.DataFrame, ic_windows: pd.DataFrame) ->
     incidents["opened_at"] = pd.to_datetime(incidents["opened_at"])
 
     for hours in (1, 6):
-        column = f"sem_intervencao_count_{hours}h"
+        column = f"no_intervention_count_{hours}h"
         window_df = ic_windows.loc[
-            ic_windows["window_hours"] == hours, ["entity_id", "window_start", "sem_intervencao_count"]
+            ic_windows["window_hours"] == hours, ["entity_id", "window_start", "no_intervention_count"]
         ].copy()
         window_df["window_start"] = pd.to_datetime(window_df["window_start"])
 
         prior_bucket_start = incidents["opened_at"].dt.floor(f"{hours}h") - pd.Timedelta(hours=hours)
         key = pd.DataFrame({"entity_id": incidents["entity_id"], "window_start": prior_bucket_start})
         merged = key.merge(window_df, on=["entity_id", "window_start"], how="left")
-        incidents[column] = pd.to_numeric(merged["sem_intervencao_count"], errors="coerce").fillna(0).astype(int)
+        incidents[column] = pd.to_numeric(merged["no_intervention_count"], errors="coerce").fillna(0).astype(int)
 
     return incidents
 
@@ -108,6 +108,40 @@ def add_group_load_feature(incidents: pd.DataFrame, group_load: pd.DataFrame) ->
         how="left",
     )
     incidents["group_load_1h"] = pd.to_numeric(merged["incidents_opened"], errors="coerce").fillna(0).astype(int)
+    return incidents
+
+
+def add_recategorization_history_feature(incidents: pd.DataFrame, priority_changes: pd.DataFrame) -> pd.DataFrame:
+    """Whether this ticket had a severity transition logged strictly before
+    this row's own `received_at` — the "histórico de recategorização"
+    cross-model feature (Sprint 2 §3.2), from `priority_changes_log`.
+
+    Filtering to `change_received_at < received_at` is what keeps the
+    transition that produced *this* row's own severity from leaking into
+    its own feature — a ticket recategorized P3→P2 only counts once this
+    row is itself the P2 event or later.
+    """
+    incidents = incidents.copy()
+    incidents["received_at"] = pd.to_datetime(incidents["received_at"])
+
+    if priority_changes.empty:
+        incidents["recategorization_count"] = 0
+        incidents["was_recategorized"] = 0
+        return incidents
+
+    changes = priority_changes.copy()
+    changes["received_at"] = pd.to_datetime(changes["received_at"])
+
+    merged = incidents[["event_id", "ticket_number", "received_at"]].merge(
+        changes[["ticket_number", "received_at"]].rename(columns={"received_at": "change_received_at"}),
+        on="ticket_number",
+        how="left",
+    )
+    prior = merged.loc[merged["change_received_at"] < merged["received_at"]]
+    counts = prior.groupby("event_id").size()
+
+    incidents["recategorization_count"] = incidents["event_id"].map(counts).fillna(0).astype(int)
+    incidents["was_recategorized"] = (incidents["recategorization_count"] > 0).astype(int)
     return incidents
 
 
@@ -160,9 +194,11 @@ FEATURE_COLUMNS = [
     "is_manual_open",
     "p4_precursor_present",
     "p4_precursor_length",
-    "sem_intervencao_count_1h",
-    "sem_intervencao_count_6h",
+    "no_intervention_count_1h",
+    "no_intervention_count_6h",
     "group_load_1h",
+    "was_recategorized",
+    "recategorization_count",
     "group_severity_historical_ola_ratio",
     "group_severity_historical_over_25pct_rate",
 ]
@@ -175,6 +211,7 @@ def build_feature_frame(
     p4_sequences: pd.DataFrame,
     ic_windows: pd.DataFrame,
     group_load: pd.DataFrame,
+    priority_changes: pd.DataFrame,
     p4_precursor_window_hours: int = 24,
 ) -> pd.DataFrame:
     """Full pipeline from the raw eligible-incidents population to a
@@ -188,6 +225,7 @@ def build_feature_frame(
     frame = add_p4_precursor_features(frame, p4_sequences, p4_precursor_window_hours)
     frame = add_ic_window_features(frame, ic_windows)
     frame = add_group_load_feature(frame, group_load)
+    frame = add_recategorization_history_feature(frame, priority_changes)
     frame = add_historical_group_severity_features(frame)
 
     required = FEATURE_COLUMNS + [TARGET_COLUMN]

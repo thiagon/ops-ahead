@@ -18,11 +18,23 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.12-slim
 
+# lightgbm's compiled extension links against libgomp (GNU OpenMP) at
+# runtime — python:3.12-slim doesn't ship it, so import fails with
+# "OSError: libgomp.so.1: cannot open shared object file" without this.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 COPY apps/ml-model-serving/src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
+# prometheus_client's multiprocess mode (BentoML's default `PrometheusClient`)
+# writes per-worker metric files here and refuses to serve `/metrics` at all
+# if the directory doesn't exist — required even with a single worker.
+ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus_multiproc_dir"
+RUN mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 
-CMD ["python", "-m", "src.main"]
+CMD ["bentoml", "serve", "service:ModelServing"]

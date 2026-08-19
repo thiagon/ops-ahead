@@ -64,6 +64,7 @@ def _map_row(row: pd.Series, source: str) -> dict:
         "priority_code": int(payload["priority_code"]),
         "configuration_item": payload.get("configuration_item") or "",
         "status": payload.get("status") or "",
+        "opened_by": payload.get("opened_by") or "",
         "payload": payload,
     }
 

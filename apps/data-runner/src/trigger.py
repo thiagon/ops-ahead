@@ -6,9 +6,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from .register_snapshot import register_snapshot as _register_snapshot
-from .settings import Settings
-from .steps import STEPS as _STEPS
+from register_snapshot import register_snapshot as _register_snapshot
+from settings import Settings
+from steps import STEPS as _STEPS
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def consume_forever(settings: Settings) -> None:
 
     from kafka import KafkaConsumer, KafkaProducer
 
-    from src import metrics
+    import metrics
 
     consumer = KafkaConsumer(
         settings.kafka_topic,

@@ -185,6 +185,32 @@ validados estruturalmente contra dado real do cluster — detalhes em `docs/insi
 Os números de qualidade preditiva (MAPE, AUC-PR, recall@top-k) sobre o dataset completo dependem de uma
 ingestão que ainda não rodou até o fim nesta instância; ficam como follow-up, não bloqueiam o MVP.
 
+**Atualização (2026-08-17, track `ml-layer2-gaps_20260817`):** fecha a conformidade da Camada 2 com a
+seção 3.2 da Sprint 2 — tabela completa em `docs/insights/layer2_sprint2_conformance.md`.
+
+- **Projeção KPI mensal (Monte Carlo)** e **detector de evento externo (Isolation Forest)** — os dois
+  modelos que faltavam — implementados e treinados contra dado real do cluster, como análise/script no
+  `ml-trainer`, não endpoint (conforme já registrado neste documento). Resultados em
+  `docs/insights/ml_models_baseline.md`.
+- **`historico_recategorizacao`** entrou no `FEATURE_COLUMNS` do breach, a última das quatro features
+  de domínio cross-modelo da mentoria.
+- **`model-serving` verificado de verdade pela primeira vez.** `POST /predict/breach` e
+  `POST /predict/volume` nunca tinham sido chamados fora do smoke test com modelo mockado — a
+  verificação real encontrou e corrigiu 4 bugs que impediam qualquer predição real (colisão de nome de
+  pacote entre `ml-trainer`/`ml-model-serving`, dependências de terceiros ausentes no `model-serving`,
+  dtype inválido em campo nulo, timezone incompatível com o Prophet). Confirmado funcionando contra os
+  modelos `Production` reais.
+- **Metodologia de avaliação do detector de rajada corrigida.** O backtest original (precision 0,103,
+  lead-time 9s) tinha viés: contava como acerto um alerta simultâneo à própria rajada do incidente
+  grave, sem piso de antecedência. Corrigido com piso de 15min, medição de recall e janelas separadas
+  de calibração e avaliação (`docs/insights/burst_detector_methodology.md`). Com a métrica corrigida, a
+  varredura de 96 combinações de parâmetros não encontrou nenhum ponto que atinja o piso de utilidade
+  definido antes da busca (`docs/insights/burst_detector_calibration.md`) — os parâmetros seguem
+  congelados nos valores atuais. O detector permanece como o gatilho do fluxo que a arquitetura da
+  Sprint 2 define; o que o resultado diz é que o sinal, no dado disponível hoje, ainda não sustenta a
+  precisão prometida. Melhorar isso é trabalho de modelagem para a Sprint 4, não motivo para trocar o
+  desenho do fluxo.
+
 ### 4.3 Camada 3 — Copiloto IA
 
 **O que o MVP precisa testar no copiloto:**
@@ -269,7 +295,10 @@ O MVP não é validado por demo bonita — é validado por evidência em dado re
 **Modelos:**
 - Modelo de volume: MAPE em hold-out por prioridade; cobertura do intervalo de confiança
 - Modelo de breach: AUC-PR e recall@top-10 e top-50 por hora em hold-out temporal
-- Detector de rajada: precision dos alertas e lead-time mediano antes do P2 (usando o histórico real do CSV como ground truth)
+- Detector de rajada: precision, recall e lead-time mediano antes do P2, com piso de antecedência
+  mínima (usando o histórico real do CSV como ground truth — ver
+  `docs/insights/burst_detector_methodology.md`). Os números da calibração atual estão em
+  `docs/insights/burst_detector_calibration.md` e ainda não atingem o piso de utilidade definido
 
 **Fluxo E2E:**
 - Tempo total do simulador publicar o incidente até o Block Kit aparecer no Slack

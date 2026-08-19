@@ -3,7 +3,7 @@ from __future__ import annotations
 import mlflow.pyfunc
 import pandas as pd
 
-from src.volume import features
+from volume import features
 
 
 class VolumeForecastModel(mlflow.pyfunc.PythonModel):
@@ -12,7 +12,7 @@ class VolumeForecastModel(mlflow.pyfunc.PythonModel):
 
     `model_input` needs one row per `priority_group` with the *as-of* date and
     the LightGBM lag/rolling features computed up to that date (see
-    `src.features.add_lag_features`) — calendar features for the target date
+    `volume.features.add_lag_features`) — calendar features for the target date
     are computed internally per horizon, not supplied by the caller.
     """
 
@@ -24,6 +24,12 @@ class VolumeForecastModel(mlflow.pyfunc.PythonModel):
     def predict(self, context, model_input: pd.DataFrame, params=None) -> pd.DataFrame:
         model_input = model_input.copy()
         model_input["date"] = pd.to_datetime(model_input["date"])
+        # A tz-aware "date" (the HTTP API accepts ISO 8601 with a Z/offset)
+        # propagates into Prophet's "ds" column below, which rejects
+        # timezone-aware timestamps outright — same drop-tz rule split.py
+        # already applies to ClickHouse's tz-aware DateTime64 columns.
+        if model_input["date"].dt.tz is not None:
+            model_input["date"] = model_input["date"].dt.tz_localize(None)
         model_input = model_input.reset_index(drop=True)
 
         rows = []

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import redis.asyncio as redis
 
-from src.detector import CusumState
+from detector import CusumState
 
 
 class RedisState:

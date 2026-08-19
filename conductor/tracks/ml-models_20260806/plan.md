@@ -152,9 +152,14 @@ MAPE) contra o dataset cheio ficam como follow-up — não bloqueiam o fechament
       isso explicitamente em vez de reportar métricas calculadas sobre uma amostra de 606 linhas
 - [x] 5.3: Precision/lead-time/FP por IC do `burst-detector` — já cobertos pelo backtest offline contra
       o CSV real (122.543 linhas) da task 3.10; não depende de simulador live nem do cluster
-- [~] 5.4: Testar `model-serving` com incidentes reais do hold-out — não executado nesta sessão (só
-      smoke test com modelo mockado, Fase 4); serviço está no ar no cluster carregando os artefatos
-      `Production` reais, mas a chamada aos endpoints com dado de hold-out real fica como follow-up
+- [x] 5.4: Testar `model-serving` com incidentes reais do hold-out — fechado na track
+      `ml-layer2-gaps_20260817` (Fase 6). A tentativa revelou que o caminho nunca funcionou de verdade:
+      colisão de nome de pacote `src` entre `ml-trainer` e `ml-model-serving` quebrava o carregamento
+      cross-processo dos artefatos `Production`, `ml-model-serving` não tinha `lightgbm`/`shap`/
+      `prophet`/`holidays` instalados para desserializar os modelos, e dois bugs de dtype/timezone
+      quebravam os dois endpoints mesmo com o modelo carregado. Os quatro corrigidos; `POST
+      /predict/breach` e `POST /predict/volume` verificados contra os modelos `Production` reais —
+      detalhes em `docs/insights/ml_models_baseline.md`
 - [x] 5.5: Nota de status adicionada em `docs/sprints/sprint-3-mvp.md` (seção 4.2) — sem números finais
       de qualidade, que dependem do follow-up de ingestão completa
 

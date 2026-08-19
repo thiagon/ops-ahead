@@ -8,14 +8,14 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from clickhouse_driver import Client
 
-from .models import IncidentEvent
-from .settings import Settings
+from models import IncidentEvent
+from settings import Settings
 
 logger = logging.getLogger(__name__)
 
 _CLICKHOUSE_INSERT = """
     INSERT INTO incidents_received
-    (event_id, source, received_at, opened_at, severity, entity_id, status, payload_raw)
+    (event_id, source, received_at, opened_at, severity, entity_id, status, opened_by, payload_raw)
     VALUES
 """
 
@@ -29,6 +29,7 @@ def _clickhouse_row(evt: IncidentEvent) -> tuple:
         evt.severity,
         evt.entity_id,
         evt.status,
+        evt.opened_by,
         evt.payload_raw,
     )
 

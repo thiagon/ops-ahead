@@ -3,7 +3,7 @@ from great_expectations.data_context.data_context.abstract_data_context import (
     AbstractDataContext,
 )
 
-from .settings import Settings
+from settings import Settings
 
 
 def build_context(settings: Settings) -> AbstractDataContext:

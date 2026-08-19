@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from src.buffer import BatchBuffer
-from src.models import IncidentEvent
+from buffer import BatchBuffer
+from models import IncidentEvent
 
 
 def _evt() -> IncidentEvent:

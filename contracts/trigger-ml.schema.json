@@ -6,7 +6,9 @@
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/volumeForecast" },
-    { "$ref": "#/definitions/breachRisk" }
+    { "$ref": "#/definitions/breachRisk" },
+    { "$ref": "#/definitions/kpiProjection" },
+    { "$ref": "#/definitions/externalEventDetection" }
   ],
   "definitions": {
     "volumeForecast": {
@@ -31,6 +33,31 @@
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
         "holdout_end": { "$ref": "#/definitions/splitDate" }
+      }
+    },
+    "kpiProjection": {
+      "type": "object",
+      "required": ["run_id", "analysis"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "analysis": { "const": "kpi_projection" },
+        "n_simulations": { "type": "integer", "minimum": 1, "description": "Monte Carlo draw count. ml-trainer's own configured default applies when omitted." },
+        "seed": { "type": "integer", "description": "RNG seed for reproducibility. ml-trainer's own configured default applies when omitted." },
+        "kpi_target_volume_p2": { "type": "integer", "minimum": 0, "description": "Locaweb PPR target — business input, no default." },
+        "kpi_target_volume_p3": { "type": "integer", "minimum": 0 },
+        "kpi_target_breaches_p2": { "type": "integer", "minimum": 0 },
+        "kpi_target_breaches_p3": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "externalEventDetection": {
+      "type": "object",
+      "required": ["run_id", "analysis"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "analysis": { "const": "external_event_detection" },
+        "contamination": { "type": "number", "minimum": 0, "maximum": 0.5, "description": "Expected share of days flagged anomalous. ml-trainer's own configured default applies when omitted." }
       }
     },
     "runId": {

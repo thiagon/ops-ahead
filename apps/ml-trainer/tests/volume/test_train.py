@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.settings import Settings
-from src.volume.features import to_long_format
-from src.volume.train import train_and_log, train_horizon
+from settings import Settings
+from volume.features import to_long_format
+from volume.train import train_and_log, train_horizon
 
 
 def _synthetic_daily(days: int = 240) -> pd.DataFrame:

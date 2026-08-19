@@ -12,7 +12,8 @@
     "severity",
     "entity_id",
     "status",
-    "payload_raw"
+    "payload_raw",
+    "opened_by"
   ],
   "additionalProperties": false,
   "properties": {
@@ -24,7 +25,11 @@
     "source": {
       "type": "string",
       "description": "Origin adapter identifier.",
-      "examples": ["itsm", "alertmanager", "datadog"]
+      "examples": [
+        "itsm",
+        "alertmanager",
+        "datadog"
+      ]
     },
     "received_at": {
       "type": "string",
@@ -48,7 +53,23 @@
     },
     "status": {
       "type": "string",
-      "description": "Current status of the incident in the originating system."
+      "enum": [
+        "no_intervention",
+        "auto_closed",
+        "closed",
+        "awaiting_problem",
+        "unknown"
+      ],
+      "description": "Incident status in the Ubiquitous Language, translated from the origin by the adapter."
+    },
+    "opened_by": {
+      "type": "string",
+      "enum": [
+        "monitoring",
+        "manual",
+        "unknown"
+      ],
+      "description": "What opened the incident, translated from the origin by the adapter."
     },
     "payload_raw": {
       "type": "string",

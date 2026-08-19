@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from src.steps import STEPS
+from steps import STEPS
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -11,9 +11,9 @@ LOGGER = logging.getLogger(__name__)
 
 def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "consume":
-        from src import metrics
-        from src.settings import Settings
-        from src.trigger import consume_forever
+        import metrics
+        from settings import Settings
+        from trigger import consume_forever
 
         settings = Settings()
         metrics.start(settings.metrics_port)
@@ -21,7 +21,7 @@ def main() -> None:
         return
 
     if len(sys.argv) < 3 or sys.argv[1] != "run" or sys.argv[2] not in STEPS:
-        LOGGER.error("Usage: python -m src.main run <transform|quality> [args...] | consume")
+        LOGGER.error("Usage: python -m main run <transform|quality> [args...] | consume")
         sys.exit(2)
 
     step, extra_args = sys.argv[2], sys.argv[3:]

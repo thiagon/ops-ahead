@@ -28,7 +28,7 @@ spec:
         - name: ml-trainer
           image: {{ include "ml-trainer.image" . | quote }}
           imagePullPolicy: {{ (index .Values "ml-trainer").image.pullPolicy }}
-          command: ["python", "-m", "src.main", "consume"]
+          command: ["python", "-m", "main", "consume"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

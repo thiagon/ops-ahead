@@ -15,5 +15,6 @@ class IncidentEvent(BaseModel):
     opened_at: Annotated[AwareDatetime, Field(description="Timestamp when the incident was opened in the originating system (UTC, ISO 8601).")]
     severity: Annotated[int, Field(description="Normalized severity: 1=Critical … 5=VeryLow.", ge=1, le=5)]
     entity_id: Annotated[str, Field(description="Identifier of the affected IC, host, or service.")]
-    status: Annotated[str, Field(description="Current status in the originating system.")]
+    status: Annotated[str, Field(description="Current status, in the Ubiquitous Language.")]
+    opened_by: Annotated[str, Field(description="What opened the incident, in the Ubiquitous Language.")] = "unknown"
     payload_raw: Annotated[str, Field(description="Full original event as JSON string, verbatim from the originating system.")]

@@ -14,7 +14,7 @@ models:
         tests: [not_null]
       - name: incident_count
         tests: [not_null]
-      - name: sem_intervencao_count
+      - name: no_intervention_count
         tests: [not_null]
 
   - name: group_load_by_window
@@ -37,6 +37,8 @@ models:
     columns:
       - name: event_id
         tests: [not_null, unique]
+      - name: received_at
+        tests: [not_null]
       - name: severity
         tests:
           - not_null
@@ -67,6 +69,10 @@ models:
       - name: total_incidents
         tests: [not_null]
       - name: p1_share
+        tests: [not_null]
+      - name: manual_open_share
+        tests: [not_null]
+      - name: no_intervention_share
         tests: [not_null]
 
   - name: kpi_monthly_state

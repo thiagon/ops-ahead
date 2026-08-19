@@ -1,0 +1,19 @@
+{
+  "id": "ml-layer2-gaps_20260817",
+  "title": "Conformidade da Camada 2 com a arquitetura da Sprint 2",
+  "type": "feature",
+  "status": "in_progress",
+  "created": "2026-08-17T00:00:00Z",
+  "updated": "2026-08-19T00:00:00Z",
+  "current_phase": 8,
+  "phases": {
+    "total": 10,
+    "completed": 9
+  },
+  "tasks": {
+    "total": 58,
+    "completed": 50
+  },
+  "github_issue": 57,
+  "github_pr": 58
+}

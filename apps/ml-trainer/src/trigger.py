@@ -6,13 +6,25 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from src.settings import Settings
+from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
-ANALYSIS_TRAINERS = {"volume_forecast": "volume", "breach_risk": "breach"}
+ANALYSIS_TRAINERS = {
+    "volume_forecast": "volume",
+    "breach_risk": "breach",
+    "kpi_projection": "kpi_projection",
+    "external_event_detection": "external_event",
+    "drift_monitoring": "drift",
+}
 
-EXPERIMENT_NAMES = {"volume": "volume-forecast", "breach": "breach-risk"}
+EXPERIMENT_NAMES = {
+    "volume": "volume-forecast",
+    "breach": "breach-risk",
+    "external_event": "external-event-detection",
+    "kpi_projection": "kpi-monthly-projection",
+    "drift": "drift-monitoring",
+}
 
 
 def configure_experiment(settings: Settings, domain: str) -> None:
@@ -53,13 +65,35 @@ def process_message(
     started_at = _now()
     publish_status({"run_id": run_id, "status": "Running", "started_at": started_at})
 
-    settings.train_end = event.get("train_end")
-    settings.validation_end = event.get("validation_end")
-    settings.holdout_end = event.get("holdout_end")
-    configure_experiment(settings, domain)
+    # consume_forever reuses one Settings instance for the process's whole
+    # lifetime, across messages of possibly different domains — mutating it
+    # in place leaks one message's fields into the next (e.g. a
+    # volume_forecast run registering under breach-risk's name because a
+    # breach_risk message set it first). A fresh copy per message, seeded
+    # from the process's own env-derived settings, can never leak.
+    message_settings = settings.model_copy()
+    message_settings.train_end = event.get("train_end")
+    message_settings.validation_end = event.get("validation_end")
+    message_settings.holdout_end = event.get("holdout_end")
+    message_settings.kpi_projection_n_simulations = event.get(
+        "n_simulations", message_settings.kpi_projection_n_simulations
+    )
+    message_settings.kpi_projection_seed = event.get("seed", message_settings.kpi_projection_seed)
+    message_settings.kpi_target_volume_p2 = event.get("kpi_target_volume_p2", message_settings.kpi_target_volume_p2)
+    message_settings.kpi_target_volume_p3 = event.get("kpi_target_volume_p3", message_settings.kpi_target_volume_p3)
+    message_settings.kpi_target_breaches_p2 = event.get(
+        "kpi_target_breaches_p2", message_settings.kpi_target_breaches_p2
+    )
+    message_settings.kpi_target_breaches_p3 = event.get(
+        "kpi_target_breaches_p3", message_settings.kpi_target_breaches_p3
+    )
+    message_settings.external_event_contamination = event.get(
+        "contamination", message_settings.external_event_contamination
+    )
+    configure_experiment(message_settings, domain)
 
     try:
-        mlflow_run_id = trainers[domain](settings)
+        mlflow_run_id = trainers[domain](message_settings)
     except Exception as exc:
         LOGGER.exception("run_id=%s failed", run_id)
         publish_status(
@@ -93,7 +127,7 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
 
     from kafka import KafkaConsumer, KafkaProducer
 
-    from src import metrics
+    import metrics
 
     consumer = KafkaConsumer(
         settings.kafka_topic,

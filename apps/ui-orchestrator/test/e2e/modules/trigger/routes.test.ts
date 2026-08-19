@@ -60,6 +60,17 @@ describe('POST /trigger', () => {
     });
   });
 
+  it('accepts a bare kpi_projection request and routes it to trigger.ml', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/trigger',
+      payload: { analysis: 'kpi_projection' },
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(publish.mock.calls[0]?.[0]).toBe('trigger.ml');
+  });
+
   it('routes data_refresh/data_quality_check to trigger.data', async () => {
     await app.inject({ method: 'POST', url: '/trigger', payload: { analysis: 'data_refresh' } });
 

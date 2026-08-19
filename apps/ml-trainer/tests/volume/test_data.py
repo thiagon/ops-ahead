@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.volume.data import dataset_version
+from volume.data import dataset_version
 
 
 def test_dataset_version_is_deterministic():

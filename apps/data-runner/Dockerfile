@@ -20,13 +20,14 @@ FROM python:3.12-slim
 
 # dbt looks up dbt_project.yml from cwd (no --project-dir passed by the
 # WorkflowTemplate steps), so the dbt project root doubles as the image's
-# WORKDIR — src/ lives alongside it so `python -m src.main`/`python -m
-# src.runner` resolve from the same directory.
+# WORKDIR — src/ lives alongside it, added to PYTHONPATH so `python -m main`
+# resolves its modules without a `src.` prefix while cwd stays /dbt.
 WORKDIR /dbt
 
 COPY --from=builder /app/.venv /app/.venv
 COPY apps/data-runner/ .
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/dbt/src"
 
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "main"]

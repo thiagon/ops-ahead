@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.schemas import BreachFeatureInput, VolumeFeatureInput, VolumePredictRequest
+from schemas import BreachFeatureInput, VolumeFeatureInput, VolumePredictRequest
 
 
 def test_volume_feature_input_accepts_valid_payload():
@@ -62,9 +62,11 @@ def test_breach_feature_input_rejects_severity_outside_p1_p3():
             is_manual_open=0,
             p4_precursor_present=0,
             p4_precursor_length=0,
-            sem_intervencao_count_1h=0,
-            sem_intervencao_count_6h=0,
+            no_intervention_count_1h=0,
+            no_intervention_count_6h=0,
             group_load_1h=0,
+            was_recategorized=0,
+            recategorization_count=0,
         )
 
 
@@ -79,8 +81,10 @@ def test_breach_feature_input_allows_missing_historical_ratio():
         is_manual_open=1,
         p4_precursor_present=1,
         p4_precursor_length=3,
-        sem_intervencao_count_1h=1,
-        sem_intervencao_count_6h=4,
+        no_intervention_count_1h=1,
+        no_intervention_count_6h=4,
         group_load_1h=2,
+        was_recategorized=1,
+        recategorization_count=2,
     )
     assert feature.group_severity_historical_ola_ratio is None

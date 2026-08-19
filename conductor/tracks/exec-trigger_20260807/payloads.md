@@ -61,6 +61,30 @@ Linguagem de negócio, discriminado por `analysis`. Idêntico ao contrato origin
 ```
 
 ```json
+// analysis: kpi_projection — sem datas de split; todos os campos opcionais,
+// os defaults configurados no ml-trainer valem quando omitidos. Targets do
+// PPR são input de negócio da Locaweb, sem default algum
+{
+  "analysis": "kpi_projection",
+  "n_simulations": 5000,
+  "seed": 7,
+  "kpi_target_volume_p2": 514,
+  "kpi_target_volume_p3": 1290,
+  "kpi_target_breaches_p2": 13,
+  "kpi_target_breaches_p3": 17
+}
+```
+
+```json
+// analysis: external_event_detection — sem datas de split; contamination
+// opcional, default configurado no ml-trainer quando omitido
+{
+  "analysis": "external_event_detection",
+  "contamination": 0.05
+}
+```
+
+```json
 // analysis: data_refresh — sem datas de split
 {
   "analysis": "data_refresh"
@@ -128,9 +152,26 @@ verdade (hoje em Out of Scope), o mecanismo certo é uma **referência** cadastr
 }
 ```
 
-`ml-trainer` (modo `consume`) lê 1 mensagem, traduz `analysis → volume`/`breach`
-localmente (tabela pequena, só nesse app), chama o mesmo `TRAINERS[...]` que o modo
-`train` (CLI) já chama hoje.
+```json
+{
+  "run_id": "c1d2e3f4-5678-9012-cdef-345678901234",
+  "analysis": "kpi_projection",
+  "n_simulations": 5000,
+  "kpi_target_volume_p2": 514
+}
+```
+
+```json
+{
+  "run_id": "d1e2f3a4-6789-0123-def0-456789012345",
+  "analysis": "external_event_detection",
+  "contamination": 0.05
+}
+```
+
+`ml-trainer` (modo `consume`) lê 1 mensagem, traduz `analysis → volume`/`breach`/
+`kpi_projection`/`external_event` localmente (tabela pequena, só nesse app), chama o
+mesmo `TRAINERS[...]` que o modo `train` (CLI) já chama hoje.
 
 ---
 

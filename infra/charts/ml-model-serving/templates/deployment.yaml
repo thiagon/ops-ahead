@@ -19,6 +19,12 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.deployment.env.httpPort | quote }}
         prometheus.io/path: "/metrics"
+        {{- with .Values.deployment.restartedAt }}
+        # Models load once at startup (models_loader.py), not on a timer — set
+        # deployment.restartedAt to any new value to force a rollout and pick
+        # up a newly promoted Production version.
+        ops-ahead.io/restarted-at: {{ . | quote }}
+        {{- end }}
     spec:
       containers:
         - name: server
@@ -34,13 +40,15 @@ spec:
               value: {{ .Values.deployment.env.volumeModelName | quote }}
             - name: BREACH_MODEL_NAME
               value: {{ .Values.deployment.env.breachModelName | quote }}
-            - name: HTTP_PORT
+            - name: BENTOML_PORT
               value: {{ .Values.deployment.env.httpPort | quote }}
+            - name: BENTOML_HOST
+              value: "0.0.0.0"
           resources:
             {{- toYaml .Values.deployment.resources | nindent 12 }}
           startupProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: {{ .Values.deployment.env.httpPort }}
             # Loading two MLflow pyfunc models (LightGBM + Prophet artifacts)
             # is slow enough to need real startup headroom, not just a longer
@@ -49,11 +57,11 @@ spec:
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: {{ .Values.deployment.env.httpPort }}
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /livez
               port: {{ .Values.deployment.env.httpPort }}
             periodSeconds: 20

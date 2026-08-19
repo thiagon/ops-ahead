@@ -6,8 +6,8 @@ import logging
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
-from src import metrics
-from src.detector import (
+import metrics
+from detector import (
     CUSUM_H,
     CUSUM_K,
     HISTORY_LENGTH,
@@ -17,9 +17,9 @@ from src.detector import (
     robust_z_score,
     update_cusum,
 )
-from src.models import BurstAlert, IncidentEvent
-from src.settings import Settings
-from src.state import RedisState
+from models import BurstAlert, IncidentEvent
+from settings import Settings
+from state import RedisState
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

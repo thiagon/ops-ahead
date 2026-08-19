@@ -7,6 +7,8 @@ describe('topicForAnalysis', () => {
   it.each([
     ['volume_forecast', 'trigger.ml'],
     ['breach_risk', 'trigger.ml'],
+    ['kpi_projection', 'trigger.ml'],
+    ['external_event_detection', 'trigger.ml'],
     ['data_refresh', 'trigger.data'],
     ['data_quality_check', 'trigger.data'],
   ] as const)(

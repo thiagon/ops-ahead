@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.breach.train import train_and_log
-from src.settings import Settings
+from breach.train import train_and_log
+from settings import Settings
 
 
 def _synthetic_incidents(n: int = 300) -> pd.DataFrame:
@@ -24,11 +24,12 @@ def _synthetic_incidents(n: int = 300) -> pd.DataFrame:
             "event_id": [f"e{i}" for i in range(n)],
             "entity_id": [f"ic{i % 5}" for i in range(n)],
             "ticket_number": [f"INC{i}" for i in range(n)],
+            "received_at": dates,
             "opened_at": dates,
             "assignment_group": groups,
-            "opened_by": rng.choice(["Manual", "Monitoramento"], size=n),
+            "opened_by": rng.choice(["manual", "monitoring"], size=n),
             "has_parent_incident": 0,
-            "status": "Encerrado",
+            "status": "closed",
             "severity": severities,
             "duration_seconds": duration.astype(int),
             "ola_limit_seconds": ola_limit,
@@ -55,11 +56,12 @@ def synthetic_settings(tmp_path) -> Settings:
 def test_train_and_log_completes_and_logs_a_run(synthetic_settings):
     incidents = _synthetic_incidents()
     empty_p4 = pd.DataFrame(columns=["entity_id", "sequence_start", "sequence_end", "sequence_length"])
-    empty_ic = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "sem_intervencao_count"])
+    empty_ic = pd.DataFrame(columns=["entity_id", "window_hours", "window_start", "no_intervention_count"])
     empty_group_load = pd.DataFrame(columns=["assignment_group", "window_start", "incidents_opened"])
+    empty_priority_changes = pd.DataFrame(columns=["ticket_number", "received_at", "severity_from", "severity_to"])
 
     run_id = train_and_log(
-        synthetic_settings, incidents, empty_p4, empty_ic, empty_group_load, n_trials=3
+        synthetic_settings, incidents, empty_p4, empty_ic, empty_group_load, empty_priority_changes, n_trials=3
     )
 
     assert run_id
