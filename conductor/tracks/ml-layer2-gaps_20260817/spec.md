@@ -69,9 +69,11 @@ especificado e não por uma versão reduzida sem justificativa registrada.
       ponto da curva sustenta o gatilho — e, nesse caso, a consequência para o desenho do fluxo
 - [x] `POST /predict/breach` e `POST /predict/volume` respondem contra os modelos `Production` reais
 - [x] Task 5.4 de `ml-models_20260806` fechada
-- [ ] Nenhum nome de campo em português fora da base histórica e do mock que a lê, como o ACL determina
-- [ ] `model-serving` empacotado com BentoML e servindo A/B entre versões por header
-- [ ] Drift PSI/KS por feature exposto como métrica Prometheus
+- [~] Nenhum nome de campo em português fora da base histórica e do mock que a lê, como o ACL determina —
+      implementado (Fase 8); só falta retreinar/repromover o breach com os nomes novos, bloqueado até o
+      deploy (task 8.6)
+- [x] `model-serving` empacotado com BentoML e servindo A/B entre versões por header
+- [x] Drift PSI/KS por feature exposto como métrica Prometheus
 
 ## Dependencies
 
