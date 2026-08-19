@@ -231,16 +231,37 @@ serviço carrega apenas `models:/<nome>/Production`.
 
 ### Tasks
 
-- [ ] 9.1: Empacotamento BentoML dos dois modelos, preservando o carregamento a partir do MLflow
-- [ ] 9.2: A/B entre versões por header — requisição sem header segue no `Production`
-- [ ] 9.3: Métrica Prometheus por versão servida, para a comparação ter leitura
-- [ ] 9.4: Testes dos dois caminhos, com e sem header
-- [ ] 9.5: Chart e deploy atualizados
+- [x] 9.1: Empacotamento BentoML dos dois modelos, preservando o carregamento a partir do MLflow —
+      `apps/ml-model-serving/src/service.py` reescreve `main.py`/`create_app` (FastAPI) como um
+      `bentoml.Service` nativo; `models_loader.py` (carga do `Production` via `mlflow.pyfunc`)
+      não muda
+- [x] 9.2: A/B entre versões por header — requisição sem header segue no `Production`. Header
+      `X-Model-Version`; `ModelRegistry.volume_model_for`/`breach_model_for` carregam e cacheiam a
+      versão pedida sob demanda (`models:/<nome>/<versão>`), versão inexistente vira 400
+      (`RequestedModelVersionNotFound`), nenhum modelo carregado vira 503 (`ModelNotLoaded`)
+- [x] 9.3: Métrica Prometheus por versão servida — `model_serving_predictions_total{model,version}`
+- [x] 9.4: Testes dos dois caminhos, com e sem header — 18 testes (`test_service.py` +
+      `test_models_loader.py`), a maioria chamando os métodos do `Service` diretamente (via
+      `bentoml.Context.in_request`) para não colidir com o registro global de métricas do
+      Prometheus que o BentoML monta por app ASGI; um teste HTTP fim-a-fim cobre a integração real
+- [x] 9.5: Chart e deploy atualizados — `Dockerfile` roda `bentoml serve service:ModelServing`;
+      probes do `deployment.yaml` migradas de `/health` (customizado, removido) para `/livez`/
+      `/readyz` (nativos do BentoML). Achado: o `PrometheusClient` do BentoML exige
+      `PROMETHEUS_MULTIPROC_DIR` ou `/metrics` derruba com 500 — variável setada no `Dockerfile`
+
+**Verificado contra o MLflow real** (via `kubectl port-forward -n ml svc/mlflow-tracking`, já
+ativo na sessão): container buildado, `/livez`/`/readyz` respondem 200 após carregar os artefatos
+reais, `POST /predict/volume` responde com forecast real contra `Production` e contra a versão `2`
+(`Archived`) via header, as duas aparecem separadas em `/metrics`.
+`POST /predict/breach` contra `Production`/versão `3` falha com `KeyError` nas colunas
+`sem_intervencao_count_*` — **não é bug desta fase**: é o bloqueio já registrado na task 8.6, o
+modelo em `Production` foi treinado antes da tradução de vocabulário da Fase 8 e só é resolvido
+quando esse retreino rodar.
 
 ### Verification
 
-- [ ] Requisição sem header responde pelo `Production`; com header, pela versão pedida
-- [ ] As duas versões aparecem separadas na métrica
+- [x] Requisição sem header responde pelo `Production`; com header, pela versão pedida
+- [x] As duas versões aparecem separadas na métrica
 
 ---
 

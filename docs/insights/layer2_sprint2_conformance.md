@@ -21,7 +21,7 @@ Auditoria linha a linha de `docs/sprints/sprint-2-architecture.md`, seção 3.2,
 | SHAP | Implementado — `BreachRiskModel.predict` | — |
 | Feature store (Feast) | Ausente | **Desvio já registrado** — `sprint-3-mvp.md` §3 exclui Feast do MVP explicitamente ("Redis direto é suficiente... Feast adiciona robustez, não funcionalidade nova"). Fora de escopo desta track também. |
 | Servir modelos: FastAPI | Implementado | — |
-| Servir modelos: BentoML (empacotamento) | Ausente — `model-serving` é FastAPI puro | **Desvio consciente, registrado agora**: BentoML empacota o que o Dockerfile + `models_loader.py` já resolvem (carga de artefato MLflow, serialização de request/response via Pydantic). Não há requisito do MVP que dependa de BentoML especificamente — A/B por header e model store não são usados no MVP. Reavaliar na Sprint 4 se surgir necessidade real de multi-model serving que o FastAPI puro não cubra. |
+| Servir modelos: BentoML (empacotamento) | Implementado — `apps/ml-model-serving/src/service.py`, `bentoml.Service` nativo com A/B entre versões por header (`X-Model-Version`) | **Revertido da Fase 1**: o desvio consciente registrado ali foi recusado pelo usuário em 2026-08-17 — ver `ml-layer2-gaps_20260817/spec.md`. Implementado na Fase 9. |
 | Detecção de rajada (`burst-detector`, worker Kafka) | Implementado, qualidade não sustentada | **Corrigido nesta track** — Fases 4 e 5 |
 | Monitoramento de drift (Evidently AI → métrica Prometheus) | Ausente, nenhum doc do MVP excluiu | **Desvio consciente, registrado agora**: drift pressupõe uma janela de produção rodando por tempo suficiente para haver o que comparar contra a janela de treino — não existe ainda nesta instância (a ingestão completa do dataset via `incident_producer.py` é ela mesma um follow-up, ver `docs/insights/ml_models_baseline.md`). Implementar Evidently sem uma janela de produção real produziria métrica sem sinal. Fica para Sprint 4, quando o pipeline estiver operando continuamente. |
 
@@ -49,8 +49,8 @@ Auditoria linha a linha de `docs/sprints/sprint-2-architecture.md`, seção 3.2,
 | Categoria | Contagem |
 |-----------|----------|
 | Já implementado, sem ação | 10 |
-| Implementado nesta track | 4 (Monte Carlo, Isolation Forest, feature de recategorização, correção do detector de rajada) |
-| Desvio consciente registrado | 3 (Feast — já excluído no MVP; BentoML; Evidently AI) |
+| Implementado nesta track | 5 (Monte Carlo, Isolation Forest, feature de recategorização, correção do detector de rajada, empacotamento BentoML + A/B) |
+| Desvio consciente registrado | 2 (Feast — já excluído no MVP; Evidently AI) |
 
 Nenhum item da seção 3.2 fica sem destino declarado.
 
