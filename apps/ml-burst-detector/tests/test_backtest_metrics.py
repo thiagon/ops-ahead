@@ -2,7 +2,7 @@ import math
 
 import pandas as pd
 
-from src.backtest_metrics import (
+from backtest_metrics import (
     Alert,
     chronological_split,
     evaluate_alerts,

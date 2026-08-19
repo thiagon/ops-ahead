@@ -1,4 +1,4 @@
-from src.detector import CUSUM_H, CUSUM_K, Z_SCORE_THRESHOLD, CusumState, robust_z_score, update_cusum
+from detector import CUSUM_H, CUSUM_K, Z_SCORE_THRESHOLD, CusumState, robust_z_score, update_cusum
 
 
 def test_z_score_near_zero_for_typical_count():

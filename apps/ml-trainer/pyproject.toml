@@ -25,8 +25,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-# The container entrypoint runs from inside src/ (see Dockerfile) so bundled
-# model classes pickle without a `src.` prefix — tests import the same way
-# (`from volume.train import ...`, not `from src.volume.train import ...`),
-# so this has to point at the same root.
+# The container entrypoint runs with src/ on PYTHONPATH (see Dockerfile) so
+# bundled model classes pickle without a `src.` prefix — tests import the
+# same way (`from volume.train import ...`, not `from src.volume.train
+# import ...`), so this has to point at the same root.
 pythonpath = ["src"]

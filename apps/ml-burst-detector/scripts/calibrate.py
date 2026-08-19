@@ -26,13 +26,22 @@ from pathlib import Path
 import pandas as pd
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.backtest_metrics import Alert, BacktestSettings, chronological_split, evaluate_alerts, group_p1_p2_by_entity
-from src.detector import HISTORY_LENGTH, WINDOWS_SECONDS, CusumState, median_absolute_deviation, update_cusum
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
+# backtest_metrics/detector live in this app's src/, imported the same way
+# the live consumer does (no `src.` prefix — see apps/ml-burst-detector/Dockerfile).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 # The historical base is read through the repo-level reader so the origin's
 # vocabulary stays confined to it (domain/acl/itsm.md).
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from backtest_metrics import (  # noqa: E402
+    Alert,
+    BacktestSettings,
+    chronological_split,
+    evaluate_alerts,
+    group_p1_p2_by_entity,
+)
+from detector import HISTORY_LENGTH, WINDOWS_SECONDS, CusumState, median_absolute_deviation, update_cusum  # noqa: E402
 import historical_dataset  # noqa: E402
 
 
@@ -102,7 +111,7 @@ class InMemoryState:
 
 
 def _z_score(count: float, history: list[float], min_robust_std: float) -> tuple[float, float, float]:
-    """Same shape as `src.detector.robust_z_score`, with `MIN_ROBUST_STD`
+    """Same shape as `detector.robust_z_score`, with `MIN_ROBUST_STD`
     exposed as a parameter instead of the module constant — needed to sweep
     it here without touching the live detector's own default."""
     if len(history) < 2:

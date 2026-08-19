@@ -20,3 +20,9 @@ dev = [
     "pandas>=2.2",
     "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+# The container entrypoint runs with src/ on PYTHONPATH (see Dockerfile), so
+# tests import the same way (`from settings import ...`, not `from
+# src.settings import ...`) — this has to point at the same root.
+pythonpath = ["src"]

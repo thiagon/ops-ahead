@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from src.suites.marts import (
+from suites.marts import (
     register_daily_anomaly_features,
     register_incidents_by_ic,
     register_kpi_monthly_state,

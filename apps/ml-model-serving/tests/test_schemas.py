@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.schemas import BreachFeatureInput, VolumeFeatureInput, VolumePredictRequest
+from schemas import BreachFeatureInput, VolumeFeatureInput, VolumePredictRequest
 
 
 def test_volume_feature_input_accepts_valid_payload():

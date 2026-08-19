@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.register_snapshot import compute_counts, fingerprint, register_snapshot
-from src.settings import Settings
+from register_snapshot import compute_counts, fingerprint, register_snapshot
+from settings import Settings
 
 
 class FakeClient:

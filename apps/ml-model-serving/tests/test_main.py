@@ -1,9 +1,9 @@
 import pandas as pd
 from fastapi.testclient import TestClient
 
-from src.main import create_app
-from src.models_loader import ModelRegistry
-from src.settings import Settings
+from main import create_app
+from models_loader import ModelRegistry
+from settings import Settings
 
 
 class FakeVolumeModel:

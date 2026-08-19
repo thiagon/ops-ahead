@@ -30,5 +30,6 @@ COPY --from=builder /app/.venv /app/.venv
 COPY apps/ml-model-serving/src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "main"]

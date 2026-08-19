@@ -23,13 +23,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from external_event.features import FEATURE_COLUMNS
-from external_event.train import fit_isolation_forest
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
+# external_event.* lives in this app's src/, imported the same way the live
+# trainer does (no `src.` prefix — see apps/ml-trainer/Dockerfile).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 # The historical base is read through the repo-level reader so the origin's
 # vocabulary stays confined to it (domain/acl/itsm.md).
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from external_event.features import FEATURE_COLUMNS  # noqa: E402
+from external_event.train import fit_isolation_forest  # noqa: E402
 import historical_dataset  # noqa: E402
 
 Z_SCORE_THRESHOLD = 3.5

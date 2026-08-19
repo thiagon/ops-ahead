@@ -4,7 +4,7 @@ import logging
 
 import mlflow.pyfunc
 
-from src.settings import Settings
+from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 

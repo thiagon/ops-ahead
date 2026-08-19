@@ -25,7 +25,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.backtest_metrics import (
+REPO_ROOT = Path(__file__).resolve().parents[3]
+# backtest_metrics/detector live in this app's src/, imported the same way
+# the live consumer does (no `src.` prefix — see apps/ml-burst-detector/Dockerfile).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+# The historical base is read through the repo-level reader so the origin's
+# vocabulary stays confined to it (domain/acl/itsm.md).
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from backtest_metrics import (  # noqa: E402
     Alert,
     BacktestSettings,
     chronological_split,
@@ -33,7 +41,7 @@ from src.backtest_metrics import (
     group_p1_p2_by_entity,
     precision_recall_curve,
 )
-from src.detector import (
+from detector import (  # noqa: E402
     CUSUM_H,
     CUSUM_K,
     HISTORY_LENGTH,
@@ -44,11 +52,6 @@ from src.detector import (
     robust_z_score,
     update_cusum,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-# The historical base is read through the repo-level reader so the origin's
-# vocabulary stays confined to it (domain/acl/itsm.md).
-sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import historical_dataset  # noqa: E402
 
 SETTINGS = BacktestSettings()
@@ -63,7 +66,7 @@ class _BucketState:
 
 
 class InMemoryState:
-    """Same bucket/history/CUSUM rollover semantics as `src.state.RedisState`,
+    """Same bucket/history/CUSUM rollover semantics as `state.RedisState`,
     without Redis — a synchronous in-process stand-in built for replaying a
     static, already-sorted dataset."""
 

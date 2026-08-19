@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from src.suites.critical import register
+from suites.critical import register
 
 
 def _rows(n=5):

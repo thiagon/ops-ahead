@@ -7,7 +7,7 @@ import logging
 import mlflow
 from clickhouse_driver import Client
 
-from .settings import Settings
+from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 

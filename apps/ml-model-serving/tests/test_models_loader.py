@@ -1,5 +1,5 @@
-from src.models_loader import ModelRegistry
-from src.settings import Settings
+from models_loader import ModelRegistry
+from settings import Settings
 
 
 def test_load_survives_a_model_not_yet_in_production(monkeypatch):

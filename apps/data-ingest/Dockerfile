@@ -25,5 +25,6 @@ COPY apps/data-ingest/src/ ./src/
 COPY apps/data-ingest/migrations/ ./migrations/
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "main"]

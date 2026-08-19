@@ -7,8 +7,8 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from prometheus_client import make_asgi_app
 
-from src.models_loader import ModelRegistry
-from src.schemas import (
+from models_loader import ModelRegistry
+from schemas import (
     BreachFeatureInput,
     BreachPredictResponse,
     ShapContribution,
@@ -16,7 +16,7 @@ from src.schemas import (
     VolumePredictRequest,
     VolumePredictResponse,
 )
-from src.settings import Settings
+from settings import Settings
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)

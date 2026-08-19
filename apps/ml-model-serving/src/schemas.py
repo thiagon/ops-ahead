@@ -44,7 +44,7 @@ class VolumePredictResponse(BaseModel):
 
 
 # ---- /predict/breach -------------------------------------------------------
-# Mirrors ml-breach-model's src.features.FEATURE_COLUMNS exactly — the caller
+# Mirrors ml-breach-model's breach.features.FEATURE_COLUMNS exactly — the caller
 # is responsible for assembling these (P4 precursor, group load, etc.); this
 # service is the model I/O boundary, not a feature-computation service (see
 # conductor/tracks/ml-models_20260806/plan.md, Phase 4 notes).

@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from src.models import IncidentEvent
+from models import IncidentEvent
 
 _VALID = {
     "event_id": str(uuid4()),

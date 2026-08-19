@@ -2,8 +2,8 @@ import json
 from uuid import uuid4
 
 
-from src.models import IncidentEvent
-from src.writer import _minio_key
+from models import IncidentEvent
+from writer import _minio_key
 
 
 def _make(source: str, opened_at: str) -> IncidentEvent:

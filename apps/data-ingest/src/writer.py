@@ -8,8 +8,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from clickhouse_driver import Client
 
-from .models import IncidentEvent
-from .settings import Settings
+from models import IncidentEvent
+from settings import Settings
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,11 @@ import time
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
-from . import metrics
-from .buffer import BatchBuffer
-from .models import IncidentEvent
-from .settings import Settings
-from .writer import BatchWriter
+import metrics
+from buffer import BatchBuffer
+from models import IncidentEvent
+from settings import Settings
+from writer import BatchWriter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
