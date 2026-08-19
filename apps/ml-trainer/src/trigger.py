@@ -15,6 +15,7 @@ ANALYSIS_TRAINERS = {
     "breach_risk": "breach",
     "kpi_projection": "kpi_projection",
     "external_event_detection": "external_event",
+    "drift_monitoring": "drift",
 }
 
 EXPERIMENT_NAMES = {
@@ -22,6 +23,7 @@ EXPERIMENT_NAMES = {
     "breach": "breach-risk",
     "external_event": "external-event-detection",
     "kpi_projection": "kpi-monthly-projection",
+    "drift": "drift-monitoring",
 }
 
 

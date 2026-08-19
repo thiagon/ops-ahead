@@ -178,6 +178,24 @@ class TestProcessMessage:
         assert calls[0].external_event_contamination == 0.1
         assert calls[0].mlflow_experiment_name == "external-event-detection"
 
+    def test_drift_monitoring_message_translates_and_runs(self, settings, published, publish_status):
+        calls: list[Settings] = []
+
+        def _run_drift(s: Settings) -> str:
+            calls.append(s)
+            return "mlflow-run-drift"
+
+        process_message(
+            settings,
+            {"drift": _run_drift},
+            {"run_id": "run-8", "analysis": "drift_monitoring"},
+            publish_status,
+        )
+
+        assert len(calls) == 1
+        assert calls[0].mlflow_experiment_name == "drift-monitoring"
+        assert published[1]["detail"] == {"mlflow_run_id": "mlflow-run-drift"}
+
     def test_publishes_failed_with_error_detail_when_the_trainer_raises(
         self, settings, published, publish_status
     ):

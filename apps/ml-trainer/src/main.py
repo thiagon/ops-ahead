@@ -58,11 +58,55 @@ def _train_kpi_projection(settings: Settings) -> str:
     return run_kpi_projection(settings, daily, kpi_state)["run_id"]
 
 
+def _run_drift(settings: Settings) -> str:
+    import metrics
+    from breach import features as breach_features
+    from breach.data import (
+        fetch_eligible_incidents,
+        fetch_group_load,
+        fetch_ic_windows,
+        fetch_p4_sequences,
+        fetch_priority_changes,
+    )
+    from drift.run import run_drift_monitoring
+    from volume import features as volume_features
+    from volume.data import fetch_daily_anomaly_features
+
+    daily = fetch_daily_anomaly_features(settings)
+    # Horizon doesn't change FEATURE_COLUMNS' own distribution meaningfully —
+    # 1 is an arbitrary, stable choice, not a per-horizon drift concern.
+    volume_frame = volume_features.build_feature_frame(daily, horizon=1)
+
+    incidents = fetch_eligible_incidents(settings)
+    p4_sequences = fetch_p4_sequences(settings)
+    ic_windows = fetch_ic_windows(settings)
+    group_load = fetch_group_load(settings)
+    priority_changes = fetch_priority_changes(settings)
+    breach_frame = breach_features.build_feature_frame(
+        incidents, p4_sequences, ic_windows, group_load, priority_changes
+    )
+
+    domains = {
+        "volume": (volume_frame, "date", volume_features.FEATURE_COLUMNS),
+        "breach": (breach_frame, "opened_at", breach_features.FEATURE_COLUMNS),
+    }
+    outcome = run_drift_monitoring(settings, domains)
+
+    for domain, domain_results in outcome["results"].items():
+        for feature, result in domain_results.items():
+            metrics.feature_drift_psi.labels(domain=domain, feature=feature).set(result.psi)
+            if result.ks_pvalue is not None:
+                metrics.feature_drift_ks_pvalue.labels(domain=domain, feature=feature).set(result.ks_pvalue)
+
+    return outcome["run_id"]
+
+
 TRAINERS = {
     "volume": _train_volume,
     "breach": _train_breach,
     "external_event": _train_external_event,
     "kpi_projection": _train_kpi_projection,
+    "drift": _run_drift,
 }
 
 # volume/breach need a hold-out window to evaluate against; kpi_projection
@@ -96,7 +140,7 @@ def main() -> None:
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m main train <volume|breach|external_event|kpi_projection> | consume")
+        LOGGER.error("Usage: python -m main train <volume|breach|external_event|kpi_projection|drift> | consume")
         sys.exit(2)
 
     domain = sys.argv[2]
