@@ -65,18 +65,6 @@ mensagem, não como atualização de um registro consolidado no fim.
 - [ ] 2.3: Publicação no tópico cru correspondente à natureza da origem
 - [ ] 2.4: Métricas por origem e por natureza
 
-**Simulador**
-
-Descoberto ao planejar a Fase 2: citado nas Technical Notes do spec e nas Pendências do desenho,
-mas nunca virou task — corrigido aqui. `scripts/incident_producer.py` hoje lê uma linha do CSV já
-fechada (com duração preenchida) e publica um único evento; não há "continua aberto" para o
-acompanhador de prazo reavaliar. Não implementado nesta passada — fica registrado para quando a
-Fase 2 (rota nova, versionada) e a Fase 6 (acompanhador de prazo) estiverem prontas para receber.
-
-- [ ] 2.4.1: Reescrever o simulador para decompor os três instantes do histórico (abertura,
-      resolução, encerramento) em eventos separados — abre, opcionalmente reconhece, resolve,
-      encerra — postados na rota nova e versionada, em vez de um único evento já fechado
-
 **Bronze**
 
 - [ ] 2.5: Tabelas de bronze append-only por natureza, com o corpo preservado como chegou
