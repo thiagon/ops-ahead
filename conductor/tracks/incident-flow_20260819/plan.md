@@ -70,11 +70,26 @@ mensagem, não como atualização de um registro consolidado no fim.
 - [ ] 2.5: Tabelas de bronze append-only por natureza, com o corpo preservado como chegou
 - [ ] 2.6: Cópia em arquivo particionada por origem e por data de recepção, com o corpo como coluna
       de texto
-- [ ] 2.7: Destino do tópico atual: renomeado, mantido como alias na transição, ou descontinuado
+- [ ] 2.7: Destino do tópico atual: `incidents.received` é descontinuado — sem alias, sem preservar
+      o dado antigo (decisão do usuário, 2026-08-19: as tabelas e tópicos de hoje viram lixo assim
+      que as novas existirem, nada a migrar)
+
+**Corte de `incidents.received`**
+
+Descoberto ao planejar o corte: o plan.md original só cobria a migração do `data-ingest`, mas dois
+outros consumidores leem de `incidents.received`/`incidents_received` hoje e ficariam quebrados sem
+tarefa própria — corrigido aqui antes da Fase 2 começar a implementar.
+
+- [ ] 2.7.1: Migrar `ml-burst-detector` para consumir `incidents.monitor` — a natureza dele é
+      monitoração por entity (z-score/CUSUM sobre sinal), não gestão de ocorrência
+- [ ] 2.7.2: Migrar `stg_incidents.sql` (data-runner) para a fonte traduzida da cadeia `alert`
+- [ ] 2.7.3: Descontinuar a tabela `incidents_received` do ClickHouse e o tópico `incidents.received`
+      do chart `data-kafka` — nenhum consumidor aponta mais para eles
 
 **Tradução**
 
-- [ ] 2.8: Estágio de tradução como componente próprio, consumindo o tópico cru
+- [ ] 2.8: Estágio de tradução como componente próprio, consumindo o tópico cru — vive dentro do
+      `data-ingest` existente, não em app novo (decisão do usuário, 2026-08-19)
 - [ ] 2.9: Dicionário por origem fora do código, versionado — ciclo de vida, condição e o que
       originou o registro, mapeados no vocabulário do domínio
 - [ ] 2.10: Valor fora do dicionário vira o caso desconhecido e fica visível, sem falhar o evento
@@ -96,6 +111,7 @@ mensagem, não como atualização de um registro consolidado no fim.
 - [ ] Uma transição de estado chega como mensagem própria, não como atualização do mesmo registro
 - [ ] Corrigir o dicionário e reprocessar um período gera resultado novo sem perder o anterior
 - [ ] Origem nova não altera contrato traduzido nem consumidor
+- [ ] Nada no repositório aponta mais para `incidents.received` ou `incidents_received`
 
 ---
 
