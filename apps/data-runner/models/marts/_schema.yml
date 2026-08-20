@@ -19,11 +19,11 @@ models:
 
   - name: group_load_by_window
     columns:
-      - name: assignment_group
+      - name: owner
         tests: [not_null]
-      - name: window_start
+      - name: snapshot_at
         tests: [not_null]
-      - name: incidents_opened
+      - name: incidents_open
         tests: [not_null]
 
   - name: p4_sequences_by_ci
@@ -35,21 +35,25 @@ models:
 
   - name: first_touch_duration
     columns:
-      - name: event_id
-        tests: [not_null, unique]
-      - name: received_at
+      - name: tenant_id
+        tests: [not_null]
+      - name: external_id
+        tests: [not_null]
+      - name: opened_at
         tests: [not_null]
       - name: severity
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4, 5]
-      - name: ola_limit_seconds
+      - name: deadline_seconds
         tests: [not_null]
 
   - name: priority_changes_log
     columns:
-      - name: ticket_number
+      - name: tenant_id
+        tests: [not_null]
+      - name: external_id
         tests: [not_null]
       - name: severity_from
         tests:
@@ -59,21 +63,6 @@ models:
         tests:
           - accepted_values:
               values: [1, 2, 3, 4, 5]
-
-  - name: daily_anomaly_features
-    columns:
-      - name: date
-        tests: [not_null]
-      - name: source
-        tests: [not_null]
-      - name: total_incidents
-        tests: [not_null]
-      - name: p1_share
-        tests: [not_null]
-      - name: manual_open_share
-        tests: [not_null]
-      - name: no_intervention_share
-        tests: [not_null]
 
   - name: kpi_monthly_state
     columns:
@@ -87,3 +76,5 @@ models:
       - name: breach_rate
         # Nullable by design: NULL when the bucket has zero KPI-counted
         # incidents (undefined rate), not the same thing as a 0.0 breach rate.
+      - name: open_at_risk_count
+        tests: [not_null]

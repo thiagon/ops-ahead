@@ -48,3 +48,16 @@ models:
         tests: [not_null]
       - name: critical_share
         tests: [not_null]
+
+  - name: gold_alert_breach_consolidation
+    columns:
+      - name: tenant_id
+        tests: [not_null]
+      - name: external_id
+        tests: [not_null]
+      - name: closed_at
+        tests: [not_null]
+      - name: duration_seconds
+        tests: [not_null]
+      - name: overage_seconds
+        tests: [not_null]

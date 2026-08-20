@@ -9,8 +9,6 @@ seed-paths: ["seeds"]
 
 models:
   ops_ahead:
-    staging:
-      +materialized: view
     silver:
       +materialized: table
       +engine: "MergeTree()"

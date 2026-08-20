@@ -7,25 +7,24 @@
     )
 }}
 
--- Consecutive P4 sequences per IC (islands-and-gaps via row_number diff)
+-- Consecutive P4 sequences per IC (islands-and-gaps via row_number diff),
+-- over silver_alert — one row per occurrence, not per event.
 with p4 as (
     select
         entity_id,
-        event_id,
+        external_id,
         opened_at,
-        ticket_number,
         row_number() over (partition by entity_id order by opened_at) as rn_all,
         row_number() over (partition by entity_id order by opened_at) as rn_p4
-    from {{ ref('stg_incidents') }}
-    where severity = 4
+    from {{ ref('silver_alert') }}
+    where severity = 4 and entity_id is not null and entity_id != ''
 ),
 
 sequenced as (
     select
         entity_id,
-        event_id,
+        external_id,
         opened_at,
-        ticket_number,
         rn_p4,
         rn_all - rn_p4 as sequence_group
     from p4
@@ -37,7 +36,7 @@ select
     min(opened_at)      as sequence_start,
     max(opened_at)      as sequence_end,
     count()             as sequence_length,
-    min(ticket_number)  as first_incident,
-    max(ticket_number)  as last_incident
+    min(external_id)    as first_incident,
+    max(external_id)    as last_incident
 from sequenced
 group by entity_id, sequence_group

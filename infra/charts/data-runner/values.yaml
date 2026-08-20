@@ -56,7 +56,6 @@ run:
       - p4_sequences_by_ci
       - first_touch_duration
       - priority_changes_log
-      - daily_anomaly_features
       - kpi_monthly_state
   secretName: data-runner-secret
 

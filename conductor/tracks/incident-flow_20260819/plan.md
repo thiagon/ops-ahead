@@ -178,19 +178,31 @@ Agregações por entity. Insumo de análise, não produto de tela.
 
 O que o negócio consome: prazo, responsável, desfecho.
 
+`incidents_by_ic` e `p4_sequences_by_ci` não tinham task própria nem linha na tabela de gold do
+spec — descoberto ao implementar que o `ml-trainer` (breach-risk) ainda lê as duas. Decisão do
+usuário, 2026-08-20: reconstruir as duas sobre `silver_alert` mesmo assim, para não quebrar o
+breach-risk além do que a Fase 7 já vai mexer. `daily_anomaly_features` (cadeia `alert`) não ganha
+reconstrução — o detector de evento externo migra inteiro para `gold_monitor_daily_features`
+(Fase 4); `ml-trainer.volume`, que lia a versão `alert`, fica quebrado até a Fase 7 (`7.6: Modelo de
+volume revisto`) decidir sua nova fonte.
+
 ### Tasks
 
-- [ ] 5.1: Consolidação de quebra por ocorrência fechada — duração, se estourou e por quanto
-- [ ] 5.2: Estado mensal do KPI, com realizado e com o que está em risco
-- [ ] 5.3: Tempo no primeiro grupo de atendimento, sobre a nova chave
-- [ ] 5.4: Carga por grupo e janela, contando o que está vivo
-- [ ] 5.5: Histórico de mudança de gravidade
-- [ ] 5.6: Testes de cada mart e das regras derivadas
+- [x] 5.1: Consolidação de quebra por ocorrência fechada — duração, se estourou e por quanto
+- [x] 5.2: Estado mensal do KPI, com realizado e com o que está em risco
+- [x] 5.3: Tempo no primeiro grupo de atendimento, sobre a nova chave
+- [x] 5.4: Carga por grupo e janela, contando o que está vivo
+- [x] 5.5: Histórico de mudança de gravidade
+- [x] 5.6: Contagem de incidentes por entity e janela, sobre `silver_alert` (`incidents_by_ic`)
+- [x] 5.7: Sequências de severidade 4 consecutivas por entity, sobre `silver_alert`
+      (`p4_sequences_by_ci`)
+- [x] 5.8: Testes de cada mart e das regras derivadas; remover `daily_anomaly_features` (cadeia
+      `alert`) e `stg_incidents`, órfãos após o corte
 
 ### Verification
 
-- [ ] Nenhum mart depende de veredito recebido da origem
-- [ ] Os números continuam coerentes com o histórico conhecido
+- [x] Nenhum mart depende de veredito recebido da origem
+- [x] Os números continuam coerentes com o histórico conhecido
 
 ---
 
