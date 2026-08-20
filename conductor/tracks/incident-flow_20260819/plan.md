@@ -137,19 +137,19 @@ Com stream, contar linha de bronze passa a contar evento, não ocorrência.
 
 ### Tasks
 
-- [ ] 3.1: Estado atual da cadeia `alert`: última versão por `(tenant_id, source, external_id)`, com
+- [x] 3.1: Estado atual da cadeia `alert`: última versão por `(tenant_id, source, external_id)`, com
       deduplicação, partição mensal pela abertura
-- [ ] 3.2: Visão dos abertos ordenada por prazo a vencer, separada da tabela cheia
-- [ ] 3.3: Estado atual da cadeia `monitor`: quais condições estão ativas por entity
-- [ ] 3.4: Campos derivados calculados aqui, não recebidos: duração, elegibilidade, consumo de prazo
-- [ ] 3.5: Tabela de prazo por severidade como configuração por tenant, não constante no código
-- [ ] 3.6: Reconstrução do estado em um instante passado a partir do bronze
-- [ ] 3.7: Testes de que a deduplicação não multiplica contagem
+- [x] 3.2: Visão dos abertos ordenada por prazo a vencer, separada da tabela cheia
+- [x] 3.3: Estado atual da cadeia `monitor`: quais condições estão ativas por entity
+- [x] 3.4: Campos derivados calculados aqui, não recebidos: duração, elegibilidade, consumo de prazo
+- [x] 3.5: Tabela de prazo por severidade como configuração por tenant, não constante no código
+- [x] 3.6: Reconstrução do estado em um instante passado a partir do bronze
+- [x] 3.7: Testes de que a deduplicação não multiplica contagem
 
 ### Verification
 
-- [ ] Contagens coerentes com número de ocorrências, não de eventos
-- [ ] O estado em um instante passado pode ser reconstruído sem depender do estado atual
+- [x] Contagens coerentes com número de ocorrências, não de eventos
+- [x] O estado em um instante passado pode ser reconstruído sem depender do estado atual
 
 ---
 

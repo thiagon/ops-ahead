@@ -9,6 +9,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 def run_transform() -> None:
+    # Seeds first: silver_alert joins tenant_deadlines, which only exists
+    # once seeded (domain/ubiquitous-language.md#tenant — deadline is
+    # per-tenant config, not a code constant).
+    subprocess.run(["dbt", "seed", "--profiles-dir", "/dbt"], check=True)
     subprocess.run(["dbt", "run", "--profiles-dir", "/dbt"], check=True)
 
 
