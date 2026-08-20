@@ -7,7 +7,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class BronzeMonitorEvent(BaseModel):
-    """Same shape as data-ingest's own model (contracts/incident-monitor.schema.json)
+    """Same shape as data-ingest's own model (contracts/condition-monitor.schema.json)
     — duplicated rather than imported, consistent with how every training job
     in this track ships as its own container image. This detector reads the
     monitor chain: it reacts to observed condition signal, not to managed

@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from models import BronzeAlertEvent, BronzeMonitorEvent, IncidentEnvelope
+from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
 
 _ENVELOPE = {
     "event_id": str(uuid4()),
@@ -43,21 +43,21 @@ _MONITOR = {
 }
 
 
-class TestIncidentEnvelope:
+class TestEventEnvelope:
     def test_valid_roundtrip(self):
-        m = IncidentEnvelope.model_validate(_ENVELOPE)
-        restored = IncidentEnvelope.model_validate_json(m.model_dump_json())
+        m = EventEnvelope.model_validate(_ENVELOPE)
+        restored = EventEnvelope.model_validate_json(m.model_dump_json())
         assert restored.event_id == m.event_id
         assert restored.tenant_id == "locaweb"
 
     def test_extra_fields_forbidden(self):
         with pytest.raises(ValidationError):
-            IncidentEnvelope.model_validate({**_ENVELOPE, "unexpected": "value"})
+            EventEnvelope.model_validate({**_ENVELOPE, "unexpected": "value"})
 
     def test_missing_tenant_id(self):
         incomplete = {k: v for k, v in _ENVELOPE.items() if k != "tenant_id"}
         with pytest.raises(ValidationError):
-            IncidentEnvelope.model_validate(incomplete)
+            EventEnvelope.model_validate(incomplete)
 
 
 class TestBronzeAlertEvent:

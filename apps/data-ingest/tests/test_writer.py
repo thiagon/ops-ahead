@@ -1,11 +1,11 @@
 from uuid import uuid4
 
-from models import IncidentEnvelope
+from models import EventEnvelope
 from writer import _lake_prefix
 
 
-def _make(source: str, intake: str, received_at: str, tenant_id: str = "locaweb") -> IncidentEnvelope:
-    return IncidentEnvelope.model_validate(
+def _make(source: str, intake: str, received_at: str, tenant_id: str = "locaweb") -> EventEnvelope:
+    return EventEnvelope.model_validate(
         {
             "event_id": str(uuid4()),
             "tenant_id": tenant_id,

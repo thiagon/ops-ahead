@@ -11,7 +11,7 @@ from clickhouse_driver import Client
 
 import metrics
 from dictionaries import DictionaryRegistry
-from models import BronzeAlertEvent, BronzeMonitorEvent, IncidentEnvelope
+from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
 from settings import Settings
 from translate import UnknownSourceError, translate
 
@@ -92,7 +92,7 @@ def _monitor_row(evt: BronzeMonitorEvent) -> tuple:
     )
 
 
-def _lake_prefix(envelope: IncidentEnvelope) -> str:
+def _lake_prefix(envelope: EventEnvelope) -> str:
     date = envelope.received_at.astimezone(UTC).date()
     return f"raw/tenant={envelope.tenant_id}/intake={envelope.intake}/source={envelope.source}/date={date}/"
 
@@ -122,7 +122,7 @@ class BatchWriter:
         self._bucket = settings.minio_bucket
         self._dictionaries = DictionaryRegistry(settings.dictionaries_dir)
 
-    async def write(self, batch: list[IncidentEnvelope]) -> None:
+    async def write(self, batch: list[EventEnvelope]) -> None:
         # The body is gravado antes de qualquer interpretação: the lake write
         # never depends on translation succeeding.
         self._write_lake(batch)
@@ -157,10 +157,10 @@ class BatchWriter:
             self._ch.execute(_CLICKHOUSE_INSERT_MONITOR, monitor_rows)
             logger.info("clickhouse: inserted %d bronze_monitor rows", len(monitor_rows))
 
-    def _write_lake(self, batch: list[IncidentEnvelope]) -> None:
+    def _write_lake(self, batch: list[EventEnvelope]) -> None:
         # Grouped by (tenant, intake, source, date de recepção) — reprocessar é
         # sempre "reler o que chegou entre tal e tal dia".
-        groups: dict[str, list[IncidentEnvelope]] = {}
+        groups: dict[str, list[EventEnvelope]] = {}
         for envelope in batch:
             groups.setdefault(_lake_prefix(envelope), []).append(envelope)
 

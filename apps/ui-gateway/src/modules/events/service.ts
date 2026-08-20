@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type IncidentEnvelope, incidentEnvelopeSchema } from './schema.ts';
+import { type EventEnvelope, eventEnvelopeSchema } from './schema.ts';
 import type { OriginCredential } from './sources/registry.ts';
 
 /**
@@ -12,8 +12,8 @@ import type { OriginCredential } from './sources/registry.ts';
 export function buildEnvelope(
   credential: OriginCredential,
   body: Record<string, unknown>,
-): IncidentEnvelope {
-  return incidentEnvelopeSchema.parse({
+): EventEnvelope {
+  return eventEnvelopeSchema.parse({
     event_id: randomUUID(),
     tenant_id: credential.tenantId,
     source: credential.source,

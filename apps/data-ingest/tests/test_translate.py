@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from dictionaries import DictionaryRegistry
-from models import BronzeAlertEvent, IncidentEnvelope
+from models import BronzeAlertEvent, EventEnvelope
 from translate import UnknownSourceError, translate
 
 
@@ -26,7 +26,7 @@ def dictionaries(tmp_path):
     return DictionaryRegistry(tmp_path)
 
 
-def _envelope(**overrides) -> IncidentEnvelope:
+def _envelope(**overrides) -> EventEnvelope:
     body = {
         "ticket_number": "INC0012345",
         "opened_at": "2025-12-31 23:45:18",
@@ -44,7 +44,7 @@ def _envelope(**overrides) -> IncidentEnvelope:
         "payload": json.dumps(body),
     }
     fields.update(overrides)
-    return IncidentEnvelope.model_validate(fields)
+    return EventEnvelope.model_validate(fields)
 
 
 def test_translates_a_known_source_into_a_bronze_alert_event(dictionaries):

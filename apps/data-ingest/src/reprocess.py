@@ -18,7 +18,7 @@ import pyarrow.parquet as pq
 
 import metrics
 from dictionaries import DictionaryRegistry
-from models import BronzeAlertEvent, IncidentEnvelope
+from models import BronzeAlertEvent, EventEnvelope
 from settings import Settings
 from translate import UnknownSourceError
 from translate import translate as translate_envelope
@@ -58,10 +58,10 @@ def _list_objects(s3, bucket: str, prefix: str) -> list[str]:
     return keys
 
 
-def _read_envelopes(s3, bucket: str, key: str) -> list[IncidentEnvelope]:
+def _read_envelopes(s3, bucket: str, key: str) -> list[EventEnvelope]:
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     table = pq.read_table(io.BytesIO(body))
-    return [IncidentEnvelope.model_validate(row) for row in table.to_pylist()]
+    return [EventEnvelope.model_validate(row) for row in table.to_pylist()]
 
 
 def reprocess(

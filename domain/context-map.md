@@ -43,11 +43,11 @@ Especificado em [`acl/itsm.md`](./acl/itsm.md).
 
 A Integração publica events num formato versionado e público, e quem consome se conforma a
 ele. Um contrato por intake — [`contracts/incident-alert.schema.json`](../contracts/incident-alert.schema.json)
-e [`contracts/incident-monitor.schema.json`](../contracts/incident-monitor.schema.json) —
+e [`contracts/condition-monitor.schema.json`](../contracts/condition-monitor.schema.json) —
 porque as duas naturezas de origem não têm o mesmo formato (ver
-[intake](./ubiquitous-language.md#intake)). O envelope cru que antecede a tradução é
-[`contracts/incident-envelope.schema.json`](../contracts/incident-envelope.schema.json) —
-a ACL ainda é quem o lê, mesmo rodando no processo que também grava o Acervo (ver
+[intake](./ubiquitous-language.md#intake)). O envelope cru que antecede a tradução, agnóstico
+de natureza, é [`contracts/event-envelope.schema.json`](../contracts/event-envelope.schema.json)
+— a ACL ainda é quem o lê, mesmo rodando no processo que também grava o Acervo (ver
 [`acl/itsm.md`](./acl/itsm.md#onde-a-tradução-acontece)).
 
 O upstream aqui é o **fornecedor**: mudar o formato quebra todo mundo a jusante, e por isso

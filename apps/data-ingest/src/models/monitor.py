@@ -7,7 +7,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class BronzeMonitorEvent(BaseModel):
-    """Mirrors contracts/incident-monitor.schema.json — an observed condition,
+    """Mirrors contracts/condition-monitor.schema.json — an observed condition,
     no owner, no acknowledgment, no deadline."""
 
     model_config = ConfigDict(extra="forbid")

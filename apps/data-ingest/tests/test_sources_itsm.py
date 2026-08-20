@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from dictionaries import Dictionary
-from models import IncidentEnvelope
+from models import EventEnvelope
 from sources.itsm import translate_alert
 
 DICTIONARY = Dictionary(
@@ -34,8 +34,8 @@ BODY = {
 }
 
 
-def _envelope() -> IncidentEnvelope:
-    return IncidentEnvelope.model_validate(
+def _envelope() -> EventEnvelope:
+    return EventEnvelope.model_validate(
         {
             "event_id": str(uuid4()),
             "tenant_id": "locaweb",

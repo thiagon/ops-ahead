@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "incident-monitor/v1",
-  "title": "IncidentMonitorEvent",
+  "$id": "condition-monitor/v1",
+  "title": "ConditionMonitorEvent",
   "description": "Translated event for the monitor intake — an observed condition on an entity, with no owner, no acknowledgment, and no deadline: the origin observes, it doesn't manage work. Published on the translated topic. See domain/ubiquitous-language.md#condition and docs/insights/fluxo-do-incidente.md.",
   "type": "object",
   "required": [

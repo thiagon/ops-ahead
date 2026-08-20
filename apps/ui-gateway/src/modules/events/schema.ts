@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 /**
- * Output contract — mirrors contracts/incident-envelope.schema.json (draft-07).
+ * Output contract — mirrors contracts/event-envelope.schema.json (draft-07).
  * The gateway authenticates and envelopes; it never interprets the body. The
  * origin's payload is preserved verbatim, opaque, as a JSON string — nothing
  * inside it is typed here (domain/acl/itsm.md#onde-a-tradução-acontece).
  */
-export const incidentEnvelopeSchema = z
+export const eventEnvelopeSchema = z
   .object({
     event_id: z.uuid().meta({ description: 'Identity of the event, minted by the gateway' }),
     tenant_id: z
@@ -25,9 +25,9 @@ export const incidentEnvelopeSchema = z
     payload: z.string().meta({ description: "The origin's body, verbatim, as a JSON string" }),
   })
   .strict()
-  .meta({ id: 'IncidentEnvelope', description: 'The raw envelope published to the bus' });
+  .meta({ id: 'EventEnvelope', description: 'The raw envelope published to the bus' });
 
-export type IncidentEnvelope = z.infer<typeof incidentEnvelopeSchema>;
+export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
 
 /** The body a webhook route accepts: any JSON object, kept opaque. */
 export const webhookBodySchema = z.record(z.string(), z.unknown()).meta({

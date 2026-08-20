@@ -21,7 +21,7 @@ apps/                        # one folder per image you build; chart/ overlay co
   data-runner/                # deployment (ns: data) — dbt-clickhouse marts + Great Expectations, consumes trigger.data
   ml-trainer/                 # deployment (ns: ml) — volume/breach training, consumes trigger.ml
   ui-orchestrator/            # deployment (ns: ui) — REST/MCP intake → Kafka (trigger.ml/trigger.data)
-contracts/                   # shared JSON Schemas (incident-envelope/-alert/-monitor, translation-dictionary, trigger-*.schema.json)
+contracts/                   # shared JSON Schemas (event-envelope, incident-alert, condition-monitor, translation-dictionary, trigger-*.schema.json)
 domain/                      # domain specs (SDD): language, contexts, ACLs
 scripts/                     # local utilities, never go to K8s
   prepare_dataset.py         # Excel → CSV pipeline

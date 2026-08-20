@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from dictionaries import Dictionary, DictionaryRegistry
-from models import BronzeAlertEvent, BronzeMonitorEvent, IncidentEnvelope
+from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
 from sources.itsm import translate_alert
 
 #: One adapter per (source, intake) — adding an origin is adding an entry
@@ -17,7 +17,7 @@ class UnknownSourceError(Exception):
 
 
 def translate(
-    envelope: IncidentEnvelope,
+    envelope: EventEnvelope,
     dictionaries: DictionaryRegistry,
     dictionary: Dictionary | None = None,
 ) -> BronzeAlertEvent | BronzeMonitorEvent:

@@ -7,7 +7,7 @@ from faststream.kafka import KafkaBroker
 
 import metrics
 from buffer import BatchBuffer
-from models import IncidentEnvelope
+from models import EventEnvelope
 from settings import Settings
 from writer import BatchWriter
 
@@ -20,7 +20,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     app = FastStream(broker)
     writer = BatchWriter(settings, publisher=broker)
 
-    async def _flush(batch: list[IncidentEnvelope]) -> None:
+    async def _flush(batch: list[EventEnvelope]) -> None:
         t0 = time.perf_counter()
         await writer.write(batch)
         metrics.batch_latency.observe(time.perf_counter() - t0)
@@ -37,12 +37,12 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     # (docs/insights/fluxo-do-incidente.md — translation lives inside
     # data-ingest, not a separate app).
     @broker.subscriber(settings.kafka_topic_raw_alert, group_id=settings.kafka_group_id)
-    async def handle_alert(msg: IncidentEnvelope) -> None:
+    async def handle_alert(msg: EventEnvelope) -> None:
         metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
         await buffer.add(msg)
 
     @broker.subscriber(settings.kafka_topic_raw_monitor, group_id=settings.kafka_group_id)
-    async def handle_monitor(msg: IncidentEnvelope) -> None:
+    async def handle_monitor(msg: EventEnvelope) -> None:
         metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
         await buffer.add(msg)
 

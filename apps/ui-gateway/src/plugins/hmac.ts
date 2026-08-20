@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { FastifyError, FastifyInstance, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
-import type { OriginCredential } from '../modules/incidents/sources/registry.ts';
+import type { OriginCredential } from '../modules/events/sources/registry.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';

@@ -33,7 +33,7 @@
         "alert",
         "monitor"
       ],
-      "description": "Which translated contract the mapped fields feed — incident-alert.schema.json or incident-monitor.schema.json."
+      "description": "Which translated contract the mapped fields feed — incident-alert.schema.json or condition-monitor.schema.json."
     },
     "dictionary_version": {
       "type": "string",

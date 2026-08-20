@@ -5,11 +5,11 @@ from uuid import uuid4
 import pytest
 
 from buffer import BatchBuffer
-from models import IncidentEnvelope
+from models import EventEnvelope
 
 
-def _envelope() -> IncidentEnvelope:
-    return IncidentEnvelope.model_validate(
+def _envelope() -> EventEnvelope:
+    return EventEnvelope.model_validate(
         {
             "event_id": str(uuid4()),
             "tenant_id": "locaweb",

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "incident-envelope/v1",
-  "title": "IncidentEnvelope",
+  "$id": "event-envelope/v1",
+  "title": "EventEnvelope",
   "description": "Raw envelope published by the gateway right after authentication, before any interpretation — one per received event, append-only. The payload is opaque; everything outside it is the minimum needed to authenticate, partition, and reprocess. Consumed by the translation stage, never by a business consumer. See domain/acl/itsm.md and docs/insights/fluxo-do-incidente.md.",
   "type": "object",
   "required": [

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from dictionaries import Dictionary
-from models import BronzeAlertEvent, IncidentEnvelope
+from models import BronzeAlertEvent, EventEnvelope
 from time_utils import normalize_to_utc
 
 #: ITSM's own field names, as scripts/incident_producer.py posts them
@@ -27,7 +27,7 @@ def _opt_datetime(value: Any):
     return normalize_to_utc(text) if text else None
 
 
-def translate_alert(envelope: IncidentEnvelope, dictionary: Dictionary, body: dict[str, Any]) -> BronzeAlertEvent:
+def translate_alert(envelope: EventEnvelope, dictionary: Dictionary, body: dict[str, Any]) -> BronzeAlertEvent:
     """ITSM's ACL adapter: raw field names, translated dictionary values, no
     derivation — one event in, one bronze row out."""
     raw_status = body.get(_ORIGIN_STATUS_FIELD)

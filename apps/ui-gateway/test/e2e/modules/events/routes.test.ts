@@ -105,7 +105,7 @@ describe('POST /webhook/v1/locaweb/itsm', () => {
   it('documents the envelope published to the bus', async () => {
     const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
 
-    expect(doc.components.schemas.IncidentEnvelope.properties.payload).toBeDefined();
-    expect(doc.components.schemas.IncidentEnvelope.properties.tenant_id).toBeDefined();
+    expect(doc.components.schemas.EventEnvelope.properties.payload).toBeDefined();
+    expect(doc.components.schemas.EventEnvelope.properties.tenant_id).toBeDefined();
   });
 });

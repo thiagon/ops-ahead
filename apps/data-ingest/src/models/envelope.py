@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
-class IncidentEnvelope(BaseModel):
-    """Mirrors contracts/incident-envelope.schema.json. The payload is opaque —
+class EventEnvelope(BaseModel):
+    """Mirrors contracts/event-envelope.schema.json. The payload is opaque —
     nothing inside it is typed here; translation reads it per source."""
 
     model_config = ConfigDict(extra="forbid")
