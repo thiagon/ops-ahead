@@ -45,7 +45,7 @@ def fetch_eligible_incidents(settings: Settings) -> pd.DataFrame:
 def fetch_p4_sequences(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
     columns = ", ".join(P4_SEQUENCES_COLUMNS)
-    rows = client.execute(f"select {columns} from p4_sequences_by_ci order by entity_id, sequence_start")
+    rows = client.execute(f"select {columns} from no_intervention_sequences_by_ci order by entity_id, sequence_start")
     return pd.DataFrame(rows, columns=P4_SEQUENCES_COLUMNS)
 
 

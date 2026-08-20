@@ -26,7 +26,7 @@ models:
       - name: incidents_open
         tests: [not_null]
 
-  - name: p4_sequences_by_ci
+  - name: no_intervention_sequences_by_ci
     columns:
       - name: entity_id
         tests: [not_null]

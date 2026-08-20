@@ -7,17 +7,21 @@
     )
 }}
 
--- Consecutive P4 sequences per IC (islands-and-gaps via row_number diff),
--- over silver_alert — one row per occurrence, not per event.
-with p4 as (
+-- Consecutive resolution_code = 'no_intervention' sequences per IC
+-- (islands-and-gaps via row_number diff), over silver_alert — one row per
+-- occurrence, not per event. This is the predictive signal
+-- docs/context/kickoff-challenge-locaweb.md §4 describes ("Gatilhamento
+-- Preditivo": repeated auto-resolved failures on a CI ahead of a P2 drop) —
+-- resolution_code, not severity, which is an unrelated passthrough.
+with no_intervention as (
     select
         entity_id,
         external_id,
         opened_at,
         row_number() over (partition by entity_id order by opened_at) as rn_all,
-        row_number() over (partition by entity_id order by opened_at) as rn_p4
+        row_number() over (partition by entity_id order by opened_at) as rn_ni
     from {{ ref('silver_alert') }}
-    where severity = 4 and entity_id is not null and entity_id != ''
+    where resolution_code = 'no_intervention' and entity_id is not null and entity_id != ''
 ),
 
 sequenced as (
@@ -25,9 +29,9 @@ sequenced as (
         entity_id,
         external_id,
         opened_at,
-        rn_p4,
-        rn_all - rn_p4 as sequence_group
-    from p4
+        rn_ni,
+        rn_all - rn_ni as sequence_group
+    from no_intervention
 )
 
 select

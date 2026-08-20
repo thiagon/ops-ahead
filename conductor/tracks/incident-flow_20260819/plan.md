@@ -186,6 +186,22 @@ reconstrução — o detector de evento externo migra inteiro para `gold_monitor
 (Fase 4); `ml-trainer.volume`, que lia a versão `alert`, fica quebrado até a Fase 7 (`7.6: Modelo de
 volume revisto`) decidir sua nova fonte.
 
+`p4_sequences_by_ci` reconstruída sobre `silver_alert` (5.7 abaixo) manteve o filtro `severity = 4`
+da mart antiga sem questionar — descoberto ao revisar contra
+`docs/context/kickoff-challenge-locaweb.md` §4 ("Gatilhamento Preditivo") que o sinal preditivo real
+é sequência de `resolution_code = no_intervention`, campo que `silver_alert` já define com esse
+sentido; `severity` é só passthrough, sem relação com o sinal. Corrigida e renomeada para
+`no_intervention_sequences_by_ci`. `gold_alert_daily_features` (7.9) teve o mesmo problema por trás:
+`in_kpi`/`breached`/`breach_rate` num grão sem `severity` misturava severidades com meta diferente
+numa razão só. A meta em si acabou virando trabalho desta fase (5.9/5.10 abaixo) — não é config que
+cabe fora desta track, como cheguei a registrar antes: `docs/context/data-dictionary.md` §"Metas
+Anuais de KPI" tem a banda real (anual, por severity 2 e 3, com % de atingimento), diferente do
+resumo do kickoff; ver spec.md, seção Gold da cadeia `alert`, e Technical Notes sobre a divergência.
+
+Faltando implementar ainda: 5.9-5.12 abaixo, descobertas ao conferir a gold inteira contra o
+enunciado oficial do desafio (categoria/produto sobrevivem no bronze dentro de `labels`, mas nenhuma
+gold lia — o desafio pede tendência agrupada por categoria/produto explicitamente).
+
 ### Tasks
 
 - [x] 5.1: Consolidação de quebra por ocorrência fechada — duração, se estourou e por quanto
@@ -194,10 +210,18 @@ volume revisto`) decidir sua nova fonte.
 - [x] 5.4: Carga por grupo e janela, contando o que está vivo
 - [x] 5.5: Histórico de mudança de gravidade
 - [x] 5.6: Contagem de incidentes por entity e janela, sobre `silver_alert` (`incidents_by_ic`)
-- [x] 5.7: Sequências de severidade 4 consecutivas por entity, sobre `silver_alert`
-      (`p4_sequences_by_ci`)
+- [x] 5.7: Sequências consecutivas de `resolution_code = no_intervention` por entity, sobre
+      `silver_alert` (`no_intervention_sequences_by_ci`, renomeada de `p4_sequences_by_ci`)
 - [x] 5.8: Testes de cada mart e das regras derivadas; remover `daily_anomaly_features` (cadeia
       `alert`) e `stg_incidents`, órfãos após o corte
+- [x] 5.9: `tenant_kpi_targets` (seed) — banda de atingimento anual por tenant e severity, mesmo
+      padrão de `tenant_deadlines`
+- [x] 5.10: `gold_alert_kpi_achievement` — quebras acumuladas no ano contra a banda, só severity
+      elegível
+- [x] 5.11: `gold_alert_category_trends` — volume diário por categoria e produto, extraídos de
+      `labels`
+- [x] 5.12: `gold_alert_category_entity_breakdown` — cruzamento categoria × produto × entity ×
+      severity, sem colapsar dimensão, insumo de clusterização
 
 ### Verification
 
@@ -237,16 +261,43 @@ A peça que reage à passagem do tempo, não a evento de origem.
 
 A unidade de exemplo muda: deixa de ser uma ocorrência e passa a ser (ocorrência × marco).
 
+`daily_anomaly_features` (cadeia `alert`) não tinha task própria de reconstrução — descoberto ao
+começar esta fase que `ml-trainer.volume` ficou sem fonte desde a Fase 5 (a versão que sobreviveu,
+`gold_monitor_daily_features`, é sinal do `monitor` para o detector de evento externo, não série de
+incidentes para previsão de volume). Decisão do usuário, 2026-08-20: reconstruir como
+`gold_alert_daily_features`, sobre `silver_alert`, mesma forma da antiga.
+
+Fase inteira detalhada em spec.md, seção "Treino revisto", depois de conferir contra o `ml-trainer`
+real (`apps/ml-trainer/src/breach|volume|external_event/`) e `docs/insights/fluxo-do-incidente.md` —
+que já tinha, sem eu ter lido antes de configurar a Fase 6, a análise do teto de abandono (10× o
+OLA). Decisões do usuário, 2026-08-20, todas em spec.md: rótulo é `has_breached` (não
+`kpi_breached` — apuração é julgamento de negócio não documentado pela Locaweb, não fato técnico);
+teto de abandono 10.0 (corrige também `abandoned_ratio` do acompanhador de prazo, Fase 6, que estava
+em 3.0 sem base); ruído de duração ínfima cortado por percentil 1 com piso de 60s. `group_load_1h`
+não dá mais pra ler de `group_load_by_window` (virou snapshot do "agora" na Fase 5) — recalculada
+ponto-no-tempo na própria montagem do dataset (7.1). `external_event` também ficou sem fonte e não
+tinha task — 7.10, abaixo.
+
 ### Tasks
 
-- [ ] 7.1: Conjunto de treino montado a partir do bronze, com o que se sabia em cada marco
+- [ ] 7.1: Conjunto de treino montado a partir do bronze, com o que se sabia em cada marco —
+      `silver_alert_as_of(cutoff=marco.occurred_at)`, `group_load` ponto-no-tempo calculado aqui
 - [ ] 7.2: Features de contexto vindas do gold da cadeia `monitor`, por entity
 - [ ] 7.3: Features de prazo — consumo, tempo restante, se houve reconhecimento
-- [ ] 7.4: Rótulo derivado, não recebido; decidir e registrar o teto que separa estouro de abandono
+- [ ] 7.4: Rótulo `has_breached`; exclusões do treino — `is_eligible`, abandono (≥10×), ruído de
+      duração (percentil 1, piso 60s)
 - [ ] 7.5: Modelo de risco retreinado sobre a nova unidade, com o desbalanceamento reavaliado
-- [ ] 7.6: Modelo de volume revisto — série de ocorrências que exigem trabalho separada do ruído
-- [ ] 7.7: Serving atualizado para o novo conjunto de features
+- [ ] 7.6: Modelo de volume revisto, sobre `gold_alert_daily_features` — série de ocorrências que
+      exigem trabalho separada do ruído
+- [ ] 7.7: Serving atualizado para o novo conjunto de features (trainer e `ml-model-serving` juntos —
+      `schemas.py` espelha `FEATURE_COLUMNS` com `extra="forbid"`)
 - [ ] 7.8: Testes das features novas e da montagem por marco
+- [x] 7.9: Reconstruir `daily_anomaly_features` (cadeia `alert`) como `gold_alert_daily_features`,
+      fonte de 7.6 — desenho revisto na Fase 5 (sem `in_kpi`/`breached`/`breach_rate`, `p1_count` a
+      `p5_count`)
+- [ ] 7.10: `external_event` revisto sobre `gold_monitor_daily_features` (cadeia `monitor`), fonte
+      nova decidida nas Fases 4/5 mas sem task até agora
+- [ ] 7.11: Corrigir `abandoned_ratio` de `apps/data-deadline-tracker` de 3.0 para 10.0
 
 ### Verification
 

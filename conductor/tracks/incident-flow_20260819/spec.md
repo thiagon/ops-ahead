@@ -352,10 +352,156 @@ Agregações por `entity`, consumidas pelos modelos e pelo contexto da análise,
 | Agregação | Conteúdo |
 |-----------|----------|
 | quebras consolidadas | por ocorrência fechada: duração, se estourou, por quanto |
-| estado mensal do indicador | realizado no período e o que está em risco agora |
+| estado mensal do indicador | realizado no período e o que está em risco agora, honesto por severity — não avalia meta, só conta (a meta é a linha de baixo) |
+| atingimento anual do KPI | quebras acumuladas no ano contra a banda de % de atingimento da severidade, por tenant |
 | tempo no primeiro atendimento | quanto ficou no grupo que recebeu primeiro, contra o prazo |
 | carga por grupo | quantas ocorrências vivas por `owner` e janela |
 | histórico de severidade | transições, para auditoria e para o conjunto de treino |
+| tendência por categoria/produto | volume diário por categoria e produto — o desafio pede tendência "agrupada por categoria, produto ou item de configuração"; item de configuração já é `entity_id` em todo o resto desta seção |
+| cruzamento categoria/produto/entity/severity | mesma coisa, sem colapsar nenhuma dimensão — insumo de clusterização e causa recorrente, não leitura direta |
+| sequências de sem-intervenção por entity | falhas consecutivas com `resolution_code = no_intervention` na mesma entity — o sinal preditivo de queda iminente que o kickoff da Locaweb descreve (§4, "Gatilhamento Preditivo"), nunca severity isolada |
+| features diárias | volume e composição por severidade — insumo do modelo de volume, não produto de tela; a cadeia `monitor` tem a sua própria (linha acima), para o detector de evento externo — as duas não se misturam |
+
+`gold_alert_daily_features`, uma linha por `date` × `source`:
+
+| Campo | Como sai |
+|-------|----------|
+| `date` | `toDate(opened_at)` |
+| `source` | do bronze |
+| `total_incidents` | contagem de ocorrências abertas no dia |
+| `p1_count` … `p5_count` | contagem por severidade, as cinco — volume é sobre o que exige trabalho, não só o que entra no indicador |
+| `p1_share` | fração severidade 1 sobre o total |
+| `critical_share` | fração severidade 1–2 sobre o total |
+| `unique_entities` | entities distintas no dia |
+| `incidents_per_entity` | `total_incidents / unique_entities` |
+| `standalone_count` / `standalone_share` | sem `parent_id` — contagem e fração |
+| `manual_open_share` | fração `reported_by = manual` |
+| `no_intervention_share` | fração `resolution_code = no_intervention` |
+| `avg_opened_hour` | hora média de abertura, calculada aqui — não é campo recebido nem armazenado |
+| `avg_duration_seconds` / `median_duration_seconds` / `p95_duration_seconds` | estatísticas de `duration_seconds` no dia |
+
+Deliberadamente **sem** `in_kpi`/`breached`/`breach_rate`: neste grão (`date` × `source`, sem
+`severity`) essa fração misturaria severidades com meta diferente numa razão só que não corresponde
+a nenhuma meta real — `kpi_monthly_state`, que já agrupa por `severity`, é o lugar correto para essa
+leitura, e a leitura contra a meta em si é `gold_alert_kpi_achievement`, abaixo.
+
+### A meta do KPI é configuração por tenant
+
+`docs/context/data-dictionary.md` §"Metas Anuais de KPI" é quem se declara autoridade sobre o
+significado do dado (linha 6: "É a autoridade sobre o que cada dado significa") — é essa tabela que
+vale, não o resumo da ata do kickoff (`docs/context/kickoff-challenge-locaweb.md` §3, que fala em
+"teto mensal combinado P1+P2", uma estrutura diferente). A meta real é **anual, cumulativa,
+avaliada mês a mês contra o total do ano até ali**, em banda de percentual de atingimento — mas só
+existe, documentada, para severity 2 e 3.
+
+**Severity 1 não é avaliada sozinha — entra somada com severity 2.** O kickoff nunca fala de P1
+isolado, sempre "P1+P2": a mesma meta serve para as duas juntas, não uma meta por severity. E a
+banda de 100% de severity 2 sozinha (36-39 quebras/ano) dividida por 12 dá ~3/mês — exatamente o
+"Máximo 3 (P1+P2)" do kickoff. As duas coisas batem: P1+P2 combinados são avaliados contra a mesma
+banda que hoje só está documentada em nome de severity 2, e severity 3 é avaliada separada, com
+banda própria. Decisão do usuário, 2026-08-20: `tenant_kpi_targets` é indexada por um agrupamento
+(`kpi_group`), não por `severity` sozinha — `p1_p2` (severity 1 e 2 somadas) e `p3` (severity 3
+sozinha) — não uma linha de banda por severity individual.
+
+`tenant_kpi_targets` (seed, mesmo padrão de `tenant_deadlines`): cada linha é uma faixa da banda.
+
+| Campo | Como sai |
+|-------|----------|
+| `tenant_id` | — |
+| `kpi_group` | `p1_p2` ou `p3` — nunca `severity` sozinha, porque a meta de P1+P2 é combinada |
+| `max_breaches` | teto de quebras no ano para esta faixa alcançar `achievement_pct` |
+| `achievement_pct` | percentual de atingimento da faixa |
+
+Locaweb, extraído de `data-dictionary.md` (a banda de `p1_p2` é a que hoje está documentada só em
+nome de severity 2 — não há banda própria de severity 1 isolada, e o padrão "sempre P1+P2 junto" do
+kickoff é o que justifica reaproveitá-la para o grupo):
+
+| kpi_group | max_breaches | achievement_pct |
+|-----------|--------------|------------------|
+| p1_p2 | 30 | 150 |
+| p1_p2 | 35 | 125 |
+| p1_p2 | 39 | 100 |
+| p1_p2 | 45 | 75 |
+| p1_p2 | 53 | 50 |
+| p1_p2 | 999999 | 0 |
+| p3 | 200 | 150 |
+| p3 | 230 | 125 |
+| p3 | 263 | 100 |
+| p3 | 290 | 75 |
+| p3 | 320 | 50 |
+| p3 | 999999 | 0 |
+
+`999999` no lugar de um `max_breaches` nulo/infinito — mesma razão de `tenant_deadlines` nunca usar
+`NULL` para "sem limite": a faixa de 0% precisa de uma linha explícita e comparável, não um caso
+especial na consulta.
+
+`gold_alert_kpi_achievement`, uma linha por `tenant_id` × `year` × `month` × `kpi_group`
+(`severity in (1,2)` vira `p1_p2`, somadas; `severity = 3` vira `p3`; 4/5 seguem fora do KPI):
+
+| Campo | Como sai |
+|-------|----------|
+| `tenant_id` | — |
+| `year` | `toYear(opened_at)` |
+| `month` | `toStartOfMonth(opened_at)` |
+| `kpi_group` | `multiIf(severity in (1,2), 'p1_p2', severity = 3, 'p3', null)` |
+| `breached_in_month` | quebras daquele mês, somadas dentro do grupo, só entre os `is_eligible` — sem isso um incidente com `parent_id` preenchido ou `resolution_code = no_intervention` contaria pra meta que a regra do KPI diz que ele nem participa |
+| `breached_ytd` | soma cumulativa de `breached_in_month` no ano, até este mês — é contra ela que a banda é lida |
+| `achievement_pct` | faixa de `tenant_kpi_targets` cujo `max_breaches` é o menor que ainda cobre `breached_ytd`, pelo `kpi_group` |
+
+É esta mart, não `kpi_monthly_state`, que responde à user story do gestor ("quero ver a projeção de
+fechamento dos KPIs do mês") — a projeção só faz sentido contra a meta anual cumulativa, não contra
+um mês isolado.
+
+`no_intervention_sequences_by_ci`, uma linha por sequência consecutiva — mesma técnica de
+islands-and-gaps que a antiga `p4_sequences_by_ci` usava, mas o critério vem de `resolution_code`
+(campo que o domínio já define com esse sentido em `silver_alert`), não de `severity`, que é um
+passthrough sem relação com o sinal que o kickoff descreve:
+
+| Campo | Como sai |
+|-------|----------|
+| `entity_id` | do silver |
+| `sequence_group` | agrupador da sequência (islands-and-gaps), não tem sentido de negócio isolado |
+| `sequence_start` / `sequence_end` | `min`/`max(opened_at)` da sequência |
+| `sequence_length` | quantas ocorrências seguidas |
+| `first_incident` / `last_incident` | `external_id` do primeiro e do último da sequência |
+
+Filtro: `resolution_code = 'no_intervention'`, ordenado por `entity_id, opened_at`, mesma técnica de
+`row_number() - row_number()` particionado por `entity_id`.
+
+### Categoria e produto — presentes desde o bronze, sem gold até agora
+
+`category`/`product`/`subcategory` sobrevivem à tradução (`apps/data-ingest/src/sources/itsm.py`),
+mas vivem dentro de `labels` (mapa livre) — nenhuma gold lê `labels` hoje. O desafio pede
+explicitamente tendência "agrupada por categoria, produto ou item de configuração" e "quais
+produtos ou categorias exigem atenção", com P2 e P3 obrigatórias — sem extrair essas duas chaves de
+`labels`, essa parte do desafio não tem onde se apoiar.
+
+`gold_alert_category_trends` — leve, uma linha por `date` × `category` × `product`, para leitura
+direta de tendência:
+
+| Campo | Como sai |
+|-------|----------|
+| `date` | `toDate(opened_at)` |
+| `category` | `labels['category']`, `''` quando ausente — não filtrado, fica visível como categoria vazia |
+| `product` | `labels['product']`, mesma regra |
+| `total_incidents` | contagem no dia |
+| `p1_count` … `p5_count` | contagem por severidade — P2/P3 sempre presentes, nunca colapsados |
+| `avg_duration_seconds` | média de `duration_seconds` no dia |
+
+`gold_alert_category_entity_breakdown` — pesado, uma linha por `date` × `category` × `product` ×
+`entity_id` × `severity`, sem colapsar nenhuma dimensão — insumo de clusterização e causa
+recorrente (desafio: "classificação ou clusterização... agrupar causas recorrentes"), não produto
+de tela:
+
+| Campo | Como sai |
+|-------|----------|
+| `date` | `toDate(opened_at)` |
+| `category` / `product` | mesma extração de `labels` |
+| `entity_id` | do silver — o "item de configuração" |
+| `severity` | — |
+| `incident_count` | contagem da combinação no dia |
+| `breached` | `countIf(has_breached)` — seguro aqui porque `severity` já é grão, não mistura metas |
+| `avg_duration_seconds` | média de `duration_seconds` da combinação |
 
 ---
 
@@ -410,6 +556,107 @@ responsável e janela.
 A consulta do acompanhador é "abertas, ordenadas por `due_at`", e `due_at` não serve como chave
 primária: ele é reescrito a cada recategorização. Como o conjunto de ocorrências vivas é pequeno,
 isso se resolve com uma visão só dos abertos, sem forçar a ordenação da tabela inteira.
+
+---
+
+## Treino revisto
+
+O `ml-trainer` de hoje (`apps/ml-trainer/src/breach/`, `volume/`, `external_event/`) foi construído
+antes desta track, sobre os marts antigos. Esta seção documenta como cada um muda — não é aspiracional,
+é o que a Fase 7 constrói.
+
+### A unidade: (incidente × marco)
+
+Cada mensagem em `deadlines.milestone` (Fase 6) vira uma linha de treino. O estado do incidente
+naquele instante é reconstruído por `silver_alert_as_of(cutoff = marco.occurred_at)` — o macro que a
+Fase 3 já constrói para exatamente isso (`apps/data-runner/macros/silver_alert_as_of.sql`); nenhuma
+feature de treino lê `silver_alert`/`silver_alert_open` diretamente, porque essas tabelas guardam o
+estado **atual**, que vaza o desfecho.
+
+Um incidente que cruza três marcos gera três linhas, cada uma com o que se sabia até ali — não é o
+mesmo incidente contado três vezes, é três instantes de decisão diferentes.
+
+### Rótulo: `has_breached`, não `kpi_breached`
+
+Decisão do usuário, 2026-08-20: o rótulo passa a ser o fato técnico (`has_breached` no instante do
+marco), não a violação apurada da Locaweb. `docs/insights/fluxo-do-incidente.md` mede os dois —
+0,97% positivos pra apuração, 14,2% pra estouro bruto — e mostra que a apuração é **julgamento
+humano/de negócio calibrado pra fechar a aritmética da meta anual** (a mesma banda de
+`tenant_kpi_targets`), não uma regra técnica sobre o incidente: quanto mais um incidente estoura,
+menos chance de ser contado (33,3% contado entre 1×-1,5× o prazo, 1,6% acima de 50×) — o oposto do
+que se esperaria de uma regra de negócio simples. O critério exato nunca foi confirmado com a
+Locaweb (pendência já registrada em `fluxo-do-incidente.md`); treinar contra ele é treinar contra um
+processo não documentado.
+
+### Exclusões do conjunto de treino
+
+- **`is_eligible`** no instante do marco — severity 1-3, sem `parent_id`, `resolution_code` diferente
+  de `no_intervention`. Herdado de `silver_alert_as_of`, não recalculado.
+- **Abandono**: `consumed_ratio >= 10.0` — teto medido em `fluxo-do-incidente.md` (2.499 incidentes
+  históricos além de dez vezes o prazo, extremo em 2.044×), "que não são casos que a operação
+  poderia ter salvo". Mesmo valor do `abandoned_ratio` do acompanhador de prazo (Fase 6) — ver nota
+  abaixo, o valor de lá estava errado e este spec corrige os dois juntos.
+- **Ruído de rede**: `duration_seconds < noise_threshold`, onde `noise_threshold = greatest(60,
+  percentile(0.01)(duration_seconds))` sobre o histórico elegível — kickoff §5 ("incidentes de
+  duração ínfima, ex: 14 segundos, são ruído de rede"). Sem número exato documentado; decisão do
+  usuário, 2026-08-20: percentil 1 com piso de 60s, não um número fixo sozinho, pra se adaptar à
+  distribuição real sem cair abaixo de um mínimo defensável.
+
+### `abandoned_ratio` do acompanhador de prazo estava errado
+
+`apps/data-deadline-tracker/src/settings.py` usa `abandoned_ratio: float = 3.0` (Fase 6) — inventado
+sem checar `fluxo-do-incidente.md`, que já tinha a análise pronta. Corrige para **10.0**, mesmo valor
+usado para excluir abandono do treino acima. Ambos os lugares precisam do mesmo número: o
+acompanhador decide quando avisar que um incidente foi abandonado, o treino decide quando parar de
+tratar um incidente como recuperável — é o mesmo limiar, medido uma vez.
+
+### Features — o que sobrevive, o que muda de fonte, o que é novo
+
+Todas calculadas **no instante do marco**, nunca sobre o estado atual:
+
+| Feature hoje (`breach/features.py`) | O que muda |
+|--------------------------------------|------------|
+| `severity` | sobrevive — severity vigente no instante do marco |
+| `opened_hour`, `opened_dayofweek` | sobrevive — de `opened_at`, fixo por incidente |
+| `is_manual_open` | sobrevive — `reported_by = 'manual'` |
+| `assignment_group` | renomeia para `owner`, mesmo campo |
+| `p4_precursor_present`/`_length` | corrige a mesma confusão da Fase 5 — o sinal do kickoff é `resolution_code = no_intervention`, não severity 4; usa `no_intervention_sequences_by_ci` reconstruído até o instante do marco, não `severity = 4` |
+| `no_intervention_count_1h`/`_6h` | sobrevive na ideia, mas a contagem tem que ser reconstruída ponto-no-tempo (bucket anterior ao marco), não lida de `incidents_by_ic` (que é histórico completo, não point-in-time) |
+| `group_load_1h` | **não dá mais pra ler de `group_load_by_window`** — essa mart virou snapshot do "agora" na Fase 5 (5.4, "contando o que está vivo"), não série histórica. Recalculada dentro da própria montagem do dataset: quantos outros incidentes do mesmo `owner` estavam abertos (`opened_at <= marco.occurred_at` e ainda não fechados naquele instante), a partir do bronze |
+| `was_recategorized`/`recategorization_count` | sobrevive, mas passa a vir de `severity_changes` do `silver_alert_as_of(cutoff)` em vez de recontar `priority_changes_log` à mão — o macro já reconstrói isso corretamente pro instante |
+| `group_severity_historical_ola_ratio`/`_over_25pct_rate` | sobrevive na ideia (histórico expansivo, sem vazamento) — recalculada sobre incidentes anteriores ao marco, não ao "agora" |
+
+Novas, da Fase 3 (marco) e Fase 4 (gold `monitor`, por `entity` — task 7.2):
+
+| Feature | De onde |
+|---------|---------|
+| `consumed_ratio` | do próprio marco |
+| `time_remaining_seconds` | `due_at - occurred_at` do marco |
+| `was_acknowledged` | `acknowledged_at is not null` no instante do marco |
+| `entity_signal_count_15m`/`_1h` | `gold_monitor_signal_counts`, janela mais próxima anterior a `occurred_at` |
+| `entity_auto_resolution_rate` | `gold_monitor_auto_resolution_rate` |
+| `entity_severity_escalations` | `gold_monitor_severity_escalations`, acumulado até `occurred_at` |
+
+### Volume (`gold_alert_daily_features`, task 7.6)
+
+Fonte muda de `daily_anomaly_features` (removida na Fase 5) para `gold_alert_daily_features` —
+`total_incidents`/`p1_count`…`p5_count` no lugar de `total_incidents`/`p1_count`/`p2_count`/
+`p3_count`. Formato longo por `priority_group` (`total`/`p1`/`p2`/`p3`), lags, rolling, Fourier,
+feriado — mesmo desenho de hoje, D+1 e D+7 mantidos. `avg_opened_hour` sobrevive (já existe em
+`gold_alert_daily_features`).
+
+### Detector de evento externo (`external_event`) — sem task na Fase 7 até agora
+
+Descoberto ao escrever esta seção: `external_event/data.py` também lê a extinta
+`daily_anomaly_features`, e a Fase 4/5 já decidiu que esse detector migra inteiro para
+`gold_monitor_daily_features` (cadeia `monitor`) — mas nenhuma task da Fase 7 cobria atualizar o
+treino em si. Adicionada como 7.10.
+
+### Serving
+
+`apps/ml-model-serving/src/schemas.py` espelha `FEATURE_COLUMNS` campo a campo com
+`extra="forbid"` — qualquer mudança acima quebra o schema Pydantic de `/predict/breach` até ser
+atualizado. Task 7.7 cobre os dois lados juntos, não só o trainer.
 
 ## Technical Notes
 
@@ -476,6 +723,15 @@ passa a derivar a elegibilidade e o valor deixa de ser inócuo.
 **O simulador precisa emitir ciclo de vida.** Hoje ele publica o incidente já fechado, com duração
 preenchida — não existe "continua aberto" para reavaliar. O histórico tem os três instantes
 (abertura, resolução, encerramento) necessários para decompor.
+
+**A meta de erro do KPI não tem banda documentada por severity individual para P1.**
+`data-dictionary.md` §"Metas Anuais de KPI" só define banda de atingimento para P2 e P3 — nenhuma
+linha para P1 sozinha, e a estrutura ali (banda anual cumulativa de % de atingimento) diverge do
+resumo do kickoff ("teto mensal combinado P1+P2"). `tenant_kpi_targets` resolve isso combinando P1 e
+P2 num `kpi_group` só (`p1_p2`), avaliados contra a banda hoje documentada em nome de severity 2 —
+o kickoff nunca fala de P1 isolado, sempre "P1+P2", e a banda de 100% de P2 (36-39/ano) dividida por
+12 bate com o "Máximo 3" do kickoff. Aproximação declarada, não confirmada — terceira pergunta a
+levar para a Locaweb, mesma natureza da divergência do prazo de P4.
 
 ---
 

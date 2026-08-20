@@ -61,3 +61,59 @@ models:
         tests: [not_null]
       - name: overage_seconds
         tests: [not_null]
+
+  - name: gold_alert_daily_features
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: source
+        tests: [not_null]
+      - name: total_incidents
+        tests: [not_null]
+      - name: p1_share
+        tests: [not_null]
+      - name: no_intervention_share
+        tests: [not_null]
+
+  - name: gold_alert_kpi_achievement
+    columns:
+      - name: tenant_id
+        tests: [not_null]
+      - name: year
+        tests: [not_null]
+      - name: month
+        tests: [not_null]
+      - name: kpi_group
+        tests:
+          - not_null
+          - accepted_values:
+              values: [p1_p2, p3]
+      - name: breached_ytd
+        tests: [not_null]
+      - name: achievement_pct
+        tests: [not_null]
+
+  - name: gold_alert_category_trends
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: product
+        tests: [not_null]
+      - name: total_incidents
+        tests: [not_null]
+
+  - name: gold_alert_category_entity_breakdown
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: entity_id
+        tests: [not_null]
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: incident_count
+        tests: [not_null]
