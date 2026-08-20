@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Translated, published for every business consumer downstream.
     kafka_topic_alert: str = "events.alert"
     kafka_topic_monitor: str = "events.monitor"
-    kafka_group_id: str = "incidents-ingest"
+    kafka_group_id: str = "events-ingest"
 
     clickhouse_host: str = "localhost"
     clickhouse_port: int = 9000
