@@ -33,8 +33,14 @@ spec:
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
-            - name: KAFKA_TOPIC
-              value: {{ .Values.consumer.env.kafkaTopic | quote }}
+            - name: KAFKA_TOPIC_RAW_ALERT
+              value: {{ .Values.consumer.env.kafkaTopicRawAlert | quote }}
+            - name: KAFKA_TOPIC_RAW_MONITOR
+              value: {{ .Values.consumer.env.kafkaTopicRawMonitor | quote }}
+            - name: KAFKA_TOPIC_ALERT
+              value: {{ .Values.consumer.env.kafkaTopicAlert | quote }}
+            - name: KAFKA_TOPIC_MONITOR
+              value: {{ .Values.consumer.env.kafkaTopicMonitor | quote }}
             - name: KAFKA_GROUP_ID
               value: {{ .Values.consumer.env.kafkaGroupId | quote }}
             - name: CLICKHOUSE_HOST

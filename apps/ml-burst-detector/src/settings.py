@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
 
     kafka_bootstrap_servers: str = "localhost:9092"
-    kafka_topic: str = "incidents.received"
+    kafka_topic: str = "events.monitor"
     kafka_group_id: str = "burst-detector"
     alert_topic: str = "alerts.burst"
 

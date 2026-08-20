@@ -28,7 +28,7 @@ spec:
               kubernetes.io/metadata.name: ml
       ports:
         - port: 5000
-    # data: Kafka plain listener — the gateway publishes incidents.received
+    # data: Kafka plain listener — the gateway publishes to events.raw.*
     - to:
         - namespaceSelector:
             matchLabels:

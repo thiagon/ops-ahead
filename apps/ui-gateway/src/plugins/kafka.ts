@@ -3,6 +3,7 @@ import fp from 'fastify-plugin';
 import { Kafka, logLevel, type Producer } from 'kafkajs';
 
 export interface OutboundMessage {
+  topic: string;
   key: string;
   value: string;
 }
@@ -23,13 +24,16 @@ declare module 'fastify' {
 }
 
 /**
- * Wrap a kafkajs producer as the gateway's outbound port. The publisher owns
- * the connection state so a broker that was down when the app started — or
- * dropped mid-flight — is reconnected by the next publish instead of leaving a
- * stale producer behind. Callers see only publish, and a rejection means the
- * event did not reach the topic.
+ * Wrap a kafkajs producer as the gateway's outbound port. The topic is per
+ * message, not fixed at construction: the gateway publishes to a different
+ * raw topic per intake nature (domain/ubiquitous-language.md#intake), and one
+ * producer serves all of them. The publisher owns the connection state so a
+ * broker that was down when the app started — or dropped mid-flight — is
+ * reconnected by the next publish instead of leaving a stale producer behind.
+ * Callers see only publish, and a rejection means the event did not reach the
+ * topic.
  */
-export function createPublisher(producer: Producer, topic: string): ManagedPublisher {
+export function createPublisher(producer: Producer): ManagedPublisher {
   let connected = false;
 
   async function connect(): Promise<void> {
@@ -47,7 +51,7 @@ export function createPublisher(producer: Producer, topic: string): ManagedPubli
       await producer.disconnect();
     },
 
-    async publish({ key, value }) {
+    async publish({ topic, key, value }) {
       try {
         await connect();
         await producer.send({ topic, acks: -1, messages: [{ key, value }] });
@@ -73,7 +77,7 @@ async function kafkaPlugin(fastify: FastifyInstance) {
     logLevel: logLevel.WARN,
   });
 
-  const publisher = createPublisher(kafka.producer(), fastify.env.KAFKA_TOPIC);
+  const publisher = createPublisher(kafka.producer());
   fastify.decorate('kafka', publisher);
 
   fastify.addHook('onReady', async () => {

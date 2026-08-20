@@ -1,46 +1,111 @@
 import io
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC
+from typing import Protocol
 
 import boto3
 import pyarrow as pa
 import pyarrow.parquet as pq
 from clickhouse_driver import Client
 
-from models import IncidentEvent
+import metrics
+from dictionaries import DictionaryRegistry
+from models import BronzeAlertEvent, BronzeMonitorEvent, IncidentEnvelope
 from settings import Settings
+from translate import UnknownSourceError, translate
 
 logger = logging.getLogger(__name__)
 
-_CLICKHOUSE_INSERT = """
-    INSERT INTO incidents_received
-    (event_id, source, received_at, opened_at, severity, entity_id, status, opened_by, payload_raw)
+_CLICKHOUSE_INSERT_ALERT = """
+    INSERT INTO bronze_alert
+    (event_id, tenant_id, source, version, dictionary_version, received_at, external_id,
+     opened_at, acknowledged_at, resolved_at, closed_at, severity, status, entity_id, title,
+     description, owner, reported_by, parent_id, resolution_code, resolution_summary, labels,
+     source_url)
+    VALUES
+"""
+
+_CLICKHOUSE_INSERT_MONITOR = """
+    INSERT INTO bronze_monitor
+    (event_id, tenant_id, source, version, dictionary_version, received_at, external_id,
+     started_at, ended_at, severity, condition, entity_id, title, description, labels,
+     source_url)
     VALUES
 """
 
 
-def _clickhouse_row(evt: IncidentEvent) -> tuple:
+class Publisher(Protocol):
+    async def publish(self, message: str, topic: str) -> None: ...
+
+
+def _naive_utc(dt):
+    return dt.astimezone(UTC).replace(tzinfo=None) if dt is not None else None
+
+
+def _alert_row(evt: BronzeAlertEvent) -> tuple:
     return (
         str(evt.event_id),
+        evt.tenant_id,
         evt.source,
-        evt.received_at.astimezone(UTC).replace(tzinfo=None),
-        evt.opened_at.astimezone(UTC).replace(tzinfo=None),
+        evt.version,
+        evt.dictionary_version,
+        _naive_utc(evt.received_at),
+        evt.external_id,
+        _naive_utc(evt.opened_at),
+        _naive_utc(evt.acknowledged_at),
+        _naive_utc(evt.resolved_at),
+        _naive_utc(evt.closed_at),
         evt.severity,
-        evt.entity_id,
         evt.status,
-        evt.opened_by,
-        evt.payload_raw,
+        evt.entity_id or "",
+        evt.title,
+        evt.description or "",
+        evt.owner or "",
+        evt.reported_by or "",
+        evt.parent_id or "",
+        evt.resolution_code or "",
+        evt.resolution_summary or "",
+        evt.labels or {},
+        evt.source_url or "",
     )
 
 
-def _minio_key(evt: IncidentEvent) -> str:
-    date = evt.opened_at.astimezone(UTC).date()
-    return f"received/source={evt.source}/date={date}/"
+def _monitor_row(evt: BronzeMonitorEvent) -> tuple:
+    return (
+        str(evt.event_id),
+        evt.tenant_id,
+        evt.source,
+        evt.version,
+        evt.dictionary_version,
+        _naive_utc(evt.received_at),
+        evt.external_id,
+        _naive_utc(evt.started_at),
+        _naive_utc(evt.ended_at),
+        evt.severity,
+        evt.condition,
+        evt.entity_id,
+        evt.title or "",
+        evt.description or "",
+        evt.labels or {},
+        evt.source_url or "",
+    )
+
+
+def _lake_prefix(envelope: IncidentEnvelope) -> str:
+    date = envelope.received_at.astimezone(UTC).date()
+    return f"raw/tenant={envelope.tenant_id}/intake={envelope.intake}/source={envelope.source}/date={date}/"
 
 
 class BatchWriter:
-    def __init__(self, settings: Settings) -> None:
+    """One handler, sequential steps — no separate app for translation
+    (docs/insights/fluxo-do-incidente.md): the raw body is written to the lake
+    before any interpretation, then each envelope is translated and the bronze
+    row + the translated event are produced together."""
+
+    def __init__(self, settings: Settings, publisher: Publisher) -> None:
+        self._settings = settings
+        self._publisher = publisher
         self._ch = Client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_port,
@@ -55,31 +120,56 @@ class BatchWriter:
             aws_secret_access_key=settings.minio_secret_key,
         )
         self._bucket = settings.minio_bucket
+        self._dictionaries = DictionaryRegistry(settings.dictionaries_dir)
 
-    async def write(self, batch: list[IncidentEvent]) -> None:
-        self._write_clickhouse(batch)
-        self._write_parquet(batch)
+    async def write(self, batch: list[IncidentEnvelope]) -> None:
+        # The body is gravado antes de qualquer interpretação: the lake write
+        # never depends on translation succeeding.
+        self._write_lake(batch)
 
-    def _write_clickhouse(self, batch: list[IncidentEvent]) -> None:
-        rows = [_clickhouse_row(e) for e in batch]
-        self._ch.execute(_CLICKHOUSE_INSERT, rows)
-        logger.info("clickhouse: inserted %d rows", len(rows))
+        alert_rows: list[tuple] = []
+        monitor_rows: list[tuple] = []
+        for envelope in batch:
+            try:
+                bronze = translate(envelope, self._dictionaries)
+            except UnknownSourceError:
+                metrics.translation_failures.labels(source=envelope.source, intake=envelope.intake).inc()
+                logger.warning(
+                    "no adapter/dictionary for tenant=%s source=%s intake=%s — event kept in the "
+                    "lake, skipped for bronze",
+                    envelope.tenant_id,
+                    envelope.source,
+                    envelope.intake,
+                )
+                continue
 
-    def _write_parquet(self, batch: list[IncidentEvent]) -> None:
-        # group by (source, date) to produce one Parquet file per partition key
-        groups: dict[str, list[IncidentEvent]] = {}
-        for evt in batch:
-            key = _minio_key(evt)
-            groups.setdefault(key, []).append(evt)
+            if isinstance(bronze, BronzeAlertEvent):
+                alert_rows.append(_alert_row(bronze))
+                await self._publisher.publish(bronze.model_dump_json(), topic=self._settings.kafka_topic_alert)
+            else:
+                monitor_rows.append(_monitor_row(bronze))
+                await self._publisher.publish(bronze.model_dump_json(), topic=self._settings.kafka_topic_monitor)
 
-        for prefix, events in groups.items():
-            table = pa.Table.from_pylist(
-                [json.loads(e.model_dump_json()) for e in events]
-            )
+        if alert_rows:
+            self._ch.execute(_CLICKHOUSE_INSERT_ALERT, alert_rows)
+            logger.info("clickhouse: inserted %d bronze_alert rows", len(alert_rows))
+        if monitor_rows:
+            self._ch.execute(_CLICKHOUSE_INSERT_MONITOR, monitor_rows)
+            logger.info("clickhouse: inserted %d bronze_monitor rows", len(monitor_rows))
+
+    def _write_lake(self, batch: list[IncidentEnvelope]) -> None:
+        # Grouped by (tenant, intake, source, date de recepção) — reprocessar é
+        # sempre "reler o que chegou entre tal e tal dia".
+        groups: dict[str, list[IncidentEnvelope]] = {}
+        for envelope in batch:
+            groups.setdefault(_lake_prefix(envelope), []).append(envelope)
+
+        for prefix, envelopes in groups.items():
+            table = pa.Table.from_pylist([json.loads(e.model_dump_json()) for e in envelopes])
             buf = io.BytesIO()
             pq.write_table(table, buf)
             buf.seek(0)
-            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            ts = envelopes[0].received_at.astimezone(UTC).strftime("%Y%m%dT%H%M%S%fZ")
             object_key = f"{prefix}{ts}.parquet"
             self._s3.put_object(Bucket=self._bucket, Key=object_key, Body=buf)
-            logger.info("minio: wrote %s (%d events)", object_key, len(events))
+            logger.info("lake: wrote %s (%d events)", object_key, len(envelopes))

@@ -17,7 +17,7 @@ consumer:
       memory: 256Mi
   env:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
-    kafkaTopic: incidents.received
+    kafkaTopic: events.monitor
     kafkaGroupId: burst-detector
     alertTopic: alerts.burst
     redisHost: redis.ml.svc.cluster.local

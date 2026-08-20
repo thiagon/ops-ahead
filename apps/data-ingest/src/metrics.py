@@ -2,8 +2,14 @@ from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 events_consumed = Counter(
     "ingest_events_consumed_total",
-    "Total events consumed from Kafka",
-    ["source"],
+    "Total raw envelopes consumed from Kafka",
+    ["source", "intake"],
+)
+
+translation_failures = Counter(
+    "ingest_translation_failures_total",
+    "Raw envelopes with no adapter or dictionary — kept in the lake, skipped for bronze",
+    ["source", "intake"],
 )
 
 batch_size = Histogram(

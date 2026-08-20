@@ -42,7 +42,13 @@ Especificado em [`acl/itsm.md`](./acl/itsm.md).
 ### Integração → Acervo — Published Language
 
 A Integração publica events num formato versionado e público, e quem consome se conforma a
-ele. O contrato é [`contracts/incident-event.schema.json`](../contracts/incident-event.schema.json).
+ele. Um contrato por intake — [`contracts/incident-alert.schema.json`](../contracts/incident-alert.schema.json)
+e [`contracts/incident-monitor.schema.json`](../contracts/incident-monitor.schema.json) —
+porque as duas naturezas de origem não têm o mesmo formato (ver
+[intake](./ubiquitous-language.md#intake)). O envelope cru que antecede a tradução é
+[`contracts/incident-envelope.schema.json`](../contracts/incident-envelope.schema.json) —
+a ACL ainda é quem o lê, mesmo rodando no processo que também grava o Acervo (ver
+[`acl/itsm.md`](./acl/itsm.md#onde-a-tradução-acontece)).
 
 O upstream aqui é o **fornecedor**: mudar o formato quebra todo mundo a jusante, e por isso
 a mudança passa por versão do contrato, não por combinação entre dois times.
@@ -81,14 +87,15 @@ implicitamente pelo próprio acesso à rede da plataforma.
 
 Igual à Integração, é a única porta de entrada pra esse tipo de pedido — Predição e
 Acervo nunca são acionados sob demanda por nenhum outro caminho. Ao contrário da
-Integração, não fica no meio do fluxo pub/sub principal (`incidents.received` e o resto
-continuam fluindo sem passar por ela).
+Integração, não fica no meio do fluxo pub/sub principal (`incidents.raw.*`, `incidents.alert`/
+`incidents.monitor` e o resto continuam fluindo sem passar por ela).
 
 ## O que os pontos de integração carregam
 
 | Ponto | Entre | Carrega |
 |-------|-------|---------|
-| `incidents.received` | Integração → Acervo, Detecção | event normalizado, logo após a tradução |
+| `incidents.raw.alert` / `incidents.raw.monitor` | Integração → Integração (tradução) | envelope cru, corpo opaco — nenhum consumidor de negócio lê estes |
+| `incidents.alert` / `incidents.monitor` | Integração → Acervo, Detecção | event traduzido, um tópico por intake |
 | `incidents.scored` | Predição → Copiloto | event com risco de breach estimado |
 | `alerts.burst` | Detecção → Copiloto | rajada reconhecida numa entity |
 | `recommendations` | Copiloto → Integração | recomendação explicável, pronta para sair |
@@ -96,7 +103,8 @@ continuam fluindo sem passar por ela).
 | `trigger.ml` / `trigger.data` | execução sob demanda → Predição / Acervo | `analysis` + parâmetros de um pedido validado, um tópico por domínio |
 | `trigger.status` | Predição / Acervo → execução sob demanda | estado atual de um pedido (`run_id` como key, log compactado — só a última mensagem por run sobrevive) |
 
-Só `incidents.received` tem tráfego hoje entre os pontos pub/sub; `trigger.ml`/
-`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`.
-Os demais continuam reservados — declará-los cedo é o que permite implementar os
-contextos em qualquer ordem.
+`incidents.raw.*`, `incidents.alert` e `incidents.monitor` têm tráfego hoje entre os pontos
+pub/sub — substituem o antigo `incidents.received`, cortado sem alias na track
+`incident-flow_20260819`. `trigger.ml`/`trigger.data`/`trigger.status` têm tráfego real desde
+a track `exec-trigger_20260807`. Os demais continuam reservados — declará-los cedo é o que
+permite implementar os contextos em qualquer ordem.

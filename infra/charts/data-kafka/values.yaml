@@ -25,7 +25,28 @@ kafka:
       size: 5Gi
 
 kafkaTopics:
-  - name: incidents.received
+  # Raw, one per intake — only data-ingest reads these, translating into the
+  # topics below (docs/insights/fluxo-do-incidente.md). Retention only needs
+  # to outlive the consumer: the lake (MinIO Parquet) is what reprocessing
+  # reads, not this topic.
+  - name: events.raw.alert
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  - name: events.raw.monitor
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  # Translated — every business consumer downstream of translation reads
+  # these, never the raw topics above.
+  - name: events.alert
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  - name: events.monitor
     partitions: 12
     replicas: 2
     config:

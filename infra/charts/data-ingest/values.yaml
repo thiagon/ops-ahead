@@ -25,7 +25,10 @@ consumer:
       memory: 512Mi
   env:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
-    kafkaTopic: incidents.received
+    kafkaTopicRawAlert: events.raw.alert
+    kafkaTopicRawMonitor: events.raw.monitor
+    kafkaTopicAlert: events.alert
+    kafkaTopicMonitor: events.monitor
     kafkaGroupId: incidents-ingest
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead

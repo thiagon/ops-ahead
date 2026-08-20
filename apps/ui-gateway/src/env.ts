@@ -28,16 +28,26 @@ export const envSchema = z
       .pipe(z.array(z.url())),
 
     KAFKA_BOOTSTRAP_SERVERS: z.string().default('localhost:9092'),
-    KAFKA_TOPIC: z.string().default('incidents.received'),
+    // One raw topic per intake nature — never a single stream for both
+    // (domain/ubiquitous-language.md#intake).
+    KAFKA_TOPIC_RAW_ALERT: z.string().default('events.raw.alert'),
+    KAFKA_TOPIC_RAW_MONITOR: z.string().default('events.raw.monitor'),
 
     HMAC_ENABLED: z.stringbool().default(false),
-    HMAC_SECRET: z.string().default(''),
+    // Keyed by sources/registry.ts's hmacSecretEnv — one secret per (tenant,
+    // source) credential, never one global secret for every origin.
+    HMAC_SECRET_LOCAWEB_ITSM: z.string().default(''),
   })
-  // Dev runs the loop unsigned; the cluster flips the toggle on with a mounted
-  // secret. Turning it on without a secret would silently accept everything.
-  .refine(env => !env.HMAC_ENABLED || env.HMAC_SECRET.length > 0, {
-    path: ['HMAC_SECRET'],
-    message: 'HMAC_SECRET is required when HMAC_ENABLED is true',
+  // Dev runs the loop unsigned; the cluster flips the toggle on with mounted
+  // secrets. Turning it on without a secret would silently accept everything
+  // signed with the empty string.
+  .refine(env => !env.HMAC_ENABLED || env.HMAC_SECRET_LOCAWEB_ITSM.length > 0, {
+    path: ['HMAC_SECRET_LOCAWEB_ITSM'],
+    message: 'required when HMAC_ENABLED is true',
   });
 
 export type Env = z.infer<typeof envSchema>;
+
+export function rawTopicFor(env: Env, intake: 'alert' | 'monitor'): string {
+  return intake === 'alert' ? env.KAFKA_TOPIC_RAW_ALERT : env.KAFKA_TOPIC_RAW_MONITOR;
+}

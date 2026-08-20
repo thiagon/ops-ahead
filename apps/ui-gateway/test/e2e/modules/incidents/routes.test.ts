@@ -3,23 +3,25 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
+const ROUTE = '/webhook/v1/locaweb/itsm';
+
 // The broker is out of scope here: what matters is that an accepted event
-// reaches the publisher, and that a publisher failure becomes a 502.
+// reaches the publisher, on the right topic, and that a publisher failure
+// becomes a 502.
 const publish = vi.fn(async (_message: OutboundMessage) => undefined);
 
-// One row of assets/incidents.csv, as scripts/incident_producer.py posts it.
+// One row of assets/incidents.csv, as scripts/incident_producer.py posts it —
+// opaque from the gateway's point of view.
 const itsmEvent = {
   ticket_number: 'INC0012345',
-  source: 'itsm',
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
   status: 'Encerrado',
   opened_by: 'Monitoramento',
-  payload: { ticket_number: 'INC0012345', duration_seconds: '9120', kpi_breached: '1' },
 };
 
-describe('POST /webhook/incidents', () => {
+describe('POST /webhook/v1/locaweb/itsm', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -34,81 +36,76 @@ describe('POST /webhook/incidents', () => {
     publish.mockClear();
   });
 
-  it('accepts an ITSM event and answers with its event id', async () => {
-    const res = await app.inject({ method: 'POST', url: '/webhook/incidents', payload: itsmEvent });
+  it('accepts an ITSM event and answers with its event, tenant, and source ids', async () => {
+    const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(202);
     expect(res.json()).toEqual({
       event_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      tenant_id: 'locaweb',
       source: 'itsm',
     });
   });
 
-  it('publishes the normalized event keyed by its event id', async () => {
-    const res = await app.inject({ method: 'POST', url: '/webhook/incidents', payload: itsmEvent });
+  it('publishes the raw envelope, keyed by its event id, to the alert raw topic', async () => {
+    const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(publish).toHaveBeenCalledTimes(1);
     const message = publish.mock.calls[0]?.[0];
+    expect(message?.topic).toBe('events.raw.alert');
     expect(message?.key).toBe(res.json().event_id);
-    expect(JSON.parse(message?.value ?? '')).toMatchObject({
+    const envelope = JSON.parse(message?.value ?? '');
+    expect(envelope).toMatchObject({
       event_id: res.json().event_id,
+      tenant_id: 'locaweb',
       source: 'itsm',
-      opened_at: '2025-12-31T23:45:18.000Z',
-      severity: 2,
-      entity_id: 'srv-web-04',
-      status: 'closed',
+      intake: 'alert',
     });
+    expect(JSON.parse(envelope.payload)).toEqual(itsmEvent);
   });
 
   it('answers 502 when the event does not reach the bus', async () => {
     publish.mockRejectedValueOnce(new Error('broker down'));
 
-    const res = await app.inject({ method: 'POST', url: '/webhook/incidents', payload: itsmEvent });
+    const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(502);
     expect(res.json()).toMatchObject({ error: 'PublishFailed' });
   });
 
-  it('refuses a source no adapter claims', async () => {
+  it('answers 404 for a credential the gateway does not have', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
-      payload: { ...itsmEvent, source: 'datadog' },
+      url: '/webhook/v1/locaweb/datadog',
+      payload: itsmEvent,
     });
 
-    expect(res.statusCode).toBe(400);
-    expect(res.json().details).toContainEqual(expect.objectContaining({ path: 'source' }));
+    expect(res.statusCode).toBe(404);
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('reports which field broke the origin contract', async () => {
+  it('rejects a non-object body', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
-      payload: { ...itsmEvent, priority_code: 9 },
+      url: ROUTE,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify('not an object'),
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json().details).toContainEqual(expect.objectContaining({ path: 'priority_code' }));
     expect(publish).not.toHaveBeenCalled();
   });
 
   it('publishes the route in the openapi document', async () => {
     const res = await app.inject({ method: 'GET', url: '/docs/json' });
 
-    expect(res.json().paths['/webhook/incidents']).toBeDefined();
+    expect(res.json().paths[ROUTE]).toBeDefined();
   });
 
-  it('documents the body as one variant per source, under components', async () => {
+  it('documents the envelope published to the bus', async () => {
     const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
-    const body =
-      doc.paths['/webhook/incidents'].post.requestBody.content['application/json'].schema;
 
-    expect(body.$ref).toBe('#/components/schemas/IncidentWebhookInput');
-    expect(doc.components.schemas.IncidentWebhookInput.oneOf).toEqual([
-      { $ref: '#/components/schemas/ItsmWebhookInput' },
-    ]);
-    expect(doc.components.schemas.ItsmWebhookInput.properties.ticket_number).toBeDefined();
-    expect(doc.components.schemas.IncidentEvent.properties.payload_raw).toBeDefined();
+    expect(doc.components.schemas.IncidentEnvelope.properties.payload).toBeDefined();
+    expect(doc.components.schemas.IncidentEnvelope.properties.tenant_id).toBeDefined();
   });
 });

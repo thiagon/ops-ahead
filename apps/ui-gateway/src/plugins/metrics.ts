@@ -4,9 +4,9 @@ import { Counter, collectDefaultMetrics, Registry } from 'prom-client';
 
 export interface Metrics {
   registry: Registry;
-  eventsPublished: Counter<'source'>;
-  publishFailures: Counter<'source'>;
-  signatureFailures: Counter<'reason'>;
+  eventsPublished: Counter<'source' | 'intake'>;
+  publishFailures: Counter<'source' | 'intake'>;
+  signatureFailures: Counter<'reason' | 'tenant_id' | 'source'>;
 }
 
 declare module 'fastify' {
@@ -29,22 +29,22 @@ function createMetrics(): Metrics {
 
     eventsPublished: new Counter({
       name: 'gateway_events_published_total',
-      help: 'Incident events normalized and published to the bus',
-      labelNames: ['source'],
+      help: 'Incident envelopes published to the bus',
+      labelNames: ['source', 'intake'],
       registers: [registry],
     }),
 
     publishFailures: new Counter({
       name: 'gateway_publish_failures_total',
-      help: 'Incident events the gateway could not publish to the bus',
-      labelNames: ['source'],
+      help: 'Incident envelopes the gateway could not publish to the bus',
+      labelNames: ['source', 'intake'],
       registers: [registry],
     }),
 
     signatureFailures: new Counter({
       name: 'gateway_signature_failures_total',
       help: 'Requests rejected by HMAC signature verification',
-      labelNames: ['reason'],
+      labelNames: ['reason', 'tenant_id', 'source'],
       registers: [registry],
     }),
   };

@@ -5,17 +5,9 @@ import { checkSignature } from '../../../src/plugins/hmac.ts';
 import { createTestApp } from '../../helpers/app.ts';
 
 const SECRET = 'itsm-shared-secret';
+const ROUTE = '/webhook/v1/locaweb/itsm';
 
-const itsmEvent = {
-  ticket_number: 'INC0012345',
-  source: 'itsm',
-  opened_at: '2025-12-31 23:45:18',
-  priority_code: 2,
-  configuration_item: 'srv-web-04',
-  status: 'Encerrado',
-  opened_by: 'Monitoramento',
-  payload: { ticket_number: 'INC0012345' },
-};
+const itsmEvent = { ticket_number: 'INC0012345', priority_code: 2, status: 'Encerrado' };
 
 function sign(body: string, secret = SECRET): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
@@ -54,21 +46,21 @@ describe('signature verification enabled', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    process.env.HMAC_SECRET = SECRET;
+    process.env.HMAC_SECRET_LOCAWEB_ITSM = SECRET;
     app = await createTestApp();
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.HMAC_ENABLED;
-    delete process.env.HMAC_SECRET;
+    delete process.env.HMAC_SECRET_LOCAWEB_ITSM;
   });
 
   it('accepts a signed request', async () => {
     const body = JSON.stringify(itsmEvent);
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
+      url: ROUTE,
       headers: { 'content-type': 'application/json', 'x-signature': sign(body) },
       body,
     });
@@ -77,7 +69,7 @@ describe('signature verification enabled', () => {
   });
 
   it('refuses an unsigned request', async () => {
-    const res = await app.inject({ method: 'POST', url: '/webhook/incidents', payload: itsmEvent });
+    const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(401);
     expect(res.json()).toMatchObject({ error: 'InvalidSignature' });
@@ -88,7 +80,7 @@ describe('signature verification enabled', () => {
     const body = JSON.stringify({ ...itsmEvent, priority_code: 1 });
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
+      url: ROUTE,
       headers: { 'content-type': 'application/json', 'x-signature': signature },
       body,
     });
@@ -99,9 +91,9 @@ describe('signature verification enabled', () => {
   it('answers an unsigned malformed body with 401, not a parser error', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
+      url: ROUTE,
       headers: { 'content-type': 'application/json' },
-      body: '{"source": "itsm",',
+      body: '{"ticket_number": "INC1",',
     });
 
     expect(res.statusCode).toBe(401);
@@ -126,7 +118,7 @@ describe('signature verification disabled', () => {
   });
 
   it('accepts an unsigned request so dev runs the loop without a secret', async () => {
-    const res = await app.inject({ method: 'POST', url: '/webhook/incidents', payload: itsmEvent });
+    const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(202);
   });

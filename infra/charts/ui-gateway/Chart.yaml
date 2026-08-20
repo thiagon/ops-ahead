@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ui-gateway
-description: Ingestion gateway (Fastify) — ITSM webhook → incidents.received (ns:ui)
+description: Ingestion gateway (Fastify) — per-tenant webhook → events.raw.{alert,monitor} (ns:ui)
 type: application
 version: 0.2.0
 appVersion: "0.1.0"

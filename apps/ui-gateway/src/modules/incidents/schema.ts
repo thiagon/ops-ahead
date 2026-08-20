@@ -1,27 +1,39 @@
 import { z } from 'zod';
-import { incidentOpenedBySchema, incidentStatusSchema } from './domain.ts';
 
 /**
- * Output contract — mirrors contracts/incident-event.schema.json (draft-07).
- * Universal fields first-class; the origin event is preserved verbatim as a
- * JSON string in payload_raw. Strict, to match additionalProperties: false.
+ * Output contract — mirrors contracts/incident-envelope.schema.json (draft-07).
+ * The gateway authenticates and envelopes; it never interprets the body. The
+ * origin's payload is preserved verbatim, opaque, as a JSON string — nothing
+ * inside it is typed here (domain/acl/itsm.md#onde-a-tradução-acontece).
  */
-export const incidentEventSchema = z
+export const incidentEnvelopeSchema = z
   .object({
     event_id: z.uuid().meta({ description: 'Identity of the event, minted by the gateway' }),
-    source: z.string().min(1).meta({ description: 'Origin system that reported the incident' }),
+    tenant_id: z
+      .string()
+      .min(1)
+      .meta({ description: 'Assigned from the credential that signed the request' }),
+    source: z
+      .string()
+      .min(1)
+      .meta({ description: 'Origin system that reported the event, assigned by the route' }),
+    intake: z
+      .enum(['alert', 'monitor'])
+      .meta({ description: 'Nature of the origin, assigned by the route' }),
+    version: z.string().min(1).meta({ description: "This envelope's format version" }),
     received_at: z.iso.datetime().meta({ description: 'When the gateway accepted the event' }),
-    opened_at: z.iso.datetime().meta({ description: 'When the incident was opened, ISO 8601 UTC' }),
-    severity: z.int().min(1).max(5).meta({ description: '1 critical … 5 very low' }),
-    entity_id: z.string().meta({ description: 'Affected configuration item' }),
-    status: incidentStatusSchema,
-    opened_by: incidentOpenedBySchema,
-    payload_raw: z.string().meta({ description: 'The origin event, verbatim, as a JSON string' }),
+    payload: z.string().meta({ description: "The origin's body, verbatim, as a JSON string" }),
   })
   .strict()
-  .meta({ id: 'IncidentEvent', description: 'The universal event published to the bus' });
+  .meta({ id: 'IncidentEnvelope', description: 'The raw envelope published to the bus' });
 
-export type IncidentEvent = z.infer<typeof incidentEventSchema>;
+export type IncidentEnvelope = z.infer<typeof incidentEnvelopeSchema>;
+
+/** The body a webhook route accepts: any JSON object, kept opaque. */
+export const webhookBodySchema = z.record(z.string(), z.unknown()).meta({
+  id: 'WebhookBody',
+  description: "The origin's event, in its own vocabulary — preserved verbatim",
+});
 
 /** Signed-request header — required when HMAC_ENABLED=true, ignored otherwise. */
 export const webhookHeadersSchema = z.object({
@@ -35,6 +47,7 @@ export const webhookHeadersSchema = z.object({
 export const webhookAcceptedSchema = z
   .object({
     event_id: z.uuid(),
+    tenant_id: z.string(),
     source: z.string(),
   })
   .meta({ id: 'WebhookAccepted', description: 'The bus owns the event now' });

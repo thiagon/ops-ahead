@@ -69,15 +69,19 @@ spec:
               value: {{ .Values.gateway.env.corsOrigins | toJson | quote }}
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ .Values.gateway.env.kafkaBootstrapServers | quote }}
-            - name: KAFKA_TOPIC
-              value: {{ .Values.gateway.env.kafkaTopic | quote }}
+            - name: KAFKA_TOPIC_RAW_ALERT
+              value: {{ .Values.gateway.env.kafkaTopicRawAlert | quote }}
+            - name: KAFKA_TOPIC_RAW_MONITOR
+              value: {{ .Values.gateway.env.kafkaTopicRawMonitor | quote }}
             - name: HMAC_ENABLED
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
-            - name: HMAC_SECRET
+            # One secret per (tenant, source) credential — sources/registry.ts
+            # names the env var each credential reads.
+            - name: HMAC_SECRET_LOCAWEB_ITSM
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.gateway.secretName }}
-                  key: HMAC_SECRET
+                  key: HMAC_SECRET_LOCAWEB_ITSM
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           livenessProbe:

@@ -14,7 +14,7 @@ export default fp(
     app.withTypeProvider<ZodTypeProvider>().get(
       '/health',
       {
-        schema: { hide: true }
+        schema: { hide: true },
       },
       async () => ({
         status: 'ok' as const,

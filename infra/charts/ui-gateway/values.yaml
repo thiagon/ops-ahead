@@ -21,7 +21,8 @@ gateway:
     logLevel: info
     serviceName: gateway
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
-    kafkaTopic: incidents.received
+    kafkaTopicRawAlert: events.raw.alert
+    kafkaTopicRawMonitor: events.raw.monitor
     hmacEnabled: "true"
     httpsEnabled: "false"
     corsOrigins:

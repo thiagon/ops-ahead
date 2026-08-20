@@ -13,7 +13,7 @@ from great_expectations.expectations.core.unexpected_rows_expectation import (
 def register(context: AbstractDataContext) -> ValidationDefinition:
     datasource = context.data_sources.get("clickhouse")
     asset = datasource.add_table_asset(
-        name="incidents_received", table_name="incidents_received"
+        name="bronze_alert", table_name="bronze_alert"
     )
     batch_def = asset.add_batch_definition_whole_table("full")
 
@@ -31,7 +31,8 @@ def register(context: AbstractDataContext) -> ValidationDefinition:
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="event_id"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="opened_at"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="received_at"))
-    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="entity_id"))
+    # entity_id is optional in the alert contract — not every origin reports
+    # one (contracts/incident-alert.schema.json) — so it is not checked here.
     suite.add_expectation(
         gxe.ExpectColumnValuesToBeBetween(column="severity", min_value=1, max_value=5)
     )

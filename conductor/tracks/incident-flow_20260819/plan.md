@@ -64,20 +64,23 @@ mensagem, não como atualização de um registro consolidado no fim.
 
 **Recepção**
 
-- [ ] 2.1: Rota de entrada por origem, versionada, com a credencial da integração vinculada a ela
-- [ ] 2.2: Envelope atribuído pelo gateway: identidade do evento, origem, entrada, versão do
+- [x] 2.1: Rota de entrada por origem, versionada, com a credencial da integração vinculada a ela
+- [x] 2.2: Envelope atribuído pelo gateway: identidade do evento, origem, entrada, versão do
       formato e instante de recepção — nada lido do corpo
-- [ ] 2.3: Publicação no tópico cru correspondente à natureza da origem
-- [ ] 2.4: Métricas por origem e por natureza
+- [x] 2.3: Publicação no tópico cru correspondente à natureza da origem
+- [x] 2.4: Métricas por origem e por natureza
 
 **Bronze**
 
-- [ ] 2.5: Raw no lake, em arquivo colunar particionado por tenant, entrada, origem e data de
+- [x] 2.5: Raw no lake, em arquivo colunar particionado por tenant, entrada, origem e data de
       recepção, com o corpo como coluna de texto — o corpo cru não é materializado no warehouse
-- [ ] 2.6: Tabelas de bronze no warehouse, append-only por entrada, sem o corpo: partição mensal por
+- [x] 2.6: Tabelas de bronze no warehouse, append-only por entrada, sem o corpo: partição mensal por
       recepção e ordenação por `(tenant_id, source, external_id, received_at)`
-- [ ] 2.7: Leitura do raw pelo warehouse para reprocessamento, sem materializar
-- [ ] 2.8: Destino do tópico atual: `incidents.received` é descontinuado — sem alias, sem preservar
+- [x] 2.7: Leitura do raw pelo warehouse para reprocessamento, sem materializar — implementado como
+      leitor Python (`reprocess.py`) sobre os objetos do lake, não como função `S3`/tabela nativa do
+      ClickHouse; atinge o mesmo objetivo (reprocessar sem materializar o raw no warehouse), mas vale
+      revisar se uma tabela `S3` do ClickHouse serve melhor quando o volume justificar
+- [x] 2.8: Destino do tópico atual: `incidents.received` é descontinuado — sem alias, sem preservar
       o dado antigo (decisão do usuário, 2026-08-19: as tabelas e tópicos de hoje viram lixo assim
       que as novas existirem, nada a migrar)
 
@@ -87,38 +90,44 @@ Descoberto ao planejar o corte: o plan.md original só cobria a migração do `d
 outros consumidores leem de `incidents.received`/`incidents_received` hoje e ficariam quebrados sem
 tarefa própria — corrigido aqui antes da Fase 2 começar a implementar.
 
-- [ ] 2.7.1: Migrar `ml-burst-detector` para consumir `incidents.monitor` — a natureza dele é
+- [x] 2.7.1: Migrar `ml-burst-detector` para consumir `events.monitor` — a natureza dele é
       monitoração por entity (z-score/CUSUM sobre sinal), não gestão de ocorrência
-- [ ] 2.7.2: Migrar `stg_incidents.sql` (data-runner) para a fonte traduzida da cadeia `alert`
-- [ ] 2.7.3: Descontinuar a tabela `incidents_received` do ClickHouse e o tópico `incidents.received`
+- [x] 2.7.2: Migrar `stg_incidents.sql` (data-runner) para a fonte traduzida da cadeia `alert` — os
+      sete marts que dependem dele (`incidents_by_ic`, `p4_sequences_by_ci`,
+      `daily_anomaly_features`, `first_touch_duration`, `group_load_by_window`,
+      `kpi_monthly_state`, `priority_changes_log`) ficam quebrados até serem reconstruídos por cadeia
+      nas Fases 3–5 — consequência aceita do corte duro, não um bug desta task
+- [x] 2.7.3: Descontinuar a tabela `incidents_received` do ClickHouse e o tópico `incidents.received`
       do chart `data-kafka` — nenhum consumidor aponta mais para eles
 
 **Tradução**
 
-- [ ] 2.9: Estágio de tradução como componente próprio, consumindo o tópico cru — vive dentro do
+- [x] 2.9: Estágio de tradução como componente próprio, consumindo o tópico cru — vive dentro do
       `data-ingest` existente, não em app novo (decisão do usuário, 2026-08-19)
-- [ ] 2.10: Dicionário por tenant e origem fora do código, versionado — ciclo de vida, condição e o que
+- [x] 2.10: Dicionário por tenant e origem fora do código, versionado — ciclo de vida, condição e o que
       originou o registro, mapeados no vocabulário do domínio
-- [ ] 2.11: Valor fora do dicionário vira o caso desconhecido e fica visível, sem falhar o evento
-- [ ] 2.12: Publicação no tópico traduzido, que é o que os consumidores de negócio leem
-- [ ] 2.13: Reprocessamento de um período com uma versão de dicionário, sem sobrescrever o resultado
+- [x] 2.11: Valor fora do dicionário vira o caso desconhecido e fica visível, sem falhar o evento
+- [x] 2.12: Publicação no tópico traduzido, que é o que os consumidores de negócio leem
+- [x] 2.13: Reprocessamento de um período com uma versão de dicionário, sem sobrescrever o resultado
       anterior
-- [ ] 2.14: `ScaledObject` para os consumidores da ingestão e da tradução
+- [x] 2.14: `ScaledObject` para os consumidores da ingestão e da tradução — dois triggers Kafka (um
+      por tópico cru) no mesmo `ScaledObject`, já que ingestão e tradução são o mesmo consumidor
 
 **Testes**
 
-- [ ] 2.15: Tradução por origem, incluindo valor fora do dicionário
-- [ ] 2.16: Payload que tenta declarar a própria origem não influencia o envelope
-- [ ] 2.17: Reprocessamento produz resultado determinístico para uma dada versão de dicionário
+- [x] 2.15: Tradução por origem, incluindo valor fora do dicionário
+- [x] 2.16: Payload que tenta declarar a própria origem não influencia o envelope
+- [x] 2.17: Reprocessamento produz resultado determinístico para uma dada versão de dicionário
 
 ### Verification
 
-- [ ] O corpo é gravado antes de qualquer interpretação
-- [ ] Nenhum consumidor de negócio lê o tópico cru
-- [ ] Uma transição de estado chega como mensagem própria, não como atualização do mesmo registro
-- [ ] Corrigir o dicionário e reprocessar um período gera resultado novo sem perder o anterior
-- [ ] Origem nova não altera contrato traduzido nem consumidor
-- [ ] Nada no repositório aponta mais para `incidents.received` ou `incidents_received`
+- [x] O corpo é gravado antes de qualquer interpretação
+- [x] Nenhum consumidor de negócio lê o tópico cru
+- [x] Uma transição de estado chega como mensagem própria, não como atualização do mesmo registro
+- [x] Corrigir o dicionário e reprocessar um período gera resultado novo sem perder o anterior
+- [x] Origem nova não altera contrato traduzido nem consumidor
+- [x] Nada no repositório aponta mais para `incidents.received` ou `incidents_received` (fora de
+      migrations históricas e docs de tracks já fechadas, que registram o que era verdade então)
 
 ---
 

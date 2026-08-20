@@ -7,7 +7,7 @@ from faststream.kafka import KafkaBroker
 
 import metrics
 from buffer import BatchBuffer
-from models import IncidentEvent
+from models import IncidentEnvelope
 from settings import Settings
 from writer import BatchWriter
 
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     broker = KafkaBroker(settings.kafka_bootstrap_servers)
     app = FastStream(broker)
-    writer = BatchWriter(settings)
+    writer = BatchWriter(settings, publisher=broker)
 
-    async def _flush(batch: list[IncidentEvent]) -> None:
+    async def _flush(batch: list[IncidentEnvelope]) -> None:
         t0 = time.perf_counter()
         await writer.write(batch)
         metrics.batch_latency.observe(time.perf_counter() - t0)
@@ -32,12 +32,18 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         max_seconds=settings.batch_max_seconds,
     )
 
-    @broker.subscriber(
-        settings.kafka_topic,
-        group_id=settings.kafka_group_id,
-    )
-    async def handle(msg: IncidentEvent) -> None:
-        metrics.events_consumed.labels(source=msg.source).inc()
+    # Same consumer group on both raw topics: this is the ingestion+translation
+    # stage as a whole, not two independent processes
+    # (docs/insights/fluxo-do-incidente.md — translation lives inside
+    # data-ingest, not a separate app).
+    @broker.subscriber(settings.kafka_topic_raw_alert, group_id=settings.kafka_group_id)
+    async def handle_alert(msg: IncidentEnvelope) -> None:
+        metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
+        await buffer.add(msg)
+
+    @broker.subscriber(settings.kafka_topic_raw_monitor, group_id=settings.kafka_group_id)
+    async def handle_monitor(msg: IncidentEnvelope) -> None:
+        metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
         await buffer.add(msg)
 
     @app.on_startup

@@ -5,7 +5,7 @@ sources:
     database: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
     schema: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
     tables:
-      - name: incidents_received
+      - name: bronze_alert
         columns:
           - name: event_id
             tests: [not_null, unique]
@@ -16,5 +16,17 @@ sources:
                   values: [1, 2, 3, 4, 5]
           - name: opened_at
             tests: [not_null]
+          - name: tenant_id
+            tests: [not_null]
+          - name: external_id
+            tests: [not_null]
+      - name: bronze_monitor
+        columns:
+          - name: event_id
+            tests: [not_null, unique]
+          - name: started_at
+            tests: [not_null]
           - name: entity_id
+            tests: [not_null]
+          - name: tenant_id
             tests: [not_null]

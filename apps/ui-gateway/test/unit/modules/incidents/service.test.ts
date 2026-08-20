@@ -1,100 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeToIsoUtc,
-  normalizeWebhook,
-  webhookBodySchema,
-} from '../../../../src/modules/incidents/service.ts';
-import { toIncidentEvent } from '../../../../src/modules/incidents/sources/itsm.ts';
+import { buildEnvelope } from '../../../../src/modules/incidents/service.ts';
+import type { OriginCredential } from '../../../../src/modules/incidents/sources/registry.ts';
+
+const ITSM_CREDENTIAL: OriginCredential = {
+  tenantId: 'locaweb',
+  source: 'itsm',
+  intake: 'alert',
+  envelopeVersion: 'v1',
+  hmacSecretEnv: 'HMAC_SECRET_LOCAWEB_ITSM',
+};
 
 // One row of assets/incidents.csv, as scripts/incident_producer.py posts it.
-const itsmEvent = {
+const itsmBody = {
   ticket_number: 'INC0012345',
-  source: 'itsm' as const,
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
   status: 'Encerrado',
   opened_by: 'Monitoramento',
-  payload: { ticket_number: 'INC0012345', duration_seconds: '9120', kpi_breached: '1' },
 };
 
-describe('normalizeToIsoUtc', () => {
-  it('reads a naive ITSM timestamp as UTC', () => {
-    expect(normalizeToIsoUtc('2025-12-31 23:45:18')).toBe('2025-12-31T23:45:18.000Z');
-  });
+describe('buildEnvelope', () => {
+  it('assigns identity, tenant, source, and intake from the credential — nothing from the body', () => {
+    const envelope = buildEnvelope(ITSM_CREDENTIAL, itsmBody);
 
-  it('honors an explicit offset instead of shifting it', () => {
-    expect(normalizeToIsoUtc('2026-01-01T00:45:18-03:00')).toBe('2026-01-01T03:45:18.000Z');
-  });
-
-  it('rejects a timestamp it cannot parse', () => {
-    expect(() => normalizeToIsoUtc('yesterday')).toThrow(/unparseable timestamp/);
-  });
-});
-
-describe('toIncidentEvent', () => {
-  it('maps the ITSM fields onto the universal schema', () => {
-    const event = toIncidentEvent(itsmEvent);
-
-    expect(event).toMatchObject({
+    expect(envelope).toMatchObject({
+      tenant_id: 'locaweb',
       source: 'itsm',
-      opened_at: '2025-12-31T23:45:18.000Z',
-      severity: 2,
-      entity_id: 'srv-web-04',
-      status: 'closed',
+      intake: 'alert',
+      version: 'v1',
     });
   });
 
-  it('keeps the origin payload verbatim in payload_raw', () => {
-    const event = toIncidentEvent(itsmEvent);
+  it('keeps the origin body verbatim, opaque, in payload', () => {
+    const envelope = buildEnvelope(ITSM_CREDENTIAL, itsmBody);
 
-    expect(JSON.parse(event.payload_raw)).toEqual(itsmEvent.payload);
+    expect(JSON.parse(envelope.payload)).toEqual(itsmBody);
   });
 
-  it('carries a column the origin added without the gateway knowing it', () => {
-    const event = toIncidentEvent({ ...itsmEvent, payload: { origin_channel: 'chat' } });
+  it('is not influenced by a body that tries to declare its own source or tenant', () => {
+    const envelope = buildEnvelope(ITSM_CREDENTIAL, {
+      ...itsmBody,
+      source: 'datadog',
+      tenant_id: 'someone-else',
+      intake: 'monitor',
+    });
 
-    expect(JSON.parse(event.payload_raw)).toEqual({ origin_channel: 'chat' });
+    expect(envelope).toMatchObject({ tenant_id: 'locaweb', source: 'itsm', intake: 'alert' });
   });
 
   it('gives every event its own id', () => {
-    expect(toIncidentEvent(itsmEvent).event_id).not.toBe(toIncidentEvent(itsmEvent).event_id);
-  });
-});
-
-describe('webhookBodySchema', () => {
-  it('accepts the contract of a registered source', () => {
-    expect(webhookBodySchema.safeParse(itsmEvent).success).toBe(true);
-  });
-
-  it('reports the offending field when the payload breaks the contract', () => {
-    const result = webhookBodySchema.safeParse({ ...itsmEvent, priority_code: 9 });
-
-    expect(result.success).toBe(false);
-    expect(result.error?.issues).toContainEqual(
-      expect.objectContaining({ path: ['priority_code'] }),
+    expect(buildEnvelope(ITSM_CREDENTIAL, itsmBody).event_id).not.toBe(
+      buildEnvelope(ITSM_CREDENTIAL, itsmBody).event_id,
     );
-  });
-
-  it('refuses a source no adapter claims', () => {
-    const result = webhookBodySchema.safeParse({ ...itsmEvent, source: 'datadog' });
-
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.path).toEqual(['source']);
-  });
-
-  it('defaults the optional ITSM fields the dataset may leave blank', () => {
-    const { configuration_item, status, ...withoutOptionals } = itsmEvent;
-
-    expect(normalizeWebhook(webhookBodySchema.parse(withoutOptionals))).toMatchObject({
-      entity_id: '',
-      status: 'unknown',
-    });
-  });
-});
-
-describe('normalizeWebhook', () => {
-  it('maps the body through the branch that owns its source', () => {
-    expect(normalizeWebhook(itsmEvent)).toMatchObject({ source: 'itsm', severity: 2 });
   });
 });

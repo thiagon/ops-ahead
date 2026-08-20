@@ -1,4 +1,4 @@
-# KEDA scales this Deployment's replica count from incidents.received's
+# KEDA scales this Deployment's replica count from events.monitor's
 # consumer lag, down to zero when idle.
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
