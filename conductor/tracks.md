@@ -9,6 +9,6 @@
 | [~] | ml-models_20260806 | Modelos de ML (Camada 2 — Inteligência) | 2026-08-06 | 2026-08-07 |
 | [x] | exec-trigger_20260807 | Execução Sob Demanda (ui-orchestrator + KEDA) | 2026-08-07 | 2026-08-16 |
 | [~] | ml-layer2-gaps_20260817 | Conformidade da Camada 2 com a arquitetura da Sprint 2 | 2026-08-17 | 2026-08-17 |
-| [~] | incident-flow_20260819 | Fluxo do incidente (duas entradas, marcos de prazo, read model) | 2026-08-19 | 2026-08-19 |
+| [~] | incident-flow_20260819 | Fluxo do incidente (duas entradas, marcos de prazo, read model) | 2026-08-19 | 2026-08-20 |
 
 <!-- Tracks registered by /conductor:new-track -->

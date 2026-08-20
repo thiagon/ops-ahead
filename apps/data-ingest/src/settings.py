@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Translated, published for every business consumer downstream.
     kafka_topic_alert: str = "events.alert"
     kafka_topic_monitor: str = "events.monitor"
+    # Already canonical (published by apps/data-deadline-tracker) — landed
+    # straight into bronze_deadline_milestone, no translation involved.
+    kafka_topic_milestone: str = "deadlines.milestone"
     kafka_group_id: str = "events-ingest"
 
     clickhouse_host: str = "localhost"

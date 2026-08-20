@@ -1,7 +1,8 @@
+from datetime import datetime
 from uuid import uuid4
 
-from models import EventEnvelope
-from writer import _lake_prefix
+from models import EventEnvelope, MilestoneEvent
+from writer import _lake_prefix, _milestone_row
 
 
 def _make(source: str, intake: str, received_at: str, tenant_id: str = "locaweb") -> EventEnvelope:
@@ -41,3 +42,33 @@ def test_lake_prefix_utc_normalization():
     evt_utc = _make("itsm", "alert", "2024-03-07T01:00:00+00:00")
     evt_brt = _make("itsm", "alert", "2024-03-06T22:00:00-03:00")  # same UTC instant
     assert _lake_prefix(evt_utc) == _lake_prefix(evt_brt)
+
+
+def _make_milestone(**overrides) -> MilestoneEvent:
+    fields = {
+        "event_id": str(uuid4()),
+        "tenant_id": "locaweb",
+        "source": "itsm",
+        "external_id": "INC001",
+        "entity_id": None,
+        "kind": "pct_75",
+        "severity": 2,
+        "opened_at": "2024-03-07T01:00:00+00:00",
+        "acknowledged_at": None,
+        "due_at": "2024-03-07T05:00:00+00:00",
+        "deadline_seconds": 14400,
+        "consumed_ratio": 0.75,
+        "occurred_at": "2024-03-07T04:00:00+00:00",
+        **overrides,
+    }
+    return MilestoneEvent.model_validate(fields)
+
+
+def test_milestone_row_defaults_missing_entity_id_to_empty_string():
+    row = _milestone_row(_make_milestone(entity_id=None))
+    assert row[4] == ""
+
+
+def test_milestone_row_converts_aware_datetimes_to_naive_utc():
+    row = _milestone_row(_make_milestone(occurred_at="2024-03-06T22:00:00-03:00"))
+    assert row[-1] == datetime(2024, 3, 7, 1, 0, 0)

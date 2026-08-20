@@ -563,15 +563,17 @@ isso se resolve com uma visão só dos abertos, sem forçar a ordenação da tab
 
 O `ml-trainer` de hoje (`apps/ml-trainer/src/breach/`, `volume/`, `external_event/`) foi construído
 antes desta track, sobre os marts antigos. Esta seção documenta como cada um muda — não é aspiracional,
-é o que a Fase 7 constrói.
+é o que a Fase 8 constrói, sobre a mart `breach_training_examples` que a Fase 7 já deixou pronta.
 
 ### A unidade: (incidente × marco)
 
-Cada mensagem em `deadlines.milestone` (Fase 6) vira uma linha de treino. O estado do incidente
-naquele instante é reconstruído por `silver_alert_as_of(cutoff = marco.occurred_at)` — o macro que a
-Fase 3 já constrói para exatamente isso (`apps/data-runner/macros/silver_alert_as_of.sql`); nenhuma
-feature de treino lê `silver_alert`/`silver_alert_open` diretamente, porque essas tabelas guardam o
-estado **atual**, que vaza o desfecho.
+Cada mensagem em `deadlines.milestone` (Fase 6) vira uma linha de treino, materializada por
+`breach_training_examples` (Fase 7, `apps/data-runner/models/marts/breach_training_examples.sql`) —
+mesma técnica do macro `silver_alert_as_of` (`received_at <= cutoff`), aplicada por marco em vez de
+"agora". Nenhuma feature de treino lê `silver_alert`/`silver_alert_open` diretamente, porque essas
+tabelas guardam o estado **atual**, que vaza o desfecho — as únicas colunas dessa mart que vêm do
+estado atual são `has_breached`/`final_consumed_ratio`/`final_duration_seconds` (o rótulo e os
+critérios de exclusão abaixo, deliberadamente).
 
 Um incidente que cruza três marcos gera três linhas, cada uma com o que se sabia até ali — não é o
 mesmo incidente contado três vezes, é três instantes de decisão diferentes.
@@ -626,7 +628,7 @@ Todas calculadas **no instante do marco**, nunca sobre o estado atual:
 | `was_recategorized`/`recategorization_count` | sobrevive, mas passa a vir de `severity_changes` do `silver_alert_as_of(cutoff)` em vez de recontar `priority_changes_log` à mão — o macro já reconstrói isso corretamente pro instante |
 | `group_severity_historical_ola_ratio`/`_over_25pct_rate` | sobrevive na ideia (histórico expansivo, sem vazamento) — recalculada sobre incidentes anteriores ao marco, não ao "agora" |
 
-Novas, da Fase 3 (marco) e Fase 4 (gold `monitor`, por `entity` — task 7.2):
+Novas, da Fase 3 (marco) e Fase 4 (gold `monitor`, por `entity` — task 8.2):
 
 | Feature | De onde |
 |---------|---------|
@@ -637,7 +639,7 @@ Novas, da Fase 3 (marco) e Fase 4 (gold `monitor`, por `entity` — task 7.2):
 | `entity_auto_resolution_rate` | `gold_monitor_auto_resolution_rate` |
 | `entity_severity_escalations` | `gold_monitor_severity_escalations`, acumulado até `occurred_at` |
 
-### Volume (`gold_alert_daily_features`, task 7.6)
+### Volume (`gold_alert_daily_features`, task 8.6)
 
 Fonte muda de `daily_anomaly_features` (removida na Fase 5) para `gold_alert_daily_features` —
 `total_incidents`/`p1_count`…`p5_count` no lugar de `total_incidents`/`p1_count`/`p2_count`/
@@ -645,18 +647,18 @@ Fonte muda de `daily_anomaly_features` (removida na Fase 5) para `gold_alert_dai
 feriado — mesmo desenho de hoje, D+1 e D+7 mantidos. `avg_opened_hour` sobrevive (já existe em
 `gold_alert_daily_features`).
 
-### Detector de evento externo (`external_event`) — sem task na Fase 7 até agora
+### Detector de evento externo (`external_event`) — sem task até agora
 
 Descoberto ao escrever esta seção: `external_event/data.py` também lê a extinta
 `daily_anomaly_features`, e a Fase 4/5 já decidiu que esse detector migra inteiro para
-`gold_monitor_daily_features` (cadeia `monitor`) — mas nenhuma task da Fase 7 cobria atualizar o
-treino em si. Adicionada como 7.10.
+`gold_monitor_daily_features` (cadeia `monitor`) — mas nenhuma task cobria atualizar o treino em si.
+Adicionada como 8.9.
 
 ### Serving
 
 `apps/ml-model-serving/src/schemas.py` espelha `FEATURE_COLUMNS` campo a campo com
 `extra="forbid"` — qualquer mudança acima quebra o schema Pydantic de `/predict/breach` até ser
-atualizado. Task 7.7 cobre os dois lados juntos, não só o trainer.
+atualizado. Task 8.7 cobre os dois lados juntos, não só o trainer.
 
 ## Technical Notes
 

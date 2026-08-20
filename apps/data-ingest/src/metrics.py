@@ -6,6 +6,12 @@ events_consumed = Counter(
     ["source", "intake"],
 )
 
+milestones_consumed = Counter(
+    "ingest_milestones_consumed_total",
+    "Total deadline milestones consumed from Kafka into bronze_deadline_milestone",
+    ["kind"],
+)
+
 translation_failures = Counter(
     "ingest_translation_failures_total",
     "Raw envelopes with no adapter or dictionary — kept in the lake, skipped for bronze",

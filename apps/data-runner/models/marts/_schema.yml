@@ -64,6 +64,20 @@ models:
           - accepted_values:
               values: [1, 2, 3, 4, 5]
 
+  - name: breach_training_examples
+    columns:
+      - name: milestone_id
+        tests: [not_null, unique]
+      - name: tenant_id
+        tests: [not_null]
+      - name: occurred_at
+        tests: [not_null]
+      - name: kind
+        tests:
+          - not_null
+          - accepted_values:
+              values: [pct_25, pct_50, pct_75, pct_100, abandoned]
+
   - name: kpi_monthly_state
     columns:
       - name: month

@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     # Consumed-ratio multiple past which an open, eligible incident counts
     # as abandoned — a separate axis from the 25/50/75/100% milestones, not
     # a per-tenant contract like the deadline itself (see
-    # seeds/tenant_deadlines.csv in data-runner).
-    abandoned_ratio: float = 3.0
+    # seeds/tenant_deadlines.csv in data-runner). Same threshold the training
+    # set (ml-trainer) uses to exclude abandoned incidents — measured once in
+    # docs/insights/fluxo-do-incidente.md.
+    abandoned_ratio: float = 10.0
 
     metrics_port: int = 8000

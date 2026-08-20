@@ -11,8 +11,8 @@
 
 ## Progress
 
-- Phases: 2/7 complete
-- Tasks: 32/71 complete
+- Phases: 7/8 complete
+- Tasks: 72/81 complete
 
 ## Quick Links
 

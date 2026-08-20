@@ -100,7 +100,7 @@ Integração, não fica no meio do fluxo pub/sub principal (`events.raw.*`, `eve
 | `events.alert` / `events.monitor` | Integração → Acervo, Detecção, Acompanhamento | event traduzido, um tópico por intake |
 | `incidents.scored` | Predição → Copiloto | event com risco de breach estimado |
 | `alerts.burst` | Detecção → Copiloto | rajada reconhecida numa entity |
-| `deadlines.milestone` | Acompanhamento → Predição, Copiloto | marco de consumo do OLA (25/50/75/100% ou abandono) de um incident aberto |
+| `deadlines.milestone` | Acompanhamento → Integração (bronze), Predição, Copiloto | marco de consumo do OLA (25/50/75/100% ou abandono) de um incident aberto |
 | `recommendations` | Copiloto → Integração | recomendação explicável, pronta para sair |
 | `actions.taken` | Integração → Acervo | o que o operador decidiu, para avaliar o Copiloto |
 | `trigger.ml` / `trigger.data` | execução sob demanda → Predição / Acervo | `analysis` + parâmetros de um pedido validado, um tópico por domínio |

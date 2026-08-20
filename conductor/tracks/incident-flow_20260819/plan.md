@@ -181,9 +181,9 @@ O que o negócio consome: prazo, responsável, desfecho.
 `incidents_by_ic` e `p4_sequences_by_ci` não tinham task própria nem linha na tabela de gold do
 spec — descoberto ao implementar que o `ml-trainer` (breach-risk) ainda lê as duas. Decisão do
 usuário, 2026-08-20: reconstruir as duas sobre `silver_alert` mesmo assim, para não quebrar o
-breach-risk além do que a Fase 7 já vai mexer. `daily_anomaly_features` (cadeia `alert`) não ganha
-reconstrução — o detector de evento externo migra inteiro para `gold_monitor_daily_features`
-(Fase 4); `ml-trainer.volume`, que lia a versão `alert`, fica quebrado até a Fase 7 (`7.6: Modelo de
+breach-risk além do que as Fases 7/8 já vão mexer. `daily_anomaly_features` (cadeia `alert`) não
+ganha reconstrução — o detector de evento externo migra inteiro para `gold_monitor_daily_features`
+(Fase 4); `ml-trainer.volume`, que lia a versão `alert`, fica quebrado até a Fase 8 (`8.6: Modelo de
 volume revisto`) decidir sua nova fonte.
 
 `p4_sequences_by_ci` reconstruída sobre `silver_alert` (5.7 abaixo) manteve o filtro `severity = 4`
@@ -257,47 +257,95 @@ A peça que reage à passagem do tempo, não a evento de origem.
 
 ---
 
-## Phase 7: Treinos revistos
+## Phase 7: Bronze de marco e reconstrução ponto-no-tempo
 
-A unidade de exemplo muda: deixa de ser uma ocorrência e passa a ser (ocorrência × marco).
+Fundação para o retreino da Fase 8: o marco (25/50/75/100%/abandono) precisa existir em bronze, e
+precisa de uma mart que reconstrua "o que se sabia" em cada marco sem vazar o desfecho. As duas
+correções soltas do `ml-trainer` atual que não dependiam de nada disso (fonte do modelo de volume,
+teto de abandono) também vivem aqui — pequenas o bastante para não merecerem fase própria.
 
 `daily_anomaly_features` (cadeia `alert`) não tinha task própria de reconstrução — descoberto ao
-começar esta fase que `ml-trainer.volume` ficou sem fonte desde a Fase 5 (a versão que sobreviveu,
-`gold_monitor_daily_features`, é sinal do `monitor` para o detector de evento externo, não série de
-incidentes para previsão de volume). Decisão do usuário, 2026-08-20: reconstruir como
-`gold_alert_daily_features`, sobre `silver_alert`, mesma forma da antiga.
+começar o levantamento desta fase que `ml-trainer.volume` ficou sem fonte desde a Fase 5 (a versão
+que sobreviveu, `gold_monitor_daily_features`, é sinal do `monitor` para o detector de evento
+externo, não série de incidentes para previsão de volume). Decisão do usuário, 2026-08-20:
+reconstruir como `gold_alert_daily_features`, sobre `silver_alert`, mesma forma da antiga (7.9).
 
-Fase inteira detalhada em spec.md, seção "Treino revisto", depois de conferir contra o `ml-trainer`
-real (`apps/ml-trainer/src/breach|volume|external_event/`) e `docs/insights/fluxo-do-incidente.md` —
-que já tinha, sem eu ter lido antes de configurar a Fase 6, a análise do teto de abandono (10× o
-OLA). Decisões do usuário, 2026-08-20, todas em spec.md: rótulo é `has_breached` (não
-`kpi_breached` — apuração é julgamento de negócio não documentado pela Locaweb, não fato técnico);
-teto de abandono 10.0 (corrige também `abandoned_ratio` do acompanhador de prazo, Fase 6, que estava
-em 3.0 sem base); ruído de duração ínfima cortado por percentil 1 com piso de 60s. `group_load_1h`
-não dá mais pra ler de `group_load_by_window` (virou snapshot do "agora" na Fase 5) — recalculada
-ponto-no-tempo na própria montagem do dataset (7.1). `external_event` também ficou sem fonte e não
-tinha task — 7.10, abaixo.
+`docs/insights/fluxo-do-incidente.md` já tinha, sem eu ter lido antes de configurar a Fase 6, a
+análise do teto de abandono (10× o OLA) — `abandoned_ratio` do acompanhador de prazo estava em 3.0
+sem base (7.11). Mesmo teto que a Fase 8 usa para excluir abandono do treino — medido uma vez, os
+dois lugares usam o mesmo número.
+
+`silver_alert_as_of(cutoff=marco.occurred_at)` — a técnica que a Fase 8 usa para reconstruir o
+estado de cada incidente no instante do seu marco — precisa saber quando cada marco ocorreu, e
+`deadlines.milestone` (Fase 6) nunca ganhou pouso em bronze, só o tópico. Descoberto ao levantar esta
+fase; sem task própria, do tamanho do que a Fase 2 fez para as outras duas cadeias. Decisão do
+usuário, 2026-08-20: `data-ingest` ganha um terceiro consumidor Kafka, aterrando direto em
+`bronze_deadline_milestone` — sem tópico raw, sem lake, sem tradução, porque a mensagem já chega no
+formato canônico do contrato (publicada por `data-deadline-tracker`, não por uma origem externa).
+`domain/context-map.md` atualizado (`deadlines.milestone` ganha Integração como consumidor, ao lado
+de Predição e Copiloto).
+
+Decisão do usuário, 2026-08-20: a reconstrução ponto-no-tempo em si vira uma mart dbt
+(`apps/data-runner/models/marts/breach_training_examples.sql`), não uma query crua dentro do
+`ml-trainer` — mesmo padrão do resto do repositório (`ml-trainer` só lê marts prontas, nunca bronze
+direto). Uma linha por milestone, com owner/parent_id/resolution_code/status/severity_changes/
+is_eligible reconstruídos via `received_at <= occurred_at` (mesma técnica de `silver_alert_as_of`,
+mas por marco em vez de "agora"), `group_load` (concorrência do mesmo owner no instante) e
+`no_intervention_count_1h/6h`/`no_intervention_precursor_length` (mesma entity, resolução conhecida
+antes do marco — não lidos de `incidents_by_ic`/`no_intervention_sequences_by_ci`, que são sobre o
+estado atual). `has_breached` + `final_consumed_ratio`/`final_duration_seconds` (rótulo e critérios
+de exclusão da Fase 8) vêm do estado atual de `silver_alert` de propósito — são o desfecho, não o que
+se sabia no marco. `dbt parse` validado (sem cluster local para rodar de fato).
+
+Fase inteira (mais o desenho completo do retreino, Fase 8) detalhada em spec.md, seção "Treino
+revisto", depois de conferir contra o `ml-trainer` real
+(`apps/ml-trainer/src/breach|volume|external_event/`). Decisões do usuário, 2026-08-20, todas em
+spec.md: rótulo do treino é `has_breached` (não `kpi_breached` — apuração é julgamento de negócio não
+documentado pela Locaweb, não fato técnico); ruído de duração ínfima cortado por percentil 1 com piso
+de 60s.
 
 ### Tasks
 
-- [ ] 7.1: Conjunto de treino montado a partir do bronze, com o que se sabia em cada marco —
-      `silver_alert_as_of(cutoff=marco.occurred_at)`, `group_load` ponto-no-tempo calculado aqui
-- [ ] 7.2: Features de contexto vindas do gold da cadeia `monitor`, por entity
-- [ ] 7.3: Features de prazo — consumo, tempo restante, se houve reconhecimento
-- [ ] 7.4: Rótulo `has_breached`; exclusões do treino — `is_eligible`, abandono (≥10×), ruído de
-      duração (percentil 1, piso 60s)
-- [ ] 7.5: Modelo de risco retreinado sobre a nova unidade, com o desbalanceamento reavaliado
-- [ ] 7.6: Modelo de volume revisto, sobre `gold_alert_daily_features` — série de ocorrências que
-      exigem trabalho separada do ruído
-- [ ] 7.7: Serving atualizado para o novo conjunto de features (trainer e `ml-model-serving` juntos —
-      `schemas.py` espelha `FEATURE_COLUMNS` com `extra="forbid"`)
-- [ ] 7.8: Testes das features novas e da montagem por marco
+- [x] 7.1: `breach_training_examples` — mart de reconstrução ponto-no-tempo por marco, uma linha por
+      `deadlines.milestone`, sobre `bronze_alert`/`bronze_deadline_milestone`
 - [x] 7.9: Reconstruir `daily_anomaly_features` (cadeia `alert`) como `gold_alert_daily_features`,
-      fonte de 7.6 — desenho revisto na Fase 5 (sem `in_kpi`/`breached`/`breach_rate`, `p1_count` a
-      `p5_count`)
-- [ ] 7.10: `external_event` revisto sobre `gold_monitor_daily_features` (cadeia `monitor`), fonte
+      fonte do modelo de volume revisto (Fase 8) — desenho revisto na Fase 5 (sem
+      `in_kpi`/`breached`/`breach_rate`, `p1_count` a `p5_count`)
+- [x] 7.11: Corrigir `abandoned_ratio` de `apps/data-deadline-tracker` de 3.0 para 10.0
+
+### Verification
+
+- [x] `bronze_deadline_milestone` recebe `deadlines.milestone` sem tópico raw, sem lake, sem tradução
+      (mensagem já canônica) — testes de `data-ingest` verificados
+- [x] `breach_training_examples` não lê nenhum campo de `bronze_alert` com `received_at` posterior ao
+      `occurred_at` do marco — `has_breached`/`final_*` são a única exceção deliberada (rótulo, não
+      feature)
+
+---
+
+## Phase 8: Treinos revistos
+
+A unidade de exemplo muda: deixa de ser uma ocorrência e passa a ser (ocorrência × marco), sobre
+`breach_training_examples` (Fase 7). `external_event` também ficou sem fonte e não tinha task — 8.9,
+abaixo.
+
+### Tasks
+
+- [ ] 8.1: `apps/ml-trainer/src/breach/data.py` passa a ler `breach_training_examples` — as cinco
+      fontes antigas (`first_touch_duration`, `no_intervention_sequences_by_ci`, `incidents_by_ic`,
+      `group_load_by_window`, `priority_changes_log`) saem do treino de risco
+- [ ] 8.2: Features de contexto vindas do gold da cadeia `monitor`, por entity
+- [ ] 8.3: Features de prazo — consumo, tempo restante, se houve reconhecimento
+- [ ] 8.4: Rótulo `has_breached`; exclusões do treino — `is_eligible`, abandono (≥10×), ruído de
+      duração (percentil 1, piso 60s)
+- [ ] 8.5: Modelo de risco retreinado sobre a nova unidade, com o desbalanceamento reavaliado
+- [ ] 8.6: Modelo de volume revisto, sobre `gold_alert_daily_features` — série de ocorrências que
+      exigem trabalho separada do ruído
+- [ ] 8.7: Serving atualizado para o novo conjunto de features (trainer e `ml-model-serving` juntos —
+      `schemas.py` espelha `FEATURE_COLUMNS` com `extra="forbid"`)
+- [ ] 8.8: Testes das features novas e da montagem por marco
+- [ ] 8.9: `external_event` revisto sobre `gold_monitor_daily_features` (cadeia `monitor`), fonte
       nova decidida nas Fases 4/5 mas sem task até agora
-- [ ] 7.11: Corrigir `abandoned_ratio` de `apps/data-deadline-tracker` de 3.0 para 10.0
 
 ### Verification
 

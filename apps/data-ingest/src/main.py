@@ -7,7 +7,7 @@ from faststream.kafka import KafkaBroker
 
 import metrics
 from buffer import BatchBuffer
-from models import EventEnvelope
+from models import EventEnvelope, MilestoneEvent
 from settings import Settings
 from writer import BatchWriter
 
@@ -31,6 +31,11 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         max_size=settings.batch_max_size,
         max_seconds=settings.batch_max_seconds,
     )
+    milestone_buffer = BatchBuffer(
+        flush=writer.write_milestones,
+        max_size=settings.batch_max_size,
+        max_seconds=settings.batch_max_seconds,
+    )
 
     # Same consumer group on both raw topics: this is the ingestion+translation
     # stage as a whole, not two independent processes
@@ -46,18 +51,27 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
         await buffer.add(msg)
 
+    # Already canonical (apps/data-deadline-tracker) — no raw topic, no lake,
+    # no translation, straight to bronze_deadline_milestone.
+    @broker.subscriber(settings.kafka_topic_milestone, group_id=settings.kafka_group_id)
+    async def handle_milestone(msg: MilestoneEvent) -> None:
+        metrics.milestones_consumed.labels(kind=msg.kind).inc()
+        await milestone_buffer.add(msg)
+
     @app.on_startup
     async def start_ticker() -> None:
         async def _tick() -> None:
             while True:
                 await asyncio.sleep(1)
                 await buffer.tick()
+                await milestone_buffer.tick()
 
         asyncio.create_task(_tick())
 
     @app.on_shutdown
     async def drain_buffer() -> None:
         await buffer.drain()
+        await milestone_buffer.drain()
 
     return app, broker
 

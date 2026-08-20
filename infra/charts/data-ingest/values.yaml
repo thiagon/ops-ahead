@@ -29,6 +29,7 @@ consumer:
     kafkaTopicRawMonitor: events.raw.monitor
     kafkaTopicAlert: events.alert
     kafkaTopicMonitor: events.monitor
+    kafkaTopicMilestone: deadlines.milestone
     kafkaGroupId: events-ingest
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead

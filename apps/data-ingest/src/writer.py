@@ -11,7 +11,7 @@ from clickhouse_driver import Client
 
 import metrics
 from dictionaries import DictionaryRegistry
-from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
+from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope, MilestoneEvent
 from settings import Settings
 from translate import UnknownSourceError, translate
 
@@ -31,6 +31,13 @@ _CLICKHOUSE_INSERT_MONITOR = """
     (event_id, tenant_id, source, version, dictionary_version, received_at, external_id,
      started_at, ended_at, severity, condition, entity_id, title, description, labels,
      source_url)
+    VALUES
+"""
+
+_CLICKHOUSE_INSERT_MILESTONE = """
+    INSERT INTO bronze_deadline_milestone
+    (event_id, tenant_id, source, external_id, entity_id, kind, severity, opened_at,
+     acknowledged_at, due_at, deadline_seconds, consumed_ratio, occurred_at)
     VALUES
 """
 
@@ -89,6 +96,24 @@ def _monitor_row(evt: BronzeMonitorEvent) -> tuple:
         evt.description or "",
         evt.labels or {},
         evt.source_url or "",
+    )
+
+
+def _milestone_row(evt: MilestoneEvent) -> tuple:
+    return (
+        str(evt.event_id),
+        evt.tenant_id,
+        evt.source,
+        evt.external_id,
+        evt.entity_id or "",
+        evt.kind,
+        evt.severity,
+        _naive_utc(evt.opened_at),
+        _naive_utc(evt.acknowledged_at),
+        _naive_utc(evt.due_at),
+        evt.deadline_seconds,
+        evt.consumed_ratio,
+        _naive_utc(evt.occurred_at),
     )
 
 
@@ -156,6 +181,11 @@ class BatchWriter:
         if monitor_rows:
             self._ch.execute(_CLICKHOUSE_INSERT_MONITOR, monitor_rows)
             logger.info("clickhouse: inserted %d bronze_monitor rows", len(monitor_rows))
+
+    async def write_milestones(self, batch: list[MilestoneEvent]) -> None:
+        rows = [_milestone_row(evt) for evt in batch]
+        self._ch.execute(_CLICKHOUSE_INSERT_MILESTONE, rows)
+        logger.info("clickhouse: inserted %d bronze_deadline_milestone rows", len(rows))
 
     def _write_lake(self, batch: list[EventEnvelope]) -> None:
         # Grouped by (tenant, intake, source, date de recepção) — reprocessar é

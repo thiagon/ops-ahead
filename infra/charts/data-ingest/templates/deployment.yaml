@@ -41,6 +41,8 @@ spec:
               value: {{ .Values.consumer.env.kafkaTopicAlert | quote }}
             - name: KAFKA_TOPIC_MONITOR
               value: {{ .Values.consumer.env.kafkaTopicMonitor | quote }}
+            - name: KAFKA_TOPIC_MILESTONE
+              value: {{ .Values.consumer.env.kafkaTopicMilestone | quote }}
             - name: KAFKA_GROUP_ID
               value: {{ .Values.consumer.env.kafkaGroupId | quote }}
             - name: CLICKHOUSE_HOST
