@@ -23,6 +23,7 @@ resolution-markers = [
 [manifest]
 members = [
     "ops-ahead",
+    "ops-ahead-data-deadline-tracker",
     "ops-ahead-data-ingest",
     "ops-ahead-data-runner",
     "ops-ahead-ml-burst-detector",
@@ -3101,6 +3102,39 @@ dev = [
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.9.0" },
+]
+
+[[package]]
+name = "ops-ahead-data-deadline-tracker"
+version = "0.1.0"
+source = { virtual = "apps/data-deadline-tracker" }
+dependencies = [
+    { name = "clickhouse-driver" },
+    { name = "faststream", extra = ["kafka"] },
+    { name = "prometheus-client" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "clickhouse-driver", specifier = ">=0.2.9" },
+    { name = "faststream", extras = ["kafka"], specifier = ">=0.5" },
+    { name = "prometheus-client", specifier = ">=0.21" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
 ]
 
 [[package]]

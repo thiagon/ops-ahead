@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "data-deadline-tracker.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-deadline-tracker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.consumer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "data-deadline-tracker.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "data-deadline-tracker.fullname" . }}
+        {{- include "data-deadline-tracker.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # The 'clickhouse' Service makes Kubernetes inject a legacy CLICKHOUSE_PORT
+      # env (tcp://ip:port) that collides with the app's own env — same
+      # reasoning as data-ingest's deployment.
+      enableServiceLinks: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: consumer
+          image: "{{ (index .Values "data-deadline-tracker").image.repository }}:{{ (index .Values "data-deadline-tracker").image.tag }}"
+          imagePullPolicy: {{ (index .Values "data-deadline-tracker").image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: metrics
+              containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC_ALERT
+              value: {{ .Values.consumer.env.kafkaTopicAlert | quote }}
+            - name: KAFKA_TOPIC_MILESTONES
+              value: {{ .Values.consumer.env.kafkaTopicMilestones | quote }}
+            - name: KAFKA_GROUP_ID_PREFIX
+              value: {{ .Values.consumer.env.kafkaGroupIdPrefix | quote }}
+            - name: TICK_SECONDS
+              value: {{ .Values.consumer.env.tickSeconds | quote }}
+            - name: ABANDONED_RATIO
+              value: {{ .Values.consumer.env.abandonedRatio | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.consumer.env.clickhouseUser | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.consumer.secretName }}
+                  key: CLICKHOUSE_PASSWORD
+            - name: CLICKHOUSE_URL
+              value: "clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.consumer.env.clickhouseHost }}:9000/{{ .Values.consumer.env.clickhouseDatabase }}"
+          resources:
+            {{- toYaml .Values.consumer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

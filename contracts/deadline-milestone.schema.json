@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "deadline-milestone/v1",
+  "title": "DeadlineMilestoneEvent",
+  "description": "Published to deadlines.milestone by the Acompanhamento context (apps/data-deadline-tracker) when an open, eligible incident crosses 25/50/75/100% of its current OLA, or the separate abandoned threshold. Carries what was known about the incident at that instant, never its final outcome — after this track, the (incident × marco) unit Predição trains on. A severity change recalculates the milestones on the new deadline instead of continuing the old one; a milestone already emitted for a given kind never fires again for the same incident. See domain/ubiquitous-language.md#marco.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "tenant_id",
+    "source",
+    "external_id",
+    "kind",
+    "severity",
+    "opened_at",
+    "due_at",
+    "deadline_seconds",
+    "consumed_ratio",
+    "occurred_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Assigned by the tracker."
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string"
+    },
+    "external_id": {
+      "type": "string",
+      "description": "Together with tenant_id and source, identifies the incident this milestone is about — same identity as incident-alert.schema.json."
+    },
+    "entity_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "pct_25",
+        "pct_50",
+        "pct_75",
+        "pct_100",
+        "abandoned"
+      ],
+      "description": "pct_100 constats the breach; no further pct_* milestone follows it for this incident. abandoned is a separate axis — its own threshold, past pct_100, for an incident that stayed open far beyond its deadline."
+    },
+    "severity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Severity in effect at the instant this milestone fired — may differ from the incident's severity at open, if it was recategorized."
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "acknowledged_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "As known at the instant this milestone fired."
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "opened_at plus the deadline for the severity in effect at this instant — recalculated whenever severity changes, never continued from a prior severity's deadline."
+    },
+    "deadline_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The tenant's configured deadline for severity, at this instant."
+    },
+    "consumed_ratio": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Elapsed time over deadline_seconds at this instant. Can exceed 1.0 — that is what drives pct_100 and, further out, abandoned."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the tracker detected and emitted this milestone — assigned, not derived from the incident's own timestamps."
+    }
+  }
+}

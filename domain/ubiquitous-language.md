@@ -124,6 +124,24 @@ como *identify OLA breach risk*, e o dicionário de origem traduz `KPI Violado?`
 was breached*. `violation` tinha entrado só como nome de coluna em dois modelos analíticos,
 sem lastro em lugar nenhum.
 
+### marco
+
+O que o acompanhador de prazo emite quando um incident aberto e elegível cruza 25%, 50%,
+75% ou 100% do seu [OLA](#ola) vigente, ou o limiar de abandono — carrega o que se sabia do
+incident naquele instante, nunca o desfecho final. O marco de 100% constata o
+[breach](#breach); nenhum marco de prazo é emitido depois dele, só o de abandono, que é um
+eixo separado.
+
+Só existe para a entrada `alert`: [OLA](#ola) é prazo contratual, e a entrada `monitor` não
+tem prazo — ver [condition](#condition).
+
+Depois desta track, é a unidade de treino da Predição: cada incident que atravessa marcos
+vira (incident × marco), não uma linha só por incident.
+
+*Não use:* milestone em conversa ou em nome de campo/tópico de negócio — o código publica em
+inglês (`deadlines.milestone`, contrato `deadline-milestone`), mas o termo do domínio, em
+português, é `marco`.
+
 ### KPI
 
 O indicador que a Locaweb mede mensalmente. Nem todo incident conta: entram apenas severity

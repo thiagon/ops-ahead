@@ -1,0 +1,32 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+data-deadline-tracker:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/data-deadline-tracker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+consumer:
+  # Fixed at 1, on purpose — no scaledobject.yaml, no hpa.yaml. The open-
+  # occurrence set lives in this process's memory; a second replica would
+  # sweep the same occurrences independently and emit every milestone
+  # twice (Fase 6, task 6.9).
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopicAlert: events.alert
+    kafkaTopicMilestones: deadlines.milestone
+    kafkaGroupIdPrefix: deadline-tracker
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    tickSeconds: "30"
+    abandonedRatio: "3.0"
+  secretName: data-deadline-tracker-secret

@@ -212,24 +212,24 @@ A peça que reage à passagem do tempo, não a evento de origem.
 
 ### Tasks
 
-- [ ] 6.1: Serviço que mantém o conjunto de ocorrências abertas, reconstruível do bronze
-- [ ] 6.2: Cálculo do instante em que cada aberta cruza 25%, 50%, 75% e 100% do prazo
-- [ ] 6.3: Emissão do marco com o que se sabia naquele instante
-- [ ] 6.4: Nenhum marco de prazo depois dos 100%
-- [ ] 6.5: Mudança de severidade recalcula os marcos sobre o prazo novo, inclusive disparando o de
+- [x] 6.1: Serviço que mantém o conjunto de ocorrências abertas, reconstruível do bronze
+- [x] 6.2: Cálculo do instante em que cada aberta cruza 25%, 50%, 75% e 100% do prazo
+- [x] 6.3: Emissão do marco com o que se sabia naquele instante
+- [x] 6.4: Nenhum marco de prazo depois dos 100%
+- [x] 6.5: Mudança de severidade recalcula os marcos sobre o prazo novo, inclusive disparando o de
       100% na hora quando o tempo já corrido excede o prazo que passou a valer
-- [ ] 6.6: Limiar separado para ocorrência abandonada, com mensagem própria
-- [ ] 6.7: Consolidação disparada no fechamento
-- [ ] 6.8: Tópico próprio para os marcos, com retenção adequada ao reprocessamento
-- [ ] 6.9: App, chart e `ArgoCD Application` — instância única, o relógio não pode emitir duas vezes
-- [ ] 6.10: Reconstrução do estado na subida, sem depender do que estava em cache
-- [ ] 6.11: Métricas e testes do cálculo de marco por gravidade
+- [x] 6.6: Limiar separado para ocorrência abandonada, com mensagem própria
+- [x] 6.7: Consolidação disparada no fechamento
+- [x] 6.8: Tópico próprio para os marcos, com retenção adequada ao reprocessamento
+- [x] 6.9: App, chart e `ArgoCD Application` — instância única, o relógio não pode emitir duas vezes
+- [x] 6.10: Reconstrução do estado na subida, sem depender do que estava em cache
+- [x] 6.11: Métricas e testes do cálculo de marco por gravidade
 
 ### Verification
 
-- [ ] Uma ocorrência que atravessa o prazo gera os quatro marcos, na ordem e nos instantes corretos
-- [ ] Ocorrência resolvida antes de um marco não o gera
-- [ ] Reinício do serviço não reemite marco já emitido
+- [x] Uma ocorrência que atravessa o prazo gera os quatro marcos, na ordem e nos instantes corretos
+- [x] Ocorrência resolvida antes de um marco não o gera
+- [x] Reinício do serviço não reemite marco já emitido
 
 ---
 

@@ -13,6 +13,7 @@ Os termos usados aqui estão na [Ubiquitous Language](./ubiquitous-language.md).
 | **Acervo** | Guardar todo event recebido e modelá-lo para análise; é a memória do sistema | implementado |
 | **Predição** | Estimar volume futuro e risco de breach | previsto |
 | **Detecção** | Reconhecer rajada e agravamento por entity, em tempo quase real | previsto |
+| **Acompanhamento** | Reagir à passagem do tempo sobre incidents abertos, emitindo marco de consumo do OLA | implementado |
 | **Copiloto** | Transformar sinal em recomendação explicável para o operador | previsto |
 
 *Previsto* significa que a arquitetura reserva o lugar e o ponto de integração existe, mas
@@ -23,10 +24,11 @@ nenhuma implementação o ocupa.
 ```
   ITSM ──ACL──▶ Integração ──PL──▶ Acervo
    (externo)         │                │
-                     │                └──PL──▶ Predição ──┐
-                     │                └──PL──▶ Detecção ──┤
-                     │                                    ▼
-                     └◀────────── PL ──────────────── Copiloto
+                     │                ├──PL──▶ Predição ────────┐
+                     │                ├──PL──▶ Detecção ────────┤
+                     │                └──PL──▶ Acompanhamento ──┤
+                     │                                          ▼
+                     └◀────────── PL ────────────────────── Copiloto
 ```
 
 ### ITSM → Integração — Anti-Corruption Layer
@@ -53,19 +55,19 @@ de natureza, é [`contracts/event-envelope.schema.json`](../contracts/event-enve
 O upstream aqui é o **fornecedor**: mudar o formato quebra todo mundo a jusante, e por isso
 a mudança passa por versão do contrato, não por combinação entre dois times.
 
-### Acervo → Predição, Acervo → Detecção — Published Language
+### Acervo → Predição, Acervo → Detecção, Acervo → Acompanhamento — Published Language
 
-Os dois consomem o mesmo event publicado, cada um com sua leitura: Predição estima, Detecção
-reconhece padrão em janela. Nenhum conhece o outro.
+Os três consomem o mesmo event publicado, cada um com sua leitura: Predição estima, Detecção
+reconhece padrão em janela, Acompanhamento mede consumo de prazo. Nenhum conhece os outros.
 
 Consumir a mesma publicação em vez de conversarem entre si é o que permite acrescentar um
-terceiro consumidor sem renegociar nada.
+quarto consumidor sem renegociar nada — foi assim que Acompanhamento entrou.
 
-### Predição, Detecção → Copiloto — Customer/Supplier
+### Predição, Detecção, Acompanhamento → Copiloto — Customer/Supplier
 
-O Copiloto é cliente dos dois: precisa de score e de sinal de rajada para recomendar. É a
-única integração em que o consumidor tem voz sobre o que o produtor emite — se a recomendação
-precisa de um campo, os produtores o incluem.
+O Copiloto é cliente dos três: precisa de score, de sinal de rajada e de marco de prazo para
+recomendar. É a única integração em que o consumidor tem voz sobre o que o produtor emite —
+se a recomendação precisa de um campo, os produtores o incluem.
 
 ### Copiloto → Integração — Published Language
 
@@ -87,24 +89,26 @@ implicitamente pelo próprio acesso à rede da plataforma.
 
 Igual à Integração, é a única porta de entrada pra esse tipo de pedido — Predição e
 Acervo nunca são acionados sob demanda por nenhum outro caminho. Ao contrário da
-Integração, não fica no meio do fluxo pub/sub principal (`incidents.raw.*`, `incidents.alert`/
-`incidents.monitor` e o resto continuam fluindo sem passar por ela).
+Integração, não fica no meio do fluxo pub/sub principal (`events.raw.*`, `events.alert`/
+`events.monitor` e o resto continuam fluindo sem passar por ela).
 
 ## O que os pontos de integração carregam
 
 | Ponto | Entre | Carrega |
 |-------|-------|---------|
-| `incidents.raw.alert` / `incidents.raw.monitor` | Integração → Integração (tradução) | envelope cru, corpo opaco — nenhum consumidor de negócio lê estes |
-| `incidents.alert` / `incidents.monitor` | Integração → Acervo, Detecção | event traduzido, um tópico por intake |
+| `events.raw.alert` / `events.raw.monitor` | Integração → Integração (tradução) | envelope cru, corpo opaco — nenhum consumidor de negócio lê estes |
+| `events.alert` / `events.monitor` | Integração → Acervo, Detecção, Acompanhamento | event traduzido, um tópico por intake |
 | `incidents.scored` | Predição → Copiloto | event com risco de breach estimado |
 | `alerts.burst` | Detecção → Copiloto | rajada reconhecida numa entity |
+| `deadlines.milestone` | Acompanhamento → Predição, Copiloto | marco de consumo do OLA (25/50/75/100% ou abandono) de um incident aberto |
 | `recommendations` | Copiloto → Integração | recomendação explicável, pronta para sair |
 | `actions.taken` | Integração → Acervo | o que o operador decidiu, para avaliar o Copiloto |
 | `trigger.ml` / `trigger.data` | execução sob demanda → Predição / Acervo | `analysis` + parâmetros de um pedido validado, um tópico por domínio |
 | `trigger.status` | Predição / Acervo → execução sob demanda | estado atual de um pedido (`run_id` como key, log compactado — só a última mensagem por run sobrevive) |
 
-`incidents.raw.*`, `incidents.alert` e `incidents.monitor` têm tráfego hoje entre os pontos
-pub/sub — substituem o antigo `incidents.received`, cortado sem alias na track
-`incident-flow_20260819`. `trigger.ml`/`trigger.data`/`trigger.status` têm tráfego real desde
-a track `exec-trigger_20260807`. Os demais continuam reservados — declará-los cedo é o que
-permite implementar os contextos em qualquer ordem.
+`events.raw.*`, `events.alert`, `events.monitor` e `deadlines.milestone` têm tráfego hoje
+entre os pontos pub/sub — os três primeiros substituem o antigo `incidents.received`, cortado
+sem alias, e o último é novo, ambos na track `incident-flow_20260819`. `trigger.ml`/
+`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`. Os
+demais continuam reservados — declará-los cedo é o que permite implementar os contextos em
+qualquer ordem.
