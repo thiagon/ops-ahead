@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: gold_monitor_signal_counts
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: window_minutes
+        tests:
+          - not_null
+          - accepted_values:
+              values: [15, 60, 360]
+      - name: window_start
+        tests: [not_null]
+      - name: signal_count
+        tests: [not_null]
+
+  - name: gold_monitor_auto_resolution_rate
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: auto_resolution_rate
+        tests: [not_null]
+
+  - name: gold_monitor_signal_intervals
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: median_interval_seconds
+        tests: [not_null]
+
+  - name: gold_monitor_severity_escalations
+    columns:
+      - name: entity_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: escalation_count
+        tests: [not_null]
+
+  - name: gold_monitor_daily_features
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: source
+        tests: [not_null]
+      - name: p1_share
+        tests: [not_null]
+      - name: critical_share
+        tests: [not_null]

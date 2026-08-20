@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
 
+    # Cache-aside snapshot the inference path reads instead of querying
+    # ClickHouse directly — see redis_snapshot.py.
+    redis_url: str = "redis://localhost:6379/0"
+
     mlflow_tracking_uri: str = "http://mlflow-tracking.ml.svc.cluster.local:5000"
     # Marts register_snapshot.py counts and fingerprints — see
     # infra/charts/data-runner/values.yaml's run.env.snapshotMarts.

@@ -40,6 +40,9 @@ run:
     clickhouseDatabase: default
     minioEndpoint: http://minio.data.svc.cluster.local:9000
     minioBucket: ops-ahead-lake
+    # Cache-aside snapshot for gold_monitor_signal_counts — see
+    # apps/data-runner/src/redis_snapshot.py.
+    redisHost: redis.ml.svc.cluster.local
     mlflowTrackingUri: http://mlflow-tracking.ml.svc.cluster.local:5000
     # Tags register_snapshot's MLflow run — which pipeline config produced
     # it. Overridden per-pipeline the same way pipelines/data-itsm-daily's

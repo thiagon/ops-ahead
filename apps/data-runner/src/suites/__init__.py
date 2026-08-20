@@ -11,6 +11,7 @@ from .marts import (
     register_incidents_by_ic,
     register_kpi_monthly_state,
 )
+from .gold_monitor import register_gold_monitor_signal_counts
 from .silver import register_silver_alert, register_silver_monitor
 
 REGISTRY: dict[str, Callable[[AbstractDataContext], ValidationDefinition]] = {
@@ -20,4 +21,5 @@ REGISTRY: dict[str, Callable[[AbstractDataContext], ValidationDefinition]] = {
     "mart_kpi_monthly_state": register_kpi_monthly_state,
     "silver_alert": register_silver_alert,
     "silver_monitor": register_silver_monitor,
+    "gold_monitor_signal_counts": register_gold_monitor_signal_counts,
 }

@@ -76,6 +76,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.run.secretName }}
                   key: minio-secret-key
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.run.secretName }}
+                  key: redis-password
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ .Values.run.env.redisHost }}:6379/0"
             - name: MLFLOW_TRACKING_URI
               value: {{ .Values.run.env.mlflowTrackingUri | quote }}
             - name: SOURCE

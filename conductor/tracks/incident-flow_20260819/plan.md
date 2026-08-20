@@ -159,18 +159,18 @@ Agregações por entity. Insumo de análise, não produto de tela.
 
 ### Tasks
 
-- [ ] 4.1: Contagem por entity e janela, sobre a nova chave e a nova fonte
-- [ ] 4.2: Taxa de auto-resolução por entity
-- [ ] 4.3: Intervalo típico entre sinais por entity
-- [ ] 4.4: Sequência de severidade crescente por entity
-- [ ] 4.5: Agregações diárias para o detector de evento externo
-- [ ] 4.6: Snapshot em cache do que o caminho de inferência consome
-- [ ] 4.7: Testes de cada agregação e do snapshot
+- [x] 4.1: Contagem por entity e janela, sobre a nova chave e a nova fonte
+- [x] 4.2: Taxa de auto-resolução por entity
+- [x] 4.3: Intervalo típico entre sinais por entity
+- [x] 4.4: Sequência de severidade crescente por entity
+- [x] 4.5: Agregações diárias para o detector de evento externo
+- [x] 4.6: Snapshot em cache do que o caminho de inferência consome
+- [x] 4.7: Testes de cada agregação e do snapshot
 
 ### Verification
 
-- [ ] As agregações existem para entity sem nenhuma ocorrência aberta
-- [ ] Os números batem com a contagem direta no bronze da cadeia
+- [x] As agregações existem para entity sem nenhuma ocorrência aberta
+- [x] Os números batem com a contagem direta no bronze da cadeia
 
 ---
 

@@ -15,6 +15,11 @@ def run_transform() -> None:
     subprocess.run(["dbt", "seed", "--profiles-dir", "/dbt"], check=True)
     subprocess.run(["dbt", "run", "--profiles-dir", "/dbt"], check=True)
 
+    from redis_snapshot import publish_snapshot
+    from settings import Settings
+
+    publish_snapshot(Settings())
+
 
 def run_quality(argv: list[str]) -> None:
     from runner import main as runner_main
