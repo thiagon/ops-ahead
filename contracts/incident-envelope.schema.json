@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "incident-envelope/v1",
+  "title": "IncidentEnvelope",
+  "description": "Raw envelope published by the gateway right after authentication, before any interpretation — one per received event, append-only. The payload is opaque; everything outside it is the minimum needed to authenticate, partition, and reprocess. Consumed by the translation stage, never by a business consumer. See domain/acl/itsm.md and docs/insights/fluxo-do-incidente.md.",
+  "type": "object",
+  "required": ["event_id", "source", "intake", "version", "received_at", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique event identifier (UUID v4), assigned by the gateway."
+    },
+    "source": {
+      "type": "string",
+      "description": "Origin adapter identifier, assigned by the gateway from the route and the integration's credential — never declared by the payload.",
+      "examples": ["itsm", "alertmanager", "datadog"]
+    },
+    "intake": {
+      "type": "string",
+      "enum": ["alert", "monitor"],
+      "description": "Nature of the origin, assigned by the gateway from the route that received the event. See domain/ubiquitous-language.md#intake."
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of this envelope's format."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the gateway received the event (UTC, ISO 8601), assigned by the gateway."
+    },
+    "payload": {
+      "type": "string",
+      "description": "The origin's body, verbatim, as a JSON string. Opaque at this stage — no field inside it is typed here."
+    }
+  }
+}

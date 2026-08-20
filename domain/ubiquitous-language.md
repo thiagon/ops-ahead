@@ -11,27 +11,68 @@ O documento define **o que os termos querem dizer**. O formato dos dados é assu
 
 ### incident
 
-Uma ocorrência no sistema de origem. Vive ao longo do tempo: é aberta, trabalhada,
-resolvida e encerrada, e pode mudar de severity no caminho.
+Uma ocorrência gerenciada, sob a entrada [intake](#intake) `alert`: tem dono, ciclo de vida
+e prazo. Vive ao longo do tempo — é aberta, trabalhada, resolvida e encerrada, e pode mudar
+de severity no caminho.
 
-Um incident **não** é o que trafega pelo sistema — o que trafega é o *event*.
+Um incident **não** é o que trafega pelo sistema — o que trafega é o *event*. E não é toda
+observação de origem: uma origem que só observa, sem gerenciar trabalho, produz *condition*,
+não incident.
+
+*Não use:* para a entrada `monitor` — ver [condition](#condition).
+
+### condition
+
+O que uma origem do tipo `monitor` reporta: um estado observado numa [entity](#entity), que
+dispara (`firing`) ou cessa (`cleared`). Sem dono, sem [acknowledgment](#acknowledgment), sem
+prazo — a origem observa, não gerencia trabalho.
+
+*Não use:* incident, para a entrada `monitor`. Os dois termos existem porque as origens não
+são da mesma natureza — ver [intake](#intake).
+
+### intake
+
+A natureza de uma origem, atribuída pelo gateway a partir da rota que recebeu o evento —
+`alert` (ocorrência gerenciada, ver [incident](#incident)) ou `monitor` (condição observada,
+ver [condition](#condition)). Nunca é declarada pelo payload: é a rota, vinculada à
+credencial da integração, que determina.
+
+Cada intake tem seu próprio tópico, sua própria tabela e seu próprio contrato — não há
+tentativa de unificar. Um contrato único para as duas naturezas produz campo vazio
+carregando semântica ambígua.
+
+*Não use:* nature, kind, em nome de campo — o campo publicado é `intake`.
+
+### acknowledgment
+
+O eixo que registra se um humano já assumiu o incident, separado do ciclo de vida
+(`status`). Um incident pode estar aberto e reconhecido, aberto e não reconhecido, ou
+encerrado tendo sido ou não reconhecido antes — quatro combinações distintas, por isso não
+é um valor de `status`.
+
+Só existe na entrada `alert`: origens do tipo `monitor` observam, não gerenciam trabalho
+humano.
+
+*Não use:* ack em nome de campo — o campo publicado é `acknowledged_at`.
 
 ### event
 
-Uma observação de um incident num instante, publicada no barramento. É a unidade que se
-move entre contextos.
+Uma observação de um incident ou de uma condition num instante, publicada no barramento. É a
+unidade que se move entre contextos — o [intake](#intake) diz qual das duas ela descreve.
 
-O mesmo incident gera vários events ao longo da vida. Recategorizar prioridade não corrige
-um event anterior: emite um novo. Por isso o sistema consegue reconstruir a história de um
-incident sem que nenhum contexto precise guardar estado sobre ele.
+O mesmo incident (ou a mesma condition) gera vários events ao longo da vida. Recategorizar
+severity não corrige um event anterior: emite um novo. Por isso o sistema consegue
+reconstruir a história de um incident sem que nenhum contexto precise guardar estado sobre
+ele.
 
 *Não use:* message, record.
 
 ### source
 
-O sistema que emitiu o event. Cada source fala seu próprio vocabulário e tem seu próprio
-contrato — o domínio nunca aprende nenhum deles, porque a tradução acontece na
-[ACL](./acl/itsm.md).
+O sistema que emitiu o event. Nunca é declarado pelo payload — é atribuído pelo gateway, a
+partir da rota e da credencial da integração vinculada a ela. Cada source fala seu próprio
+vocabulário e tem seu próprio contrato — o domínio nunca aprende nenhum deles, porque a
+tradução acontece na [ACL](./acl/itsm.md).
 
 *Não use:* origin, provider.
 
@@ -79,14 +120,19 @@ diferentes, e confundi-las inverte o indicador. As regras completas estão no
 
 ### no_intervention
 
-Incident encerrado sem nenhuma ação humana — o monitoramento abriu e o próprio evento se
-resolveu sozinho. Fica de fora do KPI. Tradução para a Ubiquitous Language do status ITSM
-"Sem Intervenção" — vocabulário de origem que não deveria aparecer em nome de campo além
-do adapter ([`acl/itsm.md`](./acl/itsm.md)).
+Incident encerrado sem nenhuma ação humana — a origem abriu por monitoramento e o próprio
+incident se resolveu sozinho. Fica de fora do KPI.
 
-*Não use:* sem_intervencao, em nome de campo nem em valor. O status chega do ITSM em
-português e é traduzido no adapter do `ui-gateway`, que é onde a ACL acontece — do contrato
-publicado em diante, `no_intervention` é o único nome.
+Deixou de ser um valor de `status`: o `status` da entrada `alert` é o ciclo de vida genérico
+entre naturezas de origem (`open` / `in_progress` / `waiting` / `resolved` / `closed` /
+`canceled` / `unknown`), e "Sem Intervenção" — vocabulário do ITSM — não é um estado de
+ciclo de vida, é um veredito sobre como o incident terminou. Passa a viver em
+`resolution_code` (valor de origem, traduzido) e é a regra de `is_eligible`, no silver, que
+o exclui do KPI — nunca mais lido de um campo de status.
+
+*Não use:* sem_intervencao, em nome de campo nem em valor; e não use como valor de
+`status`. Decisão a confirmar com a Locaweb junto das outras pendências desta track — ver
+[fluxo-do-incidente.md](../docs/insights/fluxo-do-incidente.md).
 
 ### external event
 

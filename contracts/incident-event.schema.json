@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "incident-event/v1",
   "title": "IncidentEvent",
-  "description": "Hybrid schema for incidents.received Kafka topic. Universal fields first-class; origin-specific payload preserved verbatim in payload_raw.",
+  "description": "Hybrid schema for incidents.received Kafka topic. Universal fields first-class; origin-specific payload preserved verbatim in payload_raw. Superseded by the intake split (incident-envelope.schema.json for the raw stage, incident-alert.schema.json / incident-monitor.schema.json for the translated stage) — kept unchanged and consumed in parallel until the Phase 2 cutover of incident-flow_20260819 retires it.",
   "type": "object",
   "required": [
     "event_id",

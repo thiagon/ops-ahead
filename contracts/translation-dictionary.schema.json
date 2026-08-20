@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "translation-dictionary/v1",
+  "title": "TranslationDictionary",
+  "description": "Per-origin, per-intake mapping from the origin's own values to the domain vocabulary. Lives outside code, versioned, immutable in production — a correction ships as a new version, never an edit in place. A value absent from a mapping is the unknown case at translation time: it surfaces as 'unknown' (status) or passes through untranslated (resolution_code), and never fails the event. See domain/acl/itsm.md#o-dicionário-de-tradução.",
+  "type": "object",
+  "required": ["source", "intake", "dictionary_version", "mappings"],
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "The origin this dictionary translates, e.g. 'itsm'.",
+      "examples": ["itsm", "opsgenie", "alertmanager"]
+    },
+    "intake": {
+      "type": "string",
+      "enum": ["alert", "monitor"],
+      "description": "Which translated contract the mapped fields feed — incident-alert.schema.json or incident-monitor.schema.json."
+    },
+    "dictionary_version": {
+      "type": "string",
+      "description": "Stamped as dictionary_version into every translated line this dictionary produces."
+    },
+    "mappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Only the keys relevant to this dictionary's intake are expected to be populated — status and reported_by for alert, condition for monitor.",
+      "properties": {
+        "status": {
+          "type": "object",
+          "description": "alert only — origin value to the domain's lifecycle enum.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["open", "in_progress", "waiting", "resolved", "closed", "canceled"]
+          }
+        },
+        "condition": {
+          "type": "object",
+          "description": "monitor only — origin value to firing/cleared.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["firing", "cleared"]
+          }
+        },
+        "reported_by": {
+          "type": "object",
+          "description": "alert only — origin value to automatic/manual.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["automatic", "manual"]
+          }
+        },
+        "resolution_code": {
+          "type": "object",
+          "description": "alert only — origin value translated to the domain's own vocabulary for how the incident ended, e.g. 'Sem Intervenção' to 'no_intervention'. Free-form target, unlike the other three mappings, because this list grows with what each origin's outcomes actually mean.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}

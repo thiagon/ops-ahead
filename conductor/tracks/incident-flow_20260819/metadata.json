@@ -1,0 +1,18 @@
+{
+  "id": "incident-flow_20260819",
+  "title": "Fluxo do incidente \u2014 duas entradas, marcos de prazo e read model",
+  "type": "feature",
+  "status": "in_progress",
+  "created": "2026-08-19T00:00:00Z",
+  "updated": "2026-08-19T00:00:00Z",
+  "current_phase": 2,
+  "current_task": "2.1",
+  "phases": {
+    "total": 7,
+    "completed": 1
+  },
+  "tasks": {
+    "total": 62,
+    "completed": 10
+  }
+}
