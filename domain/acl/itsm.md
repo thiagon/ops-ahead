@@ -75,8 +75,13 @@ Formato comum a toda origem, fora do código e versionado — nunca mutável em 
 Contrato em
 [`contracts/translation-dictionary.schema.json`](../../contracts/translation-dictionary.schema.json).
 
-Cada dicionário declara, para a origem que representa: os valores que ela usa para ciclo de
-vida (`status`, só na entrada `alert`), para condição (`condition`, só na entrada
+O dicionário é indexado por [tenant](../ubiquitous-language.md#tenant) e origem, não por
+origem sozinha: dois tenants no mesmo sistema — dois clientes com o mesmo ITSM, por exemplo —
+podem customizar estados diferentes, e tratar isso como um dicionário só faria um tenant
+herdar a customização do outro.
+
+Cada dicionário declara, para o tenant e a origem que representa: os valores que ela usa para
+ciclo de vida (`status`, só na entrada `alert`), para condição (`condition`, só na entrada
 `monitor`) e para o que originou o registro (`reported_by`, só na entrada `alert`), mapeados
 para o vocabulário do domínio. Valor fora do dicionário vira o caso desconhecido e fica
 visível — nunca falha o evento, porque o corpo original está preservado no raw e o mapa pode

@@ -1,7 +1,7 @@
 # Track: Fluxo do incidente — duas entradas, marcos de prazo e read model
 
 **ID:** incident-flow_20260819
-**Status:** Pending
+**Status:** In Progress
 
 ## Documents
 
@@ -11,8 +11,8 @@
 
 ## Progress
 
-- Phases: 0/7 complete
-- Tasks: 0/62 complete
+- Phases: 1/7 complete
+- Tasks: 12/71 complete
 
 ## Quick Links
 

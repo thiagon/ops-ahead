@@ -76,6 +76,21 @@ tradução acontece na [ACL](./acl/itsm.md).
 
 *Não use:* origin, provider.
 
+### tenant
+
+O cliente a quem um event pertence. Como `source`, nunca é declarado pelo payload — vem da
+credencial da integração, atribuído pelo gateway. Prefixa a identidade em toda camada: o
+identificador que uma origem dá a uma ocorrência só é único dentro de uma origem de um
+tenant, então a chave real é `(tenant_id, source, external_id)`, nunca `external_id`
+sozinho.
+
+Dois tenants no mesmo sistema de origem podem customizar estados diferentes — por isso o
+dicionário de tradução é indexado por tenant e origem, não por origem sozinha, e a tabela de
+prazo por severidade é configuração por tenant, não constante do código: o prazo é contrato
+de cada cliente.
+
+*Não use:* customer, client, org — o campo publicado é `tenant_id`.
+
 ### entity
 
 O que foi afetado — um ativo de TI, host ou serviço. É por entity que o sistema agrupa para

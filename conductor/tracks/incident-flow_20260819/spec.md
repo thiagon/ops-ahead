@@ -178,6 +178,7 @@ não uma arqueologia dentro de um campo de texto**.
 | Campo | Tipo | Origem do valor |
 |-------|------|-----------------|
 | `event_id` | uuid | atribuído |
+| `tenant_id` | string | atribuído — pela credencial |
 | `source` | string | atribuído — rota e credencial da integração |
 | `intake` | enum `alert` / `monitor` | atribuído — pela rota |
 | `version` | string | atribuído — versão do formato do envelope |
@@ -222,6 +223,7 @@ valores no vocabulário do domínio. É o que os consumidores de negócio leem.
 | Campo | Tipo | Obrigatório | Origem do valor |
 |-------|------|-------------|-----------------|
 | `event_id` | uuid | sim | atribuído |
+| `tenant_id` | string | sim | atribuído — pela credencial |
 | `source` | enum | sim | atribuído |
 | `version` | string | sim | atribuído |
 | `received_at` | timestamp | sim | atribuído |
@@ -254,6 +256,7 @@ O corpo original não se repete aqui: está no raw, e `event_id` liga uma linha 
 | Campo | Tipo | Obrigatório | Origem do valor |
 |-------|------|-------------|-----------------|
 | `event_id` | uuid | sim | atribuído |
+| `tenant_id` | string | sim | atribuído — pela credencial |
 | `source` | enum | sim | atribuído |
 | `version` | string | sim | atribuído |
 | `received_at` | timestamp | sim | atribuído |
@@ -287,6 +290,9 @@ ocorrência) e os campos derivados, que não existem em evento nenhum e só apar
 é montada.
 
 ### Ocorrência — cadeia `alert`
+
+A identidade de uma ocorrência é `(tenant_id, source, external_id)` — o identificador da origem só é
+único dentro de uma origem de um tenant.
 
 **Do bronze, pelo evento mais recente:** `external_id`, `source`, `severity`, `status`, `entity_id`,
 `title`, `description`, `owner`, `reported_by`, `parent_id`, `resolution_code`, `resolution_summary`,
@@ -370,6 +376,41 @@ que nenhuma origem além de um gerenciador teria.
 
 ---
 
+---
+
+## Onde cada camada mora e como particiona
+
+| Camada | Onde | Por quê |
+|--------|------|---------|
+| Raw | lake, em arquivo colunar | é arquivo de arquivo: existe para reprocessar e auditar, raramente é lido |
+| Bronze | warehouse | consultável, alimenta o silver, é o que os consumidores leem |
+| Silver, Gold | warehouse | derivados do bronze |
+
+O corpo cru não é materializado no warehouse e o traduzido não vai para o lake — cada evento existe
+duas vezes, em formas com função distinta. Reprocessar lê o arquivo direto, sem precisar do corpo
+materializado no warehouse.
+
+**Raw**, particionado no caminho: `tenant / entrada / origem / data de recepção`. Por recepção e não
+pela data do evento, porque reprocessar é sempre "reler o que chegou entre tal e tal dia", e escrever
+por data de recepção mantém a gravação sequencial. Um evento antigo que chegue hoje por reenvio cai
+na pasta de hoje, que é onde alguém vai procurá-lo.
+
+**Bronze**, partição mensal por recepção, ordenado por `(tenant_id, source, external_id, received_at)`.
+Mensal porque partição diária multiplica partes e degrada o merge. A ordenação é o que torna barata a
+consulta que mais importa aqui — *todos os eventos desta ocorrência, em ordem* — que é o que o silver
+faz para montar o estado.
+
+**Silver**, partição mensal pela abertura, ordenado por `(tenant_id, source, external_id)`. Muda a
+chave porque muda a pergunta: aqui a linha representa a vida da ocorrência, e as consultas são por
+período de abertura.
+
+**Gold**, ordenado pela dimensão que a agregação usa — entity e janela, período e severidade, ou
+responsável e janela.
+
+A consulta do acompanhador é "abertas, ordenadas por `due_at`", e `due_at` não serve como chave
+primária: ele é reescrito a cada recategorização. Como o conjunto de ocorrências vivas é pequeno,
+isso se resolve com uma visão só dos abertos, sem forçar a ordenação da tabela inteira.
+
 ## Technical Notes
 
 **Marco de prazo, não intervalo fixo.** O marco escala com a prioridade sozinho — 25% são uma hora em
@@ -382,6 +423,12 @@ incidentes elegíveis, menos de um por incidente.
 
 **As duas cadeias se encontram por `entity`.** É por ela que se pergunta quantos sinais estão
 disparando no recurso enquanto o incidente dele está aberto sem reconhecimento.
+
+**Multi-tenant desde o começo.** `tenant_id` é atribuído pela credencial, nunca lido do corpo, e
+prefixa a chave de ordenação em todas as camadas. Duas consequências: a tabela de prazo por
+severidade deixa de ser constante no código e vira configuração por tenant, porque o prazo é contrato
+de cada cliente; e o dicionário de tradução passa a ser indexado por tenant e origem, porque dois
+clientes com o mesmo sistema podem ter estados customizados diferentes.
 
 **O prazo é derivado, e muda quando a severidade muda.** Ele não vem da origem: sai da tabela de
 prazo por severidade, aplicada no estado atual. Mas severidade não é fixa — escalonamento de P3 para

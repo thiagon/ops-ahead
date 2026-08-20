@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "event_id",
+    "tenant_id",
     "source",
     "version",
     "dictionary_version",
@@ -23,10 +24,19 @@
       "format": "uuid",
       "description": "Same identifier as the raw envelope this event was translated from."
     },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tenant the event belongs to, assigned by the gateway from the integration's credential — never declared by the payload. Prefixes identity everywhere: an origin's identifier is only unique within one origin of one tenant."
+    },
     "source": {
       "type": "string",
       "description": "Assigned by the gateway.",
-      "examples": ["itsm", "opsgenie", "pagerduty"]
+      "examples": [
+        "itsm",
+        "opsgenie",
+        "pagerduty"
+      ]
     },
     "version": {
       "type": "string",
@@ -50,16 +60,25 @@
       "format": "date-time"
     },
     "acknowledged_at": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "Only when the origin has the field. See domain/ubiquitous-language.md#acknowledgment."
     },
     "resolved_at": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time"
     },
     "closed_at": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "Only when the origin has the field."
     },
@@ -71,43 +90,84 @@
     },
     "status": {
       "type": "string",
-      "enum": ["open", "in_progress", "waiting", "resolved", "closed", "canceled", "unknown"],
+      "enum": [
+        "open",
+        "in_progress",
+        "waiting",
+        "resolved",
+        "closed",
+        "canceled",
+        "unknown"
+      ],
       "description": "Lifecycle only, translated by the origin's dictionary. Acknowledgment is a separate axis (acknowledged_at); a business verdict like no_intervention lives in resolution_code, never here."
     },
     "entity_id": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "title": {
       "type": "string"
     },
     "description": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "owner": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Who currently holds the incident."
     },
     "reported_by": {
-      "type": ["string", "null"],
-      "enum": ["automatic", "manual", null],
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "automatic",
+        "manual",
+        null
+      ],
       "description": "Translated by the origin's dictionary."
     },
     "parent_id": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "resolution_code": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Origin's own vocabulary for how the incident ended — e.g. the ITSM's 'Sem Intervenção'. Translated by the dictionary; drives is_eligible downstream, in silver. See domain/ubiquitous-language.md#no_intervention."
     },
     "resolution_summary": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "labels": {
-      "type": ["object", "null"],
-      "additionalProperties": { "type": "string" }
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "source_url": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uri"
     }
   }

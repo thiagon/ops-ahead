@@ -39,8 +39,13 @@ de fechar vocabulário é decidir o nome duas vezes.
 - [x] 1.7: Veredito de negócio deixa de ser recebido da origem e passa a ser derivado
 - [x] 1.8: Versão no contrato publicado de cada entrada, para o consumidor saber o que está lendo e
       para duas versões coexistirem durante uma transição
-- [x] 1.9: `source` sai do contrato de entrada — a origem não se declara, é o gateway que determina
-- [x] 1.10: Formato do dicionário de tradução: como uma origem declara seus valores e como a versão
+- [x] 1.9: `source` e `tenant_id` saem do contrato de entrada — nenhum dos dois é declarado pela
+      origem, os dois vêm da credencial
+- [x] 1.10: `tenant_id` no envelope e nos dois contratos traduzidos, prefixando a identidade da
+      ocorrência: o identificador da origem só é único dentro de uma origem de um tenant
+- [x] 1.11: Dicionário de tradução indexado por tenant e origem — dois tenants no mesmo sistema podem
+      customizar estados diferentes
+- [x] 1.12: Formato do dicionário de tradução: como uma origem declara seus valores e como a versão
       do dicionário fica registrada no resultado
 
 ### Verification
@@ -67,10 +72,12 @@ mensagem, não como atualização de um registro consolidado no fim.
 
 **Bronze**
 
-- [ ] 2.5: Tabelas de bronze append-only por natureza, com o corpo preservado como chegou
-- [ ] 2.6: Cópia em arquivo particionada por origem e por data de recepção, com o corpo como coluna
-      de texto
-- [ ] 2.7: Destino do tópico atual: `incidents.received` é descontinuado — sem alias, sem preservar
+- [ ] 2.5: Raw no lake, em arquivo colunar particionado por tenant, entrada, origem e data de
+      recepção, com o corpo como coluna de texto — o corpo cru não é materializado no warehouse
+- [ ] 2.6: Tabelas de bronze no warehouse, append-only por entrada, sem o corpo: partição mensal por
+      recepção e ordenação por `(tenant_id, source, external_id, received_at)`
+- [ ] 2.7: Leitura do raw pelo warehouse para reprocessamento, sem materializar
+- [ ] 2.8: Destino do tópico atual: `incidents.received` é descontinuado — sem alias, sem preservar
       o dado antigo (decisão do usuário, 2026-08-19: as tabelas e tópicos de hoje viram lixo assim
       que as novas existirem, nada a migrar)
 
@@ -88,21 +95,21 @@ tarefa própria — corrigido aqui antes da Fase 2 começar a implementar.
 
 **Tradução**
 
-- [ ] 2.8: Estágio de tradução como componente próprio, consumindo o tópico cru — vive dentro do
+- [ ] 2.9: Estágio de tradução como componente próprio, consumindo o tópico cru — vive dentro do
       `data-ingest` existente, não em app novo (decisão do usuário, 2026-08-19)
-- [ ] 2.9: Dicionário por origem fora do código, versionado — ciclo de vida, condição e o que
+- [ ] 2.10: Dicionário por tenant e origem fora do código, versionado — ciclo de vida, condição e o que
       originou o registro, mapeados no vocabulário do domínio
-- [ ] 2.10: Valor fora do dicionário vira o caso desconhecido e fica visível, sem falhar o evento
-- [ ] 2.11: Publicação no tópico traduzido, que é o que os consumidores de negócio leem
-- [ ] 2.12: Reprocessamento de um período com uma versão de dicionário, sem sobrescrever o resultado
+- [ ] 2.11: Valor fora do dicionário vira o caso desconhecido e fica visível, sem falhar o evento
+- [ ] 2.12: Publicação no tópico traduzido, que é o que os consumidores de negócio leem
+- [ ] 2.13: Reprocessamento de um período com uma versão de dicionário, sem sobrescrever o resultado
       anterior
-- [ ] 2.13: `ScaledObject` para os consumidores da ingestão e da tradução
+- [ ] 2.14: `ScaledObject` para os consumidores da ingestão e da tradução
 
 **Testes**
 
-- [ ] 2.14: Tradução por origem, incluindo valor fora do dicionário
-- [ ] 2.15: Payload que tenta declarar a própria origem não influencia o envelope
-- [ ] 2.16: Reprocessamento produz resultado determinístico para uma dada versão de dicionário
+- [ ] 2.15: Tradução por origem, incluindo valor fora do dicionário
+- [ ] 2.16: Payload que tenta declarar a própria origem não influencia o envelope
+- [ ] 2.17: Reprocessamento produz resultado determinístico para uma dada versão de dicionário
 
 ### Verification
 
@@ -121,11 +128,14 @@ Com stream, contar linha de bronze passa a contar evento, não ocorrência.
 
 ### Tasks
 
-- [ ] 3.1: Estado atual da cadeia `alert`: última versão por identidade, com deduplicação
-- [ ] 3.2: Estado atual da cadeia `monitor`: quais condições estão ativas por entity
-- [ ] 3.3: Campos derivados calculados aqui, não recebidos: duração, elegibilidade, consumo de prazo
-- [ ] 3.4: Reconstrução do estado em um instante passado a partir do bronze
-- [ ] 3.5: Testes de que a deduplicação não multiplica contagem
+- [ ] 3.1: Estado atual da cadeia `alert`: última versão por `(tenant_id, source, external_id)`, com
+      deduplicação, partição mensal pela abertura
+- [ ] 3.2: Visão dos abertos ordenada por prazo a vencer, separada da tabela cheia
+- [ ] 3.3: Estado atual da cadeia `monitor`: quais condições estão ativas por entity
+- [ ] 3.4: Campos derivados calculados aqui, não recebidos: duração, elegibilidade, consumo de prazo
+- [ ] 3.5: Tabela de prazo por severidade como configuração por tenant, não constante no código
+- [ ] 3.6: Reconstrução do estado em um instante passado a partir do bronze
+- [ ] 3.7: Testes de que a deduplicação não multiplica contagem
 
 ### Verification
 

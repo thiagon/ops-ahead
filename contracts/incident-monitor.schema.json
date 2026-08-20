@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "event_id",
+    "tenant_id",
     "source",
     "version",
     "dictionary_version",
@@ -22,10 +23,19 @@
       "format": "uuid",
       "description": "Same identifier as the raw envelope this event was translated from."
     },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tenant the event belongs to, assigned by the gateway from the integration's credential — never declared by the payload. Prefixes identity everywhere: an origin's identifier is only unique within one origin of one tenant."
+    },
     "source": {
       "type": "string",
       "description": "Assigned by the gateway.",
-      "examples": ["alertmanager", "datadog", "zabbix"]
+      "examples": [
+        "alertmanager",
+        "datadog",
+        "zabbix"
+      ]
     },
     "version": {
       "type": "string",
@@ -49,18 +59,27 @@
       "format": "date-time"
     },
     "ended_at": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "Null while the condition persists."
     },
     "severity": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 1,
       "maximum": 5
     },
     "condition": {
       "type": "string",
-      "enum": ["firing", "cleared"],
+      "enum": [
+        "firing",
+        "cleared"
+      ],
       "description": "Translated by the origin's dictionary. 'cleared', not 'resolved' — resolved already means something else in the alert intake's lifecycle, and the same term with two meanings across intakes is a source of error."
     },
     "entity_id": {
@@ -68,17 +87,31 @@
       "description": "The only correlation key between the alert and monitor chains. See domain/ubiquitous-language.md#entity."
     },
     "title": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "description": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "labels": {
-      "type": ["object", "null"],
-      "additionalProperties": { "type": "string" }
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "source_url": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uri"
     }
   }
