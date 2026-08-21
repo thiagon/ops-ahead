@@ -151,6 +151,21 @@ make up
 make down
 ```
 
+### Adicionar um app novo
+
+Cada app com `Dockerfile` builda via Gitea Actions (`.gitea/workflows/build.yaml`) — a lista de apps
+buildados é uma matrix estática (`jobs.build.strategy.matrix.app`), não descoberta do filesystem.
+Criar um app novo em `apps/` não o coloca lá sozinho: sem essa entrada a imagem nunca é publicada e
+o pod fica em `ImagePullBackOff` indefinidamente.
+
+Pra forçar o rebuild de todas as imagens sem esperar uma mudança de código sob `apps/` (por exemplo,
+depois de um `make destroy`, quando o registry local fica vazio):
+
+```bash
+make up FORCE=1
+make sync FORCE=1
+```
+
 ### Serviços disponíveis
 
 Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomínios usam `*.localtest.me`, um wildcard DNS público que resolve para `127.0.0.1`.

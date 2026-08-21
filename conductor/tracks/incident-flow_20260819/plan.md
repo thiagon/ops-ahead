@@ -415,6 +415,9 @@ apareceram inspecionando o código, não os testes que já existiam.
 - [ ] ArgoCD reconciliando os charts da track sem drift — não verificável nesta sessão, sem cluster
       local rodando; `dbt parse`/`helm template` validados como substituto estrutural
 - [x] `docs/insights/fluxo-do-incidente.md` atualizado com o que a construção mudou no desenho
+- [x] Novo app (`data-deadline-tracker`) adicionado à matrix de build do CI
+      (`.gitea/workflows/build.yaml`) — faltava, a imagem nunca tinha sido publicada; README
+      atualizado com o passo pra não se repetir
 - [ ] PR mergeado em `main` com revisão
 
 ---
