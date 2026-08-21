@@ -147,14 +147,12 @@ class TestProcessMessage:
                 "run_id": "run-6",
                 "analysis": "kpi_projection",
                 "n_simulations": 5000,
-                "kpi_target_volume_p2": 514,
             },
             publish_status,
         )
 
         assert len(calls) == 1
         assert calls[0].kpi_projection_n_simulations == 5000
-        assert calls[0].kpi_target_volume_p2 == 514
         # Omitted in the payload — falls back to Settings' own default, not None.
         assert calls[0].kpi_projection_seed == settings.kpi_projection_seed
         assert calls[0].mlflow_experiment_name == "kpi-monthly-projection"

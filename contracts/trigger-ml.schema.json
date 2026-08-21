@@ -43,11 +43,7 @@
         "run_id": { "$ref": "#/definitions/runId" },
         "analysis": { "const": "kpi_projection" },
         "n_simulations": { "type": "integer", "minimum": 1, "description": "Monte Carlo draw count. ml-trainer's own configured default applies when omitted." },
-        "seed": { "type": "integer", "description": "RNG seed for reproducibility. ml-trainer's own configured default applies when omitted." },
-        "kpi_target_volume_p2": { "type": "integer", "minimum": 0, "description": "Locaweb PPR target — business input, no default." },
-        "kpi_target_volume_p3": { "type": "integer", "minimum": 0 },
-        "kpi_target_breaches_p2": { "type": "integer", "minimum": 0 },
-        "kpi_target_breaches_p3": { "type": "integer", "minimum": 0 }
+        "seed": { "type": "integer", "description": "RNG seed for reproducibility. ml-trainer's own configured default applies when omitted." }
       }
     },
     "externalEventDetection": {

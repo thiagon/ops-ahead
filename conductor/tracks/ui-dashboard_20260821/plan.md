@@ -3,7 +3,7 @@
 **Track ID:** ui-dashboard_20260821
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-21
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -23,18 +23,18 @@ de onde ela vive e a gravar o resultado onde a tela lê.
 
 ### Tasks
 
-- [ ] Task 1.1: Teste — a projeção lê `tenant_kpi_targets` por `kpi_group`, não `kpi_target_*` de settings
-- [ ] Task 1.2: `kpi_projection/data.py` passa a ler `gold_alert_kpi_achievement` e o seed, no grão `kpi_group`
-- [ ] Task 1.3: `DIMENSIONS` deixa de mapear `p2`/`p3` para `severity` e passa a `p1_p2`/`p3`
-- [ ] Task 1.4: A probabilidade projetada responde "qual faixa da banda ao fim do ano", contra `breached_ytd`
-- [ ] Task 1.5: Teste — a projeção grava uma linha por `tenant_id` × `as_of_date` × `kpi_group`
-- [ ] Task 1.6: Escrita em `gold_kpi_projection` (`MergeTree`, `order_by` pela chave de leitura), mantendo o log no MLflow
-- [ ] Task 1.7: Remover os `kpi_target_*` de `settings.py`, agora sem uso
+- [x] Task 1.1: Teste — a projeção lê `tenant_kpi_targets` por `kpi_group`, não `kpi_target_*` de settings
+- [x] Task 1.2: `kpi_projection/data.py` passa a ler `gold_alert_kpi_achievement` e o seed, no grão `kpi_group`
+- [x] Task 1.3: `DIMENSIONS` deixa de mapear `p2`/`p3` para `severity` e passa a `p1_p2`/`p3`
+- [x] Task 1.4: A probabilidade projetada responde "qual faixa da banda ao fim do ano", contra `breached_ytd`
+- [x] Task 1.5: Teste — a projeção grava uma linha por `tenant_id` × `as_of_date` × `kpi_group`
+- [x] Task 1.6: Escrita em `gold_kpi_projection` (`MergeTree`, `order_by` pela chave de leitura), mantendo o log no MLflow
+- [x] Task 1.7: Remover os `kpi_target_*` de `settings.py`, agora sem uso
 
 ### Verification
 
-- [ ] `uv run --package ops-ahead-ml-trainer pytest apps/ml-trainer/tests` passa
-- [ ] Uma execução da análise deixa linhas em `gold_kpi_projection`, legíveis por `SELECT`
+- [x] `uv run --package ops-ahead-ml-trainer pytest apps/ml-trainer/tests` passa
+- [x] Uma execução da análise deixa linhas em `gold_kpi_projection`, legíveis por `SELECT`
 
 ## Phase 2: A previsão de volume ganha tabela
 

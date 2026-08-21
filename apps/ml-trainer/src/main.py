@@ -47,13 +47,15 @@ def _train_external_event(settings: Settings) -> str:
 
 
 def _train_kpi_projection(settings: Settings) -> str:
-    from kpi_projection.data import fetch_kpi_monthly_state
+    from kpi_projection.data import fetch_kpi_achievement, fetch_kpi_monthly_state, fetch_kpi_targets
     from kpi_projection.run import run_kpi_projection
     from volume.data import fetch_gold_alert_daily_features
 
     daily = fetch_gold_alert_daily_features(settings)
     kpi_state = fetch_kpi_monthly_state(settings)
-    return run_kpi_projection(settings, daily, kpi_state)["run_id"]
+    achievement = fetch_kpi_achievement(settings)
+    targets = fetch_kpi_targets(settings)
+    return run_kpi_projection(settings, daily, kpi_state, achievement, targets)["run_id"]
 
 
 def _run_drift(settings: Settings) -> str:
