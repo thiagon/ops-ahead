@@ -12,7 +12,7 @@ Os termos usados aqui estão na [Ubiquitous Language](./ubiquitous-language.md).
 | **Integração** | A fronteira com o mundo externo: recebe do que está fora, traduz para o domínio, e devolve para fora o que o domínio decidiu | implementado |
 | **Acervo** | Guardar todo event recebido e modelá-lo para análise; é a memória do sistema | implementado |
 | **Predição** | Estimar volume futuro e risco de breach | previsto |
-| **Detecção** | Reconhecer rajada e agravamento por entity, em tempo quase real | previsto |
+| **Detecção** | Reconhecer rajada e agravamento por entity, em tempo quase real | implementado |
 | **Acompanhamento** | Reagir à passagem do tempo sobre incidents abertos, emitindo marco de consumo do OLA | implementado |
 | **Copiloto** | Transformar sinal em recomendação explicável para o operador | previsto |
 
@@ -109,6 +109,8 @@ Integração, não fica no meio do fluxo pub/sub principal (`events.raw.*`, `eve
 `events.raw.*`, `events.alert`, `events.monitor` e `deadlines.milestone` têm tráfego hoje
 entre os pontos pub/sub — os três primeiros substituem o antigo `incidents.received`, cortado
 sem alias, e o último é novo, ambos na track `incident-flow_20260819`. `trigger.ml`/
-`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`. Os
-demais continuam reservados — declará-los cedo é o que permite implementar os contextos em
-qualquer ordem.
+`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`.
+`alerts.burst` também tem tráfego real, desde a track `ml-models_20260806`
+(`apps/ml-burst-detector`, consumindo `events.monitor`). `incidents.scored` e `recommendations`
+continuam reservados — declará-los cedo é o que permite implementar os contextos em qualquer
+ordem.

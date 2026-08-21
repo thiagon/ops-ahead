@@ -27,7 +27,7 @@ Dados → Modelos → Copiloto IA → Interfaces
 
 | Camada | Componentes |
 |--------|-------------|
-| **Dados** | Kafka (Strimzi), MinIO, ClickHouse (Altinity), Argo Workflows |
+| **Dados** | Kafka (Strimzi), MinIO, ClickHouse (Altinity) |
 | **Modelos** | MLflow tracking + AI Gateway, Postgres, Redis |
 | **Copiloto IA** | Agent LangGraph, Postgres + pgvector |
 | **Interfaces** | Gateway + UI Nuxt |
@@ -61,13 +61,22 @@ Monorepo com workspaces `uv` para Python. Cada app em `apps/` gera sua própria 
 
 ```
 apps/                              # serviços e jobs que vão para o K8s
-  data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO
+  data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO, estágio de tradução
   data-runner/                     # Deployment (KEDA ScaledObject) — dbt-clickhouse (marts) + Great Expectations, consome trigger.data
-  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach, consome trigger.ml
+  data-deadline-tracker/           # Deployment — acompanha incidents abertos elegíveis, emite deadlines.milestone
+  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach/external-event, consome trigger.ml
+  ml-burst-detector/                # Deployment — consome events.monitor, detecta rajada por entity, publica alerts.burst
+  ml-model-serving/                 # Deployment — serving BentoML dos modelos volume/breach registrados no MLflow
+  ui-gateway/                       # Deployment — gateway de ingestão, fronteira HTTP → events.raw.{alert,monitor}
   ui-orchestrator/                 # Deployment — REST/MCP → Kafka (trigger.ml/trigger.data) sob demanda
 
 contracts/                         # JSON Schemas compartilhados entre apps
-  incidents-raw.schema.json        # schema híbrido do tópico incidents.raw
+  event-envelope.schema.json       # envelope cru, agnóstico de natureza, antes da tradução
+  incident-alert.schema.json       # entrada alert traduzida (ocorrência gerenciada)
+  condition-monitor.schema.json    # entrada monitor traduzida (condição observada)
+  deadline-milestone.schema.json   # marco de consumo do OLA (25/50/75/100%/abandono)
+  translation-dictionary.schema.json  # dicionário de tradução por tenant e origem
+  trigger-*.schema.json            # payloads de execução sob demanda (ui-orchestrator)
 
 scripts/                           # utilitários locais (não vão para o K8s)
   prepare_dataset.py               # pipeline Excel → CSV
@@ -77,7 +86,7 @@ assets/
   incidents.csv                    # dataset processado (122.543 linhas, 27 colunas)
 
 infra/
-  charts/                          # Helm charts por namespace
+  charts/                          # Helm charts — um por app em apps/ (mesmo nome), mais os compartilhados:
     data-kafka/                    # Kafka cluster + KafkaTopics (Strimzi)
     data-minio/                    # MinIO object storage
     data-clickhouse/               # ClickHouse (Altinity operator)
@@ -87,7 +96,6 @@ infra/
     ml-postgres/                   # Postgres (ns: ml)
     ml-redis/                      # Redis (ns: ml)
     ui-frontend/                   # UI Nuxt
-    ui-gateway/                    # Gateway nginx
     infra-argocd/                  # ArgoCD
     infra-prometheus/              # Prometheus + Grafana
     infra-vault/                   # Vault

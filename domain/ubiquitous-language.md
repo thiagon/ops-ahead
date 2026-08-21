@@ -135,8 +135,8 @@ eixo separado.
 Só existe para a entrada `alert`: [OLA](#ola) é prazo contratual, e a entrada `monitor` não
 tem prazo — ver [condition](#condition).
 
-Depois desta track, é a unidade de treino da Predição: cada incident que atravessa marcos
-vira (incident × marco), não uma linha só por incident.
+É a unidade de treino da Predição (`apps/data-runner/models/marts/breach_training_examples.sql`):
+cada incident que atravessa marcos vira (incident × marco), não uma linha só por incident.
 
 *Não use:* milestone em conversa ou em nome de campo/tópico de negócio — o código publica em
 inglês (`deadlines.milestone`, contrato `deadline-milestone`), mas o termo do domínio, em
