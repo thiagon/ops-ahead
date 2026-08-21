@@ -5,8 +5,19 @@ from clickhouse_driver import Client
 
 from settings import Settings
 
+KPI_MONTHLY_STATE_COLUMNS = ["month", "severity", "source", "total", "in_kpi", "breached"]
 KPI_ACHIEVEMENT_COLUMNS = ["tenant_id", "year", "month", "kpi_group", "breached_in_month", "breached_ytd"]
 KPI_TARGETS_COLUMNS = ["tenant_id", "kpi_group", "max_breaches", "achievement_pct"]
+
+
+def fetch_kpi_monthly_state(settings: Settings) -> pd.DataFrame:
+    """Eligibility signal only — how much of the month's volume counted in
+    KPI, per severity. The breach-count target itself comes from
+    gold_alert_kpi_achievement; this mart is unrelated to that band."""
+    client = Client.from_url(settings.clickhouse_url)
+    columns = ", ".join(KPI_MONTHLY_STATE_COLUMNS)
+    rows = client.execute(f"select {columns} from kpi_monthly_state order by month, severity")
+    return pd.DataFrame(rows, columns=KPI_MONTHLY_STATE_COLUMNS)
 
 
 def fetch_kpi_achievement(settings: Settings) -> pd.DataFrame:

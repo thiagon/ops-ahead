@@ -45,6 +45,24 @@ def test_fetch_kpi_achievement_reads_gold_alert_kpi_achievement_by_kpi_group(mon
     assert list(targets["kpi_group"]) == ["p1_p2"]
 
 
+def test_fetch_kpi_monthly_state_reads_eligibility_by_month_and_severity(monkeypatch, settings):
+    # Eligibility signal only — unrelated to the annual breach-count band in
+    # gold_alert_kpi_achievement, so main.py still needs both.
+    fake = _FakeClient(
+        {
+            "kpi_monthly_state": [
+                (pd.Timestamp("2026-08-01"), 1, "itsm", 10, 9, 1),
+            ],
+        }
+    )
+    monkeypatch.setattr(data.Client, "from_url", lambda url: fake)
+
+    kpi_state = data.fetch_kpi_monthly_state(settings)
+
+    assert any("kpi_monthly_state" in q for q in fake.executed)
+    assert list(kpi_state["severity"]) == [1]
+
+
 def test_fetch_kpi_achievement_never_reads_kpi_monthly_state(monkeypatch, settings):
     fake = _FakeClient(
         {
