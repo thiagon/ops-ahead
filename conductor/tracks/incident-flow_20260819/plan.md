@@ -378,7 +378,7 @@ severity/owner entre marcos do mesmo incidente).
       (`data-deadline-tracker`) + 81 (`ml-trainer`) + 18 (`ml-model-serving`) = 180 testes
 - [ ] ArgoCD reconciliando os charts da track sem drift — não verificável nesta sessão, sem cluster
       local rodando; `dbt parse`/`helm template` validados como substituto estrutural
-- [ ] `docs/insights/fluxo-do-incidente.md` atualizado com o que a construção mudou no desenho
+- [x] `docs/insights/fluxo-do-incidente.md` atualizado com o que a construção mudou no desenho
 - [ ] PR mergeado em `main` com revisão
 
 ---

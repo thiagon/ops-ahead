@@ -214,6 +214,11 @@ naturezas:
 | `kpi_monthly_state` | `alert` | veredito de negócio sobre prazo contratual |
 | `priority_changes_log` | `alert` | recategorização é decisão de quem gerencia |
 
+Nomes como estavam quando esta análise foi escrita — `p4_sequences_by_ci` virou
+`no_intervention_sequences_by_ci` (o sinal é `resolution_code`, nunca foi severidade) e
+`daily_anomaly_features` se dividiu em `gold_alert_daily_features`/`gold_monitor_daily_features`, uma
+por cadeia. `conductor/tracks/incident-flow_20260819/spec.md` tem o desenho final de cada mart.
+
 ### O que a separação torna possível
 
 O gold do `monitor` existe para recursos que **não têm incidente nenhum aberto**. Um servidor com
@@ -229,6 +234,14 @@ Cada marco emitido já é uma linha de treino pronta: *P3, Team14, 25% do prazo 
 de severidade crescente na mesma entity na última hora, ninguém deu ack* — e o desfecho, conhecido
 depois, vira o rótulo. Um incidente que passa por três marcos gera três exemplos, cada um com menos
 tempo restante. A unidade de treino passa a ser (incidente × marco), não (incidente).
+
+**Implementado** (track `incident-flow_20260819`, Fases 7-8): `deadlines.milestone` pousa em
+`bronze_deadline_milestone` (`apps/data-ingest`), e `breach_training_examples`
+(`apps/data-runner/models/marts/`) monta a linha por marco descrita acima — reconstrução ponto-no-tempo
+via `received_at <= occurred_at`, mesma técnica do macro `silver_alert_as_of`. O rótulo é "prazo
+estourado" (`has_breached`), não a apuração — a tabela "Duas naturezas de rótulo" abaixo é a decisão,
+não só a medição. Abandono (>10× o prazo) excluído do treino pelo mesmo teto que corrigiu
+`abandoned_ratio` no acompanhador (estava em 3.0, inventado, sem checar esta análise).
 
 ---
 
