@@ -1,5 +1,8 @@
 import { type ClickHouseClient, createClient } from '@clickhouse/client';
 import { getConfig } from './config.server.ts';
+import type { MilestoneRow, SeverityChangeRow, SimilarIncidentRow } from './types.ts';
+
+export type { MilestoneRow, SeverityChangeRow, SimilarIncidentRow } from './types.ts';
 
 /**
  * One row per tenant_id × as_of_date × kpi_group, written by ml-trainer's
@@ -49,23 +52,6 @@ export interface OpenAlertRow {
   has_breached: number;
   is_eligible: number;
   severity_changes: number;
-}
-
-/** A deadline milestone this occurrence already crossed. */
-export interface MilestoneRow {
-  kind: string;
-  severity: number;
-  due_at: string;
-  deadline_seconds: number;
-  consumed_ratio: number;
-  occurred_at: string;
-}
-
-/** One severity transition, from `priority_changes_log`. */
-export interface SeverityChangeRow {
-  received_at: string;
-  severity_from: number;
-  severity_to: number;
 }
 
 /**
@@ -124,6 +110,29 @@ export interface NoisyEntityRow {
   entity_id: string;
   window_minutes: number;
   signal_count: number;
+}
+
+/** One row per date × source, the alert chain's daily composition — gold_alert_daily_features. */
+export interface AlertDailyFeatureRow {
+  date: string;
+  source: string;
+  total_incidents: number;
+  p1_share: number;
+  critical_share: number;
+  no_intervention_share: number;
+  incidents_per_entity: number;
+  median_duration_seconds: number;
+}
+
+/** Recurring entity × category × severity pattern, from gold_alert_category_entity_breakdown. */
+export interface RecurringPatternRow {
+  category: string;
+  product: string;
+  entity_id: string;
+  severity: number;
+  incident_count: number;
+  breached: number;
+  avg_duration_seconds: number;
 }
 
 let cached: ClickHouseClient | undefined;
@@ -389,4 +398,76 @@ export async function fetchBreachContext(): Promise<Record<string, BreachContext
   );
 
   return Object.fromEntries(rows.map(row => [`${row.source} ${row.external_id}`, row]));
+}
+
+/**
+ * Closed occurrences with the same owner + severity — the closest real
+ * substitute for "similar incidents already resolved": no clustering model
+ * exists yet, but the breach consolidation gold already carries the grain
+ * this comparison needs.
+ */
+export async function fetchSimilarIncidents(
+  owner: string,
+  severity: number,
+  excludeExternalId: string,
+  limit = 5,
+): Promise<SimilarIncidentRow[]> {
+  return await query<SimilarIncidentRow>(
+    `select source, external_id, owner, severity, duration_seconds, deadline_seconds,
+            toUInt8(has_breached) as has_breached,
+            toString(closed_at) as closed_at
+     from gold_alert_breach_consolidation
+     where tenant_id = {tenant_id:String}
+       and owner = {owner:String}
+       and severity = {severity:UInt8}
+       and external_id != {exclude_external_id:String}
+     order by closed_at desc
+     limit {limit:UInt32}`,
+    {
+      tenant_id: getConfig().TENANT_ID,
+      owner,
+      severity,
+      exclude_external_id: excludeExternalId,
+      limit,
+    },
+  );
+}
+
+export async function fetchAlertDailyFeatures(daysBack = 14): Promise<AlertDailyFeatureRow[]> {
+  return await query<AlertDailyFeatureRow>(
+    `select toString(date) as date, source, total_incidents, p1_share, critical_share,
+            no_intervention_share, incidents_per_entity, median_duration_seconds
+     from (
+       select date, source, total_incidents, p1_share, critical_share,
+              no_intervention_share, incidents_per_entity, median_duration_seconds
+       from gold_alert_daily_features
+       where date >= today() - {days_back:UInt32}
+       order by date desc
+     )`,
+    { days_back: daysBack },
+  );
+}
+
+/**
+ * Recurring entity × category × severity patterns — the clustering/recurring
+ * cause input the challenge asks for (docs/context/challenges.md, "Agrupar
+ * causas recorrentes"). Aggregated over the window, ranked by volume.
+ */
+export async function fetchRecurringPatterns(
+  daysBack = 30,
+  limit = 10,
+): Promise<RecurringPatternRow[]> {
+  return await query<RecurringPatternRow>(
+    `select category, product, entity_id, severity,
+            sum(incident_count) as incident_count,
+            sum(breached) as breached,
+            avg(avg_duration_seconds) as avg_duration_seconds
+     from gold_alert_category_entity_breakdown
+     where date >= today() - {days_back:UInt32}
+     group by category, product, entity_id, severity
+     having incident_count > 1
+     order by incident_count desc
+     limit {limit:UInt32}`,
+    { days_back: daysBack, limit },
+  );
 }

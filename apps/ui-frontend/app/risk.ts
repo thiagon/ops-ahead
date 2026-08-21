@@ -59,3 +59,15 @@ export const MILESTONE_LABEL: Record<string, string> = {
   pct_100: 'Prazo estourado',
   abandoned: 'Abandonada',
 };
+
+/**
+ * A regra simples (severidade + prazo consumido), não uma recomendação do
+ * copiloto — o agente que decidiria a ação de fato ainda não existe.
+ */
+export function suggestedAction(severity: number, consumedRatio: number): string {
+  if (consumedRatio >= 1) return 'Estourado — escalar imediatamente';
+  if (severity <= 2 && consumedRatio >= 0.75) return 'Escalar para N2';
+  if (consumedRatio >= 0.75) return 'Escalar';
+  if (consumedRatio >= 0.5) return 'Monitorar de perto';
+  return 'Monitorar';
+}

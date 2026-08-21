@@ -73,13 +73,18 @@ describe('open occurrence queue', () => {
 describe('breach risk score', () => {
   it('comes from ml-model-serving, next to consumed_ratio and not replacing it', async () => {
     const query = vi.fn(async () => [openAlertRow({ consumed_ratio: 0.9 })]);
-    const score = vi.fn(async () => ({ breach_probability: 0.73, shap_top5: [] }));
+    const shap_top5 = [
+      { feature: 'consumed_ratio', shap_value: 0.41 },
+      { feature: 'group_load', shap_value: -0.12 },
+    ];
+    const score = vi.fn(async () => ({ breach_probability: 0.73, shap_top5 }));
 
     const queue = await buildQueue({ query, score });
 
     expect(score).toHaveBeenCalledTimes(1);
     expect(queue[0]?.breach_probability).toBe(0.73);
     expect(queue[0]?.consumed_ratio).toBe(0.9);
+    expect(queue[0]?.shap_top5).toEqual(shap_top5);
   });
 
   it('fails open when ml-model-serving does not respond', async () => {
@@ -96,6 +101,7 @@ describe('breach risk score', () => {
     expect(queue.map(row => row.external_id)).toEqual(['INC-A', 'INC-B']);
     expect(queue.map(row => row.consumed_ratio)).toEqual([0.3, 0.95]);
     expect(queue.every(row => row.breach_probability === null)).toBe(true);
+    expect(queue.every(row => row.shap_top5 === null)).toBe(true);
   });
 
   it('keeps the rows scored before a later failure', async () => {

@@ -5,6 +5,9 @@ import {
   fetchOpenAlert,
   fetchSeverityHistory,
 } from '~/clickhouse.server.ts';
+import { Badge, severityTone } from '~/components/Badge';
+import { PageHeader } from '~/components/PageHeader';
+import { Panel } from '~/components/Panel';
 import { predictBreach } from '~/model-serving.server.ts';
 import { buildQueue } from '~/queue.server.ts';
 import {
@@ -67,25 +70,27 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
   const color = riskColor(occurrence.consumed_ratio);
 
   return (
-    <main className="container mx-auto max-w-4xl p-8">
-      <Link to="/fila" className="text-sm text-text-muted hover:text-text-light">
-        ← Fila de ocorrências
-      </Link>
+    <main className="max-w-4xl px-8 py-6">
+      <PageHeader
+        breadcrumb={
+          <Link to="/fila" className="text-sm text-text-muted hover:text-text-light">
+            ← Fila de ocorrências
+          </Link>
+        }
+        title={occurrence.external_id}
+        subtitle={occurrence.title}
+      />
 
-      <h1 className="mt-4 font-mono font-semibold text-2xl text-text-light">
-        {occurrence.external_id}
-      </h1>
-      <p className="mt-1 text-text-muted">{occurrence.title}</p>
-
-      <section className="mt-8 rounded-lg border border-border-base bg-bg-tile p-6">
-        <h2 className="font-semibold text-lg text-text-light">Prazo vigente</h2>
-        <p className="mt-1 text-sm text-text-muted">
+      <Panel title="Prazo vigente" className="mt-2">
+        <p className="mb-6 text-sm text-text-muted">
           Recalculado a cada recategorização, nunca continuado do prazo original.
         </p>
 
-        <dl className="mt-6 grid grid-cols-2 gap-6 md:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-6 md:grid-cols-4">
           <Field label="Severidade">
-            {SEVERITY_LABEL[occurrence.severity] ?? occurrence.severity}
+            <Badge tone={severityTone(occurrence.severity)}>
+              {SEVERITY_LABEL[occurrence.severity] ?? occurrence.severity}
+            </Badge>
           </Field>
           <Field label="Vence em">
             <span className="font-mono">{occurrence.due_at}</span>
@@ -104,9 +109,9 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
           <Field label="Recurso">{entityId || '—'}</Field>
           <Field label="Reconhecida">
             {acknowledgedAt ? (
-              <span className="font-mono text-signal-green text-sm">{acknowledgedAt}</span>
+              <Badge tone="green">{acknowledgedAt}</Badge>
             ) : (
-              <span className="text-signal-amber">não</span>
+              <Badge tone="amber">não</Badge>
             )}
           </Field>
           <Field label="Risco de estouro">
@@ -132,10 +137,9 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
             }}
           />
         </div>
-      </section>
+      </Panel>
 
-      <section className="mt-6 rounded-lg border border-border-base bg-bg-tile p-6">
-        <h2 className="font-semibold text-lg text-text-light">Marcos já cruzados</h2>
+      <Panel title="Marcos já cruzados" className="mt-6">
         {milestones.length === 0 ? (
           <p className="mt-2 text-text-muted">Nenhum marco emitido para esta ocorrência.</p>
         ) : (
@@ -160,11 +164,10 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
             ))}
           </ol>
         )}
-      </section>
+      </Panel>
 
-      <section className="mt-6 rounded-lg border border-border-base bg-bg-tile p-6">
-        <h2 className="font-semibold text-lg text-text-light">Histórico de severidade</h2>
-        <p className="mt-1 text-sm text-text-muted">
+      <Panel title="Histórico de severidade" className="mt-6">
+        <p className="mb-3 text-sm text-text-muted">
           Aberta como {SEVERITY_LABEL[severityHistory[0]?.severity_from ?? occurrence.severity]} em{' '}
           <span className="font-mono">{occurrence.opened_at}</span>.
         </p>
@@ -186,7 +189,7 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
             ))}
           </ol>
         )}
-      </section>
+      </Panel>
     </main>
   );
 }

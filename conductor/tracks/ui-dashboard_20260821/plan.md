@@ -133,4 +133,73 @@ Sem ocorrência aberta não há linha em `silver_alert_open`, e a fila do operad
 
 ---
 
+## Débito técnico — levantado após entrega (2026-08-21)
+
+A tela do gestor foi validada como correta em escopo, mas rasa em densidade e distante
+do visual esperado. Investigação de acompanhamento levantou dois gaps que não fazem
+parte desta track (o spec já atribui o Painel N1/N2 a `mvp-closeout_20260817`, nunca
+criada) mas ficam registrados aqui para não se perder:
+
+**1. Painel N1/N2 nunca foi construído.** O spec desta track (`§Dependencies`) diz
+explicitamente: "Track `mvp-closeout_20260817` cobre copiloto e painel N1/N2; o que
+estiver aqui não se sobrepõe" — essa track nunca foi criada. O `template/frontend/`
+(README próprio) é a referência visual desse painel: fila de recomendações ordenada
+por criticidade, card com leitura em 5s (IC/ação/janela OLA), drill-down com SHAP
+top-5, ferramentas chamadas, incidentes similares (`docs/sprints/sprint-3-mvp.md`
+§4.4). Quando essa track for aberta:
+- `apps/ui-frontend/app/queue.server.ts::buildQueue()` já chama `predictBreach()` mas
+  descarta `shap_top5` da resposta — só extrai `breach_probability`. Precisa manter o
+  SHAP na `QueueRow` para alimentar o drill-down.
+- Timeline real já existe (`fetchMilestones` + `fetchSeverityHistory`), hoje só na
+  rota `/ocorrencias/:source/:externalId` — dá pra reaproveitar no drill-down do
+  painel N1/N2 sem navegação separada.
+- "Incidentes similares" pode ter fonte real via `gold_alert_breach_consolidation`
+  (incidentes fechados, mesmo grão severidade/owner) em vez de mock.
+- "Ferramentas chamadas" (tool calls do copiloto com args/resultado) **não tem fonte
+  real ainda** — depende do copiloto/agente de decisão, que não está implementado.
+  Registrar como pendência explícita na tela nova, nunca popular com dado inventado.
+
+**2. Seis das dez tabelas gold nunca viraram tela** — hoje só são lidas como feature
+interna do modelo de breach (`fetchBreachContext`) ou não são lidas em lugar nenhum:
+- `gold_alert_breach_consolidation` — incidentes fechados com overage; além de
+  "incidentes similares" (acima), serve pra métricas de MTTR/overage reais.
+- `gold_alert_daily_features` — série diária: `p1_share`, `critical_share`,
+  `incidents_per_entity`, `no_intervention_share`, percentis de duração. Não exposta.
+- `gold_alert_category_entity_breakdown` — o comentário no próprio `.sql` já diz
+  "clustering/recurring-cause input": é o desafio analítico 03 do desafio Locaweb
+  (`docs/context/challenges.md`, "Identificar padrões de incidentes críticos / Agrupar
+  causas recorrentes") e nunca teve tela nenhuma.
+- `gold_monitor_severity_escalations`, `gold_monitor_signal_intervals`,
+  `gold_monitor_auto_resolution_rate`, `gold_monitor_daily_features` — sinais de
+  monitor por entidade, usados só como feature de `fetchBreachContext`, nunca exibidos.
+
+Qualquer track futura que reformule a tela inicial deve tratar essas seis tabelas como
+fonte primária de densidade real, em vez de adicionar gráficos sobre os poucos dados já
+expostos.
+
+## Phase 7: Tela inicial vira o Painel N1/N2, densa, com as gold disponíveis
+
+A tela inicial precisa parecer com `template/frontend` de verdade: fila de
+recomendações ordenada por criticidade + drill-down lado a lado, densa em informação.
+Onde falta gold específica (incidentes similares, ferramentas chamadas), usa-se a gold
+mais próxima do que já existe em vez de deixar a seção vazia ou mockada.
+
+### Tasks
+
+- [x] Task 7.1: `queue.server.ts::buildQueue()` para de descartar `shap_top5` — `QueueRow` ganha `shap_top5: ShapContribution[] | null`; ajustar `test/queue.test.ts`
+- [x] Task 7.2: Componentes `RecommendationCard.tsx`, `DrillDown.tsx`, `Timeline.tsx` em `app/components/`, layout fiel ao `template/frontend/components/*` (cores pelos tokens já existentes em `app.css`)
+- [x] Task 7.3: "Incidentes similares" real via `gold_alert_breach_consolidation` — mesmo `severity`/`owner`, incidentes já fechados, ordenados por mais recente
+- [x] Task 7.4: Densidade adicional na tela: `gold_alert_daily_features` (p1_share, critical_share, no_intervention_share) e `gold_alert_category_entity_breakdown` (padrões recorrentes por entidade/categoria) viram KPI cards/seções extras
+- [x] Task 7.5: "Ferramentas chamadas" sem copiloto real — omitir a seção citando a pendência (não mockar), OU substituir por `BreachContextRow` já calculado (group_load, sinais do monitor, histórico de OLA do owner) formatado como "sinais considerados" — decidir e implementar
+- [x] Task 7.6: Nova rota inicial usa `loadQueue()` ordenado por criticidade (severidade + breach_probability), painel de gestor atual move para `/painel-gestor`, `routes.ts` atualizado
+- [ ] Task 7.7: Labels em pt-br, `make sync`, validação visual via Playwright em `ui.ops-ahead.localtest.me`
+
+### Verification
+
+- [ ] `npm run typecheck && npm run lint && npm test` em `apps/ui-frontend`
+- [ ] Tela inicial visualmente comparável ao `template/frontend` (sidebar + cards + drilldown), dados reais, sem mock
+- [ ] `/painel-gestor` preserva o conteúdo que hoje está em `/`
+
+---
+
 _Generated by Conductor. Tasks will be marked [~] in progress and [x] complete._

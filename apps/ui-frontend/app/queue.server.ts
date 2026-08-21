@@ -2,28 +2,9 @@ import type { BreachContextRow, OpenAlertRow } from './clickhouse.server.ts';
 import { fetchBreachContext, fetchOpenAlerts, OPEN_ALERTS_SQL } from './clickhouse.server.ts';
 import type { BreachFeatureInput, ScoreBreach } from './model-serving.server.ts';
 import { predictBreach } from './model-serving.server.ts';
+import type { QueueRow, ShapContribution } from './types.ts';
 
-/** One row of the operator queue, as the screen consumes it. */
-export interface QueueRow {
-  source: string;
-  external_id: string;
-  severity: number;
-  status: string;
-  title: string;
-  owner: string;
-  entity_id: string | null;
-  opened_at: string;
-  due_at: string;
-  deadline_seconds: number;
-  consumed_ratio: number;
-  time_remaining_seconds: number;
-  has_breached: boolean;
-  is_eligible: boolean;
-  acknowledged: boolean;
-  severity_changes: number;
-  /** null when ml-model-serving did not answer — consumed_ratio still stands. */
-  breach_probability: number | null;
-}
+export type { QueueRow } from './types.ts';
 
 export interface BuildQueueOptions {
   query: (sql: string, params: Record<string, unknown>) => Promise<OpenAlertRow[]>;
@@ -83,7 +64,10 @@ export function buildBreachFeatures(
   };
 }
 
-export function toQueueRow(row: OpenAlertRow, now: Date): Omit<QueueRow, 'breach_probability'> {
+export function toQueueRow(
+  row: OpenAlertRow,
+  now: Date,
+): Omit<QueueRow, 'breach_probability' | 'shap_top5'> {
   const dueAt = parseClickHouseDate(row.due_at);
   return {
     source: row.source,
@@ -119,17 +103,21 @@ export async function buildQueue(options: BuildQueueOptions): Promise<QueueRow[]
     rows.map(async row => {
       const base = toQueueRow(row, now);
       let breach_probability: number | null = null;
+      let shap_top5: ShapContribution[] | null = null;
       try {
         const features = buildBreachFeatures(
           row,
           context[occurrenceKey(row.source, row.external_id)],
           now,
         );
-        breach_probability = (await score(features))?.breach_probability ?? null;
+        const prediction = await score(features);
+        breach_probability = prediction?.breach_probability ?? null;
+        shap_top5 = prediction?.shap_top5 ?? null;
       } catch {
         breach_probability = null;
+        shap_top5 = null;
       }
-      return { ...base, breach_probability };
+      return { ...base, breach_probability, shap_top5 };
     }),
   );
 }

@@ -1,4 +1,7 @@
 import { getConfig } from './config.server.ts';
+import type { ShapContribution } from './types.ts';
+
+export type { ShapContribution } from './types.ts';
 
 /** Mirrors `BreachFeatureInput` in apps/ml-model-serving/src/schemas.py. */
 export interface BreachFeatureInput {
@@ -23,11 +26,6 @@ export interface BreachFeatureInput {
   entity_signal_count_1h: number;
   entity_auto_resolution_rate: number | null;
   entity_severity_escalations: number;
-}
-
-export interface ShapContribution {
-  feature: string;
-  shap_value: number;
 }
 
 export interface BreachPrediction {

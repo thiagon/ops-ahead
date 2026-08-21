@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Dashboard front end \u2014 React Router framework mode; server-side loaders read the ClickHouse gold layer and no database credential ever reaches the browser (ns:ui)",
+  "description": "Dashboard front end — React Router framework mode; server-side loaders read the ClickHouse gold layer and no database credential ever reaches the browser (ns:ui)",
   "engines": {
     "node": ">=24"
   },
@@ -30,6 +30,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router": "8.3.0",
+    "recharts": "3.10.1",
     "zod": "4.4.3"
   },
   "devDependencies": {
