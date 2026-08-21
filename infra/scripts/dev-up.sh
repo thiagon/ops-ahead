@@ -362,7 +362,7 @@ VAULT_SCRIPT
 info "Vault: secrets and ESO role configured"
 
 step "Waiting for ESO to sync secrets"
-kubectl wait pod -l app.kubernetes.io/name=external-secrets -n infra \
+kubectl wait pod -l app.kubernetes.io/instance=infra-eso -n infra \
   --for=condition=Ready --timeout=180s > /dev/null 2>&1 || warn "ESO pod did not become Ready within 3min"
 
 kubectl wait externalsecret --all --all-namespaces \
