@@ -4,9 +4,9 @@
   "github_pr": 62,
   "title": "Fluxo do incidente \u2014 duas entradas, marcos de prazo e read model",
   "type": "feature",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-08-19T00:00:00Z",
-  "updated": "2026-08-20T00:00:00Z",
+  "updated": "2026-08-21T00:00:00Z",
   "current_phase": 8,
   "current_task": null,
   "phases": {
