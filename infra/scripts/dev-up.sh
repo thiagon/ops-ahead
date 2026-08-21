@@ -282,9 +282,17 @@ info "Actions secret REGISTRY_PASSWORD set on repo"
 
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
+FORCE_MARKER=".ci/force-build"
+if [ -n "${FORCE:-}" ]; then
+  mkdir -p "$(dirname "$FORCE_MARKER")"
+  touch "$FORCE_MARKER"
+  info "FORCE=1 — every app image will be rebuilt"
+fi
 git add -A
+[ -f "$FORCE_MARKER" ] && git add -f "$FORCE_MARKER"
 TREE_HASH=$(git write-tree)
 git reset > /dev/null 2>&1
+rm -f "$FORCE_MARKER"
 COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot")
 if git push -f "${GITEA_PUSH_URL}" "${COMMIT_HASH}:refs/heads/main" > /dev/null 2>&1; then
   info "Snapshot → ${GITEA_ADMIN_USERNAME}/ops-ahead@main"

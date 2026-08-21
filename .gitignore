@@ -16,6 +16,9 @@ wheels/
 .env
 .env.local
 
+# dev-up.sh/dev-sync.sh FORCE=1 marker (never meant to be committed for real)
+.ci/force-build
+
 # presentation files
 *.pptx
 *.ppt
