@@ -191,22 +191,35 @@ export const OPEN_ALERTS_SQL = `select ${OPEN_ALERT_COLUMNS}
 
 export async function fetchKpiAchievement(monthsBack = 12): Promise<KpiAchievementRow[]> {
   return await query<KpiAchievementRow>(
+    // toString(month) aliased back to "month" makes ClickHouse's optimizer
+    // resolve the WHERE clause against the String alias instead of the
+    // underlying Date column ("no supertype for String, Date"). Filtering
+    // and ordering in an inner scope, before the rename, avoids the clash.
     `select year, toString(month) as month, kpi_group, breached_ytd, achievement_pct
-     from gold_alert_kpi_achievement
-     where tenant_id = {tenant_id:String}
-       and month >= toStartOfMonth(now()) - toIntervalMonth({months_back:UInt32})
-     order by month asc, kpi_group`,
+     from (
+       select year, month, kpi_group, breached_ytd, achievement_pct
+       from gold_alert_kpi_achievement
+       where tenant_id = {tenant_id:String}
+         and month >= toStartOfMonth(now()) - toIntervalMonth({months_back:UInt32})
+       order by month asc, kpi_group
+     )`,
     { tenant_id: getConfig().TENANT_ID, months_back: monthsBack },
   );
 }
 
 export async function fetchCategoryTrends(daysBack = 30): Promise<CategoryTrendRow[]> {
   return await query<CategoryTrendRow>(
+    // Same alias-vs-column clash as fetchKpiAchievement — filter/order on
+    // date before renaming it to a String.
     `select toString(date) as date, category, product, total_incidents,
             p1_count, p2_count, p3_count, p4_count, p5_count, avg_duration_seconds
-     from gold_alert_category_trends
-     where date >= today() - {days_back:UInt32}
-     order by date desc, total_incidents desc`,
+     from (
+       select date, category, product, total_incidents,
+              p1_count, p2_count, p3_count, p4_count, p5_count, avg_duration_seconds
+       from gold_alert_category_trends
+       where date >= today() - {days_back:UInt32}
+       order by date desc, total_incidents desc
+     )`,
     { days_back: daysBack },
   );
 }
