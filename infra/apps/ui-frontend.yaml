@@ -10,14 +10,20 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
-  source:
-    repoURL: https://github.com/thiagon/ops-ahead
-    targetRevision: main
-    path: infra/charts/ui-frontend
-    helm:
-      valueFiles:
-        - values.yaml
-        - values-dev.yaml
+  # Multi-source: base chart from infra/charts; the app's colocated per-env
+  # overlay (apps/ui-frontend/chart/values-dev.yaml) carries env config *and*
+  # the CI-pinned image tag, so each environment runs its own image.
+  sources:
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/thiagon/ops-ahead
+      targetRevision: main
+      path: infra/charts/ui-frontend
+      helm:
+        valueFiles:
+          - values.yaml
+          - $values/apps/ui-frontend/chart/values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: ui
@@ -27,9 +33,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
     retry:
-      limit: 5
+      limit: 2
       backoff:
         duration: 10s
         factor: 2
-        maxDuration: 3m
+        maxDuration: 40s

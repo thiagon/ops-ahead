@@ -33,8 +33,12 @@ gateway:
 
 networkPolicy:
   enabled: true
-  # Kafka's plain internal listener — the only port ns:ui needs from ns:data.
+  # Kafka's plain internal listener.
   kafkaPort: 9092
+  # ClickHouse HTTP interface — ui-frontend's gold/silver loaders.
+  clickhousePort: 8123
+  # ml-model-serving — the breach score ui-frontend's operator queue reads.
+  mlModelServingPort: 3000
 
 monitoring:
   enabled: true

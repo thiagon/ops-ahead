@@ -1,8 +1,11 @@
 {{- if .Values.networkPolicy.enabled }}
-# ns:ui — accepts ingress from Traefik (kube-system); egress to ml API ports
-# and to Kafka in ns:data. The matching ingress side (data accepting ui on
-# 9092) lives in infra/apps/namespaces.yaml, where cross-namespace flows are
-# declared for the target namespace.
+# One NetworkPolicy for the whole ns:ui namespace, not per app — a
+# per-Deployment podSelector isn't used here, so a second app-scoped policy
+# under the same name would collide with this one instead of layering. Egress
+# here is the union of every ns:ui app's needs (gateway → Kafka/MLflow,
+# frontend → ClickHouse/ml-model-serving). The matching ingress side (data,
+# ml accepting ui on these ports) lives in infra/apps/namespaces.yaml, where
+# cross-namespace flows are declared for the target namespace.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,20 +24,24 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-    # ml: MLflow API (5000)
+    # ml: MLflow API (5000) and ml-model-serving (3000) — the breach score
+    # the operator queue reads alongside consumed_ratio.
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ml
       ports:
         - port: 5000
-    # data: Kafka plain listener — the gateway publishes to events.raw.*
+        - port: {{ .Values.networkPolicy.mlModelServingPort }}
+    # data: Kafka plain listener (gateway publishes to events.raw.*) and
+    # ClickHouse's HTTP interface (ui-frontend's gold/silver loaders).
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: data
       ports:
         - port: {{ .Values.networkPolicy.kafkaPort }}
+        - port: {{ .Values.networkPolicy.clickhousePort }}
     - to:
         - podSelector: {}
   ingress:

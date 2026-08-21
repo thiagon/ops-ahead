@@ -27,10 +27,5 @@ frontend:
   ingress:
     host: ui.ops-ahead.localtest.me
 
-networkPolicy:
-  enabled: true
-  clickhousePort: 8123
-  mlModelServingPort: 3000
-
 monitoring:
   enabled: true

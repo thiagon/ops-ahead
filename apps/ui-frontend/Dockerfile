@@ -33,4 +33,4 @@ COPY --from=build /app/build ./build
 COPY apps/ui-frontend/package.json ./
 EXPOSE 3000
 USER node
-CMD ["npm", "start"]
+CMD ["node_modules/.bin/react-router-serve", "./build/server/index.js"]
