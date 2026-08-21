@@ -86,22 +86,30 @@ assets/
   incidents.csv                    # dataset processado (122.543 linhas, 27 colunas)
 
 infra/
-  charts/                          # Helm charts — um por app em apps/ (mesmo nome), mais os compartilhados:
+  charts/                          # Helm charts, um por app em apps/ (mesmo nome) + os compartilhados
+    data-clickhouse/               # ClickHouse (Altinity operator)
+    data-deadline-tracker/         # app — ver apps/ acima
+    data-ingest/                   # app — ver apps/ acima
     data-kafka/                    # Kafka cluster + KafkaTopics (Strimzi)
     data-minio/                    # MinIO object storage
-    data-clickhouse/               # ClickHouse (Altinity operator)
+    data-runner/                   # app — ver apps/ acima
     data-strimzi/                  # Strimzi operator
-    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
-    ml-mlflow/                     # MLflow tracking + AI Gateway
-    ml-postgres/                   # Postgres (ns: ml)
-    ml-redis/                      # Redis (ns: ml)
-    ui-frontend/                   # UI Nuxt
     infra-argocd/                  # ArgoCD
-    infra-prometheus/              # Prometheus + Grafana
-    infra-vault/                   # Vault
     infra-eso/                     # External Secrets Operator
     infra-gitea/                   # Gitea (registry + git)
+    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
+    infra-prometheus/              # Prometheus + Grafana
     infra-secrets/                 # ClusterSecretStore
+    infra-vault/                   # Vault
+    ml-burst-detector/             # app — ver apps/ acima
+    ml-mlflow/                     # MLflow tracking + AI Gateway
+    ml-model-serving/              # app — ver apps/ acima
+    ml-postgres/                   # Postgres (ns: ml)
+    ml-redis/                      # Redis (ns: ml)
+    ml-trainer/                    # app — ver apps/ acima
+    ui-frontend/                   # UI Nuxt
+    ui-gateway/                    # app — ver apps/ acima
+    ui-orchestrator/               # app — ver apps/ acima
   apps/                            # ArgoCD Application manifests
   bootstrap/                       # root-app (app-of-apps)
   scripts/
