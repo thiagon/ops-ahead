@@ -42,14 +42,14 @@ O modelo de volume prevê D+1 e D+7 no treino e não persiste a previsão em lug
 
 ### Tasks
 
-- [ ] Task 2.1: Teste — a previsão grava uma linha por `target_date` × `priority_group` × `horizon`
-- [ ] Task 2.2: Escrita em `gold_volume_forecast` (`MergeTree`), com intervalo de predição junto do ponto
-- [ ] Task 2.3: A escrita acontece no fim do treino, na mesma execução que já calcula a previsão
+- [x] Task 2.1: Teste — a previsão grava uma linha por `target_date` × `priority_group` × `horizon`
+- [x] Task 2.2: Escrita em `gold_volume_forecast` (`MergeTree`), com intervalo de predição junto do ponto
+- [x] Task 2.3: A escrita acontece no fim do treino, na mesma execução que já calcula a previsão
 
 ### Verification
 
-- [ ] `uv run --package ops-ahead-ml-trainer pytest apps/ml-trainer/tests` passa
-- [ ] Uma execução do treino de volume deixa as duas horizontes em `gold_volume_forecast`
+- [x] `uv run --package ops-ahead-ml-trainer pytest apps/ml-trainer/tests` passa
+- [x] Uma execução do treino de volume deixa as duas horizontes em `gold_volume_forecast`
 
 ## Phase 3: O app existe e fala com o ClickHouse
 

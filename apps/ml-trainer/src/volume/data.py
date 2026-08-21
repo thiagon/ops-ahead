@@ -25,6 +25,33 @@ def fetch_gold_alert_daily_features(settings: Settings) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=GOLD_ALERT_DAILY_FEATURES_COLUMNS)
 
 
+_VOLUME_FORECAST_DDL = """
+CREATE TABLE IF NOT EXISTS gold_volume_forecast
+(
+    target_date     Date,
+    priority_group  LowCardinality(String),
+    horizon         UInt8,
+    yhat            Float64,
+    yhat_lower      Float64,
+    yhat_upper      Float64
+)
+ENGINE = MergeTree
+ORDER BY (target_date, priority_group, horizon)
+"""
+
+
+def write_volume_forecast(settings: Settings, rows: list[dict]) -> None:
+    """Persists this run's D+1/D+7 forecast — one row per target_date ×
+    priority_group × horizon — so the dashboard reads a queryable table
+    instead of an MLflow run metric."""
+    client = Client.from_url(settings.clickhouse_url)
+    client.execute(_VOLUME_FORECAST_DDL)
+    client.execute(
+        "INSERT INTO gold_volume_forecast (target_date, priority_group, horizon, yhat, yhat_lower, yhat_upper) VALUES",
+        rows,
+    )
+
+
 def dataset_version(daily: pd.DataFrame) -> str:
     """Deterministic fingerprint of the exact rows a run trained on — logged as
     an MLflow param so a run can be traced back to what the mart looked like

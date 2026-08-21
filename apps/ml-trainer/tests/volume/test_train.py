@@ -54,9 +54,25 @@ def test_train_horizon_produces_metrics_for_all_priority_groups(synthetic_settin
     assert 0.0 <= result["metrics"]["ci80_coverage"] <= 1.0
 
 
-def test_train_and_log_completes_and_logs_a_run(synthetic_settings):
+def test_train_and_log_completes_and_logs_a_run(synthetic_settings, monkeypatch):
+    monkeypatch.setattr("volume.train.write_volume_forecast", lambda settings, rows: None)
     daily = _synthetic_daily()
 
     run_id = train_and_log(synthetic_settings, daily)
 
     assert run_id
+
+
+def test_train_and_log_writes_one_row_per_priority_group_and_horizon(synthetic_settings, monkeypatch):
+    written = []
+    monkeypatch.setattr("volume.train.write_volume_forecast", lambda settings, rows: written.extend(rows))
+    daily = _synthetic_daily()
+
+    train_and_log(synthetic_settings, daily)
+
+    assert {(row["priority_group"], row["horizon"]) for row in written} == {
+        (group, horizon) for group in ("total", "p1", "p2", "p3") for horizon in (1, 7)
+    }
+    for row in written:
+        assert row["yhat"] >= 0
+        assert row["yhat_lower"] <= row["yhat_upper"]
