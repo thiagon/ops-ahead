@@ -57,18 +57,18 @@ Scaffolding do `apps/ui-frontend` e a camada de consulta, antes de qualquer tela
 
 ### Tasks
 
-- [ ] Task 3.1: `apps/ui-frontend` — React Router 7 framework mode, Node 24, npm, Biome, vitest
-- [ ] Task 3.2: `app.yaml` (`workload: deployment`, `namespace: ui`) e `chart/values-dev.yaml`
-- [ ] Task 3.3: Configuração por URL única (`clickhouse_url`, `tenant_id`), no padrão do repositório
-- [ ] Task 3.4: Teste — o cliente ClickHouse roda só no servidor; nenhuma credencial chega ao bundle
-- [ ] Task 3.5: Cliente ClickHouse server-side, com as consultas tipadas por gold
-- [ ] Task 3.6: Rota de health e `/metrics`, no mesmo formato dos demais apps de `ns: ui`
-- [ ] Task 3.7: Tokens de cor e tipografia extraídos de `docs/presentations/`, com as fontes servidas pelo app
+- [x] Task 3.1: `apps/ui-frontend` — React Router 7 framework mode, Node 24, npm, Biome, vitest
+- [x] Task 3.2: `app.yaml` (`workload: deployment`, `namespace: ui`) e `chart/values-dev.yaml`
+- [x] Task 3.3: Configuração por URL única (`clickhouse_url`, `tenant_id`), no padrão do repositório
+- [x] Task 3.4: Teste — o cliente ClickHouse roda só no servidor; nenhuma credencial chega ao bundle
+- [x] Task 3.5: Cliente ClickHouse server-side, com as consultas tipadas por gold
+- [x] Task 3.6: Rota de health e `/metrics`, no mesmo formato dos demais apps de `ns: ui`
+- [x] Task 3.7: Tokens de cor e tipografia extraídos de `docs/presentations/`, com as fontes servidas pelo app
 
 ### Verification
 
-- [ ] `npm run test` e `npm run lint` passam em `apps/ui-frontend`
-- [ ] Build de produção gera o output standalone que o Dockerfile serve
+- [x] `npm run test` e `npm run lint` passam em `apps/ui-frontend`
+- [x] Build de produção gera o output standalone que o Dockerfile serve
 
 ## Phase 4: A tela do operador
 

@@ -1,0 +1,8 @@
+ui-frontend:
+  image:
+    tag: "latest"
+frontend:
+  replicaCount: 1
+  env:
+    appEnv: dev
+    tenantId: locaweb
