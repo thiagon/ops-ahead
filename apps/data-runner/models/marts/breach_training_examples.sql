@@ -127,11 +127,14 @@ candidate_owner as (
         c.external_id,
         argMax(e.owner, e.received_at) as owner
     from candidate_open c
+    -- Inequality (e.received_at <= c.occurred_at) moved out of ON: ClickHouse's
+    -- hash join only accepts equality conditions there when the join feeds a
+    -- GROUP BY/aggregate — same shape as gold_alert_kpi_achievement's fix.
     inner join {{ source('ingest', 'bronze_alert') }} e
         on  e.tenant_id = c.tenant_id
         and e.source = c.source
         and e.external_id = c.external_id
-        and e.received_at <= c.occurred_at
+    where e.received_at <= c.occurred_at
     group by c.milestone_id, c.tenant_id, c.source, c.external_id
 
 ),

@@ -16,7 +16,11 @@ with monthly as (
         tenant_id,
         toYear(opened_at)          as year,
         toStartOfMonth(opened_at)  as month,
-        multiIf(severity in (1, 2), 'p1_p2', severity = 3, 'p3', null) as kpi_group,
+        -- '' instead of null: the WHERE below already restricts to severity
+        -- in (1,2,3), so this branch never actually fires — but a null
+        -- branch types the column Nullable, which MergeTree rejects in
+        -- order_by (allow_nullable_key is off).
+        multiIf(severity in (1, 2), 'p1_p2', severity = 3, 'p3', '') as kpi_group,
         countIf(is_eligible and has_breached)                          as breached_in_month
     from {{ ref('silver_alert') }}
     where severity in (1, 2, 3) and closed_at is not null
@@ -53,6 +57,6 @@ from cumulative c
 inner join {{ ref('tenant_kpi_targets') }} t
     on  t.tenant_id = c.tenant_id
     and t.kpi_group = c.kpi_group
-    and t.max_breaches >= c.breached_ytd
+where t.max_breaches >= c.breached_ytd
 order by c.tenant_id, c.year, c.month, c.kpi_group, t.max_breaches asc
 limit 1 by c.tenant_id, c.year, c.month, c.kpi_group
