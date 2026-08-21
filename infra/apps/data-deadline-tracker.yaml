@@ -5,9 +5,9 @@ metadata:
   namespace: infra
   annotations:
     # After data-kafka (6, the topic it consumes/publishes) and data-runner
-    # (7, whose PreSync hook seeds tenant_deadlines — the table itself, not
+    # (8, whose PreSync hook seeds tenant_deadlines — the table itself, not
     # just the ClickHouse server, is what this app's startup reads).
-    argocd.argoproj.io/sync-wave: "8"
+    argocd.argoproj.io/sync-wave: "9"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

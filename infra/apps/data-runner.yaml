@@ -4,7 +4,9 @@ metadata:
   name: data-runner
   namespace: infra
   annotations:
-    argocd.argoproj.io/sync-wave: "7"
+    # After data-ingest (7): the PreSync hook's dbt run reads the bronze_*
+    # tables data-ingest's own migration Job creates.
+    argocd.argoproj.io/sync-wave: "8"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

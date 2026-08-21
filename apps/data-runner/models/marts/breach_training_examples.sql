@@ -56,12 +56,14 @@ own_events as (
         row_number() over (
             partition by m.milestone_id order by e.received_at
         )                                                                  as rn
+    -- Inequality in WHERE, not ON: ClickHouse rejects an ON that mixes
+    -- columns from both sides outside an equality (INVALID_JOIN_ON_EXPRESSION).
     from milestones m
     inner join {{ source('ingest', 'bronze_alert') }} e
         on  e.tenant_id = m.tenant_id
         and e.source = m.source
         and e.external_id = m.external_id
-        and e.received_at <= m.occurred_at
+    where e.received_at <= m.occurred_at
 
 ),
 
@@ -80,44 +82,10 @@ own_asof_state as (
 
 ),
 
--- Fixed per incident, independent of any cutoff — once a closing event has
--- happened it stays happened. This is what makes "open at T" a lookup
--- instead of a per-T reconstruction.
-incident_lifecycle as (
-
-    select
-        tenant_id,
-        source,
-        external_id,
-        any(opened_at)                                                                as opened_at,
-        minIf(toNullable(received_at), status in ('resolved', 'closed', 'canceled'))   as first_closing_received_at
-    from {{ source('ingest', 'bronze_alert') }}
-    group by tenant_id, source, external_id
-
-),
-
--- Every OTHER incident open at this milestone's occurred_at — "opened_at <=
--- occurred_at and not yet closed at that instant" needs no per-T
--- reconstruction (see incident_lifecycle above), so this join stays cheap
--- relative to a full as-of pass over the population.
-candidate_open as (
-
-    select
-        m.milestone_id,
-        m.occurred_at,
-        l.tenant_id,
-        l.source,
-        l.external_id
-    from milestones m
-    inner join incident_lifecycle l
-        on  l.opened_at <= m.occurred_at
-        and (l.first_closing_received_at is null or l.first_closing_received_at > m.occurred_at)
-        and not (l.tenant_id = m.tenant_id and l.source = m.source and l.external_id = m.external_id)
-
-),
-
 -- Owner-at-T for every candidate — the same as-of technique as own_events,
 -- just over the wider candidate set instead of one incident's own history.
+-- candidate_open is a real model (models/marts/candidate_open.sql), not a
+-- CTE here — see that file for why.
 candidate_owner as (
 
     select
@@ -126,10 +94,7 @@ candidate_owner as (
         c.source,
         c.external_id,
         argMax(e.owner, e.received_at) as owner
-    from candidate_open c
-    -- Inequality (e.received_at <= c.occurred_at) moved out of ON: ClickHouse's
-    -- hash join only accepts equality conditions there when the join feeds a
-    -- GROUP BY/aggregate — same shape as gold_alert_kpi_achievement's fix.
+    from {{ ref('candidate_open') }} c
     inner join {{ source('ingest', 'bronze_alert') }} e
         on  e.tenant_id = c.tenant_id
         and e.source = c.source
@@ -178,12 +143,13 @@ no_intervention_nearby as (
         m.milestone_id,
         m.occurred_at,
         n.no_intervention_known_at
+    -- Only the equality stays in ON, for the same reason as own_events above.
     from milestones m
     inner join no_intervention_events n
-        on  n.entity_id = m.entity_id
+        on n.entity_id = m.entity_id
+    where m.entity_id is not null and m.entity_id != ''
         and n.no_intervention_known_at <= m.occurred_at
         and not (n.tenant_id = m.tenant_id and n.source = m.source and n.external_id = m.external_id)
-    where m.entity_id is not null and m.entity_id != ''
 
 ),
 
