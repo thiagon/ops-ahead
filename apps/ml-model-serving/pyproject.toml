@@ -8,7 +8,7 @@ dependencies = [
     "pandas>=2.2,<3",
     "prometheus-client>=0.21",
     "pydantic>=2.9",
-    "pydantic-settings>=2.5",
+    "pydantic-settings>=2.14.2",
     # Not called directly here — needed to unpickle the bundled MLflow
     # PythonModel objects ml-trainer registers (LightGBM/Prophet/isotonic/
     # SHAP artifacts). code_paths ships the model *code*, not its
