@@ -25,7 +25,13 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-const SERVER_ONLY_MODULES = ['clickhouse.server', 'config.server', 'metrics.server'];
+const SERVER_ONLY_MODULES = [
+  'clickhouse.server',
+  'config.server',
+  'metrics.server',
+  'model-serving.server',
+  'queue.server',
+];
 
 describe('server-only modules', () => {
   it('are imported only by route modules, never by shared client code', async () => {

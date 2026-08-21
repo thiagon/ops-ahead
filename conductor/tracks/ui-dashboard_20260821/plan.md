@@ -76,16 +76,16 @@ A fila de incidentes vivos, ordenada pelo prazo que resta.
 
 ### Tasks
 
-- [ ] Task 4.1: Teste — o loader lê `silver_alert_open`, ordenado por `due_at`
-- [ ] Task 4.2: Loader da fila, com `consumed_ratio`, severidade vigente e reconhecimento
-- [ ] Task 4.3: Tela da fila — o que está prestes a estourar aparece primeiro
-- [ ] Task 4.4: Teste — o score de risco vem do `ml-model-serving` e falha aberta quando ele não responde
-- [ ] Task 4.5: Score por incidente ao lado do `consumed_ratio`, sem substituí-lo
-- [ ] Task 4.6: Detalhe da ocorrência — prazo vigente, marcos já cruzados, histórico de severidade
+- [x] Task 4.1: Teste — o loader lê `silver_alert_open`, ordenado por `due_at`
+- [x] Task 4.2: Loader da fila, com `consumed_ratio`, severidade vigente e reconhecimento
+- [x] Task 4.3: Tela da fila — o que está prestes a estourar aparece primeiro
+- [x] Task 4.4: Teste — o score de risco vem do `ml-model-serving` e falha aberta quando ele não responde
+- [x] Task 4.5: Score por incidente ao lado do `consumed_ratio`, sem substituí-lo
+- [x] Task 4.6: Detalhe da ocorrência — prazo vigente, marcos já cruzados, histórico de severidade
 
 ### Verification
 
-- [ ] `npm run test` passa
+- [x] `npm run test` passa
 - [ ] Com dado da Fase 6, a fila mostra ocorrências vivas na ordem correta
 
 ## Phase 5: A tela do gestor

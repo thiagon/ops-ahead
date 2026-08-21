@@ -7,6 +7,12 @@ const configSchema = z.object({
   // protocol ml-trainer's clickhouse_driver uses.
   CLICKHOUSE_URL: z.url({ protocol: /^https?$/ }).default('http://default:@localhost:8123/default'),
   TENANT_ID: z.string().min(1).default('locaweb'),
+  ML_MODEL_SERVING_URL: z
+    .url({ protocol: /^https?$/ })
+    .default('http://ml-model-serving.ml.svc.cluster.local:3000'),
+  // The queue renders on consumed_ratio alone when serving is slow — the
+  // budget bounds the whole page, not one prediction.
+  ML_MODEL_SERVING_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
 });
 
 export type Config = z.infer<typeof configSchema>;
