@@ -7,7 +7,7 @@ dependencies = [
     "clickhouse-driver>=0.2.9",
     "prometheus-client>=0.21",
     "pydantic>=2.9",
-    "pydantic-settings>=2.5",
+    "pydantic-settings>=2.14.2",
 ]
 
 [dependency-groups]
