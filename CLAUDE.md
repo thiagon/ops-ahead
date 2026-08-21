@@ -17,11 +17,15 @@ uv sync          # install all workspace dependencies
 
 ```
 apps/                        # one folder per image you build; chart/ overlay colocated
-  data-ingest/               # deployment (ns: data) — Kafka consumer → ClickHouse + MinIO
+  data-ingest/                # deployment (ns: data) — Kafka consumer → ClickHouse + MinIO, translation stage
   data-runner/                # deployment (ns: data) — dbt-clickhouse marts + Great Expectations, consumes trigger.data
-  ml-trainer/                 # deployment (ns: ml) — volume/breach training, consumes trigger.ml
-  ui-orchestrator/            # deployment (ns: ui) — REST/MCP intake → Kafka (trigger.ml/trigger.data)
-contracts/                   # shared JSON Schemas (incident-event.schema.json, trigger-*.schema.json)
+  data-deadline-tracker/      # deployment (ns: data) — tracks open eligible incidents, emits deadline milestones to deadlines.milestone
+  ml-trainer/                  # deployment (ns: ml) — volume/breach/external-event training, consumes trigger.ml
+  ml-burst-detector/           # deployment (ns: ml) — consumes events.monitor, detects signal bursts per entity, publishes alerts.burst
+  ml-model-serving/            # deployment (ns: ml) — BentoML serving for the volume/breach models registered in MLflow
+  ui-gateway/                  # deployment (ns: ui) — ingestion gateway, HTTP boundary → events.raw.{alert,monitor}
+  ui-orchestrator/             # deployment (ns: ui) — REST/MCP intake → Kafka (trigger.ml/trigger.data)
+contracts/                   # shared JSON Schemas (event-envelope, incident-alert, condition-monitor, deadline-milestone, translation-dictionary, trigger-*.schema.json)
 domain/                      # domain specs (SDD): language, contexts, ACLs
 scripts/                     # local utilities, never go to K8s
   prepare_dataset.py         # Excel → CSV pipeline
@@ -30,11 +34,12 @@ assets/
   incidents.csv              # processed dataset (27 cols, snake_case)
 infra/
   charts/                    # Helm charts, one per namespace prefix (data-*, ml-*, ui-*, infra-*)
-  apps/                      # ArgoCD Application manifests + pipelines ApplicationSet
+  apps/                      # ArgoCD Application manifests
   bootstrap/                 # root-app (app-of-apps)
   scripts/                   # dev-setup.sh, dev-up.sh, dev-down.sh
 docs/
   context/                   # data dictionary
+  insights/                  # EDA and design analyses referenced by track specs
   sprints/                   # sprint requirements
 ```
 

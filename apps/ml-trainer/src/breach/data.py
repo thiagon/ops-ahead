@@ -7,69 +7,77 @@ from clickhouse_driver import Client
 
 from settings import Settings
 
-ELIGIBLE_INCIDENTS_COLUMNS = [
-    "event_id",
+# One row per (incidente × marco) — reconstructed point-in-time by the mart
+# itself (apps/data-runner/models/marts/breach_training_examples.sql).
+# has_breached/final_consumed_ratio/final_duration_seconds are the eventual
+# outcome (the label and the exclusion criteria), everything else is only
+# what was known at occurred_at.
+BREACH_TRAINING_EXAMPLES_COLUMNS = [
+    "milestone_id",
+    "tenant_id",
+    "source",
+    "external_id",
     "entity_id",
-    "ticket_number",
-    "received_at",
+    "kind",
+    "severity_at_milestone",
     "opened_at",
-    "assignment_group",
-    "opened_by",
-    "has_parent_incident",
+    "acknowledged_at_at_milestone",
+    "due_at",
+    "deadline_seconds",
+    "consumed_ratio_at_milestone",
+    "occurred_at",
+    "owner",
+    "reported_by",
+    "parent_id",
+    "resolution_code",
     "status",
-    "severity",
-    "duration_seconds",
-    "ola_limit_seconds",
-    "kpi_breached",
+    "severity_changes",
+    "is_eligible",
+    "group_load",
+    "no_intervention_count_1h",
+    "no_intervention_count_6h",
+    "no_intervention_precursor_length",
+    "has_breached",
+    "final_consumed_ratio",
+    "final_duration_seconds",
 ]
 
-P4_SEQUENCES_COLUMNS = ["entity_id", "sequence_start", "sequence_end", "sequence_length"]
+SIGNAL_COUNTS_COLUMNS = ["entity_id", "window_minutes", "window_start", "signal_count"]
 
-IC_WINDOWS_COLUMNS = ["entity_id", "window_hours", "window_start", "no_intervention_count"]
+AUTO_RESOLUTION_RATE_COLUMNS = ["entity_id", "auto_resolution_rate"]
 
-GROUP_LOAD_COLUMNS = ["assignment_group", "window_start", "incidents_opened"]
-
-PRIORITY_CHANGES_COLUMNS = ["ticket_number", "received_at", "severity_from", "severity_to"]
+SEVERITY_ESCALATIONS_COLUMNS = ["entity_id", "date", "escalation_count"]
 
 
-def fetch_eligible_incidents(settings: Settings) -> pd.DataFrame:
-    """`first_touch_duration` is already filtered to `counted_in_kpi = 1`, which
-    is exactly the P1–P3 / no-parent / not-"no_intervention" population the
-    breach model trains on."""
+def fetch_breach_training_examples(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(ELIGIBLE_INCIDENTS_COLUMNS)
-    rows = client.execute(f"select {columns} from first_touch_duration order by opened_at")
-    return pd.DataFrame(rows, columns=ELIGIBLE_INCIDENTS_COLUMNS)
+    columns = ", ".join(BREACH_TRAINING_EXAMPLES_COLUMNS)
+    rows = client.execute(f"select {columns} from breach_training_examples order by occurred_at")
+    return pd.DataFrame(rows, columns=BREACH_TRAINING_EXAMPLES_COLUMNS)
 
 
-def fetch_p4_sequences(settings: Settings) -> pd.DataFrame:
+def fetch_signal_counts(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(P4_SEQUENCES_COLUMNS)
-    rows = client.execute(f"select {columns} from p4_sequences_by_ci order by entity_id, sequence_start")
-    return pd.DataFrame(rows, columns=P4_SEQUENCES_COLUMNS)
-
-
-def fetch_ic_windows(settings: Settings) -> pd.DataFrame:
-    client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(IC_WINDOWS_COLUMNS)
+    columns = ", ".join(SIGNAL_COUNTS_COLUMNS)
     rows = client.execute(
-        f"select {columns} from incidents_by_ic where window_hours in (1, 6) order by entity_id, window_start"
+        f"select {columns} from gold_monitor_signal_counts where window_minutes in (15, 60) "
+        "order by entity_id, window_minutes, window_start"
     )
-    return pd.DataFrame(rows, columns=IC_WINDOWS_COLUMNS)
+    return pd.DataFrame(rows, columns=SIGNAL_COUNTS_COLUMNS)
 
 
-def fetch_group_load(settings: Settings) -> pd.DataFrame:
+def fetch_auto_resolution_rate(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(GROUP_LOAD_COLUMNS)
-    rows = client.execute(f"select {columns} from group_load_by_window order by assignment_group, window_start")
-    return pd.DataFrame(rows, columns=GROUP_LOAD_COLUMNS)
+    columns = ", ".join(AUTO_RESOLUTION_RATE_COLUMNS)
+    rows = client.execute(f"select {columns} from gold_monitor_auto_resolution_rate order by entity_id")
+    return pd.DataFrame(rows, columns=AUTO_RESOLUTION_RATE_COLUMNS)
 
 
-def fetch_priority_changes(settings: Settings) -> pd.DataFrame:
+def fetch_severity_escalations(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(PRIORITY_CHANGES_COLUMNS)
-    rows = client.execute(f"select {columns} from priority_changes_log order by ticket_number, received_at")
-    return pd.DataFrame(rows, columns=PRIORITY_CHANGES_COLUMNS)
+    columns = ", ".join(SEVERITY_ESCALATIONS_COLUMNS)
+    rows = client.execute(f"select {columns} from gold_monitor_severity_escalations order by entity_id, date")
+    return pd.DataFrame(rows, columns=SEVERITY_ESCALATIONS_COLUMNS)
 
 
 def dataset_version(*frames: pd.DataFrame) -> str:

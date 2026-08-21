@@ -31,35 +31,6 @@ def register_incidents_by_ic(context: AbstractDataContext) -> ValidationDefiniti
     )
 
 
-def register_daily_anomaly_features(context: AbstractDataContext) -> ValidationDefinition:
-    batch_def = _table_asset(context, "daily_anomaly_features")
-    suite = context.suites.add(gx.ExpectationSuite(name="mart_daily_anomaly_features"))
-
-    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="date"))
-    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="source"))
-    suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="total_incidents", min_value=0)
-    )
-    suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="p1_share", min_value=0, max_value=1)
-    )
-    suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="breach_rate", min_value=0, max_value=1)
-    )
-    suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="manual_open_share", min_value=0, max_value=1)
-    )
-    suite.add_expectation(
-        gxe.ExpectColumnValuesToBeBetween(column="no_intervention_share", min_value=0, max_value=1)
-    )
-
-    return context.validation_definitions.add(
-        gx.ValidationDefinition(
-            name="mart_daily_anomaly_features", data=batch_def, suite=suite
-        )
-    )
-
-
 def register_kpi_monthly_state(context: AbstractDataContext) -> ValidationDefinition:
     batch_def = _table_asset(context, "kpi_monthly_state")
     suite = context.suites.add(gx.ExpectationSuite(name="mart_kpi_monthly_state"))

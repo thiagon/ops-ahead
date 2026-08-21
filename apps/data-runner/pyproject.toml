@@ -13,6 +13,7 @@ dependencies = [
     "mlflow>=2.17",
     "clickhouse-driver>=0.2.9",
     "prometheus-client>=0.21",
+    "redis>=5.0",
 ]
 
 [dependency-groups]

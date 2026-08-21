@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: silver_alert
+    columns:
+      - name: tenant_id
+        tests: [not_null]
+      - name: source
+        tests: [not_null]
+      - name: external_id
+        tests: [not_null]
+      - name: opened_at
+        tests: [not_null]
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+
+  - name: silver_monitor
+    columns:
+      - name: tenant_id
+        tests: [not_null]
+      - name: source
+        tests: [not_null]
+      - name: external_id
+        tests: [not_null]
+      - name: entity_id
+        tests: [not_null]
+      - name: started_at
+        tests: [not_null]
+      - name: condition
+        tests:
+          - not_null
+          - accepted_values:
+              values: [firing, cleared]

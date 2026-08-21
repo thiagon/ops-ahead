@@ -16,7 +16,7 @@ PSI_SIGNIFICANT_THRESHOLD = 0.25
 class DriftResult:
     psi: float
     # KS only applies to continuous distributions — None for categorical
-    # features (assignment_group, priority_group). Evidently's "ks" method
+    # features (owner, priority_group). Evidently's "ks" method
     # reports the test's p-value, not the D statistic — small means drift.
     ks_pvalue: float | None
 

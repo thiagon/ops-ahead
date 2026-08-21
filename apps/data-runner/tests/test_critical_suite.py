@@ -21,7 +21,7 @@ def _rows(n=5):
 
 def _load(sqlite_engine, rows):
     engine, _ = sqlite_engine
-    pd.DataFrame(rows).to_sql("incidents_received", engine, index=False, if_exists="replace")
+    pd.DataFrame(rows).to_sql("bronze_alert", engine, index=False, if_exists="replace")
 
 
 def test_critical_suite_passes_on_clean_snapshot(sqlite_engine, gx_context):
@@ -62,11 +62,14 @@ def test_critical_suite_fails_when_opened_at_after_received_at(sqlite_engine, gx
     assert result.success is False
 
 
-def test_critical_suite_fails_on_null_entity_id(sqlite_engine, gx_context):
+def test_critical_suite_passes_on_null_entity_id(sqlite_engine, gx_context):
+    # entity_id is optional in the alert contract — not every origin reports
+    # one (contracts/incident-alert.schema.json) — so a null does not fail
+    # the suite.
     rows = _rows()
     rows[0]["entity_id"] = None
     _load(sqlite_engine, rows)
 
     result = register(gx_context).run()
 
-    assert result.success is False
+    assert result.success is True

@@ -54,7 +54,7 @@ class BreachFeatureInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     severity: int = Field(ge=1, le=3)
-    assignment_group: str
+    owner: str
     opened_hour: int = Field(ge=0, le=23)
     opened_dayofweek: int = Field(ge=0, le=6)
     is_manual_open: int = Field(ge=0, le=1)
@@ -62,11 +62,18 @@ class BreachFeatureInput(BaseModel):
     p4_precursor_length: int = Field(ge=0)
     no_intervention_count_1h: int = Field(ge=0)
     no_intervention_count_6h: int = Field(ge=0)
-    group_load_1h: int = Field(ge=0)
+    group_load: int = Field(ge=0)
     was_recategorized: int = Field(ge=0, le=1)
     recategorization_count: int = Field(ge=0)
     group_severity_historical_ola_ratio: float | None = None
     group_severity_historical_over_25pct_rate: float | None = None
+    consumed_ratio: float = Field(ge=0)
+    time_remaining_seconds: float
+    was_acknowledged: int = Field(ge=0, le=1)
+    entity_signal_count_15m: int = Field(ge=0)
+    entity_signal_count_1h: int = Field(ge=0)
+    entity_auto_resolution_rate: float | None = None
+    entity_severity_escalations: int = Field(ge=0)
 
 
 class ShapContribution(BaseModel):

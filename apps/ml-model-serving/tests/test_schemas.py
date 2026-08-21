@@ -56,7 +56,7 @@ def test_breach_feature_input_rejects_severity_outside_p1_p3():
     with pytest.raises(ValidationError):
         BreachFeatureInput(
             severity=4,  # only P1-P3 are KPI-eligible
-            assignment_group="Team14",
+            owner="Team14",
             opened_hour=10,
             opened_dayofweek=2,
             is_manual_open=0,
@@ -64,18 +64,25 @@ def test_breach_feature_input_rejects_severity_outside_p1_p3():
             p4_precursor_length=0,
             no_intervention_count_1h=0,
             no_intervention_count_6h=0,
-            group_load_1h=0,
+            group_load=0,
             was_recategorized=0,
             recategorization_count=0,
+            consumed_ratio=0.25,
+            time_remaining_seconds=3600.0,
+            was_acknowledged=0,
+            entity_signal_count_15m=0,
+            entity_signal_count_1h=0,
+            entity_severity_escalations=0,
         )
 
 
-def test_breach_feature_input_allows_missing_historical_ratio():
-    # NaN for a group+severity combo with no prior history is legitimate
-    # (see ml-breach-model's add_historical_group_severity_features).
+def test_breach_feature_input_allows_missing_historical_ratio_and_auto_resolution_rate():
+    # NaN for a group+severity combo with no prior history, or an entity with
+    # no monitor-chain history yet, is legitimate (see ml-breach-model's
+    # add_historical_group_severity_features / add_monitor_context_features).
     feature = BreachFeatureInput(
         severity=2,
-        assignment_group="Team14",
+        owner="Team14",
         opened_hour=10,
         opened_dayofweek=2,
         is_manual_open=1,
@@ -83,8 +90,15 @@ def test_breach_feature_input_allows_missing_historical_ratio():
         p4_precursor_length=3,
         no_intervention_count_1h=1,
         no_intervention_count_6h=4,
-        group_load_1h=2,
+        group_load=2,
         was_recategorized=1,
         recategorization_count=2,
+        consumed_ratio=0.5,
+        time_remaining_seconds=1800.0,
+        was_acknowledged=1,
+        entity_signal_count_15m=2,
+        entity_signal_count_1h=6,
+        entity_severity_escalations=1,
     )
     assert feature.group_severity_historical_ola_ratio is None
+    assert feature.entity_auto_resolution_rate is None

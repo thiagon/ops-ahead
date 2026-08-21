@@ -1,0 +1,52 @@
+# Same PreSync-hook pattern data-ingest's migration Job uses: dbt seed +
+# dbt run materialize every seed/view/table this app owns — including
+# tenant_deadlines and silver_alert_open — before the rest of this app's
+# sync proceeds, and, via sync-wave ordering, before data-deadline-tracker's
+# wave starts, since its startup reads both.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-runner-build
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "data-runner.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: data-runner-build
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: build
+          image: {{ include "data-runner.image" . | quote }}
+          imagePullPolicy: {{ (index .Values "data-runner").image.pullPolicy }}
+          command: ["python", "-m", "main", "run", "build"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: CLICKHOUSE_HOST
+              value: {{ .Values.run.env.clickhouseHost | quote }}
+            - name: CLICKHOUSE_DATABASE
+              value: {{ .Values.run.env.clickhouseDatabase | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.run.env.clickhouseUser | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.run.secretName }}
+                  key: clickhouse-password
+          resources:
+            {{- toYaml .Values.run.resources | nindent 12 }}

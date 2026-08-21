@@ -23,6 +23,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY apps/data-ingest/src/ ./src/
 COPY apps/data-ingest/migrations/ ./migrations/
+COPY apps/data-ingest/dictionaries/ ./dictionaries/
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"

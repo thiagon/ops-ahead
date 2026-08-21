@@ -31,10 +31,15 @@ termos**. Um consumidor que precise saber que a origem é o ITSM indica traduç�
 
 ## Onde a tradução acontece
 
-Duas peças, com responsabilidades diferentes:
+Três peças, com responsabilidades diferentes:
 
-**O adapter da origem**, dentro da fronteira, é a ACL propriamente dita. Recebe o contrato do
-ITSM, preenche os campos do domínio e preserva o evento original.
+**O gateway**, na fronteira, autentica a origem pela rota e pela credencial da integração, e
+envelopa o corpo como chegou — não traduz. É a rota que determina `source` e `intake`; o
+corpo continua opaco até o estágio seguinte.
+
+**O estágio de tradução**, logo depois, é a ACL propriamente dita: lê o tópico cru, aplica o
+dicionário da origem e publica no vocabulário do domínio. Separar do gateway é o que permite
+corrigir um mapeamento e reprocessar um período sem reautenticar nem reenviar nada.
 
 **O produtor de mock**, fora do sistema, simula o ITSM lendo a base histórica. Ele não é
 parte do domínio: é um substituto do sistema externo, e existe só enquanto não há webhook
@@ -59,10 +64,34 @@ adicionar um adapter para virar renomear o sistema inteiro.
 
 ## Onde o mapeamento concreto mora
 
-Campo a campo, a correspondência é implementação: vive no adapter e no dicionário do mock, e
-o formato publicado está em [`contracts/`](../../contracts/). Este documento define **o que**
-é traduzido e **por quê**; repetir a lista aqui criaria uma terceira cópia para divergir das
-outras duas.
+Campo a campo, a correspondência é implementação: vive no dicionário do estágio de tradução,
+e o formato publicado está em [`contracts/`](../../contracts/). Este documento define **o
+que** é traduzido e **por quê**; repetir a lista aqui criaria uma terceira cópia para
+divergir das outras duas.
+
+## O dicionário de tradução
+
+Formato comum a toda origem, fora do código e versionado — nunca mutável em produção.
+Contrato em
+[`contracts/translation-dictionary.schema.json`](../../contracts/translation-dictionary.schema.json).
+
+O dicionário é indexado por [tenant](../ubiquitous-language.md#tenant) e origem, não por
+origem sozinha: dois tenants no mesmo sistema — dois clientes com o mesmo ITSM, por exemplo —
+podem customizar estados diferentes, e tratar isso como um dicionário só faria um tenant
+herdar a customização do outro.
+
+Cada dicionário declara, para o tenant e a origem que representa: os valores que ela usa para
+ciclo de vida (`status`, só na entrada `alert`), para condição (`condition`, só na entrada
+`monitor`) e para o que originou o registro (`reported_by`, só na entrada `alert`), mapeados
+para o vocabulário do domínio. Valor fora do dicionário vira o caso desconhecido e fica
+visível — nunca falha o evento, porque o corpo original está preservado no raw e o mapa pode
+ser estendido depois.
+
+A versão do dicionário é registrada em cada linha traduzida, em campo próprio
+(`dictionary_version`) — separado da `version` do contrato publicado, porque as duas mudam
+por motivos diferentes. É essa versão que torna o reprocessamento explicável: reprocessar um
+período com o dicionário que valia então reproduz o que a tradução decidiu naquele momento,
+não o que decidiria hoje.
 
 ## Adicionar uma origem
 

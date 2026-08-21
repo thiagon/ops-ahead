@@ -27,7 +27,7 @@ Dados → Modelos → Copiloto IA → Interfaces
 
 | Camada | Componentes |
 |--------|-------------|
-| **Dados** | Kafka (Strimzi), MinIO, ClickHouse (Altinity), Argo Workflows |
+| **Dados** | Kafka (Strimzi), MinIO, ClickHouse (Altinity) |
 | **Modelos** | MLflow tracking + AI Gateway, Postgres, Redis |
 | **Copiloto IA** | Agent LangGraph, Postgres + pgvector |
 | **Interfaces** | Gateway + UI Nuxt |
@@ -61,13 +61,22 @@ Monorepo com workspaces `uv` para Python. Cada app em `apps/` gera sua própria 
 
 ```
 apps/                              # serviços e jobs que vão para o K8s
-  data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO
+  data-ingest/                     # Deployment — consumer Kafka → ClickHouse + MinIO, estágio de tradução
   data-runner/                     # Deployment (KEDA ScaledObject) — dbt-clickhouse (marts) + Great Expectations, consome trigger.data
-  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach, consome trigger.ml
+  data-deadline-tracker/           # Deployment — acompanha incidents abertos elegíveis, emite deadlines.milestone
+  ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach/external-event, consome trigger.ml
+  ml-burst-detector/                # Deployment — consome events.monitor, detecta rajada por entity, publica alerts.burst
+  ml-model-serving/                 # Deployment — serving BentoML dos modelos volume/breach registrados no MLflow
+  ui-gateway/                       # Deployment — gateway de ingestão, fronteira HTTP → events.raw.{alert,monitor}
   ui-orchestrator/                 # Deployment — REST/MCP → Kafka (trigger.ml/trigger.data) sob demanda
 
 contracts/                         # JSON Schemas compartilhados entre apps
-  incidents-raw.schema.json        # schema híbrido do tópico incidents.raw
+  event-envelope.schema.json       # envelope cru, agnóstico de natureza, antes da tradução
+  incident-alert.schema.json       # entrada alert traduzida (ocorrência gerenciada)
+  condition-monitor.schema.json    # entrada monitor traduzida (condição observada)
+  deadline-milestone.schema.json   # marco de consumo do OLA (25/50/75/100%/abandono)
+  translation-dictionary.schema.json  # dicionário de tradução por tenant e origem
+  trigger-*.schema.json            # payloads de execução sob demanda (ui-orchestrator)
 
 scripts/                           # utilitários locais (não vão para o K8s)
   prepare_dataset.py               # pipeline Excel → CSV
@@ -77,23 +86,30 @@ assets/
   incidents.csv                    # dataset processado (122.543 linhas, 27 colunas)
 
 infra/
-  charts/                          # Helm charts por namespace
+  charts/                          # Helm charts, um por app em apps/ (mesmo nome) + os compartilhados
+    data-clickhouse/               # ClickHouse (Altinity operator)
+    data-deadline-tracker/         # app — ver apps/ acima
+    data-ingest/                   # app — ver apps/ acima
     data-kafka/                    # Kafka cluster + KafkaTopics (Strimzi)
     data-minio/                    # MinIO object storage
-    data-clickhouse/               # ClickHouse (Altinity operator)
+    data-runner/                   # app — ver apps/ acima
     data-strimzi/                  # Strimzi operator
-    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
-    ml-mlflow/                     # MLflow tracking + AI Gateway
-    ml-postgres/                   # Postgres (ns: ml)
-    ml-redis/                      # Redis (ns: ml)
-    ui-frontend/                   # UI Nuxt
-    ui-gateway/                    # Gateway nginx
     infra-argocd/                  # ArgoCD
-    infra-prometheus/              # Prometheus + Grafana
-    infra-vault/                   # Vault
     infra-eso/                     # External Secrets Operator
     infra-gitea/                   # Gitea (registry + git)
+    infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
+    infra-prometheus/              # Prometheus + Grafana
     infra-secrets/                 # ClusterSecretStore
+    infra-vault/                   # Vault
+    ml-burst-detector/             # app — ver apps/ acima
+    ml-mlflow/                     # MLflow tracking + AI Gateway
+    ml-model-serving/              # app — ver apps/ acima
+    ml-postgres/                   # Postgres (ns: ml)
+    ml-redis/                      # Redis (ns: ml)
+    ml-trainer/                    # app — ver apps/ acima
+    ui-frontend/                   # UI Nuxt
+    ui-gateway/                    # app — ver apps/ acima
+    ui-orchestrator/               # app — ver apps/ acima
   apps/                            # ArgoCD Application manifests
   bootstrap/                       # root-app (app-of-apps)
   scripts/
@@ -133,6 +149,21 @@ make up
 
 ```bash
 make down
+```
+
+### Adicionar um app novo
+
+Cada app com `Dockerfile` builda via Gitea Actions (`.gitea/workflows/build.yaml`) — a lista de apps
+buildados é uma matrix estática (`jobs.build.strategy.matrix.app`), não descoberta do filesystem.
+Criar um app novo em `apps/` não o coloca lá sozinho: sem essa entrada a imagem nunca é publicada e
+o pod fica em `ImagePullBackOff` indefinidamente.
+
+Pra forçar o rebuild de todas as imagens sem esperar uma mudança de código sob `apps/` (por exemplo,
+depois de um `make destroy`, quando o registry local fica vazio):
+
+```bash
+make up FORCE=1
+make sync FORCE=1
 ```
 
 ### Serviços disponíveis

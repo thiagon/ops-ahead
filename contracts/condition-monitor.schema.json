@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "condition-monitor/v1",
+  "title": "ConditionMonitorEvent",
+  "description": "Translated event for the monitor intake — an observed condition on an entity, with no owner, no acknowledgment, and no deadline: the origin observes, it doesn't manage work. Published on the translated topic. See domain/ubiquitous-language.md#condition and docs/insights/fluxo-do-incidente.md.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "tenant_id",
+    "source",
+    "version",
+    "dictionary_version",
+    "received_at",
+    "external_id",
+    "started_at",
+    "condition",
+    "entity_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Same identifier as the raw envelope this event was translated from."
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tenant the event belongs to, assigned by the gateway from the integration's credential — never declared by the payload. Prefixes identity everywhere: an origin's identifier is only unique within one origin of one tenant."
+    },
+    "source": {
+      "type": "string",
+      "description": "Assigned by the gateway.",
+      "examples": [
+        "alertmanager",
+        "datadog",
+        "zabbix"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of this translated contract — separate from dictionary_version, since the two change for different reasons."
+    },
+    "dictionary_version": {
+      "type": "string",
+      "description": "Version of the source's translation dictionary that produced this line. See domain/acl/itsm.md#o-dicionário-de-tradução."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Assigned by the gateway."
+    },
+    "external_id": {
+      "type": "string",
+      "description": "Identity in the origin."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Null while the condition persists."
+    },
+    "severity": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 5
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "firing",
+        "cleared"
+      ],
+      "description": "Translated by the origin's dictionary. 'cleared', not 'resolved' — resolved already means something else in the alert intake's lifecycle, and the same term with two meanings across intakes is a source of error."
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "The only correlation key between the alert and monitor chains. See domain/ubiquitous-language.md#entity."
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "labels": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "source_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri"
+    }
+  }
+}

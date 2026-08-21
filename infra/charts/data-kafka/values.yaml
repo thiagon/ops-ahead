@@ -25,7 +25,28 @@ kafka:
       size: 5Gi
 
 kafkaTopics:
-  - name: incidents.received
+  # Raw, one per intake — only data-ingest reads these, translating into the
+  # topics below (docs/insights/fluxo-do-incidente.md). Retention only needs
+  # to outlive the consumer: the lake (MinIO Parquet) is what reprocessing
+  # reads, not this topic.
+  - name: events.raw.alert
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  - name: events.raw.monitor
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  # Translated — every business consumer downstream of translation reads
+  # these, never the raw topics above.
+  - name: events.alert
+    partitions: 12
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
+  - name: events.monitor
     partitions: 12
     replicas: 2
     config:
@@ -36,6 +57,15 @@ kafkaTopics:
   - name: alerts.burst
     partitions: 3
     replicas: 2
+  # Append, not compacted: an incident crosses up to five milestones
+  # (pct_25/50/75/100/abandoned) and every one of them is its own training
+  # row in Predição (incident × marco) — compaction on the incident's key
+  # would erase all but the last.
+  - name: deadlines.milestone
+    partitions: 3
+    replicas: 2
+    config:
+      retention.ms: "604800000"   # 7 days
   - name: recommendations
     partitions: 3
     replicas: 2

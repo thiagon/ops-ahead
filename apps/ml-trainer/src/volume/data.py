@@ -7,7 +7,7 @@ from clickhouse_driver import Client
 
 from settings import Settings
 
-DAILY_ANOMALY_FEATURES_COLUMNS = [
+GOLD_ALERT_DAILY_FEATURES_COLUMNS = [
     "date",
     "source",
     "total_incidents",
@@ -18,11 +18,11 @@ DAILY_ANOMALY_FEATURES_COLUMNS = [
 ]
 
 
-def fetch_daily_anomaly_features(settings: Settings) -> pd.DataFrame:
+def fetch_gold_alert_daily_features(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
-    columns = ", ".join(DAILY_ANOMALY_FEATURES_COLUMNS)
-    rows = client.execute(f"select {columns} from daily_anomaly_features order by date")
-    return pd.DataFrame(rows, columns=DAILY_ANOMALY_FEATURES_COLUMNS)
+    columns = ", ".join(GOLD_ALERT_DAILY_FEATURES_COLUMNS)
+    rows = client.execute(f"select {columns} from gold_alert_daily_features order by date")
+    return pd.DataFrame(rows, columns=GOLD_ALERT_DAILY_FEATURES_COLUMNS)
 
 
 def dataset_version(daily: pd.DataFrame) -> str:

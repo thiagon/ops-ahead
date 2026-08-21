@@ -6,21 +6,31 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
-class IncidentEvent(BaseModel):
-    """Same shape as data-ingest's own model (contracts/incident-event.schema.json)
+class BronzeMonitorEvent(BaseModel):
+    """Same shape as data-ingest's own model (contracts/condition-monitor.schema.json)
     — duplicated rather than imported, consistent with how every training job
-    in this track ships as its own container image."""
+    in this track ships as its own container image. This detector reads the
+    monitor chain: it reacts to observed condition signal, not to managed
+    incident lifecycle (domain/ubiquitous-language.md#condition)."""
 
     model_config = ConfigDict(extra="forbid")
 
-    event_id: Annotated[UUID, Field(description="Globally unique event identifier (UUID v4).")]
-    source: Annotated[str, Field(description="Origin adapter identifier.", examples=["itsm", "alertmanager", "datadog"])]
-    received_at: Annotated[AwareDatetime, Field(description="Timestamp when the consumer received the event (UTC, ISO 8601).")]
-    opened_at: Annotated[AwareDatetime, Field(description="Timestamp when the incident was opened in the originating system (UTC, ISO 8601).")]
-    severity: Annotated[int, Field(description="Normalized severity: 1=Critical … 5=VeryLow.", ge=1, le=5)]
-    entity_id: Annotated[str, Field(description="Identifier of the affected IC, host, or service.")]
-    status: Annotated[str, Field(description="Current status in the originating system.")]
-    payload_raw: Annotated[str, Field(description="Full original event as JSON string, verbatim from the originating system.")]
+    event_id: Annotated[UUID, Field(description="Same id as the raw envelope this was translated from.")]
+    tenant_id: Annotated[str, Field(min_length=1)]
+    source: Annotated[str, Field(examples=["alertmanager", "datadog", "zabbix"])]
+    version: Annotated[str, Field(description="Translated contract version.")]
+    dictionary_version: Annotated[str, Field()]
+    received_at: Annotated[AwareDatetime, Field()]
+    external_id: Annotated[str, Field()]
+    started_at: Annotated[AwareDatetime, Field()]
+    ended_at: Annotated[AwareDatetime | None, Field(default=None)]
+    severity: Annotated[int | None, Field(default=None, ge=1, le=5)]
+    condition: Annotated[str, Field(description="firing/cleared, translated.")]
+    entity_id: Annotated[str, Field(description="Only correlation key between the alert and monitor chains.")]
+    title: Annotated[str | None, Field(default=None)]
+    description: Annotated[str | None, Field(default=None)]
+    labels: Annotated[dict[str, str] | None, Field(default=None)]
+    source_url: Annotated[str | None, Field(default=None)]
 
 
 class BurstAlert(BaseModel):

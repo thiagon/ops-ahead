@@ -1,10 +1,15 @@
--- Ingestion
-SELECT count() AS received_total FROM incidents_received;
-SELECT source, count() AS n FROM incidents_received GROUP BY source;
+-- Ingestion (incidents.received retired by incident-flow_20260819 — bronze is
+-- split by intake now)
+SELECT count() AS alert_total FROM bronze_alert;
+SELECT count() AS monitor_total FROM bronze_monitor;
+SELECT source, count() AS n FROM bronze_alert GROUP BY source;
+SELECT source, count() AS n FROM bronze_monitor GROUP BY source;
 
--- Mart coverage vs ingestion
+-- Mart coverage vs ingestion — the marts below are pending the per-chain
+-- rebuild in incident-flow_20260819's later phases; this section is stale
+-- until then.
 SELECT
-    (SELECT count() FROM incidents_received)      AS received,
+    (SELECT count() FROM bronze_alert)            AS received,
     (SELECT sum(incident_count) FROM incidents_by_ic WHERE window_hours = 24) AS by_ic_24h,
     (SELECT count() FROM first_touch_duration)    AS first_touch,
     (SELECT count() FROM daily_anomaly_features)  AS daily_features,

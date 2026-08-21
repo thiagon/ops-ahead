@@ -55,9 +55,10 @@ restore_pulled_overlays() {
     cp "$PULL_FORWARD_BACKUP/$f" "$f"
   done < <(cd "$PULL_FORWARD_BACKUP" && find . -type f | sed 's|^\./||')
 }
+FORCE_MARKER=".ci/force-build"
 # On any exit — a failed push, Ctrl-C, a closed pipe — the working tree still
 # goes back to what the user left. Restoring twice copies the same bytes.
-trap 'restore_pulled_overlays; rm -rf "$PULL_FORWARD_BACKUP"' EXIT
+trap 'restore_pulled_overlays; rm -rf "$PULL_FORWARD_BACKUP"; rm -f "$FORCE_MARKER"' EXIT
 # Same rule as the Gitea Actions write-back: every app pins <app>.image.tag,
 # keyed by its own name. Discovered from the overlays themselves — owning one
 # is what makes an app's tag CI-managed.
@@ -67,9 +68,16 @@ for overlay in apps/*/chart/values-dev.yaml; do
   pull_forward_key "$overlay" ".[\"${app}\"].image.tag"
 done
 
+if [ -n "${FORCE:-}" ]; then
+  mkdir -p "$(dirname "$FORCE_MARKER")"
+  touch "$FORCE_MARKER"
+  info "FORCE=1 — every app image will be rebuilt"
+fi
+
 # Working dir snapshot (modified + untracked) without touching the user's HEAD.
 info "Snapshotting working dir..."
 git add -A
+[ -f "$FORCE_MARKER" ] && git add -f "$FORCE_MARKER"
 TREE_HASH=$(git write-tree)
 git reset > /dev/null 2>&1
 COMMIT_HASH=$(git commit-tree "$TREE_HASH" -p HEAD -m "dev: working dir snapshot")

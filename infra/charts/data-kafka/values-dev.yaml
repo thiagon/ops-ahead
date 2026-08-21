@@ -23,7 +23,22 @@ kafka:
       size: 1Gi
 
 kafkaTopics:
-  - name: incidents.received
+  - name: events.raw.alert
+    partitions: 3
+    replicas: 1
+    config:
+      retention.ms: "86400000"    # 24 hours
+  - name: events.raw.monitor
+    partitions: 3
+    replicas: 1
+    config:
+      retention.ms: "86400000"    # 24 hours
+  - name: events.alert
+    partitions: 3
+    replicas: 1
+    config:
+      retention.ms: "86400000"    # 24 hours
+  - name: events.monitor
     partitions: 3
     replicas: 1
     config:

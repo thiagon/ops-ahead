@@ -24,6 +24,8 @@ Navigation hub for project context.
 - [ml-models_20260806 — Modelos de ML (Camada 2 — Inteligência)](./tracks/ml-models_20260806/index.md)
 - [ml-layer2-gaps_20260817 — Conformidade da Camada 2 com a arquitetura da Sprint 2](./tracks/ml-layer2-gaps_20260817/index.md)
 
+- [incident-flow_20260819 — Fluxo do incidente (duas entradas, marcos de prazo, read model)](./tracks/incident-flow_20260819/index.md)
+
 <!-- Auto-populated by /conductor:new-track -->
 
 ## Getting Started

@@ -5,11 +5,22 @@ profile: ops_ahead
 model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
+seed-paths: ["seeds"]
 
 models:
   ops_ahead:
-    staging:
-      +materialized: view
+    silver:
+      +materialized: table
+      +engine: "MergeTree()"
+    gold:
+      +materialized: table
+      +engine: "MergeTree()"
     marts:
       +materialized: table
       +engine: "MergeTree()"
+
+seeds:
+  ops_ahead:
+    +column_types:
+      severity: UInt8
+      deadline_seconds: UInt32

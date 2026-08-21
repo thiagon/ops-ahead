@@ -1,5 +1,8 @@
-# KEDA scales this Deployment's replica count from incidents.received's
-# consumer lag, down to zero when idle.
+# KEDA scales this Deployment's replica count from the consumed topics' lag,
+# down to zero when idle. One consumer group reads all three (ingestion +
+# translation + the already-canonical milestone topic, same process — see
+# src/main.py), so a lag spike on any of them must be able to scale the
+# deployment up.
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -19,6 +22,20 @@ spec:
       metadata:
         bootstrapServers: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
         consumerGroup: {{ .Values.consumer.env.kafkaGroupId | quote }}
-        topic: {{ .Values.consumer.env.kafkaTopic | quote }}
+        topic: {{ .Values.consumer.env.kafkaTopicRawAlert | quote }}
+        lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
+        offsetResetPolicy: earliest
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.consumer.env.kafkaGroupId | quote }}
+        topic: {{ .Values.consumer.env.kafkaTopicRawMonitor | quote }}
+        lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
+        offsetResetPolicy: earliest
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+        consumerGroup: {{ .Values.consumer.env.kafkaGroupId | quote }}
+        topic: {{ .Values.consumer.env.kafkaTopicMilestone | quote }}
         lagThreshold: {{ .Values.scaledObject.lagThreshold | quote }}
         offsetResetPolicy: earliest

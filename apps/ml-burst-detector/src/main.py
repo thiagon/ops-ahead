@@ -17,7 +17,7 @@ from detector import (
     robust_z_score,
     update_cusum,
 )
-from models import BurstAlert, IncidentEvent
+from models import BronzeMonitorEvent, BurstAlert
 from settings import Settings
 from state import RedisState
 
@@ -30,8 +30,8 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     app = FastStream(broker)
     state = RedisState(settings.redis_url, HISTORY_LENGTH)
 
-    async def _process_window(msg: IncidentEvent, window_name: str, window_seconds: int) -> None:
-        event_epoch = msg.opened_at.timestamp()
+    async def _process_window(msg: BronzeMonitorEvent, window_name: str, window_seconds: int) -> None:
+        event_epoch = msg.started_at.timestamp()
         count, history = await state.record_event(msg.entity_id, event_epoch, window_name, window_seconds)
         z, median, mad = robust_z_score(count, history)
         robust_std = robust_std_from_mad(mad)
@@ -71,7 +71,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
             await broker.publish(alert.model_dump_json().encode(), settings.alert_topic)
 
     @broker.subscriber(settings.kafka_topic, group_id=settings.kafka_group_id)
-    async def handle(msg: IncidentEvent) -> None:
+    async def handle(msg: BronzeMonitorEvent) -> None:
         metrics.events_consumed.inc()
         for window_name, window_seconds in WINDOWS_SECONDS.items():
             await _process_window(msg, window_name, window_seconds)

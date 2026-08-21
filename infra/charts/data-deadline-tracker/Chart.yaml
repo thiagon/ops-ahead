@@ -1,0 +1,6 @@
+apiVersion: v2
+name: data-deadline-tracker
+description: Acompanhador de prazo — reacts to time passing on open incidents, emits deadline milestones (ns:data)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

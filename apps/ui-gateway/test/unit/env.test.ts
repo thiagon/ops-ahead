@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { envSchema } from '../../src/env.ts';
+import { envSchema, rawTopicFor } from '../../src/env.ts';
 
 describe('envSchema', () => {
   it('applies defaults when nothing is set', () => {
@@ -14,9 +14,10 @@ describe('envSchema', () => {
       HTTPS_ENABLED: false,
       CORS_ORIGINS: [],
       KAFKA_BOOTSTRAP_SERVERS: 'localhost:9092',
-      KAFKA_TOPIC: 'incidents.received',
+      KAFKA_TOPIC_RAW_ALERT: 'events.raw.alert',
+      KAFKA_TOPIC_RAW_MONITOR: 'events.raw.monitor',
       HMAC_ENABLED: false,
-      HMAC_SECRET: '',
+      HMAC_SECRET_LOCAWEB_ITSM: '',
     });
   });
 
@@ -49,6 +50,18 @@ describe('envSchema', () => {
     const result = envSchema.safeParse({ HMAC_ENABLED: 'true' });
 
     expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors.HMAC_SECRET).toBeDefined();
+    expect(result.error?.flatten().fieldErrors.HMAC_SECRET_LOCAWEB_ITSM).toBeDefined();
+  });
+});
+
+describe('rawTopicFor', () => {
+  const env = envSchema.parse({});
+
+  it('picks the alert raw topic for the alert intake', () => {
+    expect(rawTopicFor(env, 'alert')).toBe('events.raw.alert');
+  });
+
+  it('picks the monitor raw topic for the monitor intake', () => {
+    expect(rawTopicFor(env, 'monitor')).toBe('events.raw.monitor');
   });
 });

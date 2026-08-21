@@ -10,19 +10,21 @@ def test_collapses_multiple_sources_into_one_row_per_date():
             {
                 "date": "2026-01-01",
                 "source": "itsm",
-                "total_incidents": 20,
+                "total_signals": 20,
+                "firing_count": 12,
+                "cleared_count": 8,
                 "p1_share": 0.1,
-                "manual_open_share": 0.15,
-                "no_intervention_share": 0.6,
+                "critical_share": 0.3,
                 "unique_entities": 5,
             },
             {
                 "date": "2026-01-01",
                 "source": "alertmanager",
-                "total_incidents": 10,
+                "total_signals": 10,
+                "firing_count": 6,
+                "cleared_count": 4,
                 "p1_share": 0.2,
-                "manual_open_share": 0.05,
-                "no_intervention_share": 0.4,
+                "critical_share": 0.5,
                 "unique_entities": 3,
             },
         ]
@@ -32,10 +34,12 @@ def test_collapses_multiple_sources_into_one_row_per_date():
 
     assert len(result) == 1
     row = result.iloc[0]
-    assert row["total_incidents"] == 30
+    assert row["total_signals"] == 30
     assert row["unique_entities"] == 8
     assert row["p1_share"] == pytest.approx(0.15)  # mean of 0.1 and 0.2
-    assert row["manual_open_share"] == pytest.approx(0.1)  # mean of 0.15 and 0.05
+    assert row["critical_share"] == pytest.approx(0.4)  # mean of 0.3 and 0.5
+    assert row["signals_per_entity"] == pytest.approx(30 / 8)  # recomputed from summed counts
+    assert row["cleared_share"] == pytest.approx(12 / 30)  # (8+4)/(20+10), not averaged
 
 
 def test_output_has_expected_columns_and_is_sorted_by_date():
@@ -44,19 +48,21 @@ def test_output_has_expected_columns_and_is_sorted_by_date():
             {
                 "date": "2026-01-03",
                 "source": "itsm",
-                "total_incidents": 5,
+                "total_signals": 5,
+                "firing_count": 3,
+                "cleared_count": 2,
                 "p1_share": 0.0,
-                "manual_open_share": 0.0,
-                "no_intervention_share": 0.0,
+                "critical_share": 0.0,
                 "unique_entities": 1,
             },
             {
                 "date": "2026-01-01",
                 "source": "itsm",
-                "total_incidents": 5,
+                "total_signals": 5,
+                "firing_count": 3,
+                "cleared_count": 2,
                 "p1_share": 0.0,
-                "manual_open_share": 0.0,
-                "no_intervention_share": 0.0,
+                "critical_share": 0.0,
                 "unique_entities": 1,
             },
         ]

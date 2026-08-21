@@ -16,10 +16,11 @@ NS  ?= infra
 setup: .env
 	bash infra/scripts/dev-setup.sh
 
-# Bring up the k3d cluster and bootstrap GitOps.
+# Bring up the k3d cluster and bootstrap GitOps. FORCE=1 rebuilds every app
+# image regardless of what changed (make up FORCE=1).
 .PHONY: up
 up:
-	bash infra/scripts/dev-up.sh
+	FORCE=$(FORCE) bash infra/scripts/dev-up.sh
 
 # Stop the k3d cluster, preserving data (resume with `make up`).
 .PHONY: down
@@ -32,9 +33,10 @@ destroy:
 	bash infra/scripts/dev-destroy.sh
 
 # Push working dir to Gitea + refresh ArgoCD (use after editing charts).
+# FORCE=1 rebuilds every app image regardless of what changed (make sync FORCE=1).
 .PHONY: sync
 sync:
-	bash infra/scripts/dev-sync.sh
+	FORCE=$(FORCE) bash infra/scripts/dev-sync.sh
 
 # One-shot health probe (apps, pods, secrets, warnings). Run after up/sync.
 .PHONY: health

@@ -5,18 +5,17 @@ import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
 const SECRET = 'itsm-shared-secret';
+const ROUTE = '/webhook/v1/locaweb/itsm';
 
 const publish = vi.fn(async (_message: OutboundMessage) => undefined);
 
 const itsmEvent = {
   ticket_number: 'INC0012345',
-  source: 'itsm',
   opened_at: '2025-12-31 23:45:18',
   priority_code: 2,
   configuration_item: 'srv-web-04',
   status: 'Encerrado',
   opened_by: 'Monitoramento',
-  payload: { ticket_number: 'INC0012345' },
 };
 
 describe('GET /metrics', () => {
@@ -24,14 +23,14 @@ describe('GET /metrics', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    process.env.HMAC_SECRET = SECRET;
+    process.env.HMAC_SECRET_LOCAWEB_ITSM = SECRET;
     app = await createTestApp(instance => instance.decorate('kafka', { publish }));
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.HMAC_ENABLED;
-    delete process.env.HMAC_SECRET;
+    delete process.env.HMAC_SECRET_LOCAWEB_ITSM;
   });
 
   function post(body: object, signed = true) {
@@ -39,7 +38,7 @@ describe('GET /metrics', () => {
     const signature = createHmac('sha256', SECRET).update(payload).digest('hex');
     return app.inject({
       method: 'POST',
-      url: '/webhook/incidents',
+      url: ROUTE,
       headers: {
         'content-type': 'application/json',
         ...(signed ? { 'x-signature': `sha256=${signature}` } : {}),
@@ -64,9 +63,24 @@ describe('GET /metrics', () => {
 
     const res = await app.inject({ method: 'GET', url: '/metrics' });
 
-    expect(res.body).toMatch(/gateway_events_published_total\{source="itsm"\} 1\b/);
-    expect(res.body).toMatch(/gateway_publish_failures_total\{source="itsm"\} 1\b/);
-    expect(res.body).toMatch(/gateway_signature_failures_total\{reason="missing"\} 1\b/);
+    const publishedLine = res.body
+      .split('\n')
+      .find(line => line.startsWith('gateway_events_published_total{'));
+    const failureLine = res.body
+      .split('\n')
+      .find(line => line.startsWith('gateway_publish_failures_total{'));
+    const signatureLine = res.body
+      .split('\n')
+      .find(line => line.startsWith('gateway_signature_failures_total{'));
+
+    expect(publishedLine).toContain('source="itsm"');
+    expect(publishedLine).toContain('intake="alert"');
+    expect(publishedLine).toMatch(/} 1$/);
+    expect(failureLine).toContain('source="itsm"');
+    expect(failureLine).toMatch(/} 1$/);
+    expect(signatureLine).toContain('reason="missing"');
+    expect(signatureLine).toContain('tenant_id="locaweb"');
+    expect(signatureLine).toMatch(/} 1$/);
   });
 
   it('stays out of the openapi document', async () => {
