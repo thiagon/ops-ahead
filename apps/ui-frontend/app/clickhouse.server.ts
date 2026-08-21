@@ -89,6 +89,43 @@ export interface BreachContextRow {
   p4_precursor_length: number;
 }
 
+/** One row per year × month × kpi_group, cumulative against the annual band. */
+export interface KpiAchievementRow {
+  year: number;
+  month: string;
+  kpi_group: string;
+  breached_ytd: number;
+  achievement_pct: number;
+}
+
+/** One row per date × category × product, severities never collapsed. */
+export interface CategoryTrendRow {
+  date: string;
+  category: string;
+  product: string;
+  total_incidents: number;
+  p1_count: number;
+  p2_count: number;
+  p3_count: number;
+  p4_count: number;
+  p5_count: number;
+  avg_duration_seconds: number;
+}
+
+/** Current load per owner group, from the latest group_load_by_window snapshot. */
+export interface GroupLoadRow {
+  owner: string;
+  snapshot_at: string;
+  incidents_open: number;
+}
+
+/** An entity's signal volume over the last hour, from gold_monitor_signal_counts. */
+export interface NoisyEntityRow {
+  entity_id: string;
+  window_minutes: number;
+  signal_count: number;
+}
+
 let cached: ClickHouseClient | undefined;
 
 /**
@@ -151,6 +188,54 @@ export const OPEN_ALERTS_SQL = `select ${OPEN_ALERT_COLUMNS}
      where tenant_id = {tenant_id:String}
      order by due_at asc
      limit {limit:UInt32}`;
+
+export async function fetchKpiAchievement(monthsBack = 12): Promise<KpiAchievementRow[]> {
+  return await query<KpiAchievementRow>(
+    `select year, toString(month) as month, kpi_group, breached_ytd, achievement_pct
+     from gold_alert_kpi_achievement
+     where tenant_id = {tenant_id:String}
+       and month >= toStartOfMonth(now()) - toIntervalMonth({months_back:UInt32})
+     order by month asc, kpi_group`,
+    { tenant_id: getConfig().TENANT_ID, months_back: monthsBack },
+  );
+}
+
+export async function fetchCategoryTrends(daysBack = 30): Promise<CategoryTrendRow[]> {
+  return await query<CategoryTrendRow>(
+    `select toString(date) as date, category, product, total_incidents,
+            p1_count, p2_count, p3_count, p4_count, p5_count, avg_duration_seconds
+     from gold_alert_category_trends
+     where date >= today() - {days_back:UInt32}
+     order by date desc, total_incidents desc`,
+    { days_back: daysBack },
+  );
+}
+
+export async function fetchGroupLoad(): Promise<GroupLoadRow[]> {
+  return await query<GroupLoadRow>(
+    `select owner, toString(snapshot_at) as snapshot_at, incidents_open
+     from group_load_by_window
+     order by owner
+     limit 1 by owner`,
+    {},
+  );
+}
+
+/**
+ * The busiest entities over the last hour — a proxy for "recurso ruidoso"
+ * ahead of any incident actually opening on it.
+ */
+export async function fetchNoisyEntities(limit = 10): Promise<NoisyEntityRow[]> {
+  return await query<NoisyEntityRow>(
+    `select entity_id, window_minutes, signal_count
+     from gold_monitor_signal_counts
+     where window_minutes = 60
+     order by window_start desc, signal_count desc
+     limit 1 by entity_id
+     limit {limit:UInt32}`,
+    { limit },
+  );
+}
 
 export async function fetchOpenAlerts(limit = 200): Promise<OpenAlertRow[]> {
   return await query<OpenAlertRow>(OPEN_ALERTS_SQL, {
