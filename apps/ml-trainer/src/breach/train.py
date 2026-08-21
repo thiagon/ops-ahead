@@ -24,7 +24,7 @@ from split import temporal_split
 LOGGER = logging.getLogger(__name__)
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-CATEGORICAL_COLUMNS = ["assignment_group"]
+CATEGORICAL_COLUMNS = ["owner"]
 
 
 def _prepare_x(df: pd.DataFrame) -> pd.DataFrame:
@@ -43,7 +43,9 @@ def _objective(trial: optuna.Trial, x_train, y_train, x_val, y_val) -> float:
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
     }
-    model = lgb.LGBMClassifier(class_weight="balanced", random_state=42, verbosity=-1, **params)
+    model = lgb.LGBMClassifier(
+        class_weight="balanced", random_state=42, verbosity=-1, **params
+    )
     model.fit(x_train, y_train, categorical_feature=CATEGORICAL_COLUMNS)
     val_prob = model.predict_proba(x_val)[:, 1]
     return average_precision_score(y_val, val_prob)
@@ -51,25 +53,35 @@ def _objective(trial: optuna.Trial, x_train, y_train, x_val, y_val) -> float:
 
 def tune_and_train(train_df: pd.DataFrame, validation_df: pd.DataFrame, n_trials: int):
     """Optuna search on validation AUC-PR (`class_weight='balanced'` fixes the
-    ~1% breach rate's class imbalance for the classifier itself — it distorts
-    the raw probability output, which is exactly what isotonic calibration
-    fixes afterwards, not what this search optimizes for)."""
+    class imbalance for the classifier itself — it distorts the raw
+    probability output, which is exactly what isotonic calibration fixes
+    afterwards, not what this search optimizes for). `has_breached`'s
+    positive rate (~14.2%, docs/insights/fluxo-do-incidente.md) is far less
+    skewed than the old `kpi_breached` label's (~1%), but still imbalanced
+    enough that `balanced` weighting stays the right default — reassessed,
+    not changed."""
     x_train, y_train = _prepare_x(train_df), train_df[features.TARGET_COLUMN]
     x_val, y_val = _prepare_x(validation_df), validation_df[features.TARGET_COLUMN]
 
-    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42))
+    study = optuna.create_study(
+        direction="maximize", sampler=optuna.samplers.TPESampler(seed=42)
+    )
     study.optimize(
         lambda trial: _objective(trial, x_train, y_train, x_val, y_val),
         n_trials=n_trials,
         show_progress_bar=False,
     )
 
-    best_model = lgb.LGBMClassifier(class_weight="balanced", random_state=42, verbosity=-1, **study.best_params)
+    best_model = lgb.LGBMClassifier(
+        class_weight="balanced", random_state=42, verbosity=-1, **study.best_params
+    )
     best_model.fit(x_train, y_train, categorical_feature=CATEGORICAL_COLUMNS)
     return best_model, study.best_params, study.best_value
 
 
-def calibrate(model: lgb.LGBMClassifier, validation_df: pd.DataFrame) -> IsotonicRegression:
+def calibrate(
+    model: lgb.LGBMClassifier, validation_df: pd.DataFrame
+) -> IsotonicRegression:
     x_val, y_val = _prepare_x(validation_df), validation_df[features.TARGET_COLUMN]
     raw_prob = model.predict_proba(x_val)[:, 1]
     calibrator = IsotonicRegression(out_of_bounds="clip")
@@ -79,8 +91,13 @@ def calibrate(model: lgb.LGBMClassifier, validation_df: pd.DataFrame) -> Isotoni
 
 def reliability_diagram(y_true, raw_prob, calibrated_prob) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(6, 6))
-    for prob, label in ((raw_prob, "before calibration"), (calibrated_prob, "after calibration")):
-        frac_pos, mean_pred = calibration_curve(y_true, prob, n_bins=10, strategy="quantile")
+    for prob, label in (
+        (raw_prob, "before calibration"),
+        (calibrated_prob, "after calibration"),
+    ):
+        frac_pos, mean_pred = calibration_curve(
+            y_true, prob, n_bins=10, strategy="quantile"
+        )
         ax.plot(mean_pred, frac_pos, marker="o", label=label)
     ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="perfectly calibrated")
     ax.set_xlabel("Mean predicted probability")
@@ -118,11 +135,10 @@ def recall_at_top50_per_hour(holdout_df: pd.DataFrame, scores: np.ndarray) -> fl
 
 def train_and_log(
     settings: Settings,
-    incidents: pd.DataFrame,
-    p4_sequences: pd.DataFrame,
-    ic_windows: pd.DataFrame,
-    group_load: pd.DataFrame,
-    priority_changes: pd.DataFrame,
+    examples: pd.DataFrame,
+    signal_counts: pd.DataFrame,
+    auto_resolution_rate: pd.DataFrame,
+    severity_escalations: pd.DataFrame,
     dataset_version: str | None = None,
     n_trials: int | None = None,
 ) -> str:
@@ -130,12 +146,24 @@ def train_and_log(
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
     frame = features.build_feature_frame(
-        incidents, p4_sequences, ic_windows, group_load, priority_changes, settings.p4_precursor_window_hours
+        examples,
+        signal_counts,
+        auto_resolution_rate,
+        severity_escalations,
+        settings.breach_abandoned_ratio,
     )
-    split = temporal_split(frame, "opened_at", settings.train_end, settings.validation_end, settings.holdout_end)
+    split = temporal_split(
+        frame,
+        "opened_at",
+        settings.train_end,
+        settings.validation_end,
+        settings.holdout_end,
+    )
 
     trials = n_trials if n_trials is not None else settings.optuna_trials
-    model, best_params, val_auc_pr = tune_and_train(split.train, split.validation, trials)
+    model, best_params, val_auc_pr = tune_and_train(
+        split.train, split.validation, trials
+    )
     calibrator = calibrate(model, split.validation)
 
     x_holdout = _prepare_x(split.holdout)
@@ -146,11 +174,15 @@ def train_and_log(
     holdout_auc_pr = average_precision_score(y_holdout, calibrated_prob_holdout)
     holdout_brier = brier_score_loss(y_holdout, calibrated_prob_holdout)
     holdout_recall_top10 = recall_at_k(y_holdout, calibrated_prob_holdout, 10)
-    holdout_recall_top50h = recall_at_top50_per_hour(split.holdout, calibrated_prob_holdout)
+    holdout_recall_top50h = recall_at_top50_per_hour(
+        split.holdout, calibrated_prob_holdout
+    )
 
     fig = reliability_diagram(y_holdout, raw_prob_holdout, calibrated_prob_holdout)
 
-    bundled_model = BreachRiskModel(model, calibrator, features.FEATURE_COLUMNS, CATEGORICAL_COLUMNS)
+    bundled_model = BreachRiskModel(
+        model, calibrator, features.FEATURE_COLUMNS, CATEGORICAL_COLUMNS
+    )
     # Validate the bundled predict path — including SHAP — on a small real
     # batch before it's ever registered.
     bundled_model.predict(None, split.holdout.head(min(5, len(split.holdout))))
@@ -180,7 +212,9 @@ def train_and_log(
             # package (ml-model-serving) would otherwise shadow the bundled code
             # and fail to unpickle it.
             code_paths=[str(Path(__file__).resolve().parent)],
-            registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
+            registered_model_name=settings.mlflow_registered_model_name
+            if settings.auto_promote
+            else None,
         )
         run_id = run.info.run_id
 
@@ -192,10 +226,14 @@ def train_and_log(
 
 def promote_latest(settings: Settings, run_id: str) -> None:
     client = mlflow.MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
-    versions = client.search_model_versions(f"name='{settings.mlflow_registered_model_name}'")
+    versions = client.search_model_versions(
+        f"name='{settings.mlflow_registered_model_name}'"
+    )
     matching = [v for v in versions if v.run_id == run_id]
     if not matching:
-        LOGGER.warning("No registered model version found for run %s — skipping promotion.", run_id)
+        LOGGER.warning(
+            "No registered model version found for run %s — skipping promotion.", run_id
+        )
         return
     version = matching[0].version
     client.transition_model_version_stage(
@@ -204,4 +242,9 @@ def promote_latest(settings: Settings, run_id: str) -> None:
         stage="Production",
         archive_existing_versions=True,
     )
-    LOGGER.info("Promoted %s v%s (run %s) to Production.", settings.mlflow_registered_model_name, version, run_id)
+    LOGGER.info(
+        "Promoted %s v%s (run %s) to Production.",
+        settings.mlflow_registered_model_name,
+        version,
+        run_id,
+    )

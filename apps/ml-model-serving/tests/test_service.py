@@ -25,7 +25,7 @@ VOLUME_PAYLOAD = {
 
 BREACH_PAYLOAD = {
     "severity": 2,
-    "assignment_group": "Team14",
+    "owner": "Team14",
     "opened_hour": 10,
     "opened_dayofweek": 2,
     "is_manual_open": 0,
@@ -33,9 +33,15 @@ BREACH_PAYLOAD = {
     "p4_precursor_length": 3,
     "no_intervention_count_1h": 0,
     "no_intervention_count_6h": 1,
-    "group_load_1h": 5,
+    "group_load": 5,
     "was_recategorized": 0,
     "recategorization_count": 0,
+    "consumed_ratio": 0.5,
+    "time_remaining_seconds": 7200.0,
+    "was_acknowledged": 1,
+    "entity_signal_count_15m": 2,
+    "entity_signal_count_1h": 6,
+    "entity_severity_escalations": 0,
 }
 
 
@@ -67,7 +73,7 @@ class FakeBreachModel:
                     "breach_probability": self.probability,
                     "shap_top5": [
                         {"feature": "p4_precursor_present", "shap_value": 0.31},
-                        {"feature": "group_load_1h", "shap_value": 0.12},
+                        {"feature": "group_load", "shap_value": 0.12},
                     ],
                 }
             ]

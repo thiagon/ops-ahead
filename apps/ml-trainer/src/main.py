@@ -11,49 +11,47 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _train_volume(settings: Settings) -> str:
-    from volume.data import dataset_version, fetch_daily_anomaly_features
+    from volume.data import dataset_version, fetch_gold_alert_daily_features
     from volume.train import train_and_log
 
-    daily = fetch_daily_anomaly_features(settings)
+    daily = fetch_gold_alert_daily_features(settings)
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
 
 
 def _train_breach(settings: Settings) -> str:
     from breach.data import (
         dataset_version,
-        fetch_eligible_incidents,
-        fetch_group_load,
-        fetch_ic_windows,
-        fetch_p4_sequences,
-        fetch_priority_changes,
+        fetch_auto_resolution_rate,
+        fetch_breach_training_examples,
+        fetch_severity_escalations,
+        fetch_signal_counts,
     )
     from breach.train import train_and_log
 
-    incidents = fetch_eligible_incidents(settings)
-    p4_sequences = fetch_p4_sequences(settings)
-    ic_windows = fetch_ic_windows(settings)
-    group_load = fetch_group_load(settings)
-    priority_changes = fetch_priority_changes(settings)
-    version = dataset_version(incidents, p4_sequences, ic_windows, group_load, priority_changes)
+    examples = fetch_breach_training_examples(settings)
+    signal_counts = fetch_signal_counts(settings)
+    auto_resolution_rate = fetch_auto_resolution_rate(settings)
+    severity_escalations = fetch_severity_escalations(settings)
+    version = dataset_version(examples, signal_counts, auto_resolution_rate, severity_escalations)
     return train_and_log(
-        settings, incidents, p4_sequences, ic_windows, group_load, priority_changes, dataset_version=version
+        settings, examples, signal_counts, auto_resolution_rate, severity_escalations, dataset_version=version
     )
 
 
 def _train_external_event(settings: Settings) -> str:
-    from external_event.data import dataset_version, fetch_daily_anomaly_features
+    from external_event.data import dataset_version, fetch_gold_monitor_daily_features
     from external_event.train import train_and_log
 
-    daily = fetch_daily_anomaly_features(settings)
+    daily = fetch_gold_monitor_daily_features(settings)
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
 
 
 def _train_kpi_projection(settings: Settings) -> str:
     from kpi_projection.data import fetch_kpi_monthly_state
     from kpi_projection.run import run_kpi_projection
-    from volume.data import fetch_daily_anomaly_features
+    from volume.data import fetch_gold_alert_daily_features
 
-    daily = fetch_daily_anomaly_features(settings)
+    daily = fetch_gold_alert_daily_features(settings)
     kpi_state = fetch_kpi_monthly_state(settings)
     return run_kpi_projection(settings, daily, kpi_state)["run_id"]
 
@@ -62,28 +60,26 @@ def _run_drift(settings: Settings) -> str:
     import metrics
     from breach import features as breach_features
     from breach.data import (
-        fetch_eligible_incidents,
-        fetch_group_load,
-        fetch_ic_windows,
-        fetch_p4_sequences,
-        fetch_priority_changes,
+        fetch_auto_resolution_rate,
+        fetch_breach_training_examples,
+        fetch_severity_escalations,
+        fetch_signal_counts,
     )
     from drift.run import run_drift_monitoring
     from volume import features as volume_features
-    from volume.data import fetch_daily_anomaly_features
+    from volume.data import fetch_gold_alert_daily_features
 
-    daily = fetch_daily_anomaly_features(settings)
+    daily = fetch_gold_alert_daily_features(settings)
     # Horizon doesn't change FEATURE_COLUMNS' own distribution meaningfully —
     # 1 is an arbitrary, stable choice, not a per-horizon drift concern.
     volume_frame = volume_features.build_feature_frame(daily, horizon=1)
 
-    incidents = fetch_eligible_incidents(settings)
-    p4_sequences = fetch_p4_sequences(settings)
-    ic_windows = fetch_ic_windows(settings)
-    group_load = fetch_group_load(settings)
-    priority_changes = fetch_priority_changes(settings)
+    examples = fetch_breach_training_examples(settings)
+    signal_counts = fetch_signal_counts(settings)
+    auto_resolution_rate = fetch_auto_resolution_rate(settings)
+    severity_escalations = fetch_severity_escalations(settings)
     breach_frame = breach_features.build_feature_frame(
-        incidents, p4_sequences, ic_windows, group_load, priority_changes
+        examples, signal_counts, auto_resolution_rate, severity_escalations, settings.breach_abandoned_ratio
     )
 
     domains = {

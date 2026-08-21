@@ -8,13 +8,13 @@
   "created": "2026-08-19T00:00:00Z",
   "updated": "2026-08-20T00:00:00Z",
   "current_phase": 8,
-  "current_task": "8.1",
+  "current_task": null,
   "phases": {
     "total": 8,
-    "completed": 7
+    "completed": 8
   },
   "tasks": {
     "total": 81,
-    "completed": 72
+    "completed": 81
   }
 }

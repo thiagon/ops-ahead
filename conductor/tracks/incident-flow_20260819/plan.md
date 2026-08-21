@@ -329,29 +329,45 @@ A unidade de exemplo muda: deixa de ser uma ocorrência e passa a ser (ocorrênc
 `breach_training_examples` (Fase 7). `external_event` também ficou sem fonte e não tinha task — 8.9,
 abaixo.
 
+Descoberto ao implementar: um incidente ainda aberto tem `has_breached=False` provisório (pode virar
+`True` antes de fechar) — exclusão adicional não listada nas tasks originais, `closed_filter`
+(`final_duration_seconds is not null`), mesma população que `first_touch_duration` já filtrava antes.
+`group_severity_historical_ola_ratio`/`_over_25pct_rate` (8.2 tabela "sobrevive") deduplicadas por
+incidente antes do histórico expansivo — os múltiplos marcos do mesmo incidente não podem contar como
+histórico duplicado de si mesmo, e usar o `owner`/`severity` do primeiro marco do incidente é
+aproximação aceita (mesma simplificação que o desenho antigo já fazia, sem tratar mudança de
+severity/owner entre marcos do mesmo incidente).
+
 ### Tasks
 
-- [ ] 8.1: `apps/ml-trainer/src/breach/data.py` passa a ler `breach_training_examples` — as cinco
+- [x] 8.1: `apps/ml-trainer/src/breach/data.py` passa a ler `breach_training_examples` — as cinco
       fontes antigas (`first_touch_duration`, `no_intervention_sequences_by_ci`, `incidents_by_ic`,
       `group_load_by_window`, `priority_changes_log`) saem do treino de risco
-- [ ] 8.2: Features de contexto vindas do gold da cadeia `monitor`, por entity
-- [ ] 8.3: Features de prazo — consumo, tempo restante, se houve reconhecimento
-- [ ] 8.4: Rótulo `has_breached`; exclusões do treino — `is_eligible`, abandono (≥10×), ruído de
+- [x] 8.2: Features de contexto vindas do gold da cadeia `monitor`, por entity
+- [x] 8.3: Features de prazo — consumo, tempo restante, se houve reconhecimento
+- [x] 8.4: Rótulo `has_breached`; exclusões do treino — `is_eligible`, abandono (≥10×), ruído de
       duração (percentil 1, piso 60s)
-- [ ] 8.5: Modelo de risco retreinado sobre a nova unidade, com o desbalanceamento reavaliado
-- [ ] 8.6: Modelo de volume revisto, sobre `gold_alert_daily_features` — série de ocorrências que
+- [x] 8.5: Modelo de risco retreinado sobre a nova unidade, com o desbalanceamento reavaliado —
+      `class_weight='balanced'` mantido (~14,2% positivos, menos extremo que o ~1% antigo, mas ainda
+      desbalanceado o bastante)
+- [x] 8.6: Modelo de volume revisto, sobre `gold_alert_daily_features` — série de ocorrências que
       exigem trabalho separada do ruído
-- [ ] 8.7: Serving atualizado para o novo conjunto de features (trainer e `ml-model-serving` juntos —
+- [x] 8.7: Serving atualizado para o novo conjunto de features (trainer e `ml-model-serving` juntos —
       `schemas.py` espelha `FEATURE_COLUMNS` com `extra="forbid"`)
-- [ ] 8.8: Testes das features novas e da montagem por marco
-- [ ] 8.9: `external_event` revisto sobre `gold_monitor_daily_features` (cadeia `monitor`), fonte
-      nova decidida nas Fases 4/5 mas sem task até agora
+- [x] 8.8: Testes das features novas e da montagem por marco
+- [x] 8.9: `external_event` revisto sobre `gold_monitor_daily_features` (cadeia `monitor`), fonte
+      nova decidida nas Fases 4/5 mas sem task até agora — `manual_open_share`/`no_intervention_share`
+      não existem na cadeia `monitor` (sem owner/resolution_code); substituídas por
+      `signals_per_entity`/`cleared_share`, recomputadas dos contadores brutos somáveis em vez de
+      médias entre sources
 
 ### Verification
 
-- [ ] Nenhuma feature usa informação posterior ao instante do marco
-- [ ] Uma ocorrência que atravessa três marcos gera três exemplos distintos
-- [ ] Serving responde com o conjunto de features novo
+- [x] Nenhuma feature usa informação posterior ao instante do marco — `has_breached`/`final_*`
+      nunca entram em `FEATURE_COLUMNS` (testado)
+- [x] Uma ocorrência que atravessa três marcos gera três exemplos distintos (testado)
+- [x] Serving responde com o conjunto de features novo (18 testes de `ml-model-serving`, incluindo o
+      round-trip HTTP de `/predict/breach`)
 
 ---
 

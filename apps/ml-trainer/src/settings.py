@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     validation_end: str | None = None
     holdout_end: str | None = None
 
-    # breach-risk only.
-    p4_precursor_window_hours: int = 24
+    # breach-risk only. Same threshold apps/data-deadline-tracker uses to flag
+    # abandonment — measured once in docs/insights/fluxo-do-incidente.md, both
+    # places need the same number (see spec.md, "Treino revisto").
+    breach_abandoned_ratio: float = 10.0
     optuna_trials: int = 50
 
     # external-event (Isolation Forest) only. Expected share of days flagged

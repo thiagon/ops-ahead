@@ -3,30 +3,37 @@ from __future__ import annotations
 import pandas as pd
 
 FEATURE_COLUMNS = [
-    "total_incidents",
+    "total_signals",
     "p1_share",
-    "manual_open_share",
+    "critical_share",
     "unique_entities",
-    "no_intervention_share",
+    "signals_per_entity",
+    "cleared_share",
 ]
 
 
 def to_daily_frame(daily: pd.DataFrame) -> pd.DataFrame:
-    """Collapses per-(date, source) `daily_anomaly_features` rows into one
-    row per date. Shares are averaged across sources, same simplification
-    `volume.features.to_long_format` uses for `avg_opened_hour` — the mart
-    has no per-source numerators for the share columns to reconstruct from."""
+    """Collapses per-(date, source) `gold_monitor_daily_features` rows into
+    one row per date. `p1_share`/`critical_share` are averaged across
+    sources — the mart has no per-source numerators for those to
+    reconstruct from — but `signals_per_entity`/`cleared_share` are
+    recomputed from the summed raw counts instead, since those numerators
+    (`firing_count`/`cleared_count`/`unique_entities`) are additive."""
     daily = daily.copy()
     daily["date"] = pd.to_datetime(daily["date"])
-    return (
+    agg = (
         daily.groupby("date", as_index=False)
         .agg(
-            total_incidents=("total_incidents", "sum"),
+            total_signals=("total_signals", "sum"),
+            firing_count=("firing_count", "sum"),
+            cleared_count=("cleared_count", "sum"),
             p1_share=("p1_share", "mean"),
-            manual_open_share=("manual_open_share", "mean"),
-            no_intervention_share=("no_intervention_share", "mean"),
+            critical_share=("critical_share", "mean"),
             unique_entities=("unique_entities", "sum"),
         )
         .sort_values("date")
         .reset_index(drop=True)
     )
+    agg["signals_per_entity"] = agg["total_signals"] / agg["unique_entities"]
+    agg["cleared_share"] = agg["cleared_count"] / agg["total_signals"]
+    return agg

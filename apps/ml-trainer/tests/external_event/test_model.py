@@ -7,21 +7,23 @@ from external_event.train import fit_isolation_forest
 def _daily_frame_with_one_spike(n_normal: int = 40) -> pd.DataFrame:
     rows = [
         {
-            "total_incidents": 20 + (i % 3),
+            "total_signals": 20 + (i % 3),
             "p1_share": 0.1,
-            "manual_open_share": 0.15,
+            "critical_share": 0.3,
             "unique_entities": 5,
-            "no_intervention_share": 0.6,
+            "signals_per_entity": (20 + (i % 3)) / 5,
+            "cleared_share": 0.6,
         }
         for i in range(n_normal)
     ]
     rows.append(
         {
-            "total_incidents": 500,  # obvious spike
+            "total_signals": 500,  # obvious spike
             "p1_share": 0.9,
-            "manual_open_share": 0.02,
+            "critical_share": 0.95,
             "unique_entities": 40,
-            "no_intervention_share": 0.05,
+            "signals_per_entity": 500 / 40,
+            "cleared_share": 0.05,
         }
     )
     return pd.DataFrame(rows)

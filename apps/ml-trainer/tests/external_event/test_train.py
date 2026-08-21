@@ -12,14 +12,16 @@ def _synthetic_daily(days: int = 60) -> pd.DataFrame:
     rows = []
     for i, date in enumerate(dates):
         total = 20 + rng.integers(-3, 4)
+        total = total if i != days - 1 else 400  # spike on the last day
         rows.append(
             {
                 "date": date,
                 "source": "itsm",
-                "total_incidents": total if i != days - 1 else 400,  # spike on the last day
+                "total_signals": total,
+                "firing_count": int(total * 0.6),
+                "cleared_count": int(total * 0.4),
                 "p1_share": 0.1,
-                "manual_open_share": 0.15,
-                "no_intervention_share": 0.6,
+                "critical_share": 0.3,
                 "unique_entities": 5,
             }
         )

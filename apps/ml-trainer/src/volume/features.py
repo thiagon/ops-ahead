@@ -15,7 +15,7 @@ PRIORITY_GROUPS = {
 
 
 def to_long_format(daily: pd.DataFrame) -> pd.DataFrame:
-    """Collapse `daily_anomaly_features` (one row per date × source) into one
+    """Collapse `gold_alert_daily_features` (one row per date × source) into one
     row per (date, priority_group), summing across sources. `priority_group`
     lets a single model learn the shared weekly/seasonal pattern across
     series while `MAPE` is still reported apart per group."""
@@ -98,7 +98,7 @@ FEATURE_COLUMNS = [
 
 
 def build_feature_frame(daily: pd.DataFrame, horizon: int) -> pd.DataFrame:
-    """Full pipeline from the raw `daily_anomaly_features` mart to a model-ready
+    """Full pipeline from the raw `gold_alert_daily_features` mart to a model-ready
     frame for a given forecast horizon (1 or 7 days). Rows without a full lag
     window (start of series) or without a future target (end of series) are
     dropped — both are structurally incomplete, not missing data to impute.
