@@ -94,17 +94,17 @@ O fechamento do mês contra a meta anual, e o que vem pela frente.
 
 ### Tasks
 
-- [ ] Task 5.1: Teste — o painel de KPI lê `gold_alert_kpi_achievement`, por `kpi_group`
-- [ ] Task 5.2: Realizado contra a banda anual cumulativa — `breached_ytd` e a faixa alcançada
-- [ ] Task 5.3: Projeção de fechamento de `gold_kpi_projection`, com intervalo e probabilidade
-- [ ] Task 5.4: Previsão D+1/D+7 de `gold_volume_forecast`
-- [ ] Task 5.5: Tendência por categoria e produto de `gold_alert_category_trends`, P2 e P3 nunca colapsadas
-- [ ] Task 5.6: Carga por grupo de `group_load_by_window` e recursos ruidosos das gold `monitor`
+- [x] Task 5.1: Teste — o painel de KPI lê `gold_alert_kpi_achievement`, por `kpi_group`
+- [x] Task 5.2: Realizado contra a banda anual cumulativa — `breached_ytd` e a faixa alcançada
+- [x] Task 5.3: Projeção de fechamento de `gold_kpi_projection`, com intervalo e probabilidade
+- [x] Task 5.4: Previsão D+1/D+7 de `gold_volume_forecast`
+- [x] Task 5.5: Tendência por categoria e produto de `gold_alert_category_trends`, P2 e P3 nunca colapsadas
+- [x] Task 5.6: Carga por grupo de `group_load_by_window` e recursos ruidosos das gold `monitor`
 
 ### Verification
 
-- [ ] `npm run test` passa
-- [ ] Todos os painéis têm número; nenhum depende de análise sem tabela
+- [x] `npm run test` passa
+- [x] Todos os painéis têm número; nenhum depende de análise sem tabela
 
 ## Phase 6: Dado vivo e cluster
 
