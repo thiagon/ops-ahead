@@ -13,15 +13,26 @@
 -- docs/context/kickoff-challenge-locaweb.md §4 describes ("Gatilhamento
 -- Preditivo": repeated auto-resolved failures on a CI ahead of a P2 drop) —
 -- resolution_code, not severity, which is an unrelated passthrough.
-with no_intervention as (
+with all_events as (
     select
         entity_id,
         external_id,
         opened_at,
-        row_number() over (partition by entity_id order by opened_at) as rn_all,
-        row_number() over (partition by entity_id order by opened_at) as rn_ni
+        resolution_code,
+        row_number() over (partition by entity_id order by opened_at) as rn_all
     from {{ ref('silver_alert') }}
-    where resolution_code = 'no_intervention' and entity_id is not null and entity_id != ''
+    where entity_id is not null and entity_id != ''
+),
+
+no_intervention as (
+    select
+        entity_id,
+        external_id,
+        opened_at,
+        rn_all,
+        row_number() over (partition by entity_id order by opened_at) as rn_ni
+    from all_events
+    where resolution_code = 'no_intervention'
 ),
 
 sequenced as (

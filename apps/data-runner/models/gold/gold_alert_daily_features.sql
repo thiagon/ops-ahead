@@ -22,6 +22,8 @@ select
     countIf(severity = 1)                                           as p1_count,
     countIf(severity = 2)                                           as p2_count,
     countIf(severity = 3)                                           as p3_count,
+    countIf(severity = 4)                                           as p4_count,
+    countIf(severity = 5)                                           as p5_count,
     countIf(severity = 1) / count()                                 as p1_share,
     countIf(severity <= 2) / count()                                as critical_share,
     uniqExact(entity_id)                                            as unique_entities,

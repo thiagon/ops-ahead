@@ -28,5 +28,5 @@ consumer:
     clickhouseUser: ops_ahead
     clickhouseDatabase: default
     tickSeconds: "30"
-    abandonedRatio: "3.0"
+    abandonedRatio: "10.0"
   secretName: data-deadline-tracker-secret

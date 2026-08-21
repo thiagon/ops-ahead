@@ -371,6 +371,42 @@ severity/owner entre marcos do mesmo incidente).
 
 ---
 
+## Phase 9: Correções da auditoria pós-implementação
+
+Achados de uma revisão do código real contra esta spec, depois do fechamento da track — os
+checkboxes `[x]` das Fases 1-8 batiam com o que existe, mas três deles esconderam lacunas que só
+apareceram inspecionando o código, não os testes que já existiam.
+
+### Tasks
+
+- [x] 9.1: `abandoned_ratio` corrigido só no lado Python (`apps/data-deadline-tracker/src/settings.py`,
+      10.0). `infra/charts/data-deadline-tracker/values.yaml` ainda injeta `ABANDONED_RATIO="3.0"` via
+      env var, que sobrescreve o default do Pydantic — o valor que roda no cluster continua sendo o
+      errado. Corrigir `abandonedRatio` no chart para `"10.0"`
+- [x] 9.2: `gold_alert_daily_features` não tem "as cinco" severidades que o spec pede — só
+      `p1_count`/`p2_count`/`p3_count`. Adicionar `p4_count`/`p5_count`
+- [x] 9.3: `no_intervention_sequences_by_ci` — a técnica islands-and-gaps está quebrada:
+      `rn_all`/`rn_ni` são calculados sobre a mesma CTE já filtrada, então `sequence_group` é sempre
+      `0` e a mart nunca separa sequências reais (incidentes normais intercalados não quebram o
+      agrupamento). Bug herdado da antiga `p4_sequences_by_ci`, carregado sem correção durante o
+      rename da Fase 5. É o próprio sinal preditivo que o kickoff descreve — corrigir a window
+      function para que `rn_all` conte sobre o conjunto completo da entity, não sobre o já filtrado
+- [ ] 9.4: Cobertura de teste rasa nos gold marts novos — `gold_alert_kpi_achievement`,
+      `gold_alert_category_trends`, `gold_alert_category_entity_breakdown`,
+      `gold_alert_daily_features` (Fase 5) e quatro das cinco marts `gold_monitor_*` (Fase 4) só têm
+      testes de schema do dbt, sem suíte Great Expectations equivalente à dos marts antigos. Nenhum
+      teste reconcilia contagens gold↔bronze
+
+### Verification
+
+- [x] Valor efetivo de `abandoned_ratio` no chart e no default Python é o mesmo (10.0)
+- [x] `gold_alert_daily_features` expõe `p1_count`…`p5_count`
+- [x] `no_intervention_sequences_by_ci` separa corretamente sequências com incidentes normais
+      intercalados entre ocorrências `no_intervention` da mesma entity — corrigido via `rn_all`
+      calculado sobre o conjunto completo da entity antes do filtro
+
+---
+
 ## Final Verification
 
 - [x] Todos os acceptance criteria da spec atendidos
