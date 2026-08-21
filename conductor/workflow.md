@@ -24,6 +24,14 @@
 
 **At track completion only** — Manual verification is required when an entire track is done. Individual tasks and phases proceed without blocking on manual review.
 
+Checks specific to what the track touched:
+
+- **Novo app em `apps/` com `Dockerfile`** — confirmar que foi adicionado à matrix de build do CI
+  (`.gitea/workflows/build.yaml`, `jobs.build.strategy.matrix.app`) e que o README documenta o que
+  for relevante. A matrix é uma lista estática, não descoberta do filesystem — sem essa entrada a
+  imagem nunca é publicada e o pod fica em `ImagePullBackOff` sem nenhum erro de CI que aponte pra
+  causa.
+
 ## Task Lifecycle
 
 1. **Created** — Task defined with clear acceptance criteria
