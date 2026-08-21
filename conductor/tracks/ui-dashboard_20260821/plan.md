@@ -3,7 +3,7 @@
 **Track ID:** ui-dashboard_20260821
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-21
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -86,7 +86,7 @@ A fila de incidentes vivos, ordenada pelo prazo que resta.
 ### Verification
 
 - [x] `npm run test` passa
-- [ ] Com dado da Fase 6, a fila mostra ocorrências vivas na ordem correta
+- [x] Com dado da Fase 6, a fila mostra ocorrências vivas na ordem correta
 
 ## Phase 5: A tela do gestor
 
@@ -112,24 +112,24 @@ Sem ocorrência aberta não há linha em `silver_alert_open`, e a fila do operad
 
 ### Tasks
 
-- [ ] Task 6.1: Publicar ocorrências vivas pelo contrato `incident-alert`, entrando pela ingestão normal
-- [ ] Task 6.2: Cobrir os casos que as telas precisam exercitar — cada faixa de consumo de prazo, estouro, transição de severidade, aberto sem reconhecimento
-- [ ] Task 6.3: Dockerfile e substituição do stub nginx em `infra/charts/ui-frontend`
-- [ ] Task 6.4: Ingress e NetworkPolicy, no padrão dos demais serviços de `ns: ui`
-- [ ] Task 6.5: Verificar no cluster — app sincronizado por ArgoCD, telas respondendo com dado real
+- [x] Task 6.1: Publicar ocorrências vivas pelo contrato `incident-alert`, entrando pela ingestão normal
+- [x] Task 6.2: Cobrir os casos que as telas precisam exercitar — cada faixa de consumo de prazo, estouro, transição de severidade, aberto sem reconhecimento
+- [x] Task 6.3: Dockerfile e substituição do stub nginx em `infra/charts/ui-frontend`
+- [x] Task 6.4: Ingress e NetworkPolicy, no padrão dos demais serviços de `ns: ui`
+- [x] Task 6.5: Verificar no cluster — app sincronizado por ArgoCD, telas respondendo com dado real
 
 ### Verification
 
-- [ ] As ocorrências publicadas aparecem em `silver_alert_open` com `due_at` e `consumed_ratio` corretos
-- [ ] `kubectl get pods -n ui` mostra o app rodando, e as duas telas carregam pelo ingress
+- [x] As ocorrências publicadas aparecem em `silver_alert_open` com `due_at` e `consumed_ratio` corretos
+- [x] `kubectl get pods -n ui` mostra o app rodando, e as duas telas carregam pelo ingress
 
 ## Final Verification
 
-- [ ] Todos os acceptance criteria da spec atendidos
-- [ ] Testes passando em `ml-trainer`, `ui-frontend` e `scripts`
-- [ ] Nenhuma credencial de banco no bundle servido ao navegador
-- [ ] `conductor/tech-stack.md` atualizado — hoje registra Nuxt, Airflow e PySpark, nada disso existe
-- [ ] Ready for review
+- [x] Todos os acceptance criteria da spec atendidos
+- [x] Testes passando em `ml-trainer`, `ui-frontend` e `scripts`
+- [x] Nenhuma credencial de banco no bundle servido ao navegador
+- [x] `conductor/tech-stack.md` atualizado — hoje registra Nuxt, Airflow e PySpark, nada disso existe
+- [x] Ready for review
 
 ---
 
