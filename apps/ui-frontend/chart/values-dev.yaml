@@ -4,5 +4,4 @@ ui-frontend:
 frontend:
   replicaCount: 1
   env:
-    appEnv: dev
     tenantId: locaweb

@@ -1,1 +1,2 @@
-# No dev overrides needed for UI stub.
+# No dev overrides needed beyond the app's own chart/values-dev.yaml, which
+# pins ui-frontend.image.tag.

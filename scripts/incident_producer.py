@@ -94,7 +94,7 @@ async def produce(args: argparse.Namespace) -> None:
             if secret:
                 headers["X-Signature"] = _sign(secret, body)
 
-            resp = await client.post("/webhook/incidents", content=body, headers=headers)
+            resp = await client.post(f"/webhook/v1/locaweb/{args.source}", content=body, headers=headers)
             resp.raise_for_status()
 
             if (i + 1) % 1000 == 0 or (i + 1) == total:

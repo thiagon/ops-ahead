@@ -1,6 +1,36 @@
-ui:
-  replicas: 1
-  image: nginx:1.27-alpine
-  port: 80
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ui-frontend:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    tenantId: locaweb
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
+    mlModelServingTimeoutMs: "1500"
+  secretName: ui-frontend-secret
   ingress:
     host: ui.ops-ahead.localtest.me
+
+networkPolicy:
+  enabled: true
+  clickhousePort: 8123
+  mlModelServingPort: 3000
+
+monitoring:
+  enabled: true
