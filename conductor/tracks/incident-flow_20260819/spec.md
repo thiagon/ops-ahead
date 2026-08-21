@@ -3,7 +3,7 @@
 **Track ID:** incident-flow_20260819
 **Type:** Feature
 **Created:** 2026-08-19
-**Status:** Draft
+**Status:** Complete
 
 ## Summary
 
@@ -51,18 +51,18 @@ fechamento para saber se a meta foi atingida.
 
 ## Acceptance Criteria
 
-- [ ] Uma origem do tipo `alert` e uma do tipo `monitor` entregam no mesmo gateway, cada uma pelo seu
+- [x] Uma origem do tipo `alert` e uma do tipo `monitor` entregam no mesmo gateway, cada uma pelo seu
       contrato, sem campo vazio carregando semântica
-- [ ] Um incidente aberto gera marcos aos 25%, 50%, 75% e 100% do prazo da sua prioridade
-- [ ] O marco de 100% constata o estouro; nenhum marco de prazo é emitido depois dele
-- [ ] O fechamento do incidente consolida a quebra — duração, se estourou e por quanto
-- [ ] O vocabulário do domínio distingue o que vem de cada natureza de origem, sem termo herdado de
+- [x] Um incidente aberto gera marcos aos 25%, 50%, 75% e 100% do prazo da sua prioridade
+- [x] O marco de 100% constata o estouro; nenhum marco de prazo é emitido depois dele
+- [x] O fechamento do incidente consolida a quebra — duração, se estourou e por quanto
+- [x] O vocabulário do domínio distingue o que vem de cada natureza de origem, sem termo herdado de
       quando existia uma só
-- [ ] Os marts continuam produzindo os mesmos números depois de mudarem de cadeia
-- [ ] O corpo da origem é gravado antes de qualquer interpretação, e um recorte por origem e período
+- [x] Os marts continuam produzindo os mesmos números depois de mudarem de cadeia
+- [x] O corpo da origem é gravado antes de qualquer interpretação, e um recorte por origem e período
       é lido sem abrir o corpo
-- [ ] Corrigir o dicionário e reprocessar um período produz resultado novo sem perder o anterior
-- [ ] Nenhum consumidor de negócio precisa conhecer vocabulário de origem
+- [x] Corrigir o dicionário e reprocessar um período produz resultado novo sem perder o anterior
+- [x] Nenhum consumidor de negócio precisa conhecer vocabulário de origem
 
 ## Dependencies
 

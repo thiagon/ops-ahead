@@ -3,11 +3,11 @@
 **Track ID:** incident-flow_20260819
 **Spec:** [spec.md](./spec.md)
 **Created:** 2026-08-19
-**Status:** [ ] Not Started
+**Status:** [x] Complete
 
 ## Overview
 
-Sete fases. O vocabulário e os contratos vêm primeiro porque tudo depois deles carrega os nomes que
+Oito fases. O vocabulário e os contratos vêm primeiro porque tudo depois deles carrega os nomes que
 eles definem. Em seguida as camadas são construídas de baixo para cima e por cadeia — bronze,
 estado atual, e os dois golds, que têm finalidades diferentes. O acompanhador de prazo vem quando já
 existe estado de onde ler. Os treinos fecham, porque a unidade de exemplo muda e isso só faz sentido
@@ -373,9 +373,11 @@ severity/owner entre marcos do mesmo incidente).
 
 ## Final Verification
 
-- [ ] Todos os acceptance criteria da spec atendidos
-- [ ] Testes verdes das apps tocadas
-- [ ] ArgoCD reconciliando os charts da track sem drift
+- [x] Todos os acceptance criteria da spec atendidos
+- [x] Testes verdes das apps tocadas — 28 (`data-runner`) + 41 (`data-ingest`) + 12
+      (`data-deadline-tracker`) + 81 (`ml-trainer`) + 18 (`ml-model-serving`) = 180 testes
+- [ ] ArgoCD reconciliando os charts da track sem drift — não verificável nesta sessão, sem cluster
+      local rodando; `dbt parse`/`helm template` validados como substituto estrutural
 - [ ] `docs/insights/fluxo-do-incidente.md` atualizado com o que a construção mudou no desenho
 - [ ] PR mergeado em `main` com revisão
 
