@@ -1,16 +1,17 @@
 import { Link, useLocation } from 'react-router';
-import { GridIcon, ListIcon, ShieldIcon } from './icons';
+import { ChevronRightIcon, GridIcon, ListIcon, ShieldIcon } from './icons';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Painel do gestor', icon: GridIcon },
+  { to: '/', label: 'Painel N1/N2', icon: ListIcon },
   { to: '/fila', label: 'Fila de ocorrências', icon: ListIcon },
+  { to: '/painel-gestor', label: 'Painel do gestor', icon: GridIcon },
 ];
 
 export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className="flex w-[86px] shrink-0 flex-col items-center border-border-base border-r bg-bg-elevated py-5">
+    <aside className="hidden shrink-0 flex-col items-center border-border-base border-r bg-bg-elevated py-5 sm:flex sm:w-[86px]">
       <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent-red to-signal-amber">
         <ShieldIcon className="h-6 w-6 text-text-light" />
       </div>
@@ -38,6 +39,17 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="flex flex-col items-center gap-3">
+        <div
+          title="Sessão anônima — SSO ainda não integrado"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-bg-tile font-semibold text-text-muted text-xs"
+        >
+          N1
+          <span className="-right-0.5 -bottom-0.5 absolute h-2.5 w-2.5 rounded-full border-2 border-bg-elevated bg-signal-green" />
+        </div>
+        <ChevronRightIcon className="h-4 w-4 text-text-muted" />
+      </div>
     </aside>
   );
 }

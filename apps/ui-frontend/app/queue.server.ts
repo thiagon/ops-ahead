@@ -2,7 +2,7 @@ import type { BreachContextRow, OpenAlertRow } from './clickhouse.server.ts';
 import { fetchBreachContext, fetchOpenAlerts, OPEN_ALERTS_SQL } from './clickhouse.server.ts';
 import type { BreachFeatureInput, ScoreBreach } from './model-serving.server.ts';
 import { predictBreach } from './model-serving.server.ts';
-import type { QueueRow, ShapContribution } from './types.ts';
+import type { BreachSignals, QueueRow, ShapContribution } from './types.ts';
 
 export type { QueueRow } from './types.ts';
 
@@ -64,10 +64,25 @@ export function buildBreachFeatures(
   };
 }
 
+export function toBreachSignals(context: BreachContextRow | undefined): BreachSignals | null {
+  if (!context) return null;
+  return {
+    group_load: context.group_load,
+    entity_signal_count_15m: context.entity_signal_count_15m,
+    entity_signal_count_1h: context.entity_signal_count_1h,
+    entity_auto_resolution_rate: context.entity_auto_resolution_rate,
+    entity_severity_escalations: context.entity_severity_escalations,
+    group_severity_historical_ola_ratio: context.group_severity_historical_ola_ratio,
+    no_intervention_count_1h: context.no_intervention_count_1h,
+    no_intervention_count_6h: context.no_intervention_count_6h,
+    p4_precursor_length: context.p4_precursor_length,
+  };
+}
+
 export function toQueueRow(
   row: OpenAlertRow,
   now: Date,
-): Omit<QueueRow, 'breach_probability' | 'shap_top5'> {
+): Omit<QueueRow, 'breach_probability' | 'shap_top5' | 'breach_signals'> {
   const dueAt = parseClickHouseDate(row.due_at);
   return {
     source: row.source,
@@ -102,14 +117,11 @@ export async function buildQueue(options: BuildQueueOptions): Promise<QueueRow[]
   return await Promise.all(
     rows.map(async row => {
       const base = toQueueRow(row, now);
+      const rowContext = context[occurrenceKey(row.source, row.external_id)];
       let breach_probability: number | null = null;
       let shap_top5: ShapContribution[] | null = null;
       try {
-        const features = buildBreachFeatures(
-          row,
-          context[occurrenceKey(row.source, row.external_id)],
-          now,
-        );
+        const features = buildBreachFeatures(row, rowContext, now);
         const prediction = await score(features);
         breach_probability = prediction?.breach_probability ?? null;
         shap_top5 = prediction?.shap_top5 ?? null;
@@ -117,7 +129,12 @@ export async function buildQueue(options: BuildQueueOptions): Promise<QueueRow[]
         breach_probability = null;
         shap_top5 = null;
       }
-      return { ...base, breach_probability, shap_top5 };
+      return {
+        ...base,
+        breach_probability,
+        shap_top5,
+        breach_signals: toBreachSignals(rowContext),
+      };
     }),
   );
 }

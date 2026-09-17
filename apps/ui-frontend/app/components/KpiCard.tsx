@@ -11,6 +11,9 @@ export interface Kpi {
   tone: KpiTone;
   icon: KpiIcon;
   sparkline?: number[];
+  /** One label per sparkline point, shown in the chart tooltip. */
+  sparklineLabels?: string[];
+  sparklineFormat?: (value: number) => string;
 }
 
 const iconMap = {
@@ -60,7 +63,12 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
       <div className="mb-1 text-3xl font-bold text-text-light">{kpi.value}</div>
       {kpi.delta && <div className={`text-xs ${tone.text}`}>{kpi.delta}</div>}
       {kpi.sparkline && (
-        <Sparkline data={kpi.sparkline} className={`mt-2 h-8 w-full opacity-70 ${tone.text}`} />
+        <Sparkline
+          data={kpi.sparkline}
+          labels={kpi.sparklineLabels}
+          formatValue={kpi.sparklineFormat}
+          className={`mt-2 h-10 w-full ${tone.text}`}
+        />
       )}
     </div>
   );

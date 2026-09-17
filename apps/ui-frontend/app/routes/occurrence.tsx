@@ -95,7 +95,7 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
           <Field label="Vence em">
             <span className="font-mono">{occurrence.due_at}</span>
           </Field>
-          <Field label="Restante">
+          <Field label="Prazo">
             <span className="font-mono" style={{ color }}>
               {formatRemaining(occurrence.time_remaining_seconds)}
             </span>

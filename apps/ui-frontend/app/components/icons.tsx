@@ -161,3 +161,35 @@ export function ChevronRightIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="5 9 12 16 19 9" />
+    </svg>
+  );
+}
+
+export function InfoIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="8.5" />
+      <line x1="12" y1="10.5" x2="12" y2="16" />
+      <circle cx="12" cy="7.5" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

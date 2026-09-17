@@ -9,6 +9,34 @@ export interface ShapContribution {
   shap_value: number;
 }
 
+/** One row per target_date × priority_group × horizon (D+1 and D+7). */
+export interface VolumeForecastRow {
+  target_date: string;
+  priority_group: string;
+  horizon: number;
+  yhat: number;
+  yhat_lower: number;
+  yhat_upper: number;
+}
+
+/**
+ * The signals the breach model reads beyond `silver_alert_open` — owner load,
+ * the entity's monitor-chain activity, and this owner+severity's historical
+ * OLA behavior. No copilot exists yet to call tools against them; the drill-down
+ * shows this as "signals considered" instead of a mocked tool call.
+ */
+export interface BreachSignals {
+  group_load: number;
+  entity_signal_count_15m: number;
+  entity_signal_count_1h: number;
+  entity_auto_resolution_rate: number | null;
+  entity_severity_escalations: number;
+  group_severity_historical_ola_ratio: number | null;
+  no_intervention_count_1h: number;
+  no_intervention_count_6h: number;
+  p4_precursor_length: number;
+}
+
 /** One row of the operator queue, as the screen consumes it. */
 export interface QueueRow {
   source: string;
@@ -31,6 +59,8 @@ export interface QueueRow {
   breach_probability: number | null;
   /** null on the same failure as breach_probability. */
   shap_top5: ShapContribution[] | null;
+  /** null when no breach-context row exists for this owner + entity yet. */
+  breach_signals: BreachSignals | null;
 }
 
 /** A deadline milestone this occurrence already crossed. */
@@ -56,6 +86,8 @@ export interface SimilarIncidentRow {
   external_id: string;
   owner: string;
   severity: number;
+  title: string;
+  entity_id: string | null;
   duration_seconds: number;
   deadline_seconds: number;
   has_breached: number;

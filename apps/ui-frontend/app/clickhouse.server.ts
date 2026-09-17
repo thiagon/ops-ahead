@@ -1,8 +1,18 @@
 import { type ClickHouseClient, createClient } from '@clickhouse/client';
 import { getConfig } from './config.server.ts';
-import type { MilestoneRow, SeverityChangeRow, SimilarIncidentRow } from './types.ts';
+import type {
+  MilestoneRow,
+  SeverityChangeRow,
+  SimilarIncidentRow,
+  VolumeForecastRow,
+} from './types.ts';
 
-export type { MilestoneRow, SeverityChangeRow, SimilarIncidentRow } from './types.ts';
+export type {
+  MilestoneRow,
+  SeverityChangeRow,
+  SimilarIncidentRow,
+  VolumeForecastRow,
+} from './types.ts';
 
 /**
  * One row per tenant_id × as_of_date × kpi_group, written by ml-trainer's
@@ -16,16 +26,6 @@ export interface KpiProjectionRow {
   ci80_lower: number;
   ci80_upper: number;
   p_within_target: number | null;
-}
-
-/** One row per target_date × priority_group × horizon (D+1 and D+7). */
-export interface VolumeForecastRow {
-  target_date: string;
-  priority_group: string;
-  horizon: number;
-  yhat: number;
-  yhat_lower: number;
-  yhat_upper: number;
 }
 
 /**
@@ -121,7 +121,8 @@ export interface AlertDailyFeatureRow {
   critical_share: number;
   no_intervention_share: number;
   incidents_per_entity: number;
-  median_duration_seconds: number;
+  /** null on days where nothing closed — there is no duration to take a median of. */
+  median_duration_seconds: number | null;
 }
 
 /** Recurring entity × category × severity pattern, from gold_alert_category_entity_breakdown. */
@@ -404,7 +405,8 @@ export async function fetchBreachContext(): Promise<Record<string, BreachContext
  * Closed occurrences with the same owner + severity — the closest real
  * substitute for "similar incidents already resolved": no clustering model
  * exists yet, but the breach consolidation gold already carries the grain
- * this comparison needs.
+ * this comparison needs. The title and entity live in `silver_alert`; the mart
+ * keeps only the breach measurements.
  */
 export async function fetchSimilarIncidents(
   owner: string,
@@ -413,15 +415,24 @@ export async function fetchSimilarIncidents(
   limit = 5,
 ): Promise<SimilarIncidentRow[]> {
   return await query<SimilarIncidentRow>(
-    `select source, external_id, owner, severity, duration_seconds, deadline_seconds,
-            toUInt8(has_breached) as has_breached,
-            toString(closed_at) as closed_at
-     from gold_alert_breach_consolidation
-     where tenant_id = {tenant_id:String}
-       and owner = {owner:String}
-       and severity = {severity:UInt8}
-       and external_id != {exclude_external_id:String}
-     order by closed_at desc
+    `select c.source                        as source,
+            c.external_id                   as external_id,
+            c.owner                         as owner,
+            c.severity                      as severity,
+            a.title                         as title,
+            a.entity_id                     as entity_id,
+            c.duration_seconds              as duration_seconds,
+            c.deadline_seconds              as deadline_seconds,
+            toUInt8(c.has_breached)         as has_breached,
+            toString(c.closed_at)           as closed_at
+     from gold_alert_breach_consolidation c
+     left join silver_alert a
+       on a.tenant_id = c.tenant_id and a.source = c.source and a.external_id = c.external_id
+     where c.tenant_id = {tenant_id:String}
+       and c.owner = {owner:String}
+       and c.severity = {severity:UInt8}
+       and c.external_id != {exclude_external_id:String}
+     order by c.closed_at desc
      limit {limit:UInt32}`,
     {
       tenant_id: getConfig().TENANT_ID,
@@ -433,6 +444,11 @@ export async function fetchSimilarIncidents(
   );
 }
 
+/**
+ * The N most recent days that actually carry data, not a window relative to
+ * `today()`: the ITSM base being replayed ends well before the wall clock, so
+ * a calendar window renders the series empty or two points long.
+ */
 export async function fetchAlertDailyFeatures(daysBack = 14): Promise<AlertDailyFeatureRow[]> {
   return await query<AlertDailyFeatureRow>(
     `select toString(date) as date, source, total_incidents, p1_share, critical_share,
@@ -441,7 +457,10 @@ export async function fetchAlertDailyFeatures(daysBack = 14): Promise<AlertDaily
        select date, source, total_incidents, p1_share, critical_share,
               no_intervention_share, incidents_per_entity, median_duration_seconds
        from gold_alert_daily_features
-       where date >= today() - {days_back:UInt32}
+       where date in (
+         select date from gold_alert_daily_features
+         group by date order by date desc limit {days_back:UInt32}
+       )
        order by date desc
      )`,
     { days_back: daysBack },
@@ -458,12 +477,17 @@ export async function fetchRecurringPatterns(
   limit = 10,
 ): Promise<RecurringPatternRow[]> {
   return await query<RecurringPatternRow>(
+    // Same anchoring as fetchAlertDailyFeatures — the N most recent days that
+    // carry data, not a calendar window.
     `select category, product, entity_id, severity,
             sum(incident_count) as incident_count,
             sum(breached) as breached,
             avg(avg_duration_seconds) as avg_duration_seconds
      from gold_alert_category_entity_breakdown
-     where date >= today() - {days_back:UInt32}
+     where date in (
+       select date from gold_alert_category_entity_breakdown
+       group by date order by date desc limit {days_back:UInt32}
+     )
      group by category, product, entity_id, severity
      having incident_count > 1
      order by incident_count desc

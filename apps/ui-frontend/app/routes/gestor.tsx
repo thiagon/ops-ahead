@@ -6,6 +6,7 @@ import type {
   KpiProjectionRow,
 } from '~/clickhouse.server.ts';
 import { Badge } from '~/components/Badge';
+import { ForecastChart } from '~/components/ForecastChart';
 import { type Kpi, KpiCard } from '~/components/KpiCard';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
@@ -70,37 +71,13 @@ function VolumeForecastSection({
 }: {
   rows: Route.ComponentProps['loaderData']['volumeForecast'];
 }) {
-  const byGroup = new Map<string, typeof rows>();
-  for (const row of rows) {
-    byGroup.set(row.priority_group, [...(byGroup.get(row.priority_group) ?? []), row]);
-  }
-
   return (
     <Panel title="Previsão de volume" className="mt-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {[...byGroup.entries()].map(([group, groupRows]) => (
-          <div key={group} className="rounded-lg border border-border-base bg-bg-elevated p-4">
-            <h3 className="text-text-muted text-xs uppercase tracking-wide">
-              {KPI_GROUP_LABEL[group] ?? group}
-            </h3>
-            <div className="mt-3 flex gap-8">
-              {groupRows
-                .sort((a, b) => a.horizon - b.horizon)
-                .map(row => (
-                  <div key={row.horizon}>
-                    <p className="text-text-dim text-xs">D+{row.horizon}</p>
-                    <p className="font-mono font-semibold text-text-light text-xl">
-                      {Math.round(row.yhat)}
-                    </p>
-                    <p className="font-mono text-text-dim text-xs">
-                      {Math.round(row.yhat_lower)}–{Math.round(row.yhat_upper)}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className="mb-4 text-sm text-text-muted">
+        Ocorrências previstas por grupo de prioridade em D+1 e D+7. O trecho translúcido no topo vai
+        até o limite superior da faixa de 80% publicada pelo modelo.
+      </p>
+      <ForecastChart rows={rows} />
     </Panel>
   );
 }

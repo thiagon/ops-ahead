@@ -35,13 +35,24 @@ export function formatRatio(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
-/** Remaining deadline as the operator reads it — negative once breached. */
+/**
+ * Remaining deadline as the operator reads it. Once breached, hours stop
+ * being legible past a day — an occurrence open 26 days ago reads as
+ * "estourado há 26d", not "-623h 22m".
+ */
 export function formatRemaining(seconds: number): string {
-  const sign = seconds < 0 ? '-' : '';
+  const breached = seconds < 0;
   const total = Math.floor(Math.abs(seconds));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  return `${sign}${hours}h ${String(minutes).padStart(2, '0')}m`;
+
+  if (breached && hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `estourado há ${days}d`;
+  }
+
+  const formatted = `${hours}h ${String(minutes).padStart(2, '0')}m`;
+  return breached ? `estourado há ${formatted}` : formatted;
 }
 
 export const SEVERITY_LABEL: Record<number, string> = {
@@ -67,6 +78,15 @@ export const MILESTONE_LABEL: Record<string, string> = {
 export function suggestedAction(severity: number, consumedRatio: number): string {
   if (consumedRatio >= 1) return 'Estourado — escalar imediatamente';
   if (severity <= 2 && consumedRatio >= 0.75) return 'Escalar para N2';
+  if (consumedRatio >= 0.75) return 'Escalar';
+  if (consumedRatio >= 0.5) return 'Monitorar de perto';
+  return 'Monitorar';
+}
+
+/** The same rule, in the two or three words a queue card has room for. */
+export function suggestedActionShort(severity: number, consumedRatio: number): string {
+  if (consumedRatio >= 1) return 'Escalar já';
+  if (severity <= 2 && consumedRatio >= 0.75) return 'Escalar p/ N2';
   if (consumedRatio >= 0.75) return 'Escalar';
   if (consumedRatio >= 0.5) return 'Monitorar de perto';
   return 'Monitorar';

@@ -4,7 +4,7 @@ import {
   formatRemaining,
   riskColor,
   SEVERITY_LABEL,
-  suggestedAction,
+  suggestedActionShort,
 } from '~/risk.ts';
 import type { QueueRow } from '~/types.ts';
 
@@ -30,35 +30,33 @@ export function RecommendationCard({
           : 'border-border-base hover:border-signal-blue/40'
       }`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-mono text-text-muted text-xs">
-          {row.external_id} · {row.owner || '—'}
-        </span>
-        <Badge tone={severityTone(row.severity)}>
-          {SEVERITY_LABEL[row.severity] ?? row.severity}
-        </Badge>
-      </div>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate font-semibold text-sm text-text-light">{row.title}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-text-muted text-xs">
+            {row.external_id} · {row.entity_id || row.source}
+          </div>
+          <div className="mt-2 truncate font-semibold text-sm text-text-light">{row.title}</div>
           <div className="mt-1 truncate text-text-muted text-xs">
-            {suggestedAction(row.severity, row.consumed_ratio)}
+            {row.owner || 'sem owner'} · {suggestedActionShort(row.severity, row.consumed_ratio)}
+            {!row.acknowledged && ' · não reconhecida'}
           </div>
         </div>
-        {score !== null && (
-          <span
-            className="shrink-0 rounded-md border px-2.5 py-1 font-mono font-bold text-sm"
-            style={{ color, borderColor: color, backgroundColor: `${color}1a` }}
-          >
-            {formatRatio(score)}
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Badge tone={severityTone(row.severity)}>
+            {SEVERITY_LABEL[row.severity] ?? row.severity}
+          </Badge>
+          {score !== null && (
+            <span
+              className="rounded-md border px-2.5 py-1 font-bold text-sm"
+              style={{ color, borderColor: color, backgroundColor: `${color}1a` }}
+            >
+              {formatRatio(score)}
+            </span>
+          )}
+        </div>
       </div>
-      <div className="mt-1 flex items-center justify-between text-text-muted text-xs">
-        <span>{row.acknowledged ? 'reconhecida' : 'não reconhecida'}</span>
-        <span className="font-mono" style={{ color }}>
-          {formatRemaining(row.time_remaining_seconds)}
-        </span>
+      <div className="mt-2 text-right text-text-muted text-xs">
+        {formatRemaining(row.time_remaining_seconds)}
       </div>
     </button>
   );
