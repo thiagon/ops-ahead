@@ -9,8 +9,10 @@ export function PageHeader({
   action?: React.ReactNode;
   breadcrumb?: React.ReactNode;
 }) {
+  // The mobile menu button is fixed at the top-left corner; the left padding
+  // keeps the title clear of it until the sidebar takes over at sm.
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mb-6 flex flex-col gap-4 pl-14 sm:flex-row sm:items-start sm:justify-between sm:pl-0">
       <div>
         {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
         <h1 className="font-bold text-2xl text-text-light">{title}</h1>

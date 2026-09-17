@@ -260,6 +260,17 @@ export async function fetchNoisyEntities(limit = 10): Promise<NoisyEntityRow[]> 
   );
 }
 
+/** How many occurrences are open right now — the sidebar's queue badge. */
+export async function fetchOpenAlertCount(): Promise<number> {
+  const rows = await query<{ open_count: string }>(
+    `select toString(count()) as open_count
+     from silver_alert_open
+     where tenant_id = {tenant_id:String}`,
+    { tenant_id: getConfig().TENANT_ID },
+  );
+  return Number(rows[0]?.open_count ?? 0);
+}
+
 export async function fetchOpenAlerts(limit = 200): Promise<OpenAlertRow[]> {
   return await query<OpenAlertRow>(OPEN_ALERTS_SQL, {
     tenant_id: getConfig().TENANT_ID,

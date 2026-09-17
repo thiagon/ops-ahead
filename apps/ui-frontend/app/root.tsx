@@ -8,8 +8,17 @@ import {
   ScrollRestoration,
 } from 'react-router';
 import type { Route } from './+types/root';
+import { fetchOpenAlertCount } from './clickhouse.server.ts';
 import { Sidebar } from './components/Sidebar';
 import './app.css';
+
+/**
+ * Only what the chrome around every screen needs. A failure here would take
+ * down every route, so the badge is dropped rather than propagated.
+ */
+export async function loader() {
+  return { openCount: await fetchOpenAlertCount().catch(() => null) };
+}
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -29,10 +38,10 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-export default function App() {
+export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar openCount={loaderData.openCount} />
       <div className="min-w-0 flex-1">
         <Outlet />
       </div>

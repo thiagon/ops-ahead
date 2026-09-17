@@ -193,3 +193,49 @@ export function InfoIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 5 8 12 15 19" />
+    </svg>
+  );
+}
+
+export function MenuIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="6" y1="6" x2="18" y2="18" />
+      <line x1="18" y1="6" x2="6" y2="18" />
+    </svg>
+  );
+}

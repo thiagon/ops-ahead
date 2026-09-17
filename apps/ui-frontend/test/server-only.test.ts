@@ -40,8 +40,10 @@ describe('server-only modules', () => {
 
     for (const path of sources) {
       // A route module's loader is stripped from the browser bundle; anything
-      // else in app/ ships to the client as-is.
-      const isRouteModule = path.includes(join('app', 'routes'));
+      // else in app/ ships to the client as-is. root.tsx is one too — it
+      // carries the loader behind the chrome every screen renders.
+      const isRouteModule =
+        path.includes(join('app', 'routes')) || path.endsWith(join('app', 'root.tsx'));
       if (isRouteModule || SERVER_ONLY_MODULES.some(name => path.includes(name))) continue;
 
       const source = await readFile(path, 'utf8');
