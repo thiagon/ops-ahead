@@ -250,16 +250,16 @@ export function Sidebar({ openCount }: { openCount: number | null }) {
           collapsed ? 'w-[86px]' : 'w-[240px]'
         }`}
       >
-        <Brand collapsed={collapsed} />
-        <NavLinks collapsed={collapsed} openCount={openCount} />
-        <SessionBlock collapsed={collapsed} />
-        <div className={`flex px-3 ${collapsed ? 'justify-center' : 'justify-end'}`}>
+        <div
+          className={`flex items-center gap-2 ${collapsed ? 'flex-col' : 'justify-between pr-3'}`}
+        >
+          <Brand collapsed={collapsed} />
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
             aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'}
             title={collapsed ? 'Expandir navegação' : 'Recolher navegação'}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-white/[0.04] hover:text-text-light"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-white/[0.04] hover:text-text-light"
           >
             {collapsed ? (
               <ChevronRightIcon className="h-4 w-4" />
@@ -268,6 +268,8 @@ export function Sidebar({ openCount }: { openCount: number | null }) {
             )}
           </button>
         </div>
+        <NavLinks collapsed={collapsed} openCount={openCount} />
+        <SessionBlock collapsed={collapsed} />
       </aside>
     </>
   );
