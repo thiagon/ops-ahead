@@ -8,7 +8,9 @@ import {
   GridIcon,
   ListIcon,
   MenuIcon,
+  PlugIcon,
   ShieldIcon,
+  SlidersIcon,
 } from './icons';
 
 type NavItem = {
@@ -46,6 +48,23 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
         label: 'Painel do gestor',
         hint: 'Meta anual, projeção e tendências',
         icon: ClockIcon,
+      },
+    ],
+  },
+  {
+    title: 'Ajustes',
+    items: [
+      {
+        to: '/integracoes',
+        label: 'Integrações',
+        hint: 'Sistemas de origem e o dicionário de cada um',
+        icon: PlugIcon,
+      },
+      {
+        to: '/metas-e-prazos',
+        label: 'Metas e prazos',
+        hint: 'Contrato de OLA e faixas de atingimento',
+        icon: SlidersIcon,
       },
     ],
   },

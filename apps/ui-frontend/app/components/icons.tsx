@@ -239,3 +239,87 @@ export function CloseIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function SlidersIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="4" y1="8" x2="20" y2="8" />
+      <line x1="4" y1="16" x2="20" y2="16" />
+      <circle cx="9" cy="8" r="2.5" />
+      <circle cx="16" cy="16" r="2.5" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16" />
+      <path d="M9 7V5h6v2" />
+      <path d="M6 7l1 13h10l1-13" />
+    </svg>
+  );
+}
+
+export function HistoryIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4.5l3 1.8" />
+    </svg>
+  );
+}
+
+export function PlugIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      className={`${base} ${className ?? ''}`}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 3v6" />
+      <path d="M15 3v6" />
+      <path d="M6 9h12v3a6 6 0 0 1-12 0z" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}

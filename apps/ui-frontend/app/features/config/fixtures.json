@@ -1,0 +1,520 @@
+{
+  "origins": [
+    {
+      "tenantId": "locaweb",
+      "source": "service_now",
+      "intake": "alert",
+      "envelopeVersion": "v1",
+      "secretCreatedAt": "2026-09-15T14:22:00Z",
+      "enabled": true
+    },
+    {
+      "tenantId": "locaweb",
+      "source": "zabbix",
+      "intake": "monitor",
+      "envelopeVersion": "v1",
+      "secretCreatedAt": "2026-09-16T10:40:00Z",
+      "enabled": false
+    }
+  ],
+  "fieldMaps": [
+    {
+      "tenantId": "locaweb",
+      "source": "service_now",
+      "bindings": [
+        {
+          "field": "external_id",
+          "path": "number",
+          "required": true,
+          "hint": "Identificador do chamado no sistema de origem.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "opened_at",
+          "path": "sys_created_on",
+          "required": true,
+          "hint": "Quando o chamado foi aberto.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "title",
+          "path": "short_description",
+          "required": true,
+          "hint": "Resumo em uma linha.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "severity",
+          "path": "priority",
+          "required": true,
+          "hint": "Urgência do chamado.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "status",
+          "path": "state",
+          "required": true,
+          "hint": "Situação do chamado.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "acknowledged_at",
+          "path": null,
+          "required": false,
+          "hint": "Quando alguém assumiu o chamado.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "resolved_at",
+          "path": "resolved_at",
+          "required": false,
+          "hint": "Quando a solução foi aplicada.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "closed_at",
+          "path": "closed_at",
+          "required": false,
+          "hint": "Quando o chamado foi fechado.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "entity_id",
+          "path": "cmdb_ci",
+          "required": false,
+          "hint": "O que foi afetado — servidor, serviço, cliente.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "description",
+          "path": "description",
+          "required": false,
+          "hint": "Texto completo do chamado.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "owner",
+          "path": "assigned_to",
+          "required": false,
+          "hint": "Quem está com o chamado agora.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "reported_by",
+          "path": "contact_type",
+          "required": false,
+          "hint": "Como o chamado foi aberto.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "parent_id",
+          "path": "parent_incident",
+          "required": false,
+          "hint": "Chamado pai, quando houver.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "resolution_code",
+          "path": "close_code",
+          "required": false,
+          "hint": "Como o chamado terminou.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "resolution_summary",
+          "path": "close_notes",
+          "required": false,
+          "hint": "O que foi feito para resolver.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "labels",
+          "path": null,
+          "required": false,
+          "hint": "Outros campos que queira preservar.",
+          "type": "object",
+          "translated": false
+        },
+        {
+          "field": "source_url",
+          "path": null,
+          "required": false,
+          "hint": "Link para o chamado no sistema de origem.",
+          "type": "string",
+          "translated": false
+        }
+      ]
+    },
+    {
+      "tenantId": "locaweb",
+      "source": "zabbix",
+      "bindings": [
+        {
+          "field": "external_id",
+          "path": "eventid",
+          "required": true,
+          "hint": "Identificador do evento na origem.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "started_at",
+          "path": "clock",
+          "required": true,
+          "hint": "Quando a condição disparou.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "entity_id",
+          "path": "host",
+          "required": true,
+          "hint": "O que está sendo monitorado.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "condition",
+          "path": "value",
+          "required": true,
+          "hint": "Se disparou ou normalizou.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "ended_at",
+          "path": "r_clock",
+          "required": false,
+          "hint": "Quando normalizou. Vazio enquanto persistir.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "severity",
+          "path": "severity",
+          "required": false,
+          "hint": "Urgência do sinal.",
+          "type": "string",
+          "translated": true
+        },
+        {
+          "field": "title",
+          "path": "name",
+          "required": false,
+          "hint": "Nome do gatilho.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "description",
+          "path": "opdata",
+          "required": false,
+          "hint": "Detalhe do que disparou.",
+          "type": "string",
+          "translated": false
+        },
+        {
+          "field": "labels",
+          "path": "tags",
+          "required": false,
+          "hint": "Outros campos que queira preservar.",
+          "type": "object",
+          "translated": false
+        },
+        {
+          "field": "source_url",
+          "path": null,
+          "required": false,
+          "hint": "Link para o evento na origem.",
+          "type": "string",
+          "translated": false
+        }
+      ]
+    }
+  ],
+  "dictionaries": [
+    {
+      "tenantId": "locaweb",
+      "source": "service_now",
+      "intake": "alert",
+      "version": "v1",
+      "status": "published",
+      "mappings": {
+        "status": [
+          {
+            "id": "status-1",
+            "from": "Aguardando Problema",
+            "to": "waiting"
+          },
+          {
+            "id": "status-2",
+            "from": "Encerrado",
+            "to": "closed"
+          },
+          {
+            "id": "status-3",
+            "from": "Encerrado Automaticamente",
+            "to": "closed"
+          },
+          {
+            "id": "status-4",
+            "from": "Sem Intervenção",
+            "to": "closed"
+          }
+        ],
+        "severity": [
+          {
+            "id": "severity-1",
+            "from": "1 - Crítica",
+            "to": "1"
+          },
+          {
+            "id": "severity-2",
+            "from": "2 - Alta",
+            "to": "2"
+          },
+          {
+            "id": "severity-3",
+            "from": "3 - Moderada",
+            "to": "3"
+          },
+          {
+            "id": "severity-4",
+            "from": "4 - Baixa",
+            "to": "4"
+          }
+        ],
+        "reported_by": [
+          {
+            "id": "reported_by-1",
+            "from": "Monitoramento",
+            "to": "automatic"
+          },
+          {
+            "id": "reported_by-2",
+            "from": "Manual",
+            "to": "manual"
+          }
+        ],
+        "resolution_code": [
+          {
+            "id": "resolution_code-1",
+            "from": "Sem Intervenção",
+            "to": "no_intervention"
+          },
+          {
+            "id": "resolution_code-2",
+            "from": "Encerrado Automaticamente",
+            "to": "auto_resolved"
+          }
+        ]
+      }
+    },
+    {
+      "tenantId": "locaweb",
+      "source": "zabbix",
+      "intake": "monitor",
+      "version": "v1",
+      "status": "draft",
+      "mappings": {
+        "condition": [
+          {
+            "id": "condition-1",
+            "from": "PROBLEM",
+            "to": "firing"
+          },
+          {
+            "id": "condition-2",
+            "from": "OK",
+            "to": "cleared"
+          }
+        ],
+        "severity": [
+          {
+            "id": "severity-1",
+            "from": "Disaster",
+            "to": "1"
+          },
+          {
+            "id": "severity-2",
+            "from": "High",
+            "to": "2"
+          },
+          {
+            "id": "severity-3",
+            "from": "Average",
+            "to": "3"
+          },
+          {
+            "id": "severity-4",
+            "from": "Warning",
+            "to": "4"
+          },
+          {
+            "id": "severity-5",
+            "from": "Information",
+            "to": "5"
+          }
+        ]
+      }
+    }
+  ],
+  "deadlines": [
+    {
+      "tenantId": "locaweb",
+      "severity": 1,
+      "deadlineSeconds": 14400
+    },
+    {
+      "tenantId": "locaweb",
+      "severity": 2,
+      "deadlineSeconds": 14400
+    },
+    {
+      "tenantId": "locaweb",
+      "severity": 3,
+      "deadlineSeconds": 43200
+    },
+    {
+      "tenantId": "locaweb",
+      "severity": 4,
+      "deadlineSeconds": 86400
+    },
+    {
+      "tenantId": "locaweb",
+      "severity": 5,
+      "deadlineSeconds": 345600
+    }
+  ],
+  "kpiTargets": [
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 30,
+      "achievementPct": 150
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 35,
+      "achievementPct": 125
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 39,
+      "achievementPct": 100
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 45,
+      "achievementPct": 75
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 53,
+      "achievementPct": 50
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p1_p2",
+      "maxBreaches": 999999,
+      "achievementPct": 0
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 200,
+      "achievementPct": 150
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 230,
+      "achievementPct": 125
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 263,
+      "achievementPct": 100
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 290,
+      "achievementPct": 75
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 320,
+      "achievementPct": 50
+    },
+    {
+      "tenantId": "locaweb",
+      "kpiGroup": "p3",
+      "maxBreaches": 999999,
+      "achievementPct": 0
+    }
+  ],
+  "revisions": [
+    {
+      "id": "rev-005",
+      "domain": "origin",
+      "tenantId": "locaweb",
+      "summary": "Integração zabbix criada como monitor, ainda em rascunho",
+      "author": "Operador N1",
+      "at": "2026-09-16T10:40:00Z"
+    },
+    {
+      "id": "rev-004",
+      "domain": "origin",
+      "tenantId": "locaweb",
+      "summary": "Integração service_now criada, intake alerta",
+      "author": "Operador N1",
+      "at": "2026-09-15T14:22:00Z"
+    },
+    {
+      "id": "rev-003",
+      "domain": "dictionary",
+      "tenantId": "locaweb",
+      "summary": "Dicionário v1 publicado — 8 mapeamentos",
+      "author": "Operador N1",
+      "at": "2026-09-15T14:20:00Z"
+    },
+    {
+      "id": "rev-002",
+      "domain": "kpi_target",
+      "tenantId": "locaweb",
+      "summary": "Faixas de meta P1+P2 e P3 carregadas",
+      "author": "Operador N1",
+      "at": "2026-09-12T09:05:00Z"
+    },
+    {
+      "id": "rev-001",
+      "domain": "deadline",
+      "tenantId": "locaweb",
+      "summary": "Prazos de OLA definidos para P1–P5",
+      "author": "Operador N1",
+      "at": "2026-09-12T09:01:00Z"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from 'react-router';
 import type { Route } from './+types/root';
 import { fetchOpenAlertCount } from './clickhouse.server.ts';
@@ -38,10 +39,22 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
+/**
+ * `useRouteLoaderData` instead of the component's own `loaderData`: an error
+ * thrown before the loaders run leaves the root without data, and the chrome
+ * still renders around the boundary.
+ */
+function useOpenCount(): number | null {
+  const data = useRouteLoaderData<typeof loader>('root');
+  return data?.openCount ?? null;
+}
+
+export default function App() {
+  const openCount = useOpenCount();
+
   return (
     <div className="flex min-h-screen">
-      <Sidebar openCount={loaderData.openCount} />
+      <Sidebar openCount={openCount} />
       <div className="min-w-0 flex-1">
         <Outlet />
       </div>
