@@ -6,9 +6,10 @@ from uuid import uuid4
 from clickhouse_driver import Client
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
+from faststream.kafka.annotations import KafkaMessage
 
 import metrics
-from deadlines import DeadlineTable
+from deadlines import DeadlineTable, apply_deadline
 from models import IncidentAlertEvent, MilestoneEvent
 from settings import Settings
 from tracker import OccurrenceTracker
@@ -38,6 +39,14 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     # ml-trainer's own consumer group, which must stay fixed).
     group_id = f"{settings.kafka_group_id_prefix}-{uuid4()}"
 
+    @broker.subscriber(
+        settings.kafka_topic_config_deadline, group_id=group_id, auto_offset_reset="earliest"
+    )
+    async def handle_config_deadline(msg: KafkaMessage) -> None:
+        raw_key = getattr(msg.raw_message, "key", None)
+        key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else raw_key
+        apply_deadline(deadlines, key, msg.body)
+
     @broker.subscriber(settings.kafka_topic_alert, group_id=group_id)
     async def handle_alert(event: IncidentAlertEvent) -> None:
         metrics.events_consumed.inc()
@@ -50,7 +59,6 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     @app.on_startup
     async def startup() -> None:
         client = Client.from_url(settings.clickhouse_url)
-        deadlines.refresh(client)
         tracker.reconstruct(client)
         metrics.open_occurrences.set(len(tracker))
         logger.info("reconstructed %d open occurrences", len(tracker))

@@ -19,7 +19,11 @@ class FakeClient:
 
 def _deadlines(rows: list[tuple]) -> DeadlineTable:
     table = DeadlineTable()
-    table.refresh(FakeClient(rows))
+    for tenant_id in {row[0] for row in rows}:
+        table.record(
+            tenant_id,
+            {severity: seconds for tenant, severity, seconds in rows if tenant == tenant_id},
+        )
     return table
 
 

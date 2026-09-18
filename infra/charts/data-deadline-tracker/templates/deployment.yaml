@@ -45,6 +45,8 @@ spec:
               value: {{ .Values.consumer.env.kafkaTopicAlert | quote }}
             - name: KAFKA_TOPIC_MILESTONES
               value: {{ .Values.consumer.env.kafkaTopicMilestones | quote }}
+            - name: KAFKA_TOPIC_CONFIG_DEADLINE
+              value:  {{ .Values.consumer.env.kafkaTopicConfigDeadline | quote }}
             - name: KAFKA_GROUP_ID_PREFIX
               value: {{ .Values.consumer.env.kafkaGroupIdPrefix | quote }}
             - name: TICK_SECONDS
