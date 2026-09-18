@@ -6,6 +6,13 @@ ui-orchestrator:
     tag: latest
     pullPolicy: IfNotPresent
 
+migration:
+  image: migrate/migrate:v4.18.1
+  pullPolicy: IfNotPresent
+  # ui-postgres' ExternalSecret, projected into ns:ui by the same chart that
+  # provisions the database.
+  secretName: postgres-config-secret
+
 # Fixed at 1 — see run-status.ts's RunsService: GET /runs/{run_id} answers
 # from an in-process Map, not a shared store, so a second replica would
 # answer inconsistently depending on which pod the Service happens to route
@@ -28,3 +35,11 @@ orchestrator:
     kafkaTopicMl: trigger.ml
     kafkaTopicData: trigger.data
     kafkaTopicStatus: trigger.status
+    kafkaTopicConfigOrigin: config.origin
+    kafkaTopicConfigDictionary: config.dictionary
+    kafkaTopicConfigDeadline: config.deadline
+    kafkaTopicConfigKpiTarget: config.kpi-target
+    configPostgresHost: config-postgres.ui.svc.cluster.local:5432
+    vaultAddr: http://infra-vault.infra.svc.cluster.local:8200
+    vaultRole: ui-orchestrator
+    vaultSecretPath: orchestrator-origins

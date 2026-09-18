@@ -7,8 +7,21 @@ export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
+  stubPostgres(app);
   await app.ready();
   return app;
+}
+
+/**
+ * No test reaches a database. A test that exercises config routes decorates
+ * `configService` itself; this only keeps the postgres plugin from dialing.
+ */
+export function stubPostgres(app: FastifyInstance): void {
+  if (!app.hasDecorator('sql')) {
+    app.decorate('sql', (() => {
+      throw new Error('no database in tests');
+    }) as never);
+  }
 }
 
 /**
