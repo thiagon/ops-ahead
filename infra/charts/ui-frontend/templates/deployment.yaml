@@ -54,8 +54,6 @@ spec:
               value: {{ .Values.frontend.port | quote }}
             - name: SERVICE_VERSION
               value: {{ .Chart.AppVersion | quote }}
-            - name: TENANT_ID
-              value: {{ .Values.frontend.env.tenantId | quote }}
             - name: CLICKHOUSE_USER
               value: {{ .Values.frontend.env.clickhouseUser | quote }}
             - name: CLICKHOUSE_PASSWORD

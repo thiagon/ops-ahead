@@ -3,5 +3,3 @@ ui-frontend:
     tag: "latest"
 frontend:
   replicaCount: 1
-  env:
-    tenantId: locaweb

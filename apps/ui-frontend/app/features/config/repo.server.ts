@@ -57,14 +57,54 @@ export class ConflictError extends Error {
   }
 }
 
-function tenant(): string {
-  return getConfig().TENANT_ID;
+export class MisconfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MisconfiguredError';
+  }
+}
+
+/** The active tenant — numeric id for FKs, slug for URLs and ClickHouse. */
+export type ActiveTenant = {
+  id: number;
+  slug: string;
+  name: string;
+};
+
+let cachedTenant: ActiveTenant | undefined;
+
+/** Clears the in-process cache — tests reseeding the active tenant need it. */
+export function clearTenantCache(): void {
+  cachedTenant = undefined;
+}
+
+/**
+ * Until login scopes a session, the screens serve the one active tenant row.
+ * Creating tenants is a platform act; the slug is what URLs and ClickHouse use.
+ */
+export async function currentTenant(): Promise<ActiveTenant> {
+  if (cachedTenant) return cachedTenant;
+
+  const row = await db().tenant.findFirst({ where: { active: true } });
+  if (!row) {
+    throw new MisconfiguredError(
+      'Nenhum tenant ativo no cadastro — rode o seed ou marque um como active.',
+    );
+  }
+
+  cachedTenant = { id: row.id, slug: row.slug, name: row.name };
+  return cachedTenant;
+}
+
+async function activeTenantId(): Promise<number> {
+  return (await currentTenant()).id;
 }
 
 /** Until the screens have login, the history is real and its authorship is not. */
 const AUTHOR = 'anonymous';
 
 type OriginWithRelations = {
+  id: number;
   source: string;
   intake: string;
   envelopeVersion: string;
@@ -72,7 +112,7 @@ type OriginWithRelations = {
   enabled: boolean;
   dictionary: { version: string; status: string } | null;
   bindings: { field: string; path: string | null }[];
-  mappings: { id: string; mappingField: string; fromValue: string; toValue: string }[];
+  mappings: { id: number; mappingField: string; fromValue: string; toValue: string }[];
 };
 
 function compose(origin: OriginWithRelations): Integration {
@@ -104,9 +144,18 @@ function withRelations() {
   };
 }
 
+async function originRow(source: string) {
+  const origin = await db().origin.findUnique({
+    where: { tenantId_source: { tenantId: await activeTenantId(), source } },
+    include: withRelations(),
+  });
+  if (!origin) throw new NotFoundError(`Integração ${source} não existe.`);
+  return origin;
+}
+
 export async function listIntegrations(): Promise<Integration[]> {
   const origins = await db().origin.findMany({
-    where: { tenantId: tenant() },
+    where: { tenantId: await activeTenantId() },
     include: withRelations(),
     orderBy: { source: 'asc' },
   });
@@ -114,17 +163,12 @@ export async function listIntegrations(): Promise<Integration[]> {
 }
 
 export async function getIntegration(source: string): Promise<Integration> {
-  const origin = await db().origin.findUnique({
-    where: { tenantId_source: { tenantId: tenant(), source } },
-    include: withRelations(),
-  });
-  if (!origin) throw new NotFoundError(`Integração ${source} não existe.`);
-  return compose(origin);
+  return compose(await originRow(source));
 }
 
 export async function listDeadlines(): Promise<Deadline[]> {
   const rows = await db().deadline.findMany({
-    where: { tenantId: tenant() },
+    where: { tenantId: await activeTenantId() },
     orderBy: { severity: 'asc' },
   });
   return rows.map(row => ({ severity: row.severity, deadlineSeconds: row.deadlineSeconds }));
@@ -132,7 +176,7 @@ export async function listDeadlines(): Promise<Deadline[]> {
 
 export async function listKpiTargets(): Promise<KpiTarget[]> {
   const rows = await db().kpiTarget.findMany({
-    where: { tenantId: tenant() },
+    where: { tenantId: await activeTenantId() },
     orderBy: [{ kpiGroup: 'asc' }, { achievementPct: 'desc' }],
   });
   return rows.map(row => ({
@@ -143,7 +187,7 @@ export async function listKpiTargets(): Promise<KpiTarget[]> {
 }
 
 export interface Revision {
-  id: string;
+  id: number;
   domain: ConfigDomain;
   summary: string;
   author: string;
@@ -154,7 +198,7 @@ export interface Revision {
 
 export async function listRevisions(): Promise<Revision[]> {
   const rows = await db().revision.findMany({
-    where: { tenantId: tenant() },
+    where: { tenantId: await activeTenantId() },
     orderBy: { at: 'desc' },
     take: 50,
   });
@@ -184,8 +228,7 @@ async function recordRevision(
 ): Promise<void> {
   await db().revision.create({
     data: {
-      id: crypto.randomUUID(),
-      tenantId: tenant(),
+      tenantId: await activeTenantId(),
       domain,
       configKey,
       summary,
@@ -209,7 +252,7 @@ export async function createIntegration(input: {
   intake: Intake;
   envelopeVersion: string;
 }): Promise<{ integration: Integration; secret: string }> {
-  const tenantId = tenant();
+  const tenantId = await activeTenantId();
   const existing = await db().origin.findUnique({
     where: { tenantId_source: { tenantId, source: input.source } },
   });
@@ -233,10 +276,10 @@ export async function createIntegration(input: {
 }
 
 export async function rotateSecret(source: string): Promise<string> {
-  await getIntegration(source);
+  const origin = await originRow(source);
 
   await db().origin.update({
-    where: { tenantId_source: { tenantId: tenant(), source } },
+    where: { id: origin.id },
     data: { secretCreatedAt: new Date() },
   });
   await recordRevision('origin', source, `Chave de ${source} rotacionada`, null);
@@ -249,14 +292,13 @@ export async function updateBindings(
   bindings: readonly FieldBinding[],
 ): Promise<Integration> {
   const previous = await getIntegration(source);
-  const tenantId = tenant();
+  const origin = await originRow(source);
 
   await db().$transaction([
-    db().fieldBinding.deleteMany({ where: { tenantId, source } }),
+    db().fieldBinding.deleteMany({ where: { originId: origin.id } }),
     db().fieldBinding.createMany({
       data: bindings.map(binding => ({
-        tenantId,
-        source,
+        originId: origin.id,
         field: binding.field,
         path: binding.path,
       })),
@@ -264,9 +306,9 @@ export async function updateBindings(
     // The screen's "Publicar" is this write — draft stays until the customer
     // commits the field paths (and whatever mappings they already added).
     db().dictionaryVersion.upsert({
-      where: { tenantId_source: { tenantId, source } },
+      where: { originId: origin.id },
       update: { status: 'published' },
-      create: { tenantId, source, version: 'v1', status: 'published' },
+      create: { originId: origin.id, version: 'v1', status: 'published' },
     }),
   ]);
 
@@ -278,23 +320,19 @@ export async function upsertMapping(
   source: string,
   input: { field: MappingField; from: string; to: string },
 ): Promise<Integration> {
-  await getIntegration(source);
-  const tenantId = tenant();
+  const origin = await originRow(source);
 
   await db().mapping.upsert({
     where: {
-      tenantId_source_mappingField_fromValue: {
-        tenantId,
-        source,
+      originId_mappingField_fromValue: {
+        originId: origin.id,
         mappingField: input.field,
         fromValue: input.from,
       },
     },
     update: { toValue: input.to },
     create: {
-      id: crypto.randomUUID(),
-      tenantId,
-      source,
+      originId: origin.id,
       mappingField: input.field,
       fromValue: input.from,
       toValue: input.to,
@@ -305,9 +343,10 @@ export async function upsertMapping(
   return await getIntegration(source);
 }
 
-export async function removeMapping(source: string, mappingId: string): Promise<Integration> {
+export async function removeMapping(source: string, mappingId: number): Promise<Integration> {
+  const origin = await originRow(source);
   const entry = await db().mapping.findFirst({
-    where: { id: mappingId, tenantId: tenant(), source },
+    where: { id: mappingId, originId: origin.id },
   });
   if (!entry) throw new NotFoundError('Este valor já não está mapeado.');
 
@@ -323,7 +362,7 @@ export async function removeMapping(source: string, mappingId: string): Promise<
 
 export async function replaceDeadlines(items: readonly Deadline[]): Promise<Deadline[]> {
   const previous = await listDeadlines();
-  const tenantId = tenant();
+  const tenantId = await activeTenantId();
 
   await db().$transaction([
     db().deadline.deleteMany({ where: { tenantId } }),
@@ -336,13 +375,13 @@ export async function replaceDeadlines(items: readonly Deadline[]): Promise<Dead
     }),
   ]);
 
-  await recordRevision('deadline', tenantId, 'Prazos atualizados', previous);
+  await recordRevision('deadline', (await currentTenant()).slug, 'Prazos atualizados', previous);
   return await listDeadlines();
 }
 
 export async function replaceKpiTargets(items: readonly KpiTarget[]): Promise<KpiTarget[]> {
   const previous = await listKpiTargets();
-  const tenantId = tenant();
+  const tenantId = await activeTenantId();
 
   await db().$transaction([
     db().kpiTarget.deleteMany({ where: { tenantId } }),
@@ -356,14 +395,14 @@ export async function replaceKpiTargets(items: readonly KpiTarget[]): Promise<Kp
     }),
   ]);
 
-  await recordRevision('kpi_target', tenantId, 'Metas atualizadas', previous);
+  await recordRevision('kpi_target', (await currentTenant()).slug, 'Metas atualizadas', previous);
   return await listKpiTargets();
 }
 
 /** Restores the state a revision recorded, itself recorded as a new revision. */
-export async function rollback(revisionId: string): Promise<void> {
+export async function rollback(revisionId: number): Promise<void> {
   const revision = await db().revision.findFirst({
-    where: { id: revisionId, tenantId: tenant() },
+    where: { id: revisionId, tenantId: await activeTenantId() },
   });
   if (!revision) throw new NotFoundError('Esta alteração não está mais no histórico.');
   if (revision.payload === null) {

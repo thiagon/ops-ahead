@@ -6,13 +6,12 @@ const configSchema = z.object({
   // @clickhouse/client speaks the HTTP interface (port 8123), not the native
   // protocol ml-trainer's clickhouse_driver uses.
   CLICKHOUSE_URL: z.url({ protocol: /^https?$/ }).default('http://default:@localhost:8123/default'),
-  TENANT_ID: z.string().min(1).default('locaweb'),
   // Where a customer's origin system reaches the gateway from outside the
   // cluster — an ingress host, so it differs per environment and the
   // integration screen has nothing to show until it is set.
   PUBLIC_GATEWAY_URL: z.url({ protocol: /^https?$/ }).default('https://gateway.ops-ahead.local'),
   // The configuration registry this app owns — nothing else reads or writes
-  // it (apps/ui-frontend/prisma/schema.prisma).
+  // it (apps/ui-frontend/prisma/schema.prisma). Tenant is a row there, not an env.
   CONFIG_DATABASE_URL: z
     .string()
     .min(1)

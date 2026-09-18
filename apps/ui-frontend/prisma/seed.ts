@@ -9,7 +9,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const TENANT = 'locaweb';
+const TENANT_SLUG = 'locaweb';
+const TENANT_NAME = 'Locaweb';
 const SOURCE = 'itsm';
 
 /** Where each field of incident-alert is read in the ITSM's own payload. */
@@ -75,11 +76,22 @@ const KPI_TARGETS: [group: string, maxBreaches: number, achievementPct: number][
 ];
 
 async function main(): Promise<void> {
-  await prisma.origin.upsert({
-    where: { tenantId_source: { tenantId: TENANT, source: SOURCE } },
+  await prisma.tenant.updateMany({
+    where: { slug: { not: TENANT_SLUG }, active: true },
+    data: { active: false },
+  });
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: TENANT_SLUG },
+    update: { name: TENANT_NAME, active: true },
+    create: { slug: TENANT_SLUG, name: TENANT_NAME, active: true },
+  });
+
+  const origin = await prisma.origin.upsert({
+    where: { tenantId_source: { tenantId: tenant.id, source: SOURCE } },
     update: {},
     create: {
-      tenantId: TENANT,
+      tenantId: tenant.id,
       source: SOURCE,
       intake: 'alert',
       envelopeVersion: 'v1',
@@ -91,9 +103,9 @@ async function main(): Promise<void> {
 
   for (const [field, path] of BINDINGS) {
     await prisma.fieldBinding.upsert({
-      where: { tenantId_source_field: { tenantId: TENANT, source: SOURCE, field } },
+      where: { originId_field: { originId: origin.id, field } },
       update: {},
-      create: { tenantId: TENANT, source: SOURCE, field, path },
+      create: { originId: origin.id, field, path },
     });
   }
 
@@ -101,41 +113,37 @@ async function main(): Promise<void> {
     for (const [fromValue, toValue] of Object.entries(pairs)) {
       await prisma.mapping.upsert({
         where: {
-          tenantId_source_mappingField_fromValue: {
-            tenantId: TENANT,
-            source: SOURCE,
+          originId_mappingField_fromValue: {
+            originId: origin.id,
             mappingField,
             fromValue,
           },
         },
         update: {},
-        create: {
-          id: crypto.randomUUID(),
-          tenantId: TENANT,
-          source: SOURCE,
-          mappingField,
-          fromValue,
-          toValue,
-        },
+        create: { originId: origin.id, mappingField, fromValue, toValue },
       });
     }
   }
 
   for (const [severity, deadlineSeconds] of DEADLINES) {
     await prisma.deadline.upsert({
-      where: { tenantId_severity: { tenantId: TENANT, severity } },
+      where: { tenantId_severity: { tenantId: tenant.id, severity } },
       update: {},
-      create: { tenantId: TENANT, severity, deadlineSeconds },
+      create: { tenantId: tenant.id, severity, deadlineSeconds },
     });
   }
 
   for (const [kpiGroup, maxBreaches, achievementPct] of KPI_TARGETS) {
     await prisma.kpiTarget.upsert({
       where: {
-        tenantId_kpiGroup_achievementPct: { tenantId: TENANT, kpiGroup, achievementPct },
+        tenantId_kpiGroup_achievementPct: {
+          tenantId: tenant.id,
+          kpiGroup,
+          achievementPct,
+        },
       },
       update: {},
-      create: { tenantId: TENANT, kpiGroup, maxBreaches, achievementPct },
+      create: { tenantId: tenant.id, kpiGroup, maxBreaches, achievementPct },
     });
   }
 }

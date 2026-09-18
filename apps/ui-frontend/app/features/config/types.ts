@@ -230,9 +230,8 @@ export const CONTRACT_FIELDS: Record<Intake, readonly ContractField[]> = {
 
 /** One origin value mapped to one domain value, e.g. 'Encerrado' → 'closed'. */
 export type MappingEntry = {
-  /** Stable across edits: both sides of the pair are editable, so neither
-      identifies the row, and removing one must not reshuffle the others. */
-  id: string;
+  /** Surrogate id of the row — removing one must not reshuffle the others. */
+  id: number;
   from: string;
   to: string;
 };
@@ -320,8 +319,8 @@ export function formatDuration(seconds: number): string {
 export function webhookUrl(
   base: string,
   envelopeVersion: string,
-  tenantId: string,
+  tenantSlug: string,
   source: string,
 ): string {
-  return `${base.replace(/\/+$/, '')}/webhook/${envelopeVersion}/${tenantId}/${source}`;
+  return `${base.replace(/\/+$/, '')}/webhook/${envelopeVersion}/${tenantSlug}/${source}`;
 }

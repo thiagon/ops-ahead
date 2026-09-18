@@ -41,7 +41,7 @@ export async function action({ request }: Route.ActionArgs) {
   const revert = form.get('revert');
   if (typeof revert === 'string') {
     try {
-      await rollback(revert);
+      await rollback(Number(revert));
     } catch (error) {
       if (error instanceof ConflictError || error instanceof NotFoundError)
         return { error: error.message, on: 'revert' as const };
@@ -219,7 +219,7 @@ export default function Targets({ loaderData, actionData }: Route.ComponentProps
               </div>
               {revision.revertible && (
                 <Form method="post">
-                  <GhostSubmit name="revert" value={revision.id}>
+                  <GhostSubmit name="revert" value={String(revision.id)}>
                     Reverter
                   </GhostSubmit>
                 </Form>

@@ -1,5 +1,6 @@
 import { type ClickHouseClient, createClient } from '@clickhouse/client';
 import { getConfig } from './config.server.ts';
+import { currentTenant } from './features/config/repo.server.ts';
 import type {
   MilestoneRow,
   SeverityChangeRow,
@@ -166,7 +167,7 @@ export async function fetchKpiProjection(asOfLimit = 1): Promise<KpiProjectionRo
      where tenant_id = {tenant_id:String}
      order by as_of_date desc, kpi_group
      limit {limit:UInt32} by kpi_group`,
-    { tenant_id: getConfig().TENANT_ID, limit: asOfLimit },
+    { tenant_id: (await currentTenant()).slug, limit: asOfLimit },
   );
 }
 
@@ -213,7 +214,7 @@ export async function fetchKpiAchievement(monthsBack = 12): Promise<KpiAchieveme
          and month >= toStartOfMonth(now()) - toIntervalMonth({months_back:UInt32})
        order by month asc, kpi_group
      )`,
-    { tenant_id: getConfig().TENANT_ID, months_back: monthsBack },
+    { tenant_id: (await currentTenant()).slug, months_back: monthsBack },
   );
 }
 
@@ -266,14 +267,14 @@ export async function fetchOpenAlertCount(): Promise<number> {
     `select toString(count()) as open_count
      from silver_alert_open
      where tenant_id = {tenant_id:String}`,
-    { tenant_id: getConfig().TENANT_ID },
+    { tenant_id: (await currentTenant()).slug },
   );
   return Number(rows[0]?.open_count ?? 0);
 }
 
 export async function fetchOpenAlerts(limit = 200): Promise<OpenAlertRow[]> {
   return await query<OpenAlertRow>(OPEN_ALERTS_SQL, {
-    tenant_id: getConfig().TENANT_ID,
+    tenant_id: (await currentTenant()).slug,
     limit,
   });
 }
@@ -289,7 +290,7 @@ export async function fetchOpenAlert(
        and source = {source:String}
        and external_id = {external_id:String}
      limit 1`,
-    { tenant_id: getConfig().TENANT_ID, source, external_id: externalId },
+    { tenant_id: (await currentTenant()).slug, source, external_id: externalId },
   );
   return rows[0];
 }
@@ -312,7 +313,7 @@ export async function fetchMilestones(source: string, externalId: string): Promi
        and source = {source:String}
        and external_id = {external_id:String}
      order by occurred_at asc`,
-    { tenant_id: getConfig().TENANT_ID, source, external_id: externalId },
+    { tenant_id: (await currentTenant()).slug, source, external_id: externalId },
   );
 }
 
@@ -327,7 +328,7 @@ export async function fetchSeverityHistory(
        and source = {source:String}
        and external_id = {external_id:String}
      order by received_at asc`,
-    { tenant_id: getConfig().TENANT_ID, source, external_id: externalId },
+    { tenant_id: (await currentTenant()).slug, source, external_id: externalId },
   );
 }
 
@@ -406,7 +407,7 @@ export async function fetchBreachContext(): Promise<Record<string, BreachContext
      left join escalations e on e.entity_id = o.entity_id
      left join history h on h.owner = o.owner and h.severity = o.severity
      left join precursor p on p.source = o.source and p.external_id = o.external_id`,
-    { tenant_id: getConfig().TENANT_ID },
+    { tenant_id: (await currentTenant()).slug },
   );
 
   return Object.fromEntries(rows.map(row => [`${row.source} ${row.external_id}`, row]));
@@ -446,7 +447,7 @@ export async function fetchSimilarIncidents(
      order by c.closed_at desc
      limit {limit:UInt32}`,
     {
-      tenant_id: getConfig().TENANT_ID,
+      tenant_id: (await currentTenant()).slug,
       owner,
       severity,
       exclude_external_id: excludeExternalId,

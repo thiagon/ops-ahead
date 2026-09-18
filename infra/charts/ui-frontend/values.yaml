@@ -17,7 +17,6 @@ frontend:
       cpu: 500m
       memory: 512Mi
   env:
-    tenantId: locaweb
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead
     clickhouseDatabase: default

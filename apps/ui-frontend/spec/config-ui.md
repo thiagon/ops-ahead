@@ -62,8 +62,10 @@ Três rotas, todas sob o grupo "Ajustes" da sidebar.
 ### O tenant nunca aparece como escolha
 
 A tela é a do cliente: ele *é* um tenant, não escolhe entre vários, e não cria
-outros. O tenant vem de `getConfig().TENANT_ID` — como em todas as queries de
-`clickhouse.server.ts`. Por isso não está na URL nem em campo de formulário.
+outros. O tenant ativo vem do cadastro (`config_tenants`, linha com `active`) —
+`id` numérico nas FKs, `slug` único nas URLs e no ClickHouse, `name` só para
+exibição (pode ter acento, não é único). Por isso o tenant não está na URL das
+telas de Ajustes nem em variável de ambiente.
 
 ### Vocabulário
 

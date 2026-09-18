@@ -10,9 +10,30 @@ datasource db {
   url      = env("CONFIG_DATABASE_URL")
 }
 
+/// A customer this deployment may serve. Numeric `id` is the foreign key;
+/// `slug` is unique and is what URLs / ClickHouse `tenant_id` carry;
+/// `name` is the display label (accents allowed, not unique).
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  name      String
+  /// Until login scopes a session, the UI serves whichever row is active.
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  origins    Origin[]
+  deadlines  Deadline[]
+  kpiTargets KpiTarget[]
+  revisions  Revision[]
+
+  @@map("config_tenants")
+}
+
 /// An origin the tenant sends events from, named by the customer.
 model Origin {
-  tenantId        String    @map("tenant_id")
+  id              Int       @id @default(autoincrement())
+  tenantId        Int       @map("tenant_id")
   source          String
   intake          String
   envelopeVersion String    @map("envelope_version")
@@ -22,80 +43,85 @@ model Origin {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bindings   FieldBinding[]
   mappings   Mapping[]
   dictionary DictionaryVersion?
 
-  @@id([tenantId, source])
-  @@map("config_origin")
+  @@unique([tenantId, source])
+  @@map("config_origins")
 }
 
 /// Where each field of the translated contract is read in the origin's payload.
 model FieldBinding {
-  tenantId String  @map("tenant_id")
-  source   String
+  id       Int     @id @default(autoincrement())
+  originId Int     @map("origin_id")
   field    String
   path     String?
 
-  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+  origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
-  @@id([tenantId, source, field])
-  @@map("config_field_binding")
+  @@unique([originId, field])
+  @@map("config_field_bindings")
 }
 
 /// One origin value mapped to one domain value. Several origin values may land
-/// on the same domain value, never the reverse — hence the key on the origin side.
+/// on the same domain value, never the reverse — hence the unique on the origin side.
 model Mapping {
-  id           String @id @db.Uuid
-  tenantId     String @map("tenant_id")
-  source       String
+  id           Int    @id @default(autoincrement())
+  originId     Int    @map("origin_id")
   mappingField String @map("mapping_field")
   fromValue    String @map("from_value")
   toValue      String @map("to_value")
 
-  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+  origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, source, mappingField, fromValue])
-  @@map("config_mapping")
+  @@unique([originId, mappingField, fromValue])
+  @@map("config_mappings")
 }
 
 model DictionaryVersion {
-  tenantId String @map("tenant_id")
-  source   String
+  id       Int    @id @default(autoincrement())
+  originId Int    @unique @map("origin_id")
   version  String
   status   String
 
-  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+  origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
-  @@id([tenantId, source])
-  @@map("config_dictionary_version")
+  @@map("config_dictionary_versions")
 }
 
 model Deadline {
-  tenantId        String @map("tenant_id")
-  severity        Int    @db.SmallInt
-  deadlineSeconds Int    @map("deadline_seconds")
+  id              Int @id @default(autoincrement())
+  tenantId        Int @map("tenant_id")
+  severity        Int @db.SmallInt
+  deadlineSeconds Int @map("deadline_seconds")
 
-  @@id([tenantId, severity])
-  @@map("config_deadline")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, severity])
+  @@map("config_deadlines")
 }
 
-/// A group carries one row per achievement band, so the band is part of the key.
+/// A group carries one row per achievement band, so the band is part of the unique.
 model KpiTarget {
-  tenantId       String  @map("tenant_id")
+  id             Int     @id @default(autoincrement())
+  tenantId       Int     @map("tenant_id")
   kpiGroup       String  @map("kpi_group")
   maxBreaches    Int     @map("max_breaches")
   achievementPct Decimal @map("achievement_pct") @db.Decimal(5, 2)
 
-  @@id([tenantId, kpiGroup, achievementPct])
-  @@map("config_kpi_target")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kpiGroup, achievementPct])
+  @@map("config_kpi_targets")
 }
 
 /// Append-only: `payload` is the state as it stood before the change, which is
 /// what a rollback restores.
 model Revision {
-  id        String   @id @db.Uuid
-  tenantId  String   @map("tenant_id")
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
   domain    String
   configKey String   @map("config_key")
   summary   String
@@ -103,6 +129,7 @@ model Revision {
   payload   Json?
   at        DateTime @default(now()) @db.Timestamptz()
 
-  @@index([tenantId, at(sort: Desc)])
-  @@map("config_revision")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("config_revisions")
 }

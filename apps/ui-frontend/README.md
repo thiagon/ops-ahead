@@ -26,10 +26,12 @@ npm run dev
 | Env | Meaning |
 |-----|---------|
 | `CLICKHOUSE_URL` | Whole connection in one URL, on the HTTP interface (`8123`) |
-| `TENANT_ID` | The single tenant the screens read |
 | `CONFIG_DATABASE_URL` | Postgres URL for the configuration registry this app owns |
 | `PUBLIC_GATEWAY_URL` | External webhook base shown on the integration screen |
 | `SERVICE_NAME` / `SERVICE_VERSION` | Reported by `/health` |
+
+The active tenant is a row in `config_tenants` (`slug` unique for URLs/ClickHouse,
+`name` for display), not an env var. Seed with `npm run db:seed`.
 
 ## Routes
 

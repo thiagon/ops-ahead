@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  clearTenantCache,
   ConflictError,
   createIntegration,
   getIntegration,
@@ -22,10 +23,15 @@ const { PrismaClient } = await import('@prisma/client');
 const prisma = new PrismaClient();
 
 beforeEach(async () => {
+  clearTenantCache();
   await prisma.revision.deleteMany();
   await prisma.origin.deleteMany();
   await prisma.deadline.deleteMany();
   await prisma.kpiTarget.deleteMany();
+  await prisma.tenant.deleteMany();
+  await prisma.tenant.create({
+    data: { slug: 'locaweb', name: 'Locaweb', active: true },
+  });
 });
 
 afterAll(async () => {
@@ -86,7 +92,7 @@ describe('mappings', () => {
     await upsertMapping('service_now', { field: 'condition', from: 'PROBLEM', to: 'firing' });
     const [entry] = (await getIntegration('service_now')).mappings.condition ?? [];
 
-    const after = await removeMapping('service_now', entry?.id ?? '');
+    const after = await removeMapping('service_now', entry?.id ?? 0);
 
     expect(after.mappings.condition ?? []).toHaveLength(0);
     expect((await listRevisions())[0]?.summary).toBe('PROBLEM removido de condition');
@@ -95,9 +101,7 @@ describe('mappings', () => {
   it('refuses to remove a mapping that is already gone', async () => {
     await anOrigin();
 
-    await expect(removeMapping('service_now', crypto.randomUUID())).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(removeMapping('service_now', 0)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
@@ -134,7 +138,7 @@ describe('rollback', () => {
     await replaceDeadlines([{ severity: 1, deadlineSeconds: 7200 }]);
 
     const [latest] = await listRevisions();
-    await rollback(latest?.id ?? '');
+    await rollback(latest?.id ?? 0);
 
     expect(await listDeadlines()).toEqual([
       { severity: 1, deadlineSeconds: 14400 },
@@ -158,7 +162,7 @@ describe('rollback', () => {
     // Creating an integration replaced nothing, so there is nothing to restore.
     const [creation] = await listRevisions();
 
-    await expect(rollback(creation?.id ?? '')).rejects.toBeInstanceOf(ConflictError);
+    await expect(rollback(creation?.id ?? 0)).rejects.toBeInstanceOf(ConflictError);
   });
 });
 

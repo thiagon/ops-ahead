@@ -7,11 +7,9 @@ describe('config', () => {
   it('reads the whole connection from a single URL', () => {
     const config = parseConfig({
       CLICKHOUSE_URL: 'http://ops_ahead:secret@clickhouse.data.svc.cluster.local:8123/ops_ahead',
-      TENANT_ID: 'locaweb',
     });
 
     expect(config.CLICKHOUSE_URL).toContain('clickhouse.data.svc.cluster.local:8123');
-    expect(config.TENANT_ID).toBe('locaweb');
   });
 
   it('rejects a CLICKHOUSE_URL that is not on the HTTP interface', () => {

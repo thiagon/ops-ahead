@@ -16,6 +16,7 @@ import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
 import {
   ConflictError,
+  currentTenant,
   getIntegration,
   NotFoundError,
   removeMapping,
@@ -75,6 +76,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   });
 
   const config = getConfig();
+  const tenant = await currentTenant();
   // The contract decides which fields exist and which of them translate; the
   // integration only says where each one is read.
   const bound = new Map(integration.bindings.map(binding => [binding.field, binding.path]));
@@ -101,7 +103,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       url: webhookUrl(
         config.PUBLIC_GATEWAY_URL,
         integration.envelopeVersion,
-        config.TENANT_ID,
+        tenant.slug,
         integration.source,
       ),
       fields,
@@ -137,7 +139,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     }
 
     if (intent === 'remove-mapping') {
-      await removeMapping(params.source, String(form.get('mappingId')));
+      await removeMapping(params.source, Number(form.get('mappingId')));
       return { secret: null, error: null };
     }
 
