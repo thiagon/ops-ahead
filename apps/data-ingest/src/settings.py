@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,6 +16,12 @@ class Settings(BaseSettings):
     # Already canonical (published by apps/data-deadline-tracker) — landed
     # straight into bronze_deadline_milestone, no translation involved.
     kafka_topic_milestone: str = "deadlines.milestone"
+    # Compacted — what this consumer rehydrates its configuration from. Each
+    # replica reads the whole log, so the group id is unique per boot.
+    kafka_topic_config_origin: str = "config.origin"
+    kafka_topic_config_dictionary: str = "config.dictionary"
+    kafka_topic_config_deadline: str = "config.deadline"
+    kafka_topic_config_kpi_target: str = "config.kpi-target"
     kafka_group_id: str = "events-ingest"
 
     clickhouse_host: str = "localhost"
@@ -32,7 +37,6 @@ class Settings(BaseSettings):
 
     # domain/acl/itsm.md#o-dicionário-de-tradução — outside code, versioned,
     # mounted read-only in the cluster.
-    dictionaries_dir: Path = Path(__file__).resolve().parent.parent / "dictionaries"
 
     batch_max_size: int = 1000
     batch_max_seconds: float = 5.0

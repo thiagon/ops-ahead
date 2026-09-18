@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 from clickhouse_driver import Client
 
 import metrics
+from bindings import BindingRegistry
 from dictionaries import DictionaryRegistry
 from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope, MilestoneEvent
 from settings import Settings
@@ -38,6 +39,17 @@ _CLICKHOUSE_INSERT_MILESTONE = """
     INSERT INTO bronze_deadline_milestone
     (event_id, tenant_id, source, external_id, entity_id, kind, severity, opened_at,
      acknowledged_at, due_at, deadline_seconds, consumed_ratio, occurred_at)
+    VALUES
+"""
+
+
+_CLICKHOUSE_INSERT_DEADLINE = """
+    INSERT INTO tenant_deadlines (tenant_id, severity, deadline_seconds, updated_at) VALUES
+"""
+
+_CLICKHOUSE_INSERT_KPI_TARGET = """
+    INSERT INTO tenant_kpi_targets
+    (tenant_id, kpi_group, max_breaches, achievement_pct, updated_at)
     VALUES
 """
 
@@ -128,9 +140,17 @@ class BatchWriter:
     before any interpretation, then each envelope is translated and the bronze
     row + the translated event are produced together."""
 
-    def __init__(self, settings: Settings, publisher: Publisher) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        publisher: Publisher,
+        dictionaries: DictionaryRegistry,
+        bindings: BindingRegistry,
+    ) -> None:
         self._settings = settings
         self._publisher = publisher
+        self._dictionaries = dictionaries
+        self._bindings = bindings
         self._ch = Client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_port,
@@ -145,22 +165,32 @@ class BatchWriter:
             aws_secret_access_key=settings.minio_secret_key,
         )
         self._bucket = settings.minio_bucket
-        self._dictionaries = DictionaryRegistry(settings.dictionaries_dir)
+
+    def replace_deadlines(self, rows: list[tuple]) -> None:
+        """Materializes one tenant's deadlines for the dbt models to join
+        against. ReplacingMergeTree keeps the latest row per key, so a
+        correction is an insert, never a delete-then-insert."""
+        if rows:
+            self._ch.execute(_CLICKHOUSE_INSERT_DEADLINE, rows)
+
+    def replace_kpi_targets(self, rows: list[tuple]) -> None:
+        if rows:
+            self._ch.execute(_CLICKHOUSE_INSERT_KPI_TARGET, rows)
 
     async def write(self, batch: list[EventEnvelope]) -> None:
-        # The body is gravado antes de qualquer interpretação: the lake write
-        # never depends on translation succeeding.
+        # The raw body reaches the lake before any interpretation: the lake
+        # write never depends on translation succeeding.
         self._write_lake(batch)
 
         alert_rows: list[tuple] = []
         monitor_rows: list[tuple] = []
         for envelope in batch:
             try:
-                bronze = translate(envelope, self._dictionaries)
+                bronze = translate(envelope, self._dictionaries, self._bindings)
             except UnknownSourceError:
                 metrics.translation_failures.labels(source=envelope.source, intake=envelope.intake).inc()
                 logger.warning(
-                    "no adapter/dictionary for tenant=%s source=%s intake=%s — event kept in the "
+                    "no configuration for tenant=%s source=%s intake=%s — event kept in the "
                     "lake, skipped for bronze",
                     envelope.tenant_id,
                     envelope.source,
