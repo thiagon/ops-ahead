@@ -1,0 +1,18 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: config-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ui-postgres.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: config-postgres
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+{{- end }}
