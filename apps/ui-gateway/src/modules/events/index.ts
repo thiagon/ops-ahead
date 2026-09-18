@@ -5,5 +5,5 @@ export default fp(
   async app => {
     registerIncidentRoutes(app);
   },
-  { name: 'incidents', dependencies: ['env', 'hmac', 'kafka', 'metrics'] },
+  { name: 'incidents', dependencies: ['env', 'hmac', 'kafka', 'metrics', 'origins'] },
 );

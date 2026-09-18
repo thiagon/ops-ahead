@@ -96,10 +96,10 @@ describe('POST /webhook/v1/locaweb/itsm', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('publishes the route in the openapi document', async () => {
+  it('publishes one parameterized ingest route, not one per origin', async () => {
     const res = await app.inject({ method: 'GET', url: '/docs/json' });
 
-    expect(res.json().paths[ROUTE]).toBeDefined();
+    expect(res.json().paths['/webhook/{version}/{tenant}/{source}']).toBeDefined();
   });
 
   it('documents the envelope published to the bus', async () => {

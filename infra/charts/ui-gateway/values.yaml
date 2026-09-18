@@ -23,6 +23,7 @@ gateway:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
     kafkaTopicRawAlert: events.raw.alert
     kafkaTopicRawMonitor: events.raw.monitor
+    kafkaTopicConfigOrigin: config.origin
     hmacEnabled: "true"
     httpsEnabled: "false"
     corsOrigins:

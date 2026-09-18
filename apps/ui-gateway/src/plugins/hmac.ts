@@ -1,8 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import type { FastifyError, FastifyInstance, preParsingAsyncHookHandler } from 'fastify';
+import type {
+  FastifyError,
+  FastifyInstance,
+  FastifyRequest,
+  preParsingAsyncHookHandler,
+} from 'fastify';
 import fp from 'fastify-plugin';
-import type { OriginCredential } from '../modules/events/sources/registry.ts';
+import type { OriginCredential } from './origin-registry.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';
@@ -11,7 +16,14 @@ const DEFAULT_BODY_LIMIT = 1024 * 1024;
 
 declare module 'fastify' {
   interface FastifyInstance {
-    verifySignatureFor: (credential: OriginCredential) => preParsingAsyncHookHandler;
+    /**
+     * `credential` is resolved per request: the accepted origins come from
+     * configuration, so which credential signs a request is known only once
+     * the URL is matched (see plugins/origin-registry.ts).
+     */
+    verifySignatureFor: (
+      resolve: (request: FastifyRequest) => OriginCredential | undefined,
+    ) => preParsingAsyncHookHandler;
   }
 }
 
@@ -57,8 +69,14 @@ function httpError(statusCode: number, name: string, message: string): FastifyEr
  * behalf, so a malformed body answers 401 instead of a parser error.
  */
 async function hmacPlugin(fastify: FastifyInstance) {
-  const verifySignatureFor = (credential: OriginCredential): preParsingAsyncHookHandler => {
+  const verifySignatureFor = (
+    resolve: (request: FastifyRequest) => OriginCredential | undefined,
+  ): preParsingAsyncHookHandler => {
     return async (request, _reply, payload) => {
+      const credential = resolve(request);
+      if (!credential) {
+        throw httpError(404, 'UnknownOrigin', 'no integration is configured for this address');
+      }
       if (!fastify.env.HMAC_ENABLED) return payload;
 
       const limit =

@@ -16,8 +16,8 @@ describe('envSchema', () => {
       KAFKA_BOOTSTRAP_SERVERS: 'localhost:9092',
       KAFKA_TOPIC_RAW_ALERT: 'events.raw.alert',
       KAFKA_TOPIC_RAW_MONITOR: 'events.raw.monitor',
+      KAFKA_TOPIC_CONFIG_ORIGIN: 'config.origin',
       HMAC_ENABLED: false,
-      HMAC_SECRET_LOCAWEB_ITSM: '',
     });
   });
 
@@ -46,11 +46,19 @@ describe('envSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects HMAC_ENABLED without a secret', () => {
-    const result = envSchema.safeParse({ HMAC_ENABLED: 'true' });
+  it("carries each origin's own secret, named after the origin", () => {
+    const result = envSchema.safeParse({
+      HMAC_ENABLED: 'true',
+      HMAC_SECRET_LOCAWEB_ITSM: 'sekret',
+    });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors.HMAC_SECRET_LOCAWEB_ITSM).toBeDefined();
+    // Which origins exist comes from configuration, so the set of secrets is
+    // not known at parse time and each is read by the name the registry
+    // resolved (plugins/origin-registry.ts).
+    expect(result.success).toBe(true);
+    expect((result.data as unknown as Record<string, string>).HMAC_SECRET_LOCAWEB_ITSM).toBe(
+      'sekret',
+    );
   });
 });
 

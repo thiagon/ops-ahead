@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildEnvelope } from '../../../../src/modules/events/service.ts';
-import type { OriginCredential } from '../../../../src/modules/events/sources/registry.ts';
+import type { OriginCredential } from '../../../../src/plugins/origin-registry.ts';
 
 const ITSM_CREDENTIAL: OriginCredential = {
   tenantId: 'locaweb',
