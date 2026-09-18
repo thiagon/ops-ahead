@@ -1,0 +1,23 @@
+[project]
+name = "ops-ahead-notify-slack"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "faststream[kafka]>=0.5",
+    "slack-sdk>=3.27",
+    "prometheus-client>=0.21",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+# The container entrypoint runs with src/ on PYTHONPATH (see Dockerfile), so
+# tests import the same way (`from formatting import ...`, not `from
+# src.formatting import ...`) — this has to point at the same root.
+pythonpath = ["src"]

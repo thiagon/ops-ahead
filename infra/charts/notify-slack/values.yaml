@@ -1,0 +1,31 @@
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+notify-slack:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/notify-slack
+    tag: latest
+    pullPolicy: IfNotPresent
+
+consumer:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  env:
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopic: events.alert
+    kafkaGroupId: notify-slack
+    # #toda-a-empresa-ops-ahead
+    slackChannelId: "C0C3K9ZHFQ8"
+  secretName: notify-slack-secret
+
+scaledObject:
+  pollingInterval: 15
+  cooldownPeriod: 300
+  lagThreshold: "20"
+  minReplicaCount: 0
+  maxReplicaCount: 3
