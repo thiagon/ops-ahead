@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "notify-slack.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "notify-slack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.consumer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "notify-slack.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "notify-slack.fullname" . }}
+        {{- include "notify-slack.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: consumer
+          image: "{{ (index .Values "notify-slack").image.repository }}:{{ (index .Values "notify-slack").image.tag }}"
+          imagePullPolicy: {{ (index .Values "notify-slack").image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.consumer.env.kafkaBootstrapServers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.consumer.env.kafkaTopic | quote }}
+            - name: KAFKA_GROUP_ID
+              value: {{ .Values.consumer.env.kafkaGroupId | quote }}
+            - name: SLACK_CHANNEL_ID
+              value: {{ .Values.consumer.env.slackChannelId | quote }}
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.consumer.secretName }}
+                  key: SLACK_BOT_TOKEN
+          resources:
+            {{- toYaml .Values.consumer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

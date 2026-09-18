@@ -1,0 +1,6 @@
+apiVersion: v2
+name: notify-slack
+description: Stateless Kafka consumer — posts an incident summary to Slack for every events.alert message (ns:data)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
