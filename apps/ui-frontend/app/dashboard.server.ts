@@ -59,11 +59,11 @@ export async function buildDashboard(options: BuildDashboardOptions): Promise<Da
 /** The dashboard as the route loader builds it, against the real dependencies. */
 export async function loadDashboard(): Promise<DashboardData> {
   return await buildDashboard({
-    fetchKpiAchievement: () => fetchKpiAchievement(),
-    fetchKpiProjection: () => fetchKpiProjection(),
-    fetchVolumeForecast: () => fetchVolumeForecast(),
-    fetchCategoryTrends: () => fetchCategoryTrends(),
-    fetchGroupLoad: () => fetchGroupLoad(),
-    fetchNoisyEntities: () => fetchNoisyEntities(),
+    fetchKpiAchievement: () => fetchKpiAchievement().catch(() => []),
+    fetchKpiProjection: () => fetchKpiProjection().catch(() => []),
+    fetchVolumeForecast: () => fetchVolumeForecast().catch(() => []),
+    fetchCategoryTrends: () => fetchCategoryTrends().catch(() => []),
+    fetchGroupLoad: () => fetchGroupLoad().catch(() => []),
+    fetchNoisyEntities: () => fetchNoisyEntities().catch(() => []),
   });
 }

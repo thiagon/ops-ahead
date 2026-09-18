@@ -99,6 +99,21 @@ describe('KPI achievement panel', () => {
     expect(dashboard.kpiAchievement.map(row => row.kpi_group)).toEqual(['p1_p2', 'p3']);
   });
 
+  it('keeps the rest of the dashboard when one panel has nothing to show', async () => {
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [kpiAchievementRow()],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [categoryTrendRow()],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+    });
+
+    expect(dashboard.kpiAchievement).toHaveLength(1);
+    expect(dashboard.kpiProjection).toEqual([]);
+    expect(dashboard.categoryTrends).toHaveLength(1);
+  });
+
   it('never collapses p1_p2 and p3 into one severity bucket', async () => {
     const dashboard = await buildDashboard({
       fetchKpiAchievement: async () => [

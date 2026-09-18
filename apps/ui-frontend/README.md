@@ -17,7 +17,7 @@ docker run --rm -d --name ui-frontend-config-pg \
 
 npm install
 npm run db:migrate
-npm run db:seed   # optional: locaweb/itsm as the pipeline runs today
+npm run db:seed   # optional: locaweb/service_now as Monitor
 npm run dev
 ```
 
@@ -30,15 +30,13 @@ npm run dev
 | `PUBLIC_GATEWAY_URL` | External webhook base shown on the integration screen |
 | `SERVICE_NAME` / `SERVICE_VERSION` | Reported by `/health` |
 
-The active tenant is a row in `config_tenants` (`slug` unique for URLs/ClickHouse,
-`name` for display), not an env var. Seed with `npm run db:seed`.
-
 ## Routes
 
-- `/` — Painel N1/N2
-- `/painel-gestor` — visão tática
-- `/fila` — fila priorizada
-- `/integracoes` · `/integracoes/:source` · `/metas-e-prazos` — Ajustes (config registry)
+- `/` — enter tenant slug
+- `/:tenant` — N1/N2 panel
+- `/:tenant/manager` — tactical view
+- `/:tenant/queue` — prioritized queue
+- `/:tenant/integrations` · `/:tenant/integrations/:source` · `/:tenant/targets` · `/:tenant/deadlines` — Ajustes
 - `/health` — status, service, version, uptime
 - `/metrics` — Prometheus text format
 

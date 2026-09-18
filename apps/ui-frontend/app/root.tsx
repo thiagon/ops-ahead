@@ -1,25 +1,8 @@
 import type { ReactNode } from 'react';
-import {
-  isRouteErrorResponse,
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useRouteLoaderData,
-} from 'react-router';
+import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import type { Route } from './+types/root';
-import { fetchOpenAlertCount } from './clickhouse.server.ts';
-import { Sidebar } from './components/Sidebar';
+import { useHydrateSession } from './session';
 import './app.css';
-
-/**
- * Only what the chrome around every screen needs. A failure here would take
- * down every route, so the badge is dropped rather than propagated.
- */
-export async function loader() {
-  return { openCount: await fetchOpenAlertCount().catch(() => null) };
-}
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -39,27 +22,9 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * `useRouteLoaderData` instead of the component's own `loaderData`: an error
- * thrown before the loaders run leaves the root without data, and the chrome
- * still renders around the boundary.
- */
-function useOpenCount(): number | null {
-  const data = useRouteLoaderData<typeof loader>('root');
-  return data?.openCount ?? null;
-}
-
 export default function App() {
-  const openCount = useOpenCount();
-
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar openCount={openCount} />
-      <div className="min-w-0 flex-1">
-        <Outlet />
-      </div>
-    </div>
-  );
+  useHydrateSession();
+  return <Outlet />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -72,8 +37,13 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     details =
       error.status === 404 ? 'A página solicitada não existe.' : error.statusText || details;
   } else if (import.meta.env.DEV && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
+    // Registry / Prisma messages name tables and files — they stay in the
+    // server log. The screen only says something failed.
+    const fromRegistry = /PrismaClient|Invalid `|Error converting field/i.test(error.message);
+    if (!fromRegistry) {
+      details = error.message;
+      stack = error.stack;
+    }
   }
 
   return (

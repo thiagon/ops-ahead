@@ -41,28 +41,23 @@ function formatSignalValue(key: keyof BreachSignals, value: number): string {
 }
 
 /**
- * The three sources the breach context is assembled from — named the way the
- * gold marts that answer them are, so the operator can trace a signal back to
- * the query that produced it.
+ * The three sources the breach context is assembled from, named the way the
+ * operator talks about them — never the mart that answered the query.
  */
 const SIGNAL_GROUPS: Array<{
-  source: string;
-  args: (row: QueueRow) => string;
+  label: string;
   keys: Array<keyof BreachSignals>;
 }> = [
   {
-    source: 'gold_monitor_signal_counts',
-    args: row => `entidade=${row.entity_id ?? '—'}`,
+    label: 'Recurso',
     keys: ['entity_signal_count_15m', 'entity_signal_count_1h', 'entity_severity_escalations'],
   },
   {
-    source: 'group_load_by_window',
-    args: row => `grupo=${row.owner || '—'}`,
+    label: 'Grupo',
     keys: ['group_load', 'no_intervention_count_1h', 'no_intervention_count_6h'],
   },
   {
-    source: 'gold_alert_breach_consolidation',
-    args: row => `grupo=${row.owner || '—'}, severidade=${row.severity}`,
+    label: 'Histórico',
     keys: [
       'group_severity_historical_ola_ratio',
       'entity_auto_resolution_rate',
@@ -71,7 +66,7 @@ const SIGNAL_GROUPS: Array<{
   },
 ];
 
-function BreachSignalsGrid({ row, signals }: { row: QueueRow; signals: BreachSignals | null }) {
+function BreachSignalsGrid({ signals }: { signals: BreachSignals | null }) {
   if (!signals) {
     return (
       <p className="text-text-muted text-sm">
@@ -84,19 +79,17 @@ function BreachSignalsGrid({ row, signals }: { row: QueueRow; signals: BreachSig
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {SIGNAL_GROUPS.map(group => (
         <div
-          key={group.source}
+          key={group.label}
           className="flex items-start justify-between gap-2 rounded-lg border border-border-base p-3 text-xs"
         >
           <div className="min-w-0">
-            <div className="break-words font-semibold text-text-light">
-              {group.source}({group.args(row)})
-            </div>
+            <div className="font-semibold text-text-light">{group.label}</div>
             <ul className="mt-1.5 space-y-1 text-text-muted">
               {group.keys.map(key => {
                 const value = signals[key];
                 return (
                   <li key={key}>
-                    → {SIGNAL_LABEL[key]}:{' '}
+                    {SIGNAL_LABEL[key]}:{' '}
                     <span className="font-semibold text-text-light">
                       {value === null ? 'sem histórico' : formatSignalValue(key, value)}
                     </span>
@@ -112,7 +105,7 @@ function BreachSignalsGrid({ row, signals }: { row: QueueRow; signals: BreachSig
   );
 }
 
-function SimilarIncidentsTable({ rows }: { rows: SimilarIncidentRow[] }) {
+function SimilarIncidentsList({ rows }: { rows: SimilarIncidentRow[] }) {
   if (rows.length === 0) {
     return (
       <p className="text-text-muted text-sm">
@@ -122,34 +115,25 @@ function SimilarIncidentsTable({ rows }: { rows: SimilarIncidentRow[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border-base">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-white/[0.03] text-left text-text-muted">
-            <th className="px-3 py-2 font-medium">Ocorrência</th>
-            <th className="px-3 py-2 font-medium">Título</th>
-            <th className="px-3 py-2 font-medium">Grupo</th>
-            <th className="px-3 py-2 font-medium">Resolvida em</th>
-            <th className="px-3 py-2 text-right font-medium">Estourou</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(row => (
-            <tr key={`${row.source}/${row.external_id}`} className="border-border-base border-t">
-              <td className="px-3 py-2 text-text-light">{row.external_id}</td>
-              <td className="max-w-xs truncate px-3 py-2 text-text-light" title={row.title}>
-                {row.title || '—'}
-              </td>
-              <td className="px-3 py-2 text-text-muted">{row.owner || '—'}</td>
-              <td className="px-3 py-2 text-text-muted">{formatRemaining(row.duration_seconds)}</td>
-              <td className="px-3 py-2 text-right">
-                {row.has_breached ? <Badge tone="red">sim</Badge> : <Badge tone="green">não</Badge>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="divide-y divide-border-base rounded-lg border border-border-base">
+      {rows.map(row => (
+        <li
+          key={`${row.source}/${row.external_id}`}
+          className="flex flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm text-text-light">{row.title || row.external_id}</p>
+            <p className="text-text-dim text-xs">
+              {row.external_id} · {row.owner || 'sem grupo'}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 text-xs">
+            <span className="text-text-muted">{formatRemaining(row.duration_seconds)}</span>
+            {row.has_breached ? <Badge tone="red">estourou</Badge> : <Badge tone="green">no prazo</Badge>}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -229,7 +213,7 @@ export function DrillDown({
         <div>
           <h3 className="mb-3 flex items-center gap-1.5 text-text-muted text-xs uppercase tracking-wide">
             SHAP — top 5 fatores
-            <span title="Contribuição de cada feature para o score deste caso, vinda do ml-model-serving">
+            <span title="Contribuição de cada fator para o score deste caso">
               <InfoIcon className="h-3.5 w-3.5" />
             </span>
           </h3>
@@ -261,7 +245,7 @@ export function DrillDown({
             </div>
           ) : (
             <p className="text-text-muted text-sm">
-              ml-model-serving não respondeu para esta ocorrência.
+              Score indisponível para esta ocorrência.
             </p>
           )}
         </div>
@@ -273,7 +257,7 @@ export function DrillDown({
         <h3 className="mb-3 text-text-muted text-xs uppercase tracking-wide">
           Sinais considerados no score
         </h3>
-        <BreachSignalsGrid row={row} signals={row.breach_signals} />
+        <BreachSignalsGrid signals={row.breach_signals} />
       </div>
 
       <div>
@@ -285,7 +269,7 @@ export function DrillDown({
             <span className="text-text-muted text-xs">{similarIncidents.length} encontradas</span>
           )}
         </div>
-        <SimilarIncidentsTable rows={similarIncidents} />
+        <SimilarIncidentsList rows={similarIncidents} />
       </div>
     </Panel>
   );

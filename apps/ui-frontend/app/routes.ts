@@ -1,14 +1,20 @@
 import { index, type RouteConfig, route } from '@react-router/dev/routes';
 
 export default [
-  index('routes/painel.tsx'),
-  route('painel-gestor', 'routes/gestor.tsx'),
-  route('fila', 'routes/queue.tsx'),
-  route('integracoes', 'routes/integrations.tsx'),
-  route('integracoes/:source', 'routes/integration-detail.tsx'),
-  route('metas-e-prazos', 'routes/targets.tsx'),
-  route('ocorrencias/:source/:externalId', 'routes/occurrence.tsx'),
-  route('ocorrencias/:source/:externalId/detalhe', 'routes/occurrence-detail.ts'),
+  index('routes/home.tsx'),
   route('health', 'routes/health.ts'),
   route('metrics', 'routes/metrics.ts'),
+  route(':tenant', 'routes/tenant.tsx', [
+    index('routes/painel.tsx'),
+    route('manager', 'routes/gestor.tsx'),
+    route('queue', 'routes/queue.tsx'),
+    route('integrations', 'routes/integrations.tsx'),
+    route('integrations/:source', 'routes/integration-detail.tsx'),
+    route('targets', 'routes/targets.tsx'),
+    route('deadlines', 'routes/deadlines.tsx'),
+    route('metas', 'routes/metas.tsx'),
+    route('prazos', 'routes/prazos.tsx'),
+    route('occurrences/:source/:externalId', 'routes/occurrence.tsx'),
+    route('occurrences/:source/:externalId/detail', 'routes/occurrence-detail.ts'),
+  ]),
 ] satisfies RouteConfig;

@@ -7,4 +7,10 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  ssr: {
+    external: ['@prisma/client'],
+  },
+  optimizeDeps: {
+    exclude: ['@prisma/client'],
+  },
 });

@@ -22,8 +22,8 @@ export function classify(error: unknown): { kind: Kind; status?: number } {
   // spellings must land on the same wording or hydration mismatches.
   if (
     error instanceof Error &&
-    /fetch failed|ECONNREFUSED|ENOTFOUND|timeout|aborted/i.test(
-      `${error.message} ${(error.cause as Error | undefined)?.message ?? ''}`,
+    /fetch failed|ECONNREFUSED|ENOTFOUND|timeout|aborted|PrismaClient|Invalid `|Error converting field/i.test(
+      `${error.message} ${(error.cause as Error | undefined)?.message ?? ''} ${error.name}`,
     )
   ) {
     return { kind: 'unavailable' };

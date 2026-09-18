@@ -51,16 +51,19 @@ export function GhostButton({
   children,
   onClick,
   tone = 'neutral',
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   tone?: 'neutral' | 'danger';
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-9 items-center gap-2 rounded-lg border border-border-base px-3 font-medium text-sm transition-colors ${
+      disabled={disabled}
+      className={`flex h-9 items-center gap-2 rounded-lg border border-border-base px-3 font-medium text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         tone === 'danger'
           ? 'text-text-muted hover:border-accent-red/40 hover:bg-accent-red/10 hover:text-accent-red'
           : 'text-text-muted hover:bg-white/[0.04] hover:text-text-light'
@@ -85,12 +88,16 @@ export function PrimaryButton({ children }: { children: React.ReactNode }) {
 export function SubmitButton({
   children,
   pending = false,
+  pendingLabel = 'Publicando…',
+  disabled = false,
   name,
   value,
   form,
 }: {
   children: React.ReactNode;
   pending?: boolean;
+  pendingLabel?: string;
+  disabled?: boolean;
   name?: string;
   value?: string;
   /** Submits a form it sits outside of, e.g. a header action. */
@@ -102,10 +109,10 @@ export function SubmitButton({
       form={form}
       name={name}
       value={value}
-      disabled={pending}
-      className="flex h-9 items-center gap-2 rounded-lg bg-accent-red px-4 font-semibold text-sm text-text-light transition-opacity hover:opacity-90 disabled:opacity-50"
+      disabled={pending || disabled}
+      className="flex h-9 items-center gap-2 rounded-lg bg-accent-red px-4 font-semibold text-sm text-text-light transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {pending ? 'Publicando…' : children}
+      {pending ? pendingLabel : children}
     </button>
   );
 }
@@ -117,12 +124,14 @@ export function GhostSubmit({
   value,
   tone = 'neutral',
   label,
+  disabled = false,
 }: {
   children: React.ReactNode;
   name?: string;
   value?: string;
   tone?: 'neutral' | 'danger';
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -130,7 +139,8 @@ export function GhostSubmit({
       name={name}
       value={value}
       aria-label={label}
-      className={`flex h-9 items-center gap-2 rounded-lg border border-border-base px-3 font-medium text-sm transition-colors ${
+      disabled={disabled}
+      className={`flex h-9 items-center gap-2 rounded-lg border border-border-base px-3 font-medium text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         tone === 'danger'
           ? 'text-text-muted hover:border-accent-red/40 hover:bg-accent-red/10 hover:text-accent-red'
           : 'text-text-muted hover:bg-white/[0.04] hover:text-text-light'

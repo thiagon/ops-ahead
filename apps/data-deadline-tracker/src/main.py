@@ -63,10 +63,12 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         metrics.open_occurrences.set(len(tracker))
         logger.info("reconstructed %d open occurrences", len(tracker))
 
+        # The deadlines stay current on their own: the config.deadline
+        # consumer applies every change as it arrives, so the tick only has to
+        # cross the thresholds that time alone made due.
         async def _tick() -> None:
             while True:
                 await asyncio.sleep(settings.tick_seconds)
-                deadlines.refresh(client)
                 await _publish(tracker.check(datetime.now(timezone.utc)))
 
         asyncio.create_task(_tick())

@@ -9,7 +9,9 @@ import { Badge, severityTone } from '~/components/Badge';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
+import { withTenant } from '~/features/config/repo.server.ts';
 import { predictBreach } from '~/model-serving.server.ts';
+import { queuePath, useTenantSlug } from '~/paths';
 import { buildQueue } from '~/queue.server.ts';
 import {
   formatRatio,
@@ -25,36 +27,38 @@ export function meta({ params }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-  const { source, externalId } = params;
-  const alert = await fetchOpenAlert(source, externalId);
-  if (!alert) {
-    throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
-  }
+  return withTenant(params.tenant, async () => {
+    const { source, externalId } = params;
+    const alert = await fetchOpenAlert(source, externalId);
+    if (!alert) {
+      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
+    }
 
-  const [milestones, severityHistory, context] = await Promise.all([
-    fetchMilestones(source, externalId),
-    fetchSeverityHistory(source, externalId),
-    fetchBreachContext().catch(() => ({})),
-  ]);
+    const [milestones, severityHistory, context] = await Promise.all([
+      fetchMilestones(source, externalId),
+      fetchSeverityHistory(source, externalId),
+      fetchBreachContext().catch(() => ({})),
+    ]);
 
-  // Same fail-open path as the queue, over this one row.
-  const [occurrence] = await buildQueue({
-    query: async () => [alert],
-    score: predictBreach,
-    context,
+    // Same fail-open path as the queue, over this one row.
+    const [occurrence] = await buildQueue({
+      query: async () => [alert],
+      score: predictBreach,
+      context,
+    });
+
+    if (!occurrence) {
+      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
+    }
+
+    return {
+      occurrence,
+      entityId: alert.entity_id,
+      acknowledgedAt: alert.acknowledged_at,
+      milestones,
+      severityHistory,
+    };
   });
-
-  if (!occurrence) {
-    throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
-  }
-
-  return {
-    occurrence,
-    entityId: alert.entity_id,
-    acknowledgedAt: alert.acknowledged_at,
-    milestones,
-    severityHistory,
-  };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -68,13 +72,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function Occurrence({ loaderData }: Route.ComponentProps) {
   const { occurrence, entityId, acknowledgedAt, milestones, severityHistory } = loaderData;
+  const tenant = useTenantSlug();
   const color = riskColor(occurrence.consumed_ratio);
 
   return (
     <main className="max-w-4xl px-8 py-6">
       <PageHeader
         breadcrumb={
-          <Link to="/fila" className="text-sm text-text-muted hover:text-text-light">
+          <Link to={queuePath(tenant)} className="text-sm text-text-muted hover:text-text-light">
             ← Fila de ocorrências
           </Link>
         }
@@ -196,5 +201,5 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  return <RouteError error={error} title="Ocorrência" service="O banco de dados" />;
+  return <RouteError error={error} title="Ocorrência" service="A ocorrência" />;
 }

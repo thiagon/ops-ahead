@@ -4,6 +4,7 @@ import {
   ConflictError,
   createIntegration,
   getIntegration,
+  getTenantBySlug,
   listDeadlines,
   listIntegrations,
   listRevisions,
@@ -30,7 +31,7 @@ beforeEach(async () => {
   await prisma.kpiTarget.deleteMany();
   await prisma.tenant.deleteMany();
   await prisma.tenant.create({
-    data: { slug: 'locaweb', name: 'Locaweb', active: true },
+    data: { slug: 'locaweb', name: 'Locaweb', status: 'active' },
   });
 });
 
@@ -56,7 +57,8 @@ describe('createIntegration', () => {
   it('starts the dictionary as a draft, since nothing is mapped yet', async () => {
     const { integration } = await anOrigin();
 
-    expect(integration.dictionaryStatus).toBe('draft');
+    expect(integration.dictionaryStatus).toBe('inactive');
+    expect(integration.lifecycle).toBe('inactive');
     expect(integration.mappings).toEqual({});
   });
 
@@ -121,11 +123,11 @@ describe('bindings', () => {
 
   it('marks the dictionary published — that is what Publicar commits', async () => {
     await anOrigin();
-    expect((await getIntegration('service_now')).dictionaryStatus).toBe('draft');
+    expect((await getIntegration('service_now')).dictionaryStatus).toBe('inactive');
 
     await updateBindings('service_now', [{ field: 'external_id', path: 'event.id' }]);
 
-    expect((await getIntegration('service_now')).dictionaryStatus).toBe('published');
+    expect((await getIntegration('service_now')).dictionaryStatus).toBe('active');
   });
 });
 
@@ -166,15 +168,25 @@ describe('rollback', () => {
   });
 });
 
+describe('getTenantBySlug', () => {
+  it('finds the tenant by slug and answers null for an unknown one', async () => {
+    expect(await getTenantBySlug('locaweb')).toMatchObject({ slug: 'locaweb', name: 'Locaweb' });
+    expect(await getTenantBySlug('nao-existe')).toBeNull();
+  });
+});
+
 describe('listIntegrations', () => {
-  it('embeds bindings and mappings, so one integration is one read', async () => {
+  it('returns origin rows without the dictionary, so the list stays cheap', async () => {
     await anOrigin();
     await updateBindings('service_now', [{ field: 'external_id', path: 'event.id' }]);
     await upsertMapping('service_now', { field: 'condition', from: 'PROBLEM', to: 'firing' });
 
     const [integration] = await listIntegrations();
 
-    expect(integration?.bindings).toHaveLength(1);
-    expect(integration?.mappings.condition).toHaveLength(1);
+    expect(integration).toEqual({
+      source: 'service_now',
+      intake: 'monitor',
+      lifecycle: 'inactive',
+    });
   });
 });

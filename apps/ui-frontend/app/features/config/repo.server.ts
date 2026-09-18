@@ -1,13 +1,17 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaClient } from '@prisma/client';
 import { getConfig } from '~/config.server.ts';
-import type {
-  ConfigDomain,
-  Deadline,
-  FieldBinding,
-  Intake,
-  KpiTarget,
-  MappingEntry,
-  MappingField,
+import {
+  type ConfigDomain,
+  type Deadline,
+  type FieldBinding,
+  type Intake,
+  isIntegrationReady,
+  type KpiTarget,
+  kpiGroupKey,
+  type MappingEntry,
+  type MappingField,
+  type Status,
 } from './types.ts';
 
 /**
@@ -30,15 +34,23 @@ function db(): PrismaClient {
   return cached;
 }
 
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    void cached?.$disconnect();
+    cached = undefined;
+  });
+}
+
 /** An integration as the screens read it — the origin plus what it maps. */
 export interface Integration {
   source: string;
   intake: Intake;
   envelopeVersion: string;
   secretCreatedAt: string | null;
+  lifecycle: Status;
   enabled: boolean;
   dictionaryVersion: string | null;
-  dictionaryStatus: 'published' | 'draft' | null;
+  dictionaryStatus: Status | null;
   bindings: FieldBinding[];
   mappings: Partial<Record<MappingField, MappingEntry[]>>;
 }
@@ -64,28 +76,52 @@ export class MisconfiguredError extends Error {
   }
 }
 
-/** The active tenant — numeric id for FKs, slug for URLs and ClickHouse. */
+/** The tenant in scope — numeric id for FKs, slug for URLs and ClickHouse. */
 export type ActiveTenant = {
   id: number;
   slug: string;
   name: string;
 };
 
+const tenantStore = new AsyncLocalStorage<ActiveTenant>();
+
 let cachedTenant: ActiveTenant | undefined;
 
-/** Clears the in-process cache — tests reseeding the active tenant need it. */
+/** Clears the in-process cache — tests reseeding the fallback tenant need it. */
 export function clearTenantCache(): void {
   cachedTenant = undefined;
 }
 
+export async function getTenantBySlug(slug: string): Promise<ActiveTenant | null> {
+  const row = await db().tenant.findUnique({ where: { slug } });
+  if (!row) return null;
+  return { id: row.id, slug: row.slug, name: row.name };
+}
+
 /**
- * Until login scopes a session, the screens serve the one active tenant row.
- * Creating tenants is a platform act; the slug is what URLs and ClickHouse use.
+ * Binds this async chain to a tenant looked up by URL slug. Nested loaders
+ * run in parallel, so every loader/action that reads tenant-scoped data
+ * must call this itself — a parent loader cannot leak the store downward.
+ */
+export async function withTenant<T>(slug: string, fn: () => Promise<T>): Promise<T> {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) {
+    throw new Response('Cliente não encontrado', { status: 404 });
+  }
+  return tenantStore.run(tenant, fn);
+}
+
+/**
+ * The tenant bound by `withTenant`. Tests that are not behind a URL fall
+ * back to the one `status = active` row, the same bootstrap the seed marks.
  */
 export async function currentTenant(): Promise<ActiveTenant> {
+  const fromStore = tenantStore.getStore();
+  if (fromStore) return fromStore;
+
   if (cachedTenant) return cachedTenant;
 
-  const row = await db().tenant.findFirst({ where: { active: true } });
+  const row = await db().tenant.findFirst({ where: { status: 'active' } });
   if (!row) {
     throw new MisconfiguredError(
       'Nenhum tenant ativo no cadastro — rode o seed ou marque um como active.',
@@ -106,11 +142,11 @@ const AUTHOR = 'anonymous';
 type OriginWithRelations = {
   id: number;
   source: string;
-  intake: string;
+  intake: Intake;
   envelopeVersion: string;
   secretCreatedAt: Date | null;
-  enabled: boolean;
-  dictionary: { version: string; status: string } | null;
+  status: Status;
+  dictionary: { version: string; status: Status } | null;
   bindings: { field: string; path: string | null }[];
   mappings: { id: number; mappingField: string; fromValue: string; toValue: string }[];
 };
@@ -118,12 +154,13 @@ type OriginWithRelations = {
 function compose(origin: OriginWithRelations): Integration {
   return {
     source: origin.source,
-    intake: origin.intake as Intake,
+    intake: origin.intake,
     envelopeVersion: origin.envelopeVersion,
     secretCreatedAt: origin.secretCreatedAt?.toISOString() ?? null,
-    enabled: origin.enabled,
+    lifecycle: origin.status,
+    enabled: origin.status === 'active',
     dictionaryVersion: origin.dictionary?.version ?? null,
-    dictionaryStatus: (origin.dictionary?.status as 'published' | 'draft') ?? null,
+    dictionaryStatus: origin.dictionary?.status ?? null,
     bindings: origin.bindings.map(({ field, path }) => ({ field, path })),
     mappings: origin.mappings.reduce<Integration['mappings']>((acc, mapping) => {
       const field = mapping.mappingField as MappingField;
@@ -139,8 +176,11 @@ function compose(origin: OriginWithRelations): Integration {
 function withRelations() {
   return {
     dictionary: true,
-    bindings: { orderBy: { field: 'asc' as const } },
-    mappings: { orderBy: [{ mappingField: 'asc' as const }, { fromValue: 'asc' as const }] },
+    bindings: { where: { status: 'active' }, orderBy: { field: 'asc' as const } },
+    mappings: {
+      where: { status: 'active' },
+      orderBy: [{ mappingField: 'asc' as const }, { fromValue: 'asc' as const }],
+    },
   };
 }
 
@@ -153,13 +193,24 @@ async function originRow(source: string) {
   return origin;
 }
 
-export async function listIntegrations(): Promise<Integration[]> {
+/** List row — origin only. Completeness lives in `lifecycle`, not in the dictionary. */
+export interface IntegrationListItem {
+  source: string;
+  intake: Intake;
+  lifecycle: Status;
+}
+
+export async function listIntegrations(): Promise<IntegrationListItem[]> {
   const origins = await db().origin.findMany({
-    where: { tenantId: await activeTenantId() },
-    include: withRelations(),
+    where: { tenantId: await activeTenantId(), status: { not: 'archived' } },
+    select: { source: true, intake: true, status: true },
     orderBy: { source: 'asc' },
   });
-  return origins.map(compose);
+  return origins.map(row => ({
+    source: row.source,
+    intake: row.intake,
+    lifecycle: row.status,
+  }));
 }
 
 export async function getIntegration(source: string): Promise<Integration> {
@@ -168,7 +219,7 @@ export async function getIntegration(source: string): Promise<Integration> {
 
 export async function listDeadlines(): Promise<Deadline[]> {
   const rows = await db().deadline.findMany({
-    where: { tenantId: await activeTenantId() },
+    where: { tenantId: await activeTenantId(), status: 'active' },
     orderBy: { severity: 'asc' },
   });
   return rows.map(row => ({ severity: row.severity, deadlineSeconds: row.deadlineSeconds }));
@@ -176,39 +227,49 @@ export async function listDeadlines(): Promise<Deadline[]> {
 
 export async function listKpiTargets(): Promise<KpiTarget[]> {
   const rows = await db().kpiTarget.findMany({
-    where: { tenantId: await activeTenantId() },
-    orderBy: [{ kpiGroup: 'asc' }, { achievementPct: 'desc' }],
+    where: { tenantId: await activeTenantId(), status: 'active' },
+    orderBy: { achievementPct: 'desc' },
   });
-  return rows.map(row => ({
-    kpiGroup: row.kpiGroup,
-    maxBreaches: row.maxBreaches,
-    achievementPct: Number(row.achievementPct),
-  }));
+  return rows
+    .map(row => ({
+      severities: row.severities,
+      maxBreaches: row.maxBreaches,
+      achievementPct: Number(row.achievementPct),
+    }))
+    .sort((a, b) => {
+      const byGroup = kpiGroupKey(a.severities).localeCompare(kpiGroupKey(b.severities));
+      if (byGroup !== 0) return byGroup;
+      return b.achievementPct - a.achievementPct;
+    });
 }
 
 export interface Revision {
   id: number;
   domain: ConfigDomain;
   summary: string;
-  author: string;
   at: string;
   /** Whether there is a prior state to restore — a creation replaced nothing. */
   revertible: boolean;
+  /** The state as it stood before the change. The screen loads this; Publicar writes it. */
+  payload: unknown;
 }
 
-export async function listRevisions(): Promise<Revision[]> {
+export async function listRevisions(domains?: readonly ConfigDomain[]): Promise<Revision[]> {
   const rows = await db().revision.findMany({
-    where: { tenantId: await activeTenantId() },
-    orderBy: { at: 'desc' },
+    where: {
+      tenantId: await activeTenantId(),
+      ...(domains?.length ? { domain: { in: [...domains] } } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
     take: 50,
   });
   return rows.map(row => ({
     id: row.id,
     domain: row.domain as ConfigDomain,
     summary: row.summary,
-    author: row.author,
-    at: row.at.toISOString(),
+    at: row.createdAt.toISOString(),
     revertible: row.payload !== null && row.domain !== 'dictionary',
+    payload: row.payload,
   }));
 }
 
@@ -264,9 +325,9 @@ export async function createIntegration(input: {
       source: input.source,
       intake: input.intake,
       envelopeVersion: input.envelopeVersion,
-      enabled: true,
+      status: 'inactive',
       secretCreatedAt: new Date(),
-      dictionary: { create: { version: 'v1', status: 'draft' } },
+      dictionary: { create: { version: 'v1', status: 'inactive' } },
     },
   });
 
@@ -287,6 +348,49 @@ export async function rotateSecret(source: string): Promise<string> {
   return generateSecret();
 }
 
+/** Inactive stays in the list; archived leaves it. Rows are never deleted. */
+export async function setOriginStatus(
+  source: string,
+  status: Status,
+): Promise<Integration> {
+  const origin = await originRow(source);
+  if (origin.status === status) return compose(origin);
+  if (status === 'active' && !isIntegrationReady(compose(origin))) {
+    throw new ConflictError(
+      'A integração só ativa quando todos os campos obrigatórios e os valores do vocabulário estão configurados.',
+    );
+  }
+
+  await db().origin.update({
+    where: { id: origin.id },
+    data: { status },
+  });
+  const summary =
+    status === 'active'
+      ? `Integração ${source} ativada`
+      : status === 'inactive'
+        ? `Integração ${source} inativada`
+        : `Integração ${source} arquivada`;
+  await recordRevision('origin', source, summary, { status: origin.status });
+  return await getIntegration(source);
+}
+
+async function demoteIfIncomplete(source: string): Promise<Integration> {
+  const origin = await originRow(source);
+  const integration = compose(origin);
+  if (origin.status !== 'active' || isIntegrationReady(integration)) {
+    return integration;
+  }
+  await db().origin.update({
+    where: { id: origin.id },
+    data: { status: 'inactive' },
+  });
+  await recordRevision('origin', source, `Integração ${source} inativada`, {
+    status: origin.status,
+  });
+  return compose({ ...origin, status: 'inactive' });
+}
+
 export async function updateBindings(
   source: string,
   bindings: readonly FieldBinding[],
@@ -294,26 +398,35 @@ export async function updateBindings(
   const previous = await getIntegration(source);
   const origin = await originRow(source);
 
-  await db().$transaction([
-    db().fieldBinding.deleteMany({ where: { originId: origin.id } }),
-    db().fieldBinding.createMany({
-      data: bindings.map(binding => ({
-        originId: origin.id,
-        field: binding.field,
-        path: binding.path,
-      })),
-    }),
+  await db().$transaction(async tx => {
+    const fields = bindings.map(binding => binding.field);
+    await tx.fieldBinding.updateMany({
+      where: { originId: origin.id, field: { notIn: fields } },
+      data: { status: 'inactive' },
+    });
+    for (const binding of bindings) {
+      await tx.fieldBinding.upsert({
+        where: { originId_field: { originId: origin.id, field: binding.field } },
+        update: { path: binding.path, status: 'active' },
+        create: {
+          originId: origin.id,
+          field: binding.field,
+          path: binding.path,
+          status: 'active',
+        },
+      });
+    }
     // The screen's "Publicar" is this write — draft stays until the customer
     // commits the field paths (and whatever mappings they already added).
-    db().dictionaryVersion.upsert({
+    await tx.dictionaryVersion.upsert({
       where: { originId: origin.id },
-      update: { status: 'published' },
-      create: { originId: origin.id, version: 'v1', status: 'published' },
-    }),
-  ]);
+      update: { status: 'active' },
+      create: { originId: origin.id, version: 'v1', status: 'active' },
+    });
+  });
 
   await recordRevision('origin', source, `Campos de ${source} atualizados`, previous.bindings);
-  return await getIntegration(source);
+  return await demoteIfIncomplete(source);
 }
 
 export async function upsertMapping(
@@ -330,27 +443,31 @@ export async function upsertMapping(
         fromValue: input.from,
       },
     },
-    update: { toValue: input.to },
+    update: { toValue: input.to, status: 'active' },
     create: {
       originId: origin.id,
       mappingField: input.field,
       fromValue: input.from,
       toValue: input.to,
+      status: 'active',
     },
   });
 
   await recordRevision('dictionary', source, `${input.from} → ${input.to} em ${input.field}`, null);
-  return await getIntegration(source);
+  return await demoteIfIncomplete(source);
 }
 
 export async function removeMapping(source: string, mappingId: number): Promise<Integration> {
   const origin = await originRow(source);
   const entry = await db().mapping.findFirst({
-    where: { id: mappingId, originId: origin.id },
+    where: { id: mappingId, originId: origin.id, status: 'active' },
   });
   if (!entry) throw new NotFoundError('Este valor já não está mapeado.');
 
-  await db().mapping.delete({ where: { id: mappingId } });
+  await db().mapping.update({
+    where: { id: mappingId },
+    data: { status: 'inactive' },
+  });
   await recordRevision(
     'dictionary',
     source,
@@ -364,16 +481,25 @@ export async function replaceDeadlines(items: readonly Deadline[]): Promise<Dead
   const previous = await listDeadlines();
   const tenantId = await activeTenantId();
 
-  await db().$transaction([
-    db().deadline.deleteMany({ where: { tenantId } }),
-    db().deadline.createMany({
-      data: items.map(item => ({
-        tenantId,
-        severity: item.severity,
-        deadlineSeconds: item.deadlineSeconds,
-      })),
-    }),
-  ]);
+  await db().$transaction(async tx => {
+    const severities = items.map(item => item.severity);
+    await tx.deadline.updateMany({
+      where: { tenantId, severity: { notIn: severities } },
+      data: { status: 'inactive' },
+    });
+    for (const item of items) {
+      await tx.deadline.upsert({
+        where: { tenantId_severity: { tenantId, severity: item.severity } },
+        update: { deadlineSeconds: item.deadlineSeconds, status: 'active' },
+        create: {
+          tenantId,
+          severity: item.severity,
+          deadlineSeconds: item.deadlineSeconds,
+          status: 'active',
+        },
+      });
+    }
+  });
 
   await recordRevision('deadline', (await currentTenant()).slug, 'Prazos atualizados', previous);
   return await listDeadlines();
@@ -383,17 +509,40 @@ export async function replaceKpiTargets(items: readonly KpiTarget[]): Promise<Kp
   const previous = await listKpiTargets();
   const tenantId = await activeTenantId();
 
-  await db().$transaction([
-    db().kpiTarget.deleteMany({ where: { tenantId } }),
-    db().kpiTarget.createMany({
-      data: items.map(item => ({
-        tenantId,
-        kpiGroup: item.kpiGroup,
-        maxBreaches: item.maxBreaches,
-        achievementPct: item.achievementPct,
-      })),
-    }),
-  ]);
+  await db().$transaction(async tx => {
+    const incoming = new Set(
+      items.map(item => `${kpiGroupKey(item.severities)}:${item.achievementPct}`),
+    );
+    const existing = await tx.kpiTarget.findMany({ where: { tenantId } });
+    for (const row of existing) {
+      if (!incoming.has(`${kpiGroupKey(row.severities)}:${Number(row.achievementPct)}`)) {
+        await tx.kpiTarget.update({
+          where: { id: row.id },
+          data: { status: 'inactive' },
+        });
+      }
+    }
+    for (const item of items) {
+      const severities = [...item.severities].sort((a, b) => a - b);
+      await tx.kpiTarget.upsert({
+        where: {
+          tenantId_severities_achievementPct: {
+            tenantId,
+            severities,
+            achievementPct: item.achievementPct,
+          },
+        },
+        update: { maxBreaches: item.maxBreaches, status: 'active' },
+        create: {
+          tenantId,
+          severities,
+          maxBreaches: item.maxBreaches,
+          achievementPct: item.achievementPct,
+          status: 'active',
+        },
+      });
+    }
+  });
 
   await recordRevision('kpi_target', (await currentTenant()).slug, 'Metas atualizadas', previous);
   return await listKpiTargets();

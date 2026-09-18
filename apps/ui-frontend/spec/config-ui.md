@@ -51,38 +51,52 @@ O seed inicial nasce no Postgres (`npm run db:seed` / `prisma/seed.ts`).
 
 ## 3. As telas
 
-Três rotas, todas sob o grupo "Ajustes" da sidebar.
+Rotas de Ajustes, todas sob `/:tenant`.
 
-| Rota | Conteúdo |
+**URLs são inglês.** O menu e os títulos da tela são português. Um caminho novo
+nunca entra em português (`/targets`, nunca `/metas`; `/deadlines`, nunca `/prazos`).
+
+| URL | Menu | Conteúdo |
+|---|---|---|
+| `/:tenant/targets` | Metas | Faixas de atingimento e teto anual de violações |
+| `/:tenant/deadlines` | Prazos | Tempo máximo de atendimento por prioridade |
+| `/:tenant/integrations` | Integrações → Entrada | Origens que enviam eventos, cada uma com o que falta |
+| `/:tenant/integrations/:source` | (detalhe da Entrada) | Envio, campos e valores de uma origem |
+
+Em Metas e Prazos, **Visualizar** só carrega o estado anterior na tela.
+**Descartar alterações** volta ao publicado. **Publicar** é o que grava, e
+os dois só ficam clicáveis quando o rascunho difere do publicado.
+
+`/` pede o slug do tenant. O cliente não escolhe entre vários nem cria outros:
+digita o identificador que já tem. O `id` numérico fica nas FKs; o `slug` vai
+na URL; o `name` só aparece na tela (pode ter acento, não é único).
+
+As demais telas:
+
+| URL | Conteúdo |
 |---|---|
-| `/integracoes` | Lista as integrações do tenant, cada uma com o que falta |
-| `/integracoes/:source` | Envio, campos e valores de uma integração |
-| `/metas-e-prazos` | Prazos de OLA, faixas de meta, histórico |
-
-### O tenant nunca aparece como escolha
-
-A tela é a do cliente: ele *é* um tenant, não escolhe entre vários, e não cria
-outros. O tenant ativo vem do cadastro (`config_tenants`, linha com `active`) —
-`id` numérico nas FKs, `slug` único nas URLs e no ClickHouse, `name` só para
-exibição (pode ter acento, não é único). Por isso o tenant não está na URL das
-telas de Ajustes nem em variável de ambiente.
+| `/:tenant` | Painel N1/N2 |
+| `/:tenant/manager` | Painel do gestor |
+| `/:tenant/queue` | Fila de ocorrências |
+| `/:tenant/occurrences/:source/:externalId` | Detalhe de uma ocorrência |
 
 ### Vocabulário
 
 | Domínio | Tela |
 |---|---|
-| `intake: alert` | Chamados |
-| `intake: monitor` | Sinais de monitoração |
+| `intake: alert` | Monitor — ServiceNow / ITSM; métricas e previsão entram em cima |
+| `intake: monitor` | Sinais — Prometheus, Zabbix e afins |
 | `source` | Sistema de origem, nomeado pelo cliente (`service_now`, `zabbix`) |
 
 ### Detalhe da integração
 
 **Envio** — URL completa copiável e chave de assinatura (exibida uma única vez,
-com confirmação antes de rotacionar).
+com confirmação antes de rotacionar). **Inativar** deixa a origem na lista,
+desligada; **Reativar** liga de novo.
 
-**Campos** — uma linha por campo do contrato traduzido, com o caminho no payload.
-Campos com vocabulário fixo expandem a tradução de valores ali mesmo.
-**Publicar** grava os caminhos e marca o dicionário `published`.
+**Campos** — aba à parte, uma linha por campo do contrato traduzido, com o
+caminho no payload. Campos com vocabulário fixo expandem a tradução de valores
+ali mesmo. **Publicar** grava os caminhos e marca o dicionário `active`.
 
 ---
 
@@ -97,9 +111,9 @@ app/features/config/
   secret-flash.server.ts   cookie de uma vez após criar integração
 prisma/
   schema.prisma            registry (config_*)
-  seed.ts                  estado inicial locaweb/itsm
+  seed.ts                  estado inicial locaweb/service_now (Monitor)
 app/routes/
-  integrations.tsx · integration-detail.tsx · targets.tsx
+  integrations.tsx · integration-detail.tsx · targets.tsx · deadlines.tsx
 ```
 
 Os loaders e `action()` chamam só `repo.server.ts`. Não há API HTTP intermediária.

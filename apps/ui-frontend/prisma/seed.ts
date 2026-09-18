@@ -1,19 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 
 /**
- * The state the pipeline runs on today, as it lived in the files next to each
- * consumer before these screens existed. Idempotent: re-running it leaves the
- * registry as it finds it, so a redeploy never duplicates or overwrites what
- * the customer has since changed.
+ * Bootstrap of the configuration registry. Idempotent: re-running it leaves
+ * whatever the customer has since changed.
  */
 
 const prisma = new PrismaClient();
 
 const TENANT_SLUG = 'locaweb';
 const TENANT_NAME = 'Locaweb';
-const SOURCE = 'itsm';
+const SOURCE = 'service_now';
+const INTAKE = 'monitor';
 
-/** Where each field of incident-alert is read in the ITSM's own payload. */
+/** Where each field of the Monitor contract is read in ServiceNow's payload. */
 const BINDINGS: [field: string, path: string | null][] = [
   ['external_id', 'ticket_number'],
   ['opened_at', 'opened_at'],
@@ -34,7 +33,7 @@ const BINDINGS: [field: string, path: string | null][] = [
   ['source_url', null],
 ];
 
-/** The ITSM's own vocabulary, as apps/data-ingest/dictionaries once carried it. */
+/** ServiceNow vocabulary, as apps/data-ingest/dictionaries once carried it. */
 const MAPPINGS: Record<string, Record<string, string>> = {
   status: {
     'Aguardando Problema': 'waiting',
@@ -60,44 +59,44 @@ const DEADLINES: [severity: number, seconds: number][] = [
   [5, 345600],
 ];
 
-const KPI_TARGETS: [group: string, maxBreaches: number, achievementPct: number][] = [
-  ['p1_p2', 30, 150],
-  ['p1_p2', 35, 125],
-  ['p1_p2', 39, 100],
-  ['p1_p2', 45, 75],
-  ['p1_p2', 53, 50],
-  ['p1_p2', 999999, 0],
-  ['p3', 200, 150],
-  ['p3', 230, 125],
-  ['p3', 263, 100],
-  ['p3', 290, 75],
-  ['p3', 320, 50],
-  ['p3', 999999, 0],
+const KPI_TARGETS: [severities: number[], maxBreaches: number, achievementPct: number][] = [
+  [[1, 2], 30, 150],
+  [[1, 2], 35, 125],
+  [[1, 2], 39, 100],
+  [[1, 2], 45, 75],
+  [[1, 2], 53, 50],
+  [[1, 2], 999999, 0],
+  [[3], 200, 150],
+  [[3], 230, 125],
+  [[3], 263, 100],
+  [[3], 290, 75],
+  [[3], 320, 50],
+  [[3], 999999, 0],
 ];
 
 async function main(): Promise<void> {
   await prisma.tenant.updateMany({
-    where: { slug: { not: TENANT_SLUG }, active: true },
-    data: { active: false },
+    where: { slug: { not: TENANT_SLUG }, status: 'active' },
+    data: { status: 'inactive' },
   });
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: TENANT_SLUG },
-    update: { name: TENANT_NAME, active: true },
-    create: { slug: TENANT_SLUG, name: TENANT_NAME, active: true },
+    update: { name: TENANT_NAME, status: 'active' },
+    create: { slug: TENANT_SLUG, name: TENANT_NAME, status: 'active' },
   });
 
   const origin = await prisma.origin.upsert({
     where: { tenantId_source: { tenantId: tenant.id, source: SOURCE } },
-    update: {},
+    update: { intake: INTAKE },
     create: {
       tenantId: tenant.id,
       source: SOURCE,
-      intake: 'alert',
+      intake: INTAKE,
       envelopeVersion: 'v1',
-      enabled: true,
+      status: 'active',
       secretCreatedAt: new Date(),
-      dictionary: { create: { version: 'v1', status: 'published' } },
+      dictionary: { create: { version: 'v1', status: 'active' } },
     },
   });
 
@@ -133,17 +132,17 @@ async function main(): Promise<void> {
     });
   }
 
-  for (const [kpiGroup, maxBreaches, achievementPct] of KPI_TARGETS) {
+  for (const [severities, maxBreaches, achievementPct] of KPI_TARGETS) {
     await prisma.kpiTarget.upsert({
       where: {
-        tenantId_kpiGroup_achievementPct: {
+        tenantId_severities_achievementPct: {
           tenantId: tenant.id,
-          kpiGroup,
+          severities,
           achievementPct,
         },
       },
       update: {},
-      create: { tenantId: tenant.id, kpiGroup, maxBreaches, achievementPct },
+      create: { tenantId: tenant.id, severities, maxBreaches, achievementPct },
     });
   }
 }

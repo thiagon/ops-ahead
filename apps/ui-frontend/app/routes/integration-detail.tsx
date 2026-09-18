@@ -1,13 +1,21 @@
 import { useState } from 'react';
-import { data, Form, Link, useFetcher, useNavigation } from 'react-router';
+import { data, Form, Link, redirect, useFetcher, useNavigation, useSearchParams } from 'react-router';
 import { Badge } from '~/components/Badge';
-import { Field, GhostSubmit, InputButton, inputClass, SubmitButton } from '~/components/form';
+import {
+  Field,
+  GhostButton,
+  GhostSubmit,
+  InputButton,
+  inputClass,
+  SubmitButton,
+} from '~/components/form';
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   PlusIcon,
   RefreshIcon,
+  SendIcon,
   TrashIcon,
 } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
@@ -21,20 +29,33 @@ import {
   NotFoundError,
   removeMapping,
   rotateSecret,
+  setOriginStatus,
   updateBindings,
   upsertMapping,
+  withTenant,
 } from '~/features/config/repo.server.ts';
+import {
+  parseIntegrationTab,
+  samplePayload,
+} from '~/features/config/sample-payload.ts';
 import { takeSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
   CONTRACT_FIELDS,
   DOMAIN_VALUES,
   FIELD_HINT,
-  INTAKE_HINT,
+  INTAKE_LABEL,
   type MappingEntry,
   type MappingField,
   SEVERITY_VALUE_LABEL,
+  type Status,
   webhookUrl,
 } from '~/features/config/types.ts';
+import {
+  postToWebhook,
+  unreachableWebhookMessage,
+  validateWebhookBody,
+} from '~/features/config/webhook-post.server.ts';
+import { integrationsPath, useTenantSlug } from '~/paths';
 import type { Route } from './+types/integration-detail';
 
 export function meta({ params }: Route.MetaArgs) {
@@ -68,51 +89,64 @@ function buildRows(field: MappingField, entries: MappingEntry[]): DomainRow[] {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const integration = await getIntegration(params.source).catch(error => {
-    if (error instanceof NotFoundError) {
-      throw new Response('Integração não encontrada', { status: 404 });
-    }
-    throw error;
-  });
+  return withTenant(params.tenant, async () => {
+    const integration = await getIntegration(params.source).catch(error => {
+      if (error instanceof NotFoundError) {
+        throw new Response('Integração não encontrada', { status: 404 });
+      }
+      throw error;
+    });
 
-  const config = getConfig();
-  const tenant = await currentTenant();
-  // The contract decides which fields exist and which of them translate; the
-  // integration only says where each one is read.
-  const bound = new Map(integration.bindings.map(binding => [binding.field, binding.path]));
-  const fields = CONTRACT_FIELDS[integration.intake].map(contract => {
-    const path = bound.get(contract.field) ?? null;
-    if (!contract.translated) return { ...contract, path, values: null };
-    const field = contract.field as MappingField;
-    return {
-      ...contract,
-      path,
-      values: {
-        freeForm: DOMAIN_VALUES[field].length === 0,
-        rows: buildRows(field, integration.mappings[field] ?? []),
+    const config = getConfig();
+    const tenant = await currentTenant();
+    // The contract decides which fields exist and which of them translate; the
+    // integration only says where each one is read.
+    const bound = new Map(integration.bindings.map(binding => [binding.field, binding.path]));
+    const fields = CONTRACT_FIELDS[integration.intake].map(contract => {
+      const path = bound.get(contract.field) ?? null;
+      if (!contract.translated) return { ...contract, path, values: null };
+      const field = contract.field as MappingField;
+      return {
+        ...contract,
+        path,
+        values: {
+          freeForm: DOMAIN_VALUES[field].length === 0,
+          rows: buildRows(field, integration.mappings[field] ?? []),
+        },
+      };
+    });
+
+    const { secret, clearHeader } = await takeSecretFlash(request, params.source);
+    const headers = clearHeader ? { 'Set-Cookie': clearHeader } : undefined;
+
+    return data(
+      {
+        origin: integration,
+        url: webhookUrl(
+          config.PUBLIC_GATEWAY_URL,
+          integration.envelopeVersion,
+          tenant.slug,
+          integration.source,
+        ),
+        fields,
+        sampleBody: JSON.stringify(samplePayload(fields), null, 2),
+        dictionaryVersion: integration.dictionaryVersion,
+        dictionaryStatus: integration.dictionaryStatus,
+        flashedSecret: secret,
       },
-    };
+      { headers },
+    );
   });
+}
 
-  const { secret, clearHeader } = await takeSecretFlash(request, params.source);
-  const headers = clearHeader ? { 'Set-Cookie': clearHeader } : undefined;
+type ActionResult = {
+  secret: string | null;
+  error: string | null;
+  test: { status: number; ok: boolean; body: string } | null;
+};
 
-  return data(
-    {
-      origin: integration,
-      url: webhookUrl(
-        config.PUBLIC_GATEWAY_URL,
-        integration.envelopeVersion,
-        tenant.slug,
-        integration.source,
-      ),
-      fields,
-      dictionaryVersion: integration.dictionaryVersion,
-      dictionaryStatus: integration.dictionaryStatus,
-      flashedSecret: secret,
-    },
-    { headers },
-  );
+function ok(partial: Partial<ActionResult> = {}): ActionResult {
+  return { secret: null, error: null, test: null, ...partial };
 }
 
 /**
@@ -121,43 +155,82 @@ export async function loader({ params, request }: Route.LoaderArgs) {
  * submitted with a fetcher and answer with the value alone.
  */
 export async function action({ params, request }: Route.ActionArgs) {
-  const form = await request.formData();
-  const intent = form.get('intent');
+  return withTenant(params.tenant, async () => {
+    const form = await request.formData();
+    const intent = form.get('intent');
 
-  try {
-    if (intent === 'rotate-secret') {
-      return { secret: await rotateSecret(params.source), error: null };
-    }
+    try {
+      if (intent === 'rotate-secret') {
+        return ok({ secret: await rotateSecret(params.source) });
+      }
 
-    if (intent === 'add-mapping') {
-      await upsertMapping(params.source, {
-        field: form.get('field') as MappingField,
-        from: String(form.get('from') ?? '').trim(),
-        to: String(form.get('to') ?? ''),
-      });
-      return { secret: null, error: null };
-    }
+      if (intent === 'set-status') {
+        const status = String(form.get('status'));
+        if (status !== 'active' && status !== 'inactive' && status !== 'archived') {
+          return ok({ error: 'Estado inválido.' });
+        }
+        await setOriginStatus(params.source, status);
+        if (status === 'archived') return redirect(integrationsPath(params.tenant));
+        return ok();
+      }
 
-    if (intent === 'remove-mapping') {
-      await removeMapping(params.source, Number(form.get('mappingId')));
-      return { secret: null, error: null };
-    }
+      if (intent === 'add-mapping') {
+        await upsertMapping(params.source, {
+          field: form.get('field') as MappingField,
+          from: String(form.get('from') ?? '').trim(),
+          to: String(form.get('to') ?? ''),
+        });
+        return ok();
+      }
 
-    const bindings = form.getAll('field').map((field, index) => ({
-      field: String(field),
-      path: String(form.getAll('path')[index] ?? '').trim() || null,
-    }));
-    await updateBindings(params.source, bindings);
-    return { secret: null, error: null };
-  } catch (error) {
-    if (error instanceof ConflictError || error instanceof NotFoundError) {
-      return { secret: null, error: error.message };
+      if (intent === 'remove-mapping') {
+        await removeMapping(params.source, Number(form.get('mappingId')));
+        return ok();
+      }
+
+      if (intent === 'test-post') {
+        const body = String(form.get('body') ?? '');
+        const problem = validateWebhookBody(body);
+        if (problem) return ok({ error: problem });
+
+        const config = getConfig();
+        const tenant = await currentTenant();
+        const integration = await getIntegration(params.source);
+        const url = webhookUrl(
+          config.PUBLIC_GATEWAY_URL,
+          integration.envelopeVersion,
+          tenant.slug,
+          integration.source,
+        );
+
+        try {
+          return ok({
+            test: await postToWebhook(url, body, String(form.get('secret') ?? '').trim()),
+          });
+        } catch (error) {
+          return ok({ error: unreachableWebhookMessage(error) });
+        }
+      }
+
+      const bindings = form.getAll('field').map((field, index) => ({
+        field: String(field),
+        path: String(form.getAll('path')[index] ?? '').trim() || null,
+      }));
+      await updateBindings(params.source, bindings);
+      return ok();
+    } catch (error) {
+      if (error instanceof ConflictError || error instanceof NotFoundError) {
+        return ok({ error: error.message });
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
 }
 
 type FieldRow = Route.ComponentProps['loaderData']['fields'][number];
+
+const textareaClass =
+  'min-h-64 w-full resize-y rounded-lg border border-border-base bg-bg-elevated px-3 py-2.5 font-mono text-xs text-text-light outline-none transition-colors placeholder:text-text-dim focus:border-signal-blue/60';
 
 function CopyField({ label, value, hint }: { label: string; value: string; hint?: string }) {
   const [copied, setCopied] = useState(false);
@@ -372,124 +445,206 @@ function FieldRowItem({ row }: { row: FieldRow }) {
   );
 }
 
-export default function IntegrationDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { origin, url, fields, dictionaryVersion, dictionaryStatus, flashedSecret } = loaderData;
-  const saving = useNavigation().state === 'submitting';
-  const [confirmRotate, setConfirmRotate] = useState(false);
-  const secret = actionData?.secret ?? flashedSecret;
-  const missing = fields.filter(row => row.required && !row.path).length;
-  const uncovered = fields.reduce((total, row) => {
-    if (!row.values || row.values.freeForm) return total;
-    return total + row.values.rows.filter(entry => entry.origins.length === 0).length;
-  }, 0);
+function TabLink({
+  to,
+  active,
+  children,
+}: {
+  to: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      preventScrollReset
+      replace
+      role="tab"
+      aria-selected={active}
+      className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm transition-colors ${
+        active
+          ? 'border-accent-red text-text-light'
+          : 'border-transparent text-text-muted hover:text-text-light'
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function statusHint(lifecycle: Status, canActivate: boolean): string {
+  if (lifecycle === 'active') return 'Recebe eventos neste endereço.';
+  if (canActivate) return 'Desligada. Ative para voltar a receber.';
+  return 'Só ativa quando o dicionário está completo.';
+}
+
+function StatusField({
+  lifecycle,
+  canActivate,
+}: {
+  lifecycle: Status;
+  canActivate: boolean;
+}) {
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   return (
-    <main className="p-6 sm:p-8">
-      <PageHeader
-        title={origin.source}
-        subtitle={INTAKE_HINT[origin.intake]}
-        breadcrumb={
-          <Link
-            to="/integracoes"
-            className="flex items-center gap-1 text-sm text-text-muted hover:text-text-light"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-            Integrações
-          </Link>
-        }
-        action={
-          <SubmitButton pending={saving} form="bindings">
-            Publicar
-          </SubmitButton>
-        }
-      />
+    <Field id="lifecycle" label="Estado" hint={statusHint(lifecycle, canActivate)}>
+      {() =>
+        confirmArchive ? (
+          <Form method="post" className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input type="hidden" name="intent" value="set-status" />
+            <input type="hidden" name="status" value="archived" />
+            <Badge tone="neutral">{lifecycle === 'active' ? 'Ativa' : 'Inativa'}</Badge>
+            <p className="text-sm text-text-muted">Sai da lista de entrada.</p>
+            <div className="flex gap-2">
+              <GhostSubmit tone="danger">Confirmar</GhostSubmit>
+              <InputButton type="button" onClick={() => setConfirmArchive(false)}>
+                Cancelar
+              </InputButton>
+            </div>
+          </Form>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={lifecycle === 'active' ? 'green' : 'neutral'}>
+              {lifecycle === 'active' ? 'Ativa' : 'Inativa'}
+            </Badge>
+            {lifecycle === 'active' ? (
+              <Form method="post">
+                <input type="hidden" name="intent" value="set-status" />
+                <input type="hidden" name="status" value="inactive" />
+                <GhostSubmit>Inativar</GhostSubmit>
+              </Form>
+            ) : (
+              <Form method="post">
+                <input type="hidden" name="intent" value="set-status" />
+                <input type="hidden" name="status" value="active" />
+                <GhostSubmit disabled={!canActivate}>Ativar</GhostSubmit>
+              </Form>
+            )}
+            <GhostButton tone="danger" onClick={() => setConfirmArchive(true)}>
+              Arquivar
+            </GhostButton>
+          </div>
+        )
+      }
+    </Field>
+  );
+}
 
-      {actionData?.error && (
-        <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
-          {actionData.error}
-        </p>
-      )}
+function BasicTab({
+  source,
+  url,
+  secret,
+  lifecycle,
+  canActivate,
+}: {
+  source: string;
+  url: string;
+  secret: string | null;
+  lifecycle: Status;
+  canActivate: boolean;
+}) {
+  const [confirmRotate, setConfirmRotate] = useState(false);
 
-      <Panel title="Envio" className="mb-6">
-        <p className="mb-5 text-sm text-text-muted">
-          Configure estes dois valores no {origin.source}.
-        </p>
+  return (
+    <Panel>
+      <div className="flex flex-col gap-4">
+        <CopyField
+          label="Nome"
+          value={source}
+          hint="Definido na criação. Aparece no endereço de envio."
+        />
+        <StatusField lifecycle={lifecycle} canActivate={canActivate} />
+        <CopyField
+          label="Endereço de envio"
+          value={url}
+          hint="Cada envio é um POST com o corpo em JSON."
+        />
 
-        <div className="flex flex-col gap-4">
+        {secret ? (
           <CopyField
-            label="Endereço de envio"
-            value={url}
-            hint="Cada envio é um POST com o corpo em JSON."
+            label="Chave de assinatura"
+            value={secret}
+            hint="Guarde agora — ao sair desta tela ela não é mais exibida."
           />
-
-          {secret ? (
-            <CopyField
-              label="Chave de assinatura"
-              value={secret}
-              hint="Guarde agora — ao sair desta tela ela não é mais exibida."
-            />
-          ) : (
-            <Field
-              id="secret"
-              label="Chave de assinatura"
-              hint="Assine o corpo com HMAC SHA-256 e envie no cabeçalho X-Signature."
-            >
-              {id =>
-                confirmRotate ? (
-                  <Form method="post" className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input type="hidden" name="intent" value="rotate-secret" />
-                    <input
-                      id={id}
-                      readOnly
-                      value="••••••••••••••••••••••••••••••••"
-                      className={`${inputClass} font-mono text-text-dim text-xs`}
-                    />
-                    <p className="shrink-0 text-sm text-text-muted sm:max-w-xs">
-                      A chave atual deixa de valer. Atualize no {origin.source} em seguida.
-                    </p>
-                    <div className="flex gap-2">
-                      <InputButton type="submit">
-                        <RefreshIcon className="h-4 w-4 shrink-0" />
-                        Confirmar
-                      </InputButton>
-                      <InputButton type="button" onClick={() => setConfirmRotate(false)}>
-                        Cancelar
-                      </InputButton>
-                    </div>
-                  </Form>
-                ) : (
+        ) : (
+          <Field
+            id="secret"
+            label="Chave de assinatura"
+            hint="Assine o corpo com HMAC SHA-256 e envie no cabeçalho X-Signature."
+          >
+            {id =>
+              confirmRotate ? (
+                <Form method="post" className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input type="hidden" name="intent" value="rotate-secret" />
+                  <input
+                    id={id}
+                    readOnly
+                    value="••••••••••••••••••••••••••••••••"
+                    className={`${inputClass} font-mono text-text-dim text-xs`}
+                  />
+                  <p className="shrink-0 text-sm text-text-muted sm:max-w-xs">
+                    A chave atual deixa de valer. Atualize no {source} em seguida.
+                  </p>
                   <div className="flex gap-2">
-                    <input
-                      id={id}
-                      readOnly
-                      value="••••••••••••••••••••••••••••••••"
-                      className={`${inputClass} font-mono text-text-dim text-xs`}
-                    />
-                    <InputButton type="button" onClick={() => setConfirmRotate(true)}>
+                    <InputButton type="submit">
                       <RefreshIcon className="h-4 w-4 shrink-0" />
-                      Gerar
+                      Confirmar
+                    </InputButton>
+                    <InputButton type="button" onClick={() => setConfirmRotate(false)}>
+                      Cancelar
                     </InputButton>
                   </div>
-                )
-              }
-            </Field>
-          )}
-          <p className="-mt-1 text-text-dim text-xs">
-            A chave aparece uma única vez, no momento em que é gerada. Se ela se perder, gere outra
-            e atualize no {origin.source}.
-          </p>
-        </div>
-      </Panel>
+                </Form>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    id={id}
+                    readOnly
+                    value="••••••••••••••••••••••••••••••••"
+                    className={`${inputClass} font-mono text-text-dim text-xs`}
+                  />
+                  <InputButton type="button" onClick={() => setConfirmRotate(true)}>
+                    <RefreshIcon className="h-4 w-4 shrink-0" />
+                    Gerar
+                  </InputButton>
+                </div>
+              )
+            }
+          </Field>
+        )}
+        <p className="-mt-1 text-text-dim text-xs">
+          A chave aparece uma única vez, no momento em que é gerada. Se ela se perder, gere outra e
+          atualize no {source}.
+        </p>
+      </div>
+    </Panel>
+  );
+}
 
+function DictionaryTab({
+  fields,
+  missing,
+  uncovered,
+  dictionaryVersion,
+  dictionaryStatus,
+}: {
+  fields: FieldRow[];
+  missing: number;
+  uncovered: number;
+  dictionaryVersion: string | null;
+  dictionaryStatus: string | null;
+}) {
+  return (
+    <>
       <div className="mb-2 flex flex-wrap items-center gap-2.5">
-        <h2 className="font-bold text-text-light text-xl">Campos</h2>
         {missing > 0 && <Badge tone="red">{missing} OBRIGATÓRIOS EM FALTA</Badge>}
         {uncovered > 0 && <Badge tone="amber">{uncovered} VALORES SEM MAPEAMENTO</Badge>}
         {missing === 0 && uncovered === 0 && <Badge tone="green">COMPLETO</Badge>}
         {dictionaryVersion && (
           <Badge tone="neutral">
             {dictionaryVersion.toUpperCase()}
-            {dictionaryStatus === 'draft' ? ' · RASCUNHO' : ''}
+            {dictionaryStatus === 'inactive' ? ' · RASCUNHO' : ''}
           </Badge>
         )}
       </div>
@@ -505,6 +660,192 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
         {fields.map(row => (
           <FieldRowItem key={row.field} row={row} />
         ))}
+      </div>
+    </>
+  );
+}
+
+function formatTestBody(body: string): string {
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
+}
+
+function TestTab({
+  fields,
+  sampleBody,
+  secret,
+}: {
+  fields: FieldRow[];
+  sampleBody: string;
+  secret: string | null;
+}) {
+  const fetcher = useFetcher<ActionResult>();
+  const [body, setBody] = useState(sampleBody);
+  const pending = fetcher.state !== 'idle';
+  const result = fetcher.data;
+
+  return (
+    <Panel>
+      <p className="mb-5 text-sm text-text-muted">
+        Envia um POST para o mesmo endereço da aba Envio, como o sistema de origem faria.
+      </p>
+
+      <fetcher.Form method="post" className="flex flex-col gap-4">
+        <input type="hidden" name="intent" value="test-post" />
+        <Field id="test-body" label="Corpo" hint="Objeto JSON. O envio usa exatamente estes bytes.">
+          {id => (
+            <textarea
+              id={id}
+              name="body"
+              value={body}
+              onChange={event => setBody(event.target.value)}
+              spellCheck={false}
+              className={textareaClass}
+            />
+          )}
+        </Field>
+
+        <Field
+          id="test-secret"
+          label="Chave de assinatura"
+          hint="Cole a chave gerada na aba Envio se o gateway exigir assinatura."
+        >
+          {id => (
+            <input
+              id={id}
+              name="secret"
+              type={secret ? 'text' : 'password'}
+              autoComplete="off"
+              defaultValue={secret ?? ''}
+              placeholder="opcional em desenvolvimento"
+              className={`${inputClass} font-mono text-xs`}
+            />
+          )}
+        </Field>
+
+        {result?.error && (
+          <p className="rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
+            {result.error}
+          </p>
+        )}
+
+        {result?.test && (
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              result.test.ok
+                ? 'border-signal-green/40 bg-signal-green/10 text-signal-green'
+                : 'border-accent-red/40 bg-accent-red/10 text-accent-red'
+            }`}
+          >
+            <p className="font-medium">
+              {result.test.ok ? 'Aceito' : 'Recusado'} · HTTP {result.test.status}
+            </p>
+            {result.test.body && (
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-text-light">
+                {formatTestBody(result.test.body)}
+              </pre>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <SubmitButton pending={pending} pendingLabel="Enviando…">
+            <SendIcon className="h-4 w-4" />
+            Enviar POST
+          </SubmitButton>
+          <GhostButton
+            onClick={() => setBody(JSON.stringify(samplePayload(fields), null, 2))}
+            disabled={pending}
+          >
+            Preencher de novo
+          </GhostButton>
+        </div>
+      </fetcher.Form>
+    </Panel>
+  );
+}
+
+export default function IntegrationDetail({ loaderData, actionData }: Route.ComponentProps) {
+  const { origin, url, fields, sampleBody, dictionaryVersion, dictionaryStatus, flashedSecret } =
+    loaderData;
+  const tenant = useTenantSlug();
+  const saving = useNavigation().state === 'submitting';
+  const [searchParams] = useSearchParams();
+  const tab = parseIntegrationTab(searchParams.get('tab'));
+  const secret = actionData?.secret ?? flashedSecret;
+  const missing = fields.filter(row => row.required && !row.path).length;
+  const uncovered = fields.reduce((total, row) => {
+    if (!row.values || row.values.freeForm) return total;
+    return total + row.values.rows.filter(entry => entry.origins.length === 0).length;
+  }, 0);
+
+  return (
+    <main className="p-6 sm:p-8">
+      <PageHeader
+        title={origin.source}
+        subtitle={`${INTAKE_LABEL[origin.intake]} · ${origin.lifecycle === 'active' ? 'Ativa' : 'Inativa'}`}
+        breadcrumb={
+          <Link
+            to={integrationsPath(tenant)}
+            className="flex items-center gap-1 text-sm text-text-muted hover:text-text-light"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+            Entrada
+          </Link>
+        }
+        action={
+          tab === 'dictionary' ? (
+            <SubmitButton pending={saving} form="bindings">
+              Publicar
+            </SubmitButton>
+          ) : undefined
+        }
+      />
+
+      {actionData?.error && tab !== 'test' && (
+        <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
+          {actionData.error}
+        </p>
+      )}
+
+      <nav role="tablist" aria-label="Seções da integração" className="mb-6 flex gap-1 border-border-base border-b">
+        <TabLink to="?tab=basic" active={tab === 'basic'}>
+          Envio
+        </TabLink>
+        <TabLink to="?tab=dictionary" active={tab === 'dictionary'}>
+          Dicionário
+          {(missing > 0 || uncovered > 0) && (
+            <Badge tone={missing > 0 ? 'red' : 'amber'}>{missing + uncovered}</Badge>
+          )}
+        </TabLink>
+        <TabLink to="?tab=test" active={tab === 'test'}>
+          Teste
+        </TabLink>
+      </nav>
+
+      <div hidden={tab !== 'basic'} role="tabpanel">
+        <BasicTab
+          source={origin.source}
+          url={url}
+          secret={secret}
+          lifecycle={origin.lifecycle}
+          canActivate={missing === 0 && uncovered === 0}
+        />
+      </div>
+      <div hidden={tab !== 'dictionary'} role="tabpanel">
+        <DictionaryTab
+          fields={fields}
+          missing={missing}
+          uncovered={uncovered}
+          dictionaryVersion={dictionaryVersion}
+          dictionaryStatus={dictionaryStatus}
+        />
+      </div>
+      <div hidden={tab !== 'test'} role="tabpanel">
+        <TestTab fields={fields} sampleBody={sampleBody} secret={secret} />
       </div>
     </main>
   );

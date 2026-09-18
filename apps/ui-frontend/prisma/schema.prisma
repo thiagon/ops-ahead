@@ -10,6 +10,19 @@ datasource db {
   url      = env("CONFIG_DATABASE_URL")
 }
 
+/// Shared by every registry row. `inactive` stays in the list that shows
+/// it; `archived` leaves that list. Rows are never deleted.
+enum Status {
+  active
+  inactive
+  archived
+}
+
+enum Intake {
+  monitor
+  alert
+}
+
 /// A customer this deployment may serve. Numeric `id` is the foreign key;
 /// `slug` is unique and is what URLs / ClickHouse `tenant_id` carry;
 /// `name` is the display label (accents allowed, not unique).
@@ -17,8 +30,8 @@ model Tenant {
   id        Int      @id @default(autoincrement())
   slug      String   @unique
   name      String
-  /// Until login scopes a session, the UI serves whichever row is active.
-  active    Boolean  @default(false)
+  /// Lifecycle of this tenant in the registry.
+  status    Status @default(active)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -35,9 +48,9 @@ model Origin {
   id              Int       @id @default(autoincrement())
   tenantId        Int       @map("tenant_id")
   source          String
-  intake          String
+  intake          Intake
   envelopeVersion String    @map("envelope_version")
-  enabled         Boolean   @default(true)
+  status          Status @default(inactive)
   /// Only when the key was minted — the key itself is never stored.
   secretCreatedAt DateTime? @map("secret_created_at") @db.Timestamptz()
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
@@ -54,10 +67,13 @@ model Origin {
 
 /// Where each field of the translated contract is read in the origin's payload.
 model FieldBinding {
-  id       Int     @id @default(autoincrement())
-  originId Int     @map("origin_id")
-  field    String
-  path     String?
+  id        Int      @id @default(autoincrement())
+  originId  Int      @map("origin_id")
+  field     String
+  path      String?
+  status    Status @default(active)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
@@ -68,11 +84,14 @@ model FieldBinding {
 /// One origin value mapped to one domain value. Several origin values may land
 /// on the same domain value, never the reverse — hence the unique on the origin side.
 model Mapping {
-  id           Int    @id @default(autoincrement())
-  originId     Int    @map("origin_id")
-  mappingField String @map("mapping_field")
-  fromValue    String @map("from_value")
-  toValue      String @map("to_value")
+  id           Int      @id @default(autoincrement())
+  originId     Int      @map("origin_id")
+  mappingField String   @map("mapping_field")
+  fromValue    String   @map("from_value")
+  toValue      String   @map("to_value")
+  status       Status @default(active)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
@@ -81,10 +100,13 @@ model Mapping {
 }
 
 model DictionaryVersion {
-  id       Int    @id @default(autoincrement())
-  originId Int    @unique @map("origin_id")
-  version  String
-  status   String
+  id        Int      @id @default(autoincrement())
+  originId  Int      @unique @map("origin_id")
+  version   String
+  /// `inactive` until Publicar; `active` once the fields are committed.
+  status    Status @default(inactive)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   origin Origin @relation(fields: [originId], references: [id], onDelete: Cascade)
 
@@ -92,10 +114,13 @@ model DictionaryVersion {
 }
 
 model Deadline {
-  id              Int @id @default(autoincrement())
-  tenantId        Int @map("tenant_id")
-  severity        Int @db.SmallInt
-  deadlineSeconds Int @map("deadline_seconds")
+  id              Int      @id @default(autoincrement())
+  tenantId        Int      @map("tenant_id")
+  severity        Int      @db.SmallInt
+  deadlineSeconds Int      @map("deadline_seconds")
+  status          Status @default(active)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -103,17 +128,21 @@ model Deadline {
   @@map("config_deadlines")
 }
 
-/// A group carries one row per achievement band, so the band is part of the unique.
+/// One annual band. The group is the severities that share the quota
+/// (`{1,2}` for P1+P2, `{3}` for P3) — the band is part of the unique.
 model KpiTarget {
-  id             Int     @id @default(autoincrement())
-  tenantId       Int     @map("tenant_id")
-  kpiGroup       String  @map("kpi_group")
-  maxBreaches    Int     @map("max_breaches")
-  achievementPct Decimal @map("achievement_pct") @db.Decimal(5, 2)
+  id             Int      @id @default(autoincrement())
+  tenantId       Int      @map("tenant_id")
+  severities     Int[]
+  maxBreaches    Int      @map("max_breaches")
+  achievementPct Decimal  @map("achievement_pct") @db.Decimal(5, 2)
+  status         Status @default(active)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, kpiGroup, achievementPct])
+  @@unique([tenantId, severities, achievementPct])
   @@map("config_kpi_targets")
 }
 
@@ -127,7 +156,7 @@ model Revision {
   summary   String
   author    String
   payload   Json?
-  at        DateTime @default(now()) @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

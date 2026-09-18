@@ -11,6 +11,9 @@ export type ConfigDomain = 'origin' | 'dictionary' | 'deadline' | 'kpi_target';
 
 export type Intake = 'alert' | 'monitor';
 
+/** Same values as the Prisma `Status` enum — the client never imports that module. */
+export type Status = 'active' | 'inactive' | 'archived';
+
 /**
  * Where one field of the translated contract is read in the origin's own
  * payload. What the dictionary does for values, this does for fields
@@ -39,7 +42,7 @@ export type ContractField = {
 };
 
 export const CONTRACT_FIELDS: Record<Intake, readonly ContractField[]> = {
-  alert: [
+  monitor: [
     {
       field: 'external_id',
       required: true,
@@ -154,7 +157,7 @@ export const CONTRACT_FIELDS: Record<Intake, readonly ContractField[]> = {
       translated: false,
     },
   ],
-  monitor: [
+  alert: [
     {
       field: 'external_id',
       required: true,
@@ -246,19 +249,30 @@ export type Deadline = {
 };
 
 export type KpiTarget = {
-  kpiGroup: string;
+  severities: number[];
   maxBreaches: number;
   achievementPct: number;
 };
 
+export function kpiGroupKey(severities: readonly number[]): string {
+  return [...severities].sort((a, b) => a - b).join(',');
+}
+
+export function formatKpiGroup(severities: readonly number[]): string {
+  return [...severities]
+    .sort((a, b) => a - b)
+    .map(severity => `P${severity}`)
+    .join(' + ');
+}
+
 /**
- * What each intake translates. An alert carries a lifecycle; a monitor only
+ * What each intake translates. Monitor carries a lifecycle; Sinais only
  * says whether a condition is firing or cleared — so the two never share a
  * mapping key (contracts/translation-dictionary.schema.json).
  */
 export const MAPPED_FIELDS: Record<Intake, readonly MappingField[]> = {
-  alert: ['status', 'severity', 'reported_by', 'resolution_code'],
-  monitor: ['condition', 'severity'],
+  monitor: ['status', 'severity', 'reported_by', 'resolution_code'],
+  alert: ['condition', 'severity'],
 };
 
 export const DOMAIN_VALUES: Record<MappingField, readonly string[]> = {
@@ -271,6 +285,37 @@ export const DOMAIN_VALUES: Record<MappingField, readonly string[]> = {
   /** Free-form: an unmapped resolution code passes through untranslated. */
   resolution_code: [],
 };
+
+/** Gaps against the contract — the vocabulary lives in code, not in the tenant row. */
+export function integrationGaps(input: {
+  intake: Intake;
+  bindings: readonly FieldBinding[];
+  mappings: Partial<Record<MappingField, readonly { to: string }[]>>;
+}): { missingFields: number; uncovered: number } {
+  const bound = new Map(input.bindings.map(binding => [binding.field, binding.path]));
+  const missingFields = CONTRACT_FIELDS[input.intake].filter(
+    field => field.required && !bound.get(field.field),
+  ).length;
+
+  let uncovered = 0;
+  for (const field of CONTRACT_FIELDS[input.intake]) {
+    if (!field.translated) continue;
+    const known = DOMAIN_VALUES[field.field as MappingField];
+    if (known.length === 0) continue;
+    const mapped = new Set((input.mappings[field.field as MappingField] ?? []).map(entry => entry.to));
+    uncovered += known.filter(value => !mapped.has(value)).length;
+  }
+  return { missingFields, uncovered };
+}
+
+export function isIntegrationReady(input: {
+  intake: Intake;
+  bindings: readonly FieldBinding[];
+  mappings: Partial<Record<MappingField, readonly { to: string }[]>>;
+}): boolean {
+  const { missingFields, uncovered } = integrationGaps(input);
+  return missingFields === 0 && uncovered === 0;
+}
 
 export const SEVERITY_VALUE_LABEL: Record<string, string> = {
   '1': 'Crítica',
@@ -290,13 +335,13 @@ export const FIELD_HINT: Record<MappingField, string> = {
 
 /** 'intake' is our word, not the customer's — these screens say what it means. */
 export const INTAKE_LABEL: Record<Intake, string> = {
-  alert: 'Chamados',
-  monitor: 'Sinais de monitoração',
+  monitor: 'Monitor',
+  alert: 'Sinais',
 };
 
 export const INTAKE_HINT: Record<Intake, string> = {
-  alert: 'Chamados que abrem, são atendidos e encerram.',
-  monitor: 'Avisos que disparam quando algo sai do normal e cessam quando volta.',
+  monitor: 'ServiceNow e ITSM. Métricas e previsão entram em cima.',
+  alert: 'Prometheus, Zabbix e afins.',
 };
 
 export const SEVERITY_LABEL: Record<number, string> = {
@@ -307,13 +352,27 @@ export const SEVERITY_LABEL: Record<number, string> = {
   5: 'P5 — Muito baixa',
 };
 
+export const KNOWN_SEVERITIES = Object.keys(SEVERITY_LABEL)
+  .map(Number)
+  .sort((a, b) => a - b);
+
+export function severityLabel(severity: number): string {
+  return SEVERITY_LABEL[severity] ?? `P${severity}`;
+}
+
 export function formatDuration(seconds: number): string {
-  const hours = seconds / 3600;
-  if (hours >= 24 && hours % 24 === 0) {
-    const days = hours / 24;
-    return `${days} ${days === 1 ? 'dia' : 'dias'}`;
-  }
-  return `${hours}h`;
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+  const total = Math.round(seconds);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const rest = total % 60;
+  const parts: string[] = [];
+  if (days) parts.push(days === 1 ? '1 dia' : `${days} dias`);
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}min`);
+  if (rest) parts.push(`${rest}s`);
+  return parts.join(' ');
 }
 
 export function webhookUrl(

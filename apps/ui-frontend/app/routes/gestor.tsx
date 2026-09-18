@@ -12,14 +12,16 @@ import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import { loadDashboard } from '~/dashboard.server.ts';
+import { withTenant } from '~/features/config/repo.server.ts';
+import { queuePath, useTenantSlug } from '~/paths';
 import type { Route } from './+types/gestor';
 
 export function meta() {
   return [{ title: 'Painel do gestor · Ops Ahead' }];
 }
 
-export async function loader() {
-  return await loadDashboard();
+export async function loader({ params }: Route.LoaderArgs) {
+  return withTenant(params.tenant, () => loadDashboard());
 }
 
 const KPI_GROUP_LABEL: Record<string, string> = {
@@ -149,6 +151,7 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
     groupLoad,
     noisyEntities,
   } = loaderData;
+  const tenant = useTenantSlug();
 
   const kpis = buildKpis(kpiAchievement, kpiProjection);
 
@@ -158,7 +161,7 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
         title="Painel do gestor"
         subtitle="Fechamento do mês contra a meta anual, e o que vem pela frente."
         action={
-          <Link to="/fila" className="text-sm text-text-muted hover:text-text-light">
+          <Link to={queuePath(tenant)} className="text-sm text-text-muted hover:text-text-light">
             Fila de ocorrências →
           </Link>
         }
@@ -173,8 +176,8 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
       )}
 
       <VolumeForecastSection rows={volumeForecast} />
-      <CategoryTrendsTable rows={categoryTrends} />
-      <GroupLoadSection rows={groupLoad} />
+      {categoryTrends.length > 0 && <CategoryTrendsTable rows={categoryTrends} />}
+      {groupLoad.length > 0 && <GroupLoadSection rows={groupLoad} />}
 
       <Panel title="Recursos mais ruidosos" className="mt-6">
         <ul className="divide-y divide-border-base rounded-lg border border-border-base">
@@ -195,5 +198,5 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  return <RouteError error={error} title="Painel do gestor" service="O banco de dados" />;
+  return <RouteError error={error} title="Painel do gestor" service="O painel" />;
 }

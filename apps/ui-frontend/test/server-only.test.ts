@@ -28,6 +28,7 @@ async function exists(path: string): Promise<boolean> {
 const SERVER_ONLY_MODULES = [
   'clickhouse.server',
   'features/config/repo.server',
+  'features/config/webhook-post.server',
   'config.server',
   'dashboard.server',
   'metrics.server',

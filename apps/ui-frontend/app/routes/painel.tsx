@@ -10,6 +10,8 @@ import { Panel } from '~/components/Panel';
 import { RecommendationCard } from '~/components/RecommendationCard';
 import { RouteError } from '~/components/RouteError';
 import type { TimelineEvent } from '~/components/Timeline';
+import { withTenant } from '~/features/config/repo.server.ts';
+import { managerPath, occurrenceDetailPath, queuePath, useTenantSlug } from '~/paths';
 import { loadQueue, type QueueRow } from '~/queue.server.ts';
 import { formatRatio } from '~/risk.ts';
 import type { Route } from './+types/painel';
@@ -54,18 +56,20 @@ export function parsePeriod(value: string | null): number {
   return PERIODS.includes(days as (typeof PERIODS)[number]) ? days : DEFAULT_PERIOD;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const periodDays = parsePeriod(new URL(request.url).searchParams.get('periodo'));
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(params.tenant, async () => {
+    const periodDays = parsePeriod(new URL(request.url).searchParams.get('period'));
 
-  const [queue, dailyFeatures, recurringPatterns] = await Promise.all([
-    loadQueue(),
-    fetchAlertDailyFeatures(periodDays).catch(() => []),
-    fetchRecurringPatterns(periodDays).catch(() => []),
-  ]);
+    const [queue, dailyFeatures, recurringPatterns] = await Promise.all([
+      loadQueue(),
+      fetchAlertDailyFeatures(periodDays).catch(() => []),
+      fetchRecurringPatterns(periodDays).catch(() => []),
+    ]);
 
-  const rows = [...queue].sort((a, b) => criticality(b) - criticality(a));
+    const rows = [...queue].sort((a, b) => criticality(b) - criticality(a));
 
-  return { rows, dailyFeatures, recurringPatterns, periodDays };
+    return { rows, dailyFeatures, recurringPatterns, periodDays };
+  });
 }
 
 /** One point per day, oldest first — `fetchAlertDailyFeatures` returns newest first. */
@@ -149,7 +153,7 @@ function buildKpis(rows: QueueRow[], dailyFeatures: AlertDailyFeatureRow[]): Kpi
   kpis.push({
     label: 'Score médio de risco',
     value: avgScore !== null ? formatRatio(avgScore) : '—',
-    delta: avgScore === null ? 'ml-model-serving indisponível' : undefined,
+    delta: avgScore === null ? 'score indisponível' : undefined,
     tone:
       avgScore === null ? 'blue' : avgScore >= 0.6 ? 'red' : avgScore >= 0.35 ? 'amber' : 'green',
     icon: 'trending-up',
@@ -171,9 +175,13 @@ function buildKpis(rows: QueueRow[], dailyFeatures: AlertDailyFeatureRow[]): Kpi
 
 export default function Painel({ loaderData }: Route.ComponentProps) {
   const { rows: loadedRows, dailyFeatures, recurringPatterns, periodDays } = loaderData;
+  const tenant = useTenantSlug();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sortKey, setSortKey] = useState<SortKey>('criticidade');
-  const rows = [...loadedRows].sort(SORTS[sortKey].compare);
+  const ranked = [...loadedRows].sort(SORTS[sortKey].compare);
+  // The panel is a briefing, not the full queue — only the most critical
+  // stay as cards; the rest lives on /queue, which is built to scroll.
+  const rows = ranked.slice(0, 8);
   const first = rows[0];
   const [selectedKey, setSelectedKey] = useState(
     first ? `${first.source}/${first.external_id}` : undefined,
@@ -185,14 +193,14 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     if (selected) {
-      detailLoad(`/ocorrencias/${selected.source}/${selected.external_id}/detalhe`);
+      detailLoad(occurrenceDetailPath(tenant, selected.source, selected.external_id));
     }
-  }, [selected, detailLoad]);
+  }, [selected, detailLoad, tenant]);
 
   const timeline: TimelineEvent[] = detailFetcher.data?.timeline ?? [];
   const similarIncidents = detailFetcher.data?.similarIncidents ?? [];
 
-  const kpis = buildKpis(rows, dailyFeatures);
+  const kpis = buildKpis(loadedRows, dailyFeatures);
   const navigate = useNavigate();
   const navigation = useNavigation();
   const refreshing = navigation.state !== 'idle';
@@ -204,7 +212,10 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
         subtitle="Fila de ocorrências ordenada por criticidade, com o motivo por trás de cada score."
         action={
           <>
-            <Link to="/painel-gestor" className="text-sm text-text-muted hover:text-text-light">
+            <Link
+              to={managerPath(tenant)}
+              className="text-sm text-text-muted hover:text-text-light"
+            >
               Painel do gestor →
             </Link>
             <label className="flex items-center gap-2 rounded-lg border border-border-base bg-bg-tile px-3.5 py-2.5 text-sm text-text-muted focus-within:border-signal-blue/40">
@@ -212,7 +223,7 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
               <select
                 value={periodDays}
                 onChange={e => {
-                  searchParams.set('periodo', e.target.value);
+                  searchParams.set('period', e.target.value);
                   setSearchParams(searchParams, { replace: true });
                 }}
                 className="cursor-pointer bg-transparent text-text-light outline-none"
@@ -251,7 +262,7 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
             <h2 className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold text-sm text-text-light">
               Ativas
               <span className="rounded-full bg-accent-red/15 px-2 py-0.5 font-bold text-accent-red text-xs">
-                {rows.length}
+                {loadedRows.length}
               </span>
             </h2>
             <label className="flex min-w-0 items-center gap-1.5 rounded-md border border-border-base px-2.5 py-1.5 text-text-muted text-xs focus-within:border-signal-blue/40">
@@ -287,10 +298,12 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
                 ))}
               </div>
               <Link
-                to="/fila"
+                to={queuePath(tenant)}
                 className="mt-4 block w-full rounded-lg border border-border-base py-2.5 text-center font-semibold text-sm text-text-light hover:border-signal-blue/40"
               >
-                Ver todos os incidentes
+                {loadedRows.length > rows.length
+                  ? `Ver as ${loadedRows.length} ocorrências`
+                  : 'Ver todos os incidentes'}
               </Link>
             </>
           )}
@@ -340,18 +353,10 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
           </div>
         </Panel>
       )}
-
-      <div className="mt-6 flex items-center justify-between border-border-base border-t pt-4 text-text-muted text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-signal-green" />
-          Consultado ao carregar a página
-        </span>
-        <span>ClickHouse · silver_alert_open</span>
-      </div>
     </main>
   );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  return <RouteError error={error} title="Painel N1/N2" service="O banco de dados" />;
+  return <RouteError error={error} title="Painel N1/N2" service="O painel" />;
 }
