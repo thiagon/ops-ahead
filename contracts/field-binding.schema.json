@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "field-binding/v1",
+  "title": "FieldBindingSet",
+  "description": "Per-origin, per-intake map from each field of the translated contract to where it is read in the origin's own payload. What translation-dictionary.schema.json does for values, this does for fields: without it an origin can only be added in code. Fields the pipeline itself stamps — event_id, tenant_id, source, version, dictionary_version, received_at — are never bound here. See domain/acl/itsm.md#adicionar-uma-origem.",
+  "type": "object",
+  "required": [
+    "tenant_id",
+    "source",
+    "intake",
+    "bindings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The origin system itself, named by the customer, e.g. 'service_now'."
+    },
+    "intake": {
+      "type": "string",
+      "enum": [
+        "alert",
+        "monitor"
+      ],
+      "description": "Which translated contract these bindings feed — incident-alert.schema.json or condition-monitor.schema.json."
+    },
+    "bindings": {
+      "type": "array",
+      "description": "One entry per bindable field of the contract this intake feeds. A required field left unbound is a configuration the translator refuses.",
+      "items": {
+        "type": "object",
+        "required": [
+          "field",
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Property name in the translated contract, e.g. 'external_id'."
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Dotted path into the origin's payload, e.g. 'fields.status.name'. Null leaves the field unbound: the translated line carries null, or the event is refused when the contract requires the field.",
+            "pattern": "^[^.]+(\\.[^.]+)*$"
+          }
+        }
+      }
+    }
+  }
+}
