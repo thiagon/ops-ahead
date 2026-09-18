@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { Badge, severityTone } from '~/components/Badge';
 import { PageHeader } from '~/components/PageHeader';
+import { RouteError } from '~/components/RouteError';
 import { loadQueue, type QueueRow } from '~/queue.server.ts';
 import { formatRatio, formatRemaining, riskColor, SEVERITY_LABEL } from '~/risk.ts';
 import type { Route } from './+types/queue';
@@ -130,4 +131,8 @@ export default function Queue({ loaderData }: Route.ComponentProps) {
       )}
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Fila" service="O banco de dados" />;
 }

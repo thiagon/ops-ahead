@@ -8,6 +8,7 @@ import {
 import { Badge, severityTone } from '~/components/Badge';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { RouteError } from '~/components/RouteError';
 import { predictBreach } from '~/model-serving.server.ts';
 import { buildQueue } from '~/queue.server.ts';
 import {
@@ -192,4 +193,8 @@ export default function Occurrence({ loaderData }: Route.ComponentProps) {
       </Panel>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Ocorrência" service="O banco de dados" />;
 }

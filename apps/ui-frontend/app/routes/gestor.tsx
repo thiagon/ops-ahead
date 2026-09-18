@@ -10,6 +10,7 @@ import { ForecastChart } from '~/components/ForecastChart';
 import { type Kpi, KpiCard } from '~/components/KpiCard';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { RouteError } from '~/components/RouteError';
 import { loadDashboard } from '~/dashboard.server.ts';
 import type { Route } from './+types/gestor';
 
@@ -191,4 +192,8 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
       </Panel>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Painel do gestor" service="O banco de dados" />;
 }

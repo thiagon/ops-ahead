@@ -8,6 +8,7 @@ import { type Kpi, KpiCard } from '~/components/KpiCard';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RecommendationCard } from '~/components/RecommendationCard';
+import { RouteError } from '~/components/RouteError';
 import type { TimelineEvent } from '~/components/Timeline';
 import { loadQueue, type QueueRow } from '~/queue.server.ts';
 import { formatRatio } from '~/risk.ts';
@@ -349,4 +350,8 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
       </div>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Painel N1/N2" service="O banco de dados" />;
 }

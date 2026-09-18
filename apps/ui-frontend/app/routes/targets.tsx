@@ -4,6 +4,7 @@ import { GhostSubmit, inputClass, SubmitButton } from '~/components/form';
 import { HistoryIcon } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { RouteError } from '~/components/RouteError';
 import {
   ConfigApiError,
   listDeadlines,
@@ -217,4 +218,8 @@ export default function Targets({ loaderData, actionData }: Route.ComponentProps
       </Panel>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Metas e prazos" service="O serviço de configuração" />;
 }

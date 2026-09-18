@@ -5,6 +5,7 @@ import { Field, GhostButton, inputClass, SubmitButton } from '~/components/form'
 import { ChevronRightIcon, PlusIcon } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { RouteError } from '~/components/RouteError';
 import {
   ConfigApiError,
   createIntegration,
@@ -196,4 +197,8 @@ export default function Integrations({ loaderData, actionData }: Route.Component
       </Panel>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Integrações" service="O serviço de configuração" />;
 }

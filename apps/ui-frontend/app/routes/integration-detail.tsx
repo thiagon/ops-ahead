@@ -12,6 +12,7 @@ import {
 } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
 import {
   ConfigApiError,
@@ -470,4 +471,8 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
       </div>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Integração" service="O serviço de configuração" />;
 }
