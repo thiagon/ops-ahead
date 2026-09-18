@@ -1,14 +1,22 @@
-import { Link } from 'react-router';
+import { useState } from 'react';
+import { Form, Link, redirect, useNavigation } from 'react-router';
 import { Badge } from '~/components/Badge';
-import { GhostButton } from '~/components/form';
+import { Field, GhostButton, inputClass, SubmitButton } from '~/components/form';
 import { ChevronRightIcon, PlusIcon } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
-import { type Integration, listIntegrations } from '~/features/config/api.server.ts';
 import {
+  ConfigApiError,
+  createIntegration,
+  type Integration,
+  listIntegrations,
+} from '~/features/config/api.server.ts';
+import {
+  CONTRACT_FIELDS,
   DOMAIN_VALUES,
   INTAKE_HINT,
   INTAKE_LABEL,
+  type Intake,
   type MappingField,
 } from '~/features/config/types.ts';
 import type { Route } from './+types/integrations';
@@ -19,15 +27,23 @@ export function meta() {
 
 /** Domain values of a translated field that no origin value maps onto yet. */
 function countUncovered(integration: Integration): number {
-  return integration.bindings.reduce((total, binding) => {
-    if (!binding.translated) return total;
-    const known = DOMAIN_VALUES[binding.field as MappingField];
+  return CONTRACT_FIELDS[integration.intake].reduce((total, field) => {
+    if (!field.translated) return total;
+    const known = DOMAIN_VALUES[field.field as MappingField];
     if (known.length === 0) return total;
     const mapped = new Set(
-      (integration.mappings[binding.field as MappingField] ?? []).map(entry => entry.to),
+      (integration.mappings[field.field as MappingField] ?? []).map(entry => entry.to),
     );
     return total + known.filter(value => !mapped.has(value)).length;
   }, 0);
+}
+
+/** Contract fields required by this intake that no payload path is bound to. */
+function countMissing(integration: Integration): number {
+  const bound = new Map(integration.bindings.map(binding => [binding.field, binding.path]));
+  return CONTRACT_FIELDS[integration.intake].filter(
+    field => field.required && !bound.get(field.field),
+  ).length;
 }
 
 export async function loader() {
@@ -39,11 +55,32 @@ export async function loader() {
       intake: integration.intake,
       enabled: integration.enabled,
       isDraft: integration.dictionaryStatus === 'draft',
-      missingFields: integration.bindings.filter(binding => binding.required && !binding.path)
-        .length,
+      missingFields: countMissing(integration),
       uncovered: countUncovered(integration),
     })),
   };
+}
+
+/**
+ * The new integration's signing key is minted here and shown once, on the
+ * screen the redirect lands on.
+ */
+export async function action({ request }: Route.ActionArgs) {
+  const form = await request.formData();
+  const source = String(form.get('source') ?? '').trim();
+
+  try {
+    await createIntegration({
+      source,
+      intake: form.get('intake') as Intake,
+      envelopeVersion: 'v1',
+    });
+  } catch (error) {
+    if (error instanceof ConfigApiError) return { error: error.detail };
+    throw error;
+  }
+
+  return redirect(`/integracoes/${encodeURIComponent(source)}`);
 }
 
 function Status({
@@ -61,8 +98,10 @@ function Status({
   return <Badge tone="green">Pronta</Badge>;
 }
 
-export default function Integrations({ loaderData }: Route.ComponentProps) {
+export default function Integrations({ loaderData, actionData }: Route.ComponentProps) {
   const { integrations } = loaderData;
+  const [creating, setCreating] = useState(false);
+  const saving = useNavigation().state === 'submitting';
 
   return (
     <main className="p-6 sm:p-8">
@@ -70,12 +109,52 @@ export default function Integrations({ loaderData }: Route.ComponentProps) {
         title="Integrações"
         subtitle="Os sistemas que enviam eventos para cá."
         action={
-          <GhostButton>
+          <GhostButton onClick={() => setCreating(!creating)}>
             <PlusIcon className="h-4 w-4" />
             Nova integração
           </GhostButton>
         }
       />
+
+      {creating && (
+        <Panel className="mb-4">
+          <Form method="post" className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                id="source"
+                label="Nome do sistema"
+                hint="Como você chama a origem: service_now, zabbix."
+              >
+                {id => (
+                  <input
+                    id={id}
+                    name="source"
+                    required
+                    pattern="[a-z][a-z0-9_]*"
+                    placeholder="service_now"
+                    className={`${inputClass} font-mono`}
+                  />
+                )}
+              </Field>
+
+              <Field id="intake" label="O que ele envia">
+                {id => (
+                  <select id={id} name="intake" className={inputClass} defaultValue="alert">
+                    <option value="alert">{INTAKE_LABEL.alert}</option>
+                    <option value="monitor">{INTAKE_LABEL.monitor}</option>
+                  </select>
+                )}
+              </Field>
+            </div>
+
+            {actionData?.error && <p className="text-accent-red text-sm">{actionData.error}</p>}
+
+            <div>
+              <SubmitButton pending={saving}>Criar integração</SubmitButton>
+            </div>
+          </Form>
+        </Panel>
+      )}
 
       <Panel>
         {integrations.length === 0 ? (

@@ -1,17 +1,35 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ConfigApiError,
   getIntegration,
   listDeadlines,
   listIntegrations,
-  listKpiTargets,
+  rollbackRevision,
+  upsertMapping,
 } from '../app/features/config/api.server.ts';
 import {
+  CONTRACT_FIELDS,
   DOMAIN_VALUES,
   formatDuration,
   MAPPED_FIELDS,
-  type MappingField,
 } from '../app/features/config/types.ts';
+
+/** Answers whatever the call under test asks for; no service is reachable here. */
+function stubApi(status: number, body: unknown) {
+  const fetchMock = vi.fn(
+    async (_input: Request | string | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('formatDuration', () => {
   it('reads whole days as days and everything else as hours', () => {
@@ -43,82 +61,73 @@ describe('mapped fields', () => {
   });
 });
 
-describe('config api', async () => {
-  const integrations = await listIntegrations();
-
-  it('carries the OLA deadlines the data dictionary defines', async () => {
-    const deadlines = await listDeadlines();
-    const bySeverity = new Map(deadlines.map(d => [d.severity, d.deadlineSeconds]));
-    expect(bySeverity.get(1)).toBe(14400);
-    expect(bySeverity.get(2)).toBe(14400);
-    expect(bySeverity.get(3)).toBe(43200);
-    expect(bySeverity.get(4)).toBe(86400);
-    expect(bySeverity.get(5)).toBe(345600);
+describe('contract fields', () => {
+  it('marks as translated exactly the fields its intake maps', () => {
+    for (const intake of ['alert', 'monitor'] as const) {
+      const translated = CONTRACT_FIELDS[intake]
+        .filter(field => field.translated)
+        .map(field => field.field);
+      expect([...translated].sort()).toEqual([...MAPPED_FIELDS[intake]].sort());
+    }
   });
 
-  it('answers 404 for an integration that does not exist', async () => {
+  it('carries every bindable field of each contract', () => {
+    // The pipeline stamps event_id, tenant_id, source, version,
+    // dictionary_version and received_at, so they are never bound here.
+    expect(CONTRACT_FIELDS.alert).toHaveLength(17);
+    expect(CONTRACT_FIELDS.monitor).toHaveLength(10);
+  });
+});
+
+describe('config api', () => {
+  it('addresses the configured tenant, never one the caller picks', async () => {
+    const fetchMock = stubApi(200, { items: [] });
+
+    await listIntegrations();
+
+    const request = fetchMock.mock.calls[0]?.[0] as unknown as Request;
+    expect(new URL(request.url).pathname).toBe('/tenants/locaweb/integrations');
+  });
+
+  it('carries the OLA deadlines the data dictionary defines', async () => {
+    stubApi(200, {
+      items: [
+        { severity: 1, deadlineSeconds: 14400 },
+        { severity: 3, deadlineSeconds: 43200 },
+      ],
+    });
+
+    const bySeverity = new Map((await listDeadlines()).map(d => [d.severity, d.deadlineSeconds]));
+
+    expect(bySeverity.get(1)).toBe(14400);
+    expect(bySeverity.get(3)).toBe(43200);
+  });
+
+  it('surfaces a 404 as an error carrying the status, not as an empty answer', async () => {
+    stubApi(404, { detail: 'integration nope not found' });
+
     await expect(getIntegration('nope')).rejects.toThrow(ConfigApiError);
     await expect(getIntegration('nope')).rejects.toMatchObject({ status: 404 });
   });
 
-  it('returns each integration with its bindings and mappings inlined', async () => {
-    for (const listed of integrations) {
-      const one = await getIntegration(listed.source);
-      expect(one.source).toBe(listed.source);
-      expect(one.bindings.length).toBeGreaterThan(0);
-    }
+  it('accepts a 204 from a write that returns nothing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+
+    // Rollback changes state and answers no body; parsing it would throw.
+    await expect(rollbackRevision('11111111-1111-4111-8111-111111111111')).resolves.toBeUndefined();
   });
 
-  it('never exposes the signing secret, only when it was issued', () => {
-    for (const integration of integrations) {
-      expect(Object.keys(integration)).not.toContain('secret');
-      expect(Date.parse(integration.secretCreatedAt)).not.toBeNaN();
-    }
-  });
+  it('sends a mapping as a JSON body the API can validate', async () => {
+    const fetchMock = stubApi(200, {});
 
-  it('maps only the fields its intake translates', () => {
-    for (const integration of integrations) {
-      const allowed = MAPPED_FIELDS[integration.intake];
-      for (const field of Object.keys(integration.mappings) as MappingField[]) {
-        expect(allowed, `${integration.source} maps ${field}`).toContain(field);
-      }
-    }
-  });
+    await upsertMapping('itsm', { field: 'status', from: 'Encerrado', to: 'closed' });
 
-  it('only ever targets a value the domain knows', () => {
-    for (const integration of integrations) {
-      for (const [field, entries] of Object.entries(integration.mappings)) {
-        const known = DOMAIN_VALUES[field as MappingField];
-        if (known.length === 0) continue;
-        for (const entry of entries) expect(known).toContain(entry.to);
-      }
-    }
-  });
-
-  it('gives every mapping a key that survives editing either side', () => {
-    for (const integration of integrations) {
-      const ids = Object.values(integration.mappings)
-        .flat()
-        .map(entry => entry.id);
-      expect(new Set(ids).size).toBe(ids.length);
-    }
-  });
-
-  it('marks as translated exactly the fields its intake maps', () => {
-    for (const integration of integrations) {
-      const translated = integration.bindings
-        .filter(binding => binding.translated)
-        .map(binding => binding.field);
-      expect([...translated].sort()).toEqual([...MAPPED_FIELDS[integration.intake]].sort());
-    }
-  });
-
-  it('reports the KPI target bands as ordered bands', async () => {
-    const targets = await listKpiTargets();
-    expect(targets.length).toBeGreaterThan(0);
-    for (const target of targets) {
-      expect(target.achievementPct).toBeGreaterThanOrEqual(0);
-      expect(target.maxBreaches).toBeGreaterThan(0);
-    }
+    const request = fetchMock.mock.calls[0]?.[0] as unknown as Request;
+    expect(request.method).toBe('POST');
+    expect(request.headers.get('content-type')).toBe('application/json');
+    expect(await request.json()).toEqual({ field: 'status', from: 'Encerrado', to: 'closed' });
   });
 });

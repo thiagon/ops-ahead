@@ -16,6 +16,8 @@ export function originKey(tenantId: string, source: string): string {
 
 export type ConfigStatus = 'published' | 'draft';
 
+export type Intake = 'alert' | 'monitor';
+
 export type Origin = {
   tenantId: string;
   /** The origin system itself, e.g. 'service_now' — not its category. */
@@ -28,20 +30,220 @@ export type Origin = {
 };
 
 /**
- * One field of a translated contract and where it is read from in the origin's
- * own payload. What the dictionary does for values, this does for fields:
- * without it an origin can only be added in code (apps/data-ingest/src/sources/).
+ * Where one field of the translated contract is read in the origin's own
+ * payload. What the dictionary does for values, this does for fields
+ * (contracts/field-binding.schema.json).
  */
 export type FieldBinding = {
   /** Field of incident-alert.schema.json / condition-monitor.schema.json. */
   field: string;
   /** Dotted path into the origin's payload, e.g. 'fields.status.name'. */
   path: string | null;
+};
+
+/**
+ * What the contract says about a field — whether it is required, what it
+ * carries, whether its values go through the dictionary. It describes the
+ * domain, not the tenant, so it is never configuration and never travels on
+ * the wire: the screen reads it here and the API answers paths alone.
+ */
+export type ContractField = {
+  field: string;
   required: boolean;
   type: 'string' | 'integer' | 'object';
   hint: string;
   /** Whether this field's values also go through the dictionary. */
   translated: boolean;
+};
+
+export const CONTRACT_FIELDS: Record<Intake, readonly ContractField[]> = {
+  alert: [
+    {
+      field: 'external_id',
+      required: true,
+      type: 'string',
+      hint: 'Identidade na origem, como o número do chamado.',
+      translated: false,
+    },
+    {
+      field: 'opened_at',
+      required: true,
+      type: 'string',
+      hint: 'Quando foi aberto.',
+      translated: false,
+    },
+    {
+      field: 'acknowledged_at',
+      required: false,
+      type: 'string',
+      hint: 'Quando alguém assumiu.',
+      translated: false,
+    },
+    {
+      field: 'resolved_at',
+      required: false,
+      type: 'string',
+      hint: 'Quando a causa foi resolvida.',
+      translated: false,
+    },
+    {
+      field: 'closed_at',
+      required: false,
+      type: 'string',
+      hint: 'Quando foi encerrado.',
+      translated: false,
+    },
+    {
+      field: 'severity',
+      required: true,
+      type: 'integer',
+      hint: 'Prioridade na escala da origem.',
+      translated: true,
+    },
+    { field: 'status', required: true, type: 'string', hint: 'Situação atual.', translated: true },
+    {
+      field: 'entity_id',
+      required: false,
+      type: 'string',
+      hint: 'O que foi afetado.',
+      translated: false,
+    },
+    {
+      field: 'title',
+      required: true,
+      type: 'string',
+      hint: 'Resumo em uma linha.',
+      translated: false,
+    },
+    {
+      field: 'description',
+      required: false,
+      type: 'string',
+      hint: 'Descrição completa.',
+      translated: false,
+    },
+    {
+      field: 'owner',
+      required: false,
+      type: 'string',
+      hint: 'Quem atende agora.',
+      translated: false,
+    },
+    {
+      field: 'reported_by',
+      required: false,
+      type: 'string',
+      hint: 'Como foi aberto.',
+      translated: true,
+    },
+    {
+      field: 'parent_id',
+      required: false,
+      type: 'string',
+      hint: 'Chamado pai, quando houver.',
+      translated: false,
+    },
+    {
+      field: 'resolution_code',
+      required: false,
+      type: 'string',
+      hint: 'Desfecho do encerramento.',
+      translated: true,
+    },
+    {
+      field: 'resolution_summary',
+      required: false,
+      type: 'string',
+      hint: 'O que foi feito.',
+      translated: false,
+    },
+    {
+      field: 'labels',
+      required: false,
+      type: 'object',
+      hint: 'Produto, categoria e afins.',
+      translated: false,
+    },
+    {
+      field: 'source_url',
+      required: false,
+      type: 'string',
+      hint: 'Link para o chamado na origem.',
+      translated: false,
+    },
+  ],
+  monitor: [
+    {
+      field: 'external_id',
+      required: true,
+      type: 'string',
+      hint: 'Identidade na origem.',
+      translated: false,
+    },
+    {
+      field: 'started_at',
+      required: true,
+      type: 'string',
+      hint: 'Quando a condição disparou.',
+      translated: false,
+    },
+    {
+      field: 'ended_at',
+      required: false,
+      type: 'string',
+      hint: 'Quando normalizou.',
+      translated: false,
+    },
+    {
+      field: 'severity',
+      required: false,
+      type: 'integer',
+      hint: 'Gravidade na escala da origem.',
+      translated: true,
+    },
+    {
+      field: 'condition',
+      required: true,
+      type: 'string',
+      hint: 'Disparada ou normalizada.',
+      translated: true,
+    },
+    {
+      field: 'entity_id',
+      required: true,
+      type: 'string',
+      hint: 'O que está sendo monitorado.',
+      translated: false,
+    },
+    {
+      field: 'title',
+      required: false,
+      type: 'string',
+      hint: 'Resumo em uma linha.',
+      translated: false,
+    },
+    {
+      field: 'description',
+      required: false,
+      type: 'string',
+      hint: 'Descrição completa.',
+      translated: false,
+    },
+    {
+      field: 'labels',
+      required: false,
+      type: 'object',
+      hint: 'Rótulos adicionais.',
+      translated: false,
+    },
+    {
+      field: 'source_url',
+      required: false,
+      type: 'string',
+      hint: 'Link para o sinal na origem.',
+      translated: false,
+    },
+  ],
 };
 
 /** One origin value mapped to one domain value, e.g. 'Encerrado' → 'closed'. */
@@ -52,8 +254,6 @@ export type MappingEntry = {
   from: string;
   to: string;
 };
-
-export type Intake = 'alert' | 'monitor';
 
 /** The mapping keys a dictionary can carry. Which ones apply is decided by the
     origin's intake — see MAPPED_FIELDS. */
