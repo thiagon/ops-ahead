@@ -1,5 +1,5 @@
-# Same PreSync-hook pattern data-ingest's migration Job uses: dbt seed +
-# dbt run materialize every seed/view/table this app owns — including
+# Same PreSync-hook pattern data-ingest's migration Job uses: dbt run
+# materializes every view/table this app owns — including
 # tenant_deadlines and silver_alert_open — before the rest of this app's
 # sync proceeds, and, via sync-wave ordering, before data-deadline-tracker's
 # wave starts, since its startup reads both.

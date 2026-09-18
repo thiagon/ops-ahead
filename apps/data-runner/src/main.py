@@ -21,7 +21,7 @@ def main() -> None:
         return
 
     if len(sys.argv) < 3 or sys.argv[1] != "run" or sys.argv[2] not in STEPS:
-        LOGGER.error("Usage: python -m main run <seed|transform|quality> [args...] | consume")
+        LOGGER.error("Usage: python -m main run <build|transform|quality> [args...] | consume")
         sys.exit(2)
 
     step, extra_args = sys.argv[2], sys.argv[3:]

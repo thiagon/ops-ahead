@@ -1,6 +1,0 @@
-tenant_id,severity,deadline_seconds
-locaweb,1,14400
-locaweb,2,14400
-locaweb,3,43200
-locaweb,4,86400
-locaweb,5,345600

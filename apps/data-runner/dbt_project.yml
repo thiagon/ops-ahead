@@ -5,7 +5,6 @@ profile: ops_ahead
 model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
-seed-paths: ["seeds"]
 
 models:
   ops_ahead:
@@ -19,8 +18,3 @@ models:
       +materialized: table
       +engine: "MergeTree()"
 
-seeds:
-  ops_ahead:
-    +column_types:
-      severity: UInt8
-      deadline_seconds: UInt32

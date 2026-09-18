@@ -7,7 +7,7 @@
     )
 }}
 
--- Cumulative KPI achievement against the annual band (seeds/tenant_kpi_targets.csv).
+-- Cumulative KPI achievement against the annual band, as configured per tenant.
 -- P1 and P2 share one band (kpi_group = 'p1_p2' — the kickoff never scores P1
 -- alone, always "P1+P2"); P3 has its own. breached_ytd resets every year.
 with monthly as (
@@ -54,7 +54,7 @@ select
     c.breached_ytd,
     t.achievement_pct
 from cumulative c
-inner join {{ ref('tenant_kpi_targets') }} t
+inner join {{ source('config', 'tenant_kpi_targets') }} t
     on  t.tenant_id = c.tenant_id
     and t.kpi_group = c.kpi_group
 where t.max_breaches >= c.breached_ytd
