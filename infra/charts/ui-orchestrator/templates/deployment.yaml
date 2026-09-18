@@ -77,23 +77,23 @@ spec:
               value: {{ .Values.orchestrator.env.kafkaTopicConfigDeadline | quote }}
             - name: KAFKA_TOPIC_CONFIG_KPI_TARGET
               value: {{ .Values.orchestrator.env.kafkaTopicConfigKpiTarget | quote }}
-            - name: CONFIG_POSTGRES_USER
+            - name: UI_POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: POSTGRES_USER
-            - name: CONFIG_POSTGRES_PASSWORD
+            - name: UI_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: POSTGRES_PASSWORD
-            - name: CONFIG_POSTGRES_DB
+            - name: UI_POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: POSTGRES_DB
             - name: CONFIG_DATABASE_URL
-              value: postgres://$(CONFIG_POSTGRES_USER):$(CONFIG_POSTGRES_PASSWORD)@{{ .Values.orchestrator.env.configPostgresHost }}/$(CONFIG_POSTGRES_DB)
+              value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.orchestrator.env.configPostgresHost }}/$(UI_POSTGRES_DB)
             - name: VAULT_ADDR
               value: {{ .Values.orchestrator.env.vaultAddr | quote }}
             - name: VAULT_ROLE
