@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["scripts", "apps/*"]
+members = ["scripts", "notebooks", "apps/*"]
 # apps/ui-gateway, apps/ui-orchestrator and apps/ui-frontend are
 # Node/TypeScript services (npm), not uv members.
 exclude = ["apps/ui-gateway", "apps/ui-orchestrator", "apps/ui-frontend"]
