@@ -32,7 +32,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY apps/ui-orchestrator/migrations ./migrations
 COPY apps/ui-orchestrator/package.json ./
 EXPOSE 3000
 USER node

@@ -69,37 +69,6 @@ spec:
               value: {{ .Values.orchestrator.env.kafkaTopicData | quote }}
             - name: KAFKA_TOPIC_STATUS
               value: {{ .Values.orchestrator.env.kafkaTopicStatus | quote }}
-            - name: KAFKA_TOPIC_CONFIG_ORIGIN
-              value: {{ .Values.orchestrator.env.kafkaTopicConfigOrigin | quote }}
-            - name: KAFKA_TOPIC_CONFIG_DICTIONARY
-              value: {{ .Values.orchestrator.env.kafkaTopicConfigDictionary | quote }}
-            - name: KAFKA_TOPIC_CONFIG_DEADLINE
-              value: {{ .Values.orchestrator.env.kafkaTopicConfigDeadline | quote }}
-            - name: KAFKA_TOPIC_CONFIG_KPI_TARGET
-              value: {{ .Values.orchestrator.env.kafkaTopicConfigKpiTarget | quote }}
-            - name: UI_POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: POSTGRES_USER
-            - name: UI_POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: POSTGRES_PASSWORD
-            - name: UI_POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: POSTGRES_DB
-            - name: CONFIG_DATABASE_URL
-              value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.orchestrator.env.configPostgresHost }}/$(UI_POSTGRES_DB)
-            - name: VAULT_ADDR
-              value: {{ .Values.orchestrator.env.vaultAddr | quote }}
-            - name: VAULT_ROLE
-              value: {{ .Values.orchestrator.env.vaultRole | quote }}
-            - name: VAULT_SECRET_PATH
-              value: {{ .Values.orchestrator.env.vaultSecretPath | quote }}
           resources:
             {{- toYaml .Values.orchestrator.resources | nindent 12 }}
           # trigger.status must be fully rehydrated before the app starts
@@ -125,19 +94,6 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: vault-token
-              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-              readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
-        # Projected rather than automounted: the token is short-lived and
-        # audience-scoped, and only this path carries it — Vault's Kubernetes
-        # auth is the one thing that needs it.
-        - name: vault-token
-          projected:
-            sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-                  audience: vault

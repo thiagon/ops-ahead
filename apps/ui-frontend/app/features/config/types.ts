@@ -9,25 +9,7 @@
 
 export type ConfigDomain = 'origin' | 'dictionary' | 'deadline' | 'kpi_target';
 
-/** Identifies an origin everywhere it is addressed — URL, key, revision. */
-export function originKey(tenantId: string, source: string): string {
-  return `${tenantId}:${source}`;
-}
-
-export type ConfigStatus = 'published' | 'draft';
-
 export type Intake = 'alert' | 'monitor';
-
-export type Origin = {
-  tenantId: string;
-  /** The origin system itself, e.g. 'service_now' — not its category. */
-  source: string;
-  intake: Intake;
-  envelopeVersion: string;
-  /** Shown once when generated or rotated, then never readable again. */
-  secretCreatedAt: string;
-  enabled: boolean;
-};
 
 /**
  * Where one field of the translated contract is read in the origin's own
@@ -259,50 +241,15 @@ export type MappingEntry = {
     origin's intake — see MAPPED_FIELDS. */
 export type MappingField = 'status' | 'severity' | 'reported_by' | 'resolution_code' | 'condition';
 
-export type Dictionary = {
-  tenantId: string;
-  source: string;
-  intake: Intake;
-  version: string;
-  status: ConfigStatus;
-  mappings: Partial<Record<MappingField, MappingEntry[]>>;
-};
-
 export type Deadline = {
-  tenantId: string;
   severity: number;
   deadlineSeconds: number;
 };
 
 export type KpiTarget = {
-  tenantId: string;
   kpiGroup: string;
   maxBreaches: number;
   achievementPct: number;
-};
-
-export type ConfigRevision = {
-  id: string;
-  domain: ConfigDomain;
-  tenantId: string;
-  summary: string;
-  author: string;
-  at: string;
-};
-
-export type FieldMap = {
-  tenantId: string;
-  source: string;
-  bindings: FieldBinding[];
-};
-
-export type ConfigCatalog = {
-  origins: Origin[];
-  fieldMaps: FieldMap[];
-  dictionaries: Dictionary[];
-  deadlines: Deadline[];
-  kpiTargets: KpiTarget[];
-  revisions: ConfigRevision[];
 };
 
 /**

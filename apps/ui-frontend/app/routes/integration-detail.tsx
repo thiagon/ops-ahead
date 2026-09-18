@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Link, useFetcher, useNavigation } from 'react-router';
+import { data, Form, Link, useFetcher, useNavigation } from 'react-router';
 import { Badge } from '~/components/Badge';
 import { Field, GhostSubmit, InputButton, inputClass, SubmitButton } from '~/components/form';
 import {
@@ -15,13 +15,15 @@ import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
 import {
-  ConfigApiError,
+  ConflictError,
   getIntegration,
+  NotFoundError,
   removeMapping,
   rotateSecret,
   updateBindings,
   upsertMapping,
-} from '~/features/config/api.server.ts';
+} from '~/features/config/repo.server.ts';
+import { takeSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
   CONTRACT_FIELDS,
   DOMAIN_VALUES,
@@ -64,9 +66,9 @@ function buildRows(field: MappingField, entries: MappingEntry[]): DomainRow[] {
   return [...byDomainValue].map(([domainValue, origins]) => ({ domainValue, origins }));
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const integration = await getIntegration(params.source).catch(error => {
-    if (error instanceof ConfigApiError && error.status === 404) {
+    if (error instanceof NotFoundError) {
       throw new Response('Integração não encontrada', { status: 404 });
     }
     throw error;
@@ -90,18 +92,25 @@ export async function loader({ params }: Route.LoaderArgs) {
     };
   });
 
-  return {
-    origin: integration,
-    url: webhookUrl(
-      config.PUBLIC_GATEWAY_URL,
-      integration.envelopeVersion,
-      config.TENANT_ID,
-      integration.source,
-    ),
-    fields,
-    dictionaryVersion: integration.dictionaryVersion,
-    dictionaryStatus: integration.dictionaryStatus,
-  };
+  const { secret, clearHeader } = await takeSecretFlash(request, params.source);
+  const headers = clearHeader ? { 'Set-Cookie': clearHeader } : undefined;
+
+  return data(
+    {
+      origin: integration,
+      url: webhookUrl(
+        config.PUBLIC_GATEWAY_URL,
+        integration.envelopeVersion,
+        config.TENANT_ID,
+        integration.source,
+      ),
+      fields,
+      dictionaryVersion: integration.dictionaryVersion,
+      dictionaryStatus: integration.dictionaryStatus,
+      flashedSecret: secret,
+    },
+    { headers },
+  );
 }
 
 /**
@@ -115,8 +124,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   try {
     if (intent === 'rotate-secret') {
-      const { secret } = await rotateSecret(params.source);
-      return { secret, error: null };
+      return { secret: await rotateSecret(params.source), error: null };
     }
 
     if (intent === 'add-mapping') {
@@ -140,7 +148,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     await updateBindings(params.source, bindings);
     return { secret: null, error: null };
   } catch (error) {
-    if (error instanceof ConfigApiError) return { secret: null, error: error.detail };
+    if (error instanceof ConflictError || error instanceof NotFoundError) {
+      return { secret: null, error: error.message };
+    }
     throw error;
   }
 }
@@ -361,8 +371,10 @@ function FieldRowItem({ row }: { row: FieldRow }) {
 }
 
 export default function IntegrationDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { origin, url, fields, dictionaryVersion, dictionaryStatus } = loaderData;
+  const { origin, url, fields, dictionaryVersion, dictionaryStatus, flashedSecret } = loaderData;
   const saving = useNavigation().state === 'submitting';
+  const [confirmRotate, setConfirmRotate] = useState(false);
+  const secret = actionData?.secret ?? flashedSecret;
   const missing = fields.filter(row => row.required && !row.path).length;
   const uncovered = fields.reduce((total, row) => {
     if (!row.values || row.values.freeForm) return total;
@@ -408,10 +420,10 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
             hint="Cada envio é um POST com o corpo em JSON."
           />
 
-          {actionData?.secret ? (
+          {secret ? (
             <CopyField
               label="Chave de assinatura"
-              value={actionData.secret}
+              value={secret}
               hint="Guarde agora — ao sair desta tela ela não é mais exibida."
             />
           ) : (
@@ -420,21 +432,44 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
               label="Chave de assinatura"
               hint="Assine o corpo com HMAC SHA-256 e envie no cabeçalho X-Signature."
             >
-              {id => (
-                <Form method="post" className="flex gap-2">
-                  <input type="hidden" name="intent" value="rotate-secret" />
-                  <input
-                    id={id}
-                    readOnly
-                    value="••••••••••••••••••••••••••••••••"
-                    className={`${inputClass} font-mono text-text-dim text-xs`}
-                  />
-                  <InputButton type="submit">
-                    <RefreshIcon className="h-4 w-4 shrink-0" />
-                    Gerar
-                  </InputButton>
-                </Form>
-              )}
+              {id =>
+                confirmRotate ? (
+                  <Form method="post" className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input type="hidden" name="intent" value="rotate-secret" />
+                    <input
+                      id={id}
+                      readOnly
+                      value="••••••••••••••••••••••••••••••••"
+                      className={`${inputClass} font-mono text-text-dim text-xs`}
+                    />
+                    <p className="shrink-0 text-sm text-text-muted sm:max-w-xs">
+                      A chave atual deixa de valer. Atualize no {origin.source} em seguida.
+                    </p>
+                    <div className="flex gap-2">
+                      <InputButton type="submit">
+                        <RefreshIcon className="h-4 w-4 shrink-0" />
+                        Confirmar
+                      </InputButton>
+                      <InputButton type="button" onClick={() => setConfirmRotate(false)}>
+                        Cancelar
+                      </InputButton>
+                    </div>
+                  </Form>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      id={id}
+                      readOnly
+                      value="••••••••••••••••••••••••••••••••"
+                      className={`${inputClass} font-mono text-text-dim text-xs`}
+                    />
+                    <InputButton type="button" onClick={() => setConfirmRotate(true)}>
+                      <RefreshIcon className="h-4 w-4 shrink-0" />
+                      Gerar
+                    </InputButton>
+                  </div>
+                )
+              }
             </Field>
           )}
           <p className="-mt-1 text-text-dim text-xs">

@@ -1,0 +1,108 @@
+// The configuration registry behind the Ajustes screens. This database belongs
+// to the frontend: nothing else reads or writes it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CONFIG_DATABASE_URL")
+}
+
+/// An origin the tenant sends events from, named by the customer.
+model Origin {
+  tenantId        String    @map("tenant_id")
+  source          String
+  intake          String
+  envelopeVersion String    @map("envelope_version")
+  enabled         Boolean   @default(true)
+  /// Only when the key was minted — the key itself is never stored.
+  secretCreatedAt DateTime? @map("secret_created_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  bindings   FieldBinding[]
+  mappings   Mapping[]
+  dictionary DictionaryVersion?
+
+  @@id([tenantId, source])
+  @@map("config_origin")
+}
+
+/// Where each field of the translated contract is read in the origin's payload.
+model FieldBinding {
+  tenantId String  @map("tenant_id")
+  source   String
+  field    String
+  path     String?
+
+  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+
+  @@id([tenantId, source, field])
+  @@map("config_field_binding")
+}
+
+/// One origin value mapped to one domain value. Several origin values may land
+/// on the same domain value, never the reverse — hence the key on the origin side.
+model Mapping {
+  id           String @id @db.Uuid
+  tenantId     String @map("tenant_id")
+  source       String
+  mappingField String @map("mapping_field")
+  fromValue    String @map("from_value")
+  toValue      String @map("to_value")
+
+  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+
+  @@unique([tenantId, source, mappingField, fromValue])
+  @@map("config_mapping")
+}
+
+model DictionaryVersion {
+  tenantId String @map("tenant_id")
+  source   String
+  version  String
+  status   String
+
+  origin Origin @relation(fields: [tenantId, source], references: [tenantId, source], onDelete: Cascade)
+
+  @@id([tenantId, source])
+  @@map("config_dictionary_version")
+}
+
+model Deadline {
+  tenantId        String @map("tenant_id")
+  severity        Int    @db.SmallInt
+  deadlineSeconds Int    @map("deadline_seconds")
+
+  @@id([tenantId, severity])
+  @@map("config_deadline")
+}
+
+/// A group carries one row per achievement band, so the band is part of the key.
+model KpiTarget {
+  tenantId       String  @map("tenant_id")
+  kpiGroup       String  @map("kpi_group")
+  maxBreaches    Int     @map("max_breaches")
+  achievementPct Decimal @map("achievement_pct") @db.Decimal(5, 2)
+
+  @@id([tenantId, kpiGroup, achievementPct])
+  @@map("config_kpi_target")
+}
+
+/// Append-only: `payload` is the state as it stood before the change, which is
+/// what a rollback restores.
+model Revision {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id")
+  domain    String
+  configKey String   @map("config_key")
+  summary   String
+  author    String
+  payload   Json?
+  at        DateTime @default(now()) @db.Timestamptz()
+
+  @@index([tenantId, at(sort: Desc)])
+  @@map("config_revision")
+}

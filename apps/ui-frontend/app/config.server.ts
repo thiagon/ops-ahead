@@ -11,12 +11,12 @@ const configSchema = z.object({
   // cluster — an ingress host, so it differs per environment and the
   // integration screen has nothing to show until it is set.
   PUBLIC_GATEWAY_URL: z.url({ protocol: /^https?$/ }).default('https://gateway.ops-ahead.local'),
-  // Configuration API — served by ui-orchestrator. Answered in-process while
-  // that service does not expose these routes yet.
-  CONFIG_API_URL: z
-    .url({ protocol: /^https?$/ })
-    .default('http://ui-orchestrator.ui.svc.cluster.local:3000'),
-  CONFIG_API_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  // The configuration registry this app owns — nothing else reads or writes
+  // it (apps/ui-frontend/prisma/schema.prisma).
+  CONFIG_DATABASE_URL: z
+    .string()
+    .min(1)
+    .default('postgres://config:config@config-postgres.ui.svc.cluster.local:5432/config'),
   ML_MODEL_SERVING_URL: z
     .url({ protocol: /^https?$/ })
     .default('http://ml-model-serving.ml.svc.cluster.local:3000'),

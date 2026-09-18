@@ -22,7 +22,11 @@ FROM base AS build
 ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/ui-frontend ./
-RUN npm run build \
+# Prisma needs a URL at generate time only for the datasource block; the
+# client is not connected here. The PreSync Job and the app supply the real one.
+ENV CONFIG_DATABASE_URL=postgres://config:config@127.0.0.1:5432/config
+RUN npx prisma generate \
+ && npm run build \
  && npm prune --omit=dev
 
 FROM node:24-trixie-slim AS prod
@@ -30,7 +34,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
-COPY apps/ui-frontend/package.json ./
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/package.json ./
 EXPOSE 3000
 USER node
 CMD ["node_modules/.bin/react-router-serve", "./build/server/index.js"]

@@ -6,14 +6,15 @@ import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import {
-  ConfigApiError,
+  ConflictError,
   listDeadlines,
   listKpiTargets,
   listRevisions,
+  NotFoundError,
   replaceDeadlines,
   replaceKpiTargets,
-  rollbackRevision,
-} from '~/features/config/api.server.ts';
+  rollback,
+} from '~/features/config/repo.server.ts';
 import { type ConfigDomain, formatDuration, SEVERITY_LABEL } from '~/features/config/types.ts';
 import type { Route } from './+types/targets';
 
@@ -40,12 +41,13 @@ export async function action({ request }: Route.ActionArgs) {
   const revert = form.get('revert');
   if (typeof revert === 'string') {
     try {
-      await rollbackRevision(revert);
+      await rollback(revert);
     } catch (error) {
-      if (error instanceof ConfigApiError) return { error: error.detail };
+      if (error instanceof ConflictError || error instanceof NotFoundError)
+        return { error: error.message, on: 'revert' as const };
       throw error;
     }
-    return { error: null };
+    return { error: null, on: 'revert' as const };
   }
 
   const deadlines = form.getAll('severity').map((severity, index) => ({
@@ -61,11 +63,12 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     await Promise.all([replaceDeadlines(deadlines), replaceKpiTargets(kpiTargets)]);
   } catch (error) {
-    if (error instanceof ConfigApiError) return { error: error.detail };
+    if (error instanceof ConflictError || error instanceof NotFoundError)
+      return { error: error.message, on: 'save' as const };
     throw error;
   }
 
-  return { error: null };
+  return { error: null, on: 'save' as const };
 }
 
 const DOMAIN_LABEL: Record<ConfigDomain, string> = {
@@ -105,7 +108,7 @@ export default function Targets({ loaderData, actionData }: Route.ComponentProps
           action={<SubmitButton pending={saving}>Publicar alterações</SubmitButton>}
         />
 
-        {actionData?.error && (
+        {actionData?.on === 'save' && actionData.error && (
           <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
             {actionData.error}
           </p>
@@ -189,8 +192,15 @@ export default function Targets({ loaderData, actionData }: Route.ComponentProps
           <h2 className="font-semibold text-text-light text-xl">Histórico</h2>
         </div>
         <p className="mb-4 text-sm text-text-muted">
-          Toda alteração publicada fica registrada e pode ser revertida.
+          Toda alteração publicada fica registrada. O que substituiu um estado anterior pode ser
+          revertido.
         </p>
+
+        {actionData?.on === 'revert' && actionData.error && (
+          <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
+            {actionData.error}
+          </p>
+        )}
 
         <div className="flex flex-col">
           {revisions.map(revision => (
@@ -207,11 +217,13 @@ export default function Targets({ loaderData, actionData }: Route.ComponentProps
                   </p>
                 </div>
               </div>
-              <Form method="post">
-                <GhostSubmit name="revert" value={revision.id}>
-                  Reverter
-                </GhostSubmit>
-              </Form>
+              {revision.revertible && (
+                <Form method="post">
+                  <GhostSubmit name="revert" value={revision.id}>
+                    Reverter
+                  </GhostSubmit>
+                </Form>
+              )}
             </div>
           ))}
         </div>

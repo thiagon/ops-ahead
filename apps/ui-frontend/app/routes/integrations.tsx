@@ -7,11 +7,12 @@ import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import {
-  ConfigApiError,
+  ConflictError,
   createIntegration,
   type Integration,
   listIntegrations,
-} from '~/features/config/api.server.ts';
+} from '~/features/config/repo.server.ts';
+import { setSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
   CONTRACT_FIELDS,
   DOMAIN_VALUES,
@@ -64,24 +65,27 @@ export async function loader() {
 
 /**
  * The new integration's signing key is minted here and shown once, on the
- * screen the redirect lands on.
+ * screen the redirect lands on — via a short-lived flash cookie, never the URL.
  */
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const source = String(form.get('source') ?? '').trim();
 
+  let secret: string;
   try {
-    await createIntegration({
+    ({ secret } = await createIntegration({
       source,
       intake: form.get('intake') as Intake,
       envelopeVersion: 'v1',
-    });
+    }));
   } catch (error) {
-    if (error instanceof ConfigApiError) return { error: error.detail };
+    if (error instanceof ConflictError) return { error: error.message };
     throw error;
   }
 
-  return redirect(`/integracoes/${encodeURIComponent(source)}`);
+  return redirect(`/integracoes/${encodeURIComponent(source)}`, {
+    headers: { 'Set-Cookie': await setSecretFlash(source, secret) },
+  });
 }
 
 function Status({
