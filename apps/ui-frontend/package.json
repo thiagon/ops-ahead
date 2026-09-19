@@ -30,7 +30,7 @@
     "@react-router/node": "8.3.0",
     "@react-router/serve": "8.3.0",
     "isbot": "5.2.1",
-    "prisma": "6.19.0",
+    "prisma": "6.19.3",
     "prom-client": "15.1.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -49,7 +49,7 @@
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.2.2",
-    "vitest": "4.1.11"
+    "vitest": "5.0.1"
   },
   "prisma": {
     "seed": "node --experimental-strip-types prisma/seed.ts"
