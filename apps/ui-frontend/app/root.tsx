@@ -1,8 +1,20 @@
 import type { ReactNode } from 'react';
-import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import {
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+} from 'react-router';
 import type { Route } from './+types/root';
+import logo from './assets/logo.png';
 import { useHydrateSession } from './session';
 import './app.css';
+
+export function links() {
+  return [{ rel: 'icon', href: logo, type: 'image/png' }];
+}
 
 export function Layout({ children }: { children: ReactNode }) {
   return (

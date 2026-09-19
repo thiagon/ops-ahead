@@ -1,6 +1,6 @@
 import { Form, redirect, useNavigation } from 'react-router';
 import { inputClass } from '~/components/form';
-import { ShieldIcon } from '~/components/icons';
+import { Logo } from '~/components/Logo';
 import { getTenantBySlug } from '~/features/config/repo.server.ts';
 import { panelPath } from '~/paths';
 import { useSession } from '~/session';
@@ -44,12 +44,10 @@ export default function Home({ actionData }: Route.ComponentProps) {
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent-red to-signal-amber">
-            <ShieldIcon className="h-6 w-6 text-text-light" />
-          </div>
+          <Logo />
           <div>
             <p className="font-semibold text-text-light">Ops Ahead</p>
-            <p className="text-text-dim text-xs">AIOps Locaweb</p>
+            <p className="text-text-dim text-xs">Sempre à frente</p>
           </div>
         </div>
 

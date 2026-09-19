@@ -20,9 +20,9 @@ import {
   ListIcon,
   MenuIcon,
   PlugIcon,
-  ShieldIcon,
   TrendingUpIcon,
 } from './icons';
+import { Logo } from './Logo';
 
 type NavLink = {
   to: string;
@@ -229,9 +229,7 @@ function NavLinks({
 function Brand({ tenant, collapsed }: { tenant: TenantRef; collapsed: boolean }) {
   return (
     <div className={`flex items-center gap-3 px-3 ${collapsed ? 'justify-center' : ''}`}>
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent-red to-signal-amber">
-        <ShieldIcon className="h-6 w-6 text-text-light" />
-      </div>
+      <Logo alt={collapsed ? 'Ops Ahead' : ''} />
       {!collapsed && (
         <div className="min-w-0">
           <p className="truncate font-semibold text-sm text-text-light">Ops Ahead</p>

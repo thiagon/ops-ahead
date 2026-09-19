@@ -2,19 +2,6 @@ type IconProps = { className?: string };
 
 const base = 'stroke-current fill-none';
 
-export function ShieldIcon({ className }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      strokeWidth={2}
-      className={`${base} ${className ?? ''}`}
-      aria-hidden="true"
-    >
-      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function GridIcon({ className }: IconProps) {
   return (
     <svg
