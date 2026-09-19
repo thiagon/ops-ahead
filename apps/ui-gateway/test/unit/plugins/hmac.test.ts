@@ -72,7 +72,7 @@ describe('signature verification enabled', () => {
     const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(401);
-    expect(res.json()).toMatchObject({ error: 'InvalidSignature' });
+    expect(res.json()).toMatchObject({ error: 'UnauthorizedError' });
   });
 
   it('refuses a request whose body was tampered with after signing', async () => {

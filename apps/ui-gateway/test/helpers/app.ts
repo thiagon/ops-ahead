@@ -93,13 +93,7 @@ export function memoryPrisma(): PrismaClient {
         }
         return rows.get(where.id);
       },
-      async update({
-        where,
-        data,
-      }: {
-        where: { id: string };
-        data: Partial<AnalysisRow>;
-      }) {
+      async update({ where, data }: { where: { id: string }; data: Partial<AnalysisRow> }) {
         const current = rows.get(where.id);
         if (!current) throw new Error('not found');
         rows.set(where.id, { ...current, ...data });

@@ -2,9 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestApp } from '../../../helpers/app.ts';
 
-const publish = vi.fn(
-  async (_message: { topic: string; key: string; value: string }) => undefined,
-);
+const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
 
 describe('POST /analyses', () => {
   let app: FastifyInstance;

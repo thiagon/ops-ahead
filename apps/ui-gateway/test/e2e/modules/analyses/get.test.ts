@@ -24,7 +24,7 @@ describe('GET /analyses/:id', () => {
     const res = await app.inject({ method: 'GET', url: '/analyses/never-seen' });
 
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: 'NotFound', message: 'analysis not found' });
+    expect(res.json()).toEqual({ error: 'NotFoundError', message: 'analysis not found' });
   });
 
   it('reflects running after PATCH with the kafka update key', async () => {

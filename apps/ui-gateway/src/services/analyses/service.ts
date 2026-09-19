@@ -1,27 +1,15 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import createError from 'http-errors';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import type { EventPublisher } from '../../plugins/kafka.ts';
 import { AnalysisPublish } from './publish.ts';
-import type { AnalysisRequest, AnalysisStatus, AnalysisStatusUpdate } from './schema.ts';
+import type {
+  AnalysisRequest,
+  AnalysisStatus,
+  AnalysisStatusUpdate,
+  AnalysisStatusValue,
+} from './schema.ts';
 import { AnalysisStore } from './store.ts';
-
-export class UnauthorizedUpdate extends Error {
-  readonly statusCode = 401;
-
-  constructor() {
-    super('invalid update key');
-    this.name = 'Unauthorized';
-  }
-}
-
-export class AnalysisNotFound extends Error {
-  readonly statusCode = 404;
-
-  constructor() {
-    super('analysis not found');
-    this.name = 'NotFound';
-  }
-}
 
 export class AnalysesService {
   #store: AnalysisStore;
@@ -46,20 +34,38 @@ export class AnalysesService {
     updateKey: string,
   ): Promise<AnalysisStatus> {
     const stored = await this.#store.findUpdateKeyHash(id);
-    if (!stored || !matchesStoredHash(updateKey, stored)) throw new UnauthorizedUpdate();
+    if (!stored || !matchesStoredHash(updateKey, stored)) {
+      throw createError.Unauthorized('invalid update key');
+    }
+    const current = await this.#store.getStatus(id);
+    if (!current) throw createError.NotFound('analysis not found');
+    if (!allowsTransition(current.status, patch.status)) {
+      throw createError.Conflict('status cannot move backwards');
+    }
     await this.#store.recordStatus({ id, ...patch });
     return this.getStatus(id);
   }
 
   async getStatus(id: string): Promise<AnalysisStatus> {
     const status = await this.#store.getStatus(id);
-    if (!status) throw new AnalysisNotFound();
+    if (!status) throw createError.NotFound('analysis not found');
     return status;
   }
 }
 
 function hashUpdateKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
+}
+
+const STATUS_RANK: Record<AnalysisStatusValue, number> = {
+  pending: 0,
+  running: 1,
+  succeeded: 2,
+  failed: 2,
+};
+
+function allowsTransition(from: AnalysisStatusValue, to: AnalysisStatusValue): boolean {
+  return to === from || STATUS_RANK[to] > STATUS_RANK[from];
 }
 
 function matchesStoredHash(key: string, storedHex: string): boolean {

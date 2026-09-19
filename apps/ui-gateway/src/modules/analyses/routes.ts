@@ -77,6 +77,7 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
           200: analysisStatusSchema,
           400: analysisErrorSchema,
           401: analysisErrorSchema,
+          409: analysisErrorSchema,
         },
       },
     },

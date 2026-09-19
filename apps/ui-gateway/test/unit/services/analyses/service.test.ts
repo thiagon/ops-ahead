@@ -112,4 +112,31 @@ describe('AnalysesService status', () => {
       analyses.update(started.id, { status: 'running' }, 'not-the-key'),
     ).rejects.toMatchObject({ statusCode: 401 });
   });
+
+  it('rejects moving status backwards — succeeded cannot become running', async () => {
+    const publish = vi.fn(async () => undefined);
+    const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    const started = await analyses.start({ analysis: 'data_refresh' });
+    const key = updateKeyFrom(publish);
+
+    await analyses.update(started.id, { status: 'running' }, key);
+    await analyses.update(started.id, { status: 'succeeded' }, key);
+
+    await expect(analyses.update(started.id, { status: 'running' }, key)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+  });
+
+  it('rejects swapping a terminal status for the other', async () => {
+    const publish = vi.fn(async () => undefined);
+    const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    const started = await analyses.start({ analysis: 'data_refresh' });
+    const key = updateKeyFrom(publish);
+
+    await analyses.update(started.id, { status: 'failed' }, key);
+
+    await expect(analyses.update(started.id, { status: 'succeeded' }, key)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+  });
 });
