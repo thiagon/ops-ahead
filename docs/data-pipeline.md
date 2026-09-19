@@ -36,33 +36,33 @@ app, já que `data-runner` deixou de ser um passo de uma `pipelines/` genérica 
 ter workload (`Deployment` escalado por `ScaledObject`) próprio. Em dev e prod, um `CronJob` nativo (`ns: data`,
 02:00 UTC) publica `{"run_id": "daily-<data>", "analysis": "full_pipeline"}` em
 `trigger.data` — o `run_id` é determinístico pela data, então dá pra consultar
-`GET /runs/daily-2026-08-16` sem procurar o id em log nenhum.
+`GET /analyses/daily-2026-08-16` sem procurar o id em log nenhum.
 
-## Rerodar um step isolado (via `ui-orchestrator`)
+## Rerodar um step isolado (via `ui-gateway`)
 
-`ui-orchestrator` (`https://orchestrator.ops-ahead.localtest.me`) é o único ponto de
+`ui-gateway` (`http://gateway.ops-ahead.localtest.me`) é o único ponto de
 entrada — REST ou MCP, sem kubeconfig nem conhecimento de Kafka/KEDA por parte de quem
 chama:
 
 ```bash
 # só dbt (staging → marts)
-curl -X POST https://orchestrator.ops-ahead.localtest.me/trigger \
+curl -X POST http://gateway.ops-ahead.localtest.me/analyses \
   -H 'content-type: application/json' \
   -d '{"analysis": "data_refresh"}'
 
 # só a suite Great Expectations
-curl -X POST https://orchestrator.ops-ahead.localtest.me/trigger \
+curl -X POST http://gateway.ops-ahead.localtest.me/analyses \
   -H 'content-type: application/json' \
   -d '{"analysis": "data_quality_check"}'
 ```
 
-Resposta `202 {"run_id": "..."}` na hora — o pod ainda não subiu nesse momento
+Resposta `202 {"id": "..."}` na hora — o pod ainda não subiu nesse momento
 (publicado em `trigger.data`; KEDA escala o `data-runner` de 0 pra 1 assim que detecta a
 mensagem na fila). Consultar o resultado:
 
 ```bash
-curl https://orchestrator.ops-ahead.localtest.me/runs/<run_id>
-# {"run_id": "...", "status": "queued" | "Running" | "Succeeded" | "Failed", ...}
+curl http://gateway.ops-ahead.localtest.me/analyses/<id>
+# {"id": "...", "status": "pending" | "running" | "succeeded" | "failed", ...}
 ```
 
 Nenhum dos dois dispara `register-snapshot` — esse passo só roda como parte da cadeia
@@ -73,13 +73,13 @@ caller (é vocabulário só do `CronJob` — ver
 
 Contrato completo dos 4 tipos de análise aceitos (`volume_forecast`, `breach_risk`,
 `data_refresh`, `data_quality_check`) em
-[`apps/ui-orchestrator/README.md`](../apps/ui-orchestrator/README.md).
+[`apps/ui-gateway/README.md`](../apps/ui-gateway/README.md).
 
 ## Rodar a cadeia completa manualmente (raro)
 
 Fora do horário do `CronJob`, publicar `analysis: full_pipeline` direto no tópico
-`trigger.data` roda a cadeia inteira sob demanda — `ui-orchestrator` não expõe isso via
-`POST /trigger` (não existe um "analysis" pra "cadeia completa" no vocabulário do
+`trigger.data` roda a cadeia inteira sob demanda — `ui-gateway` não expõe isso via
+`POST /analyses` (não existe um "analysis" pra "cadeia completa" no vocabulário do
 caller: o objetivo dele é a execução pontual e parametrizada de um domínio por vez, não
 reimplementar o `CronJob`). Publicar manualmente, com um `run_id` à sua escolha:
 
@@ -119,5 +119,5 @@ sujo.
   `data-pipeline-snapshots` — um run por execução de `full_pipeline`, nomeado com o
   `run_id`. Só existe pra runs da cadeia completa.
 - **Data Docs (GE):** console MinIO, bucket `ops-ahead-lake`, prefixo `ge-docs/`.
-- **Status de um run:** `GET /runs/<run_id>` no `ui-orchestrator`, sempre — reflete o
-  que o próprio `Job` publicou em `trigger.status`, nunca consulta o Kubernetes.
+- **Status de uma analysis:** `GET /analyses/<id>` no `ui-gateway`, sempre — reflete o
+  que o consumer gravou via `PATCH /analyses/{id}` (Postgres), nunca consulta o Kubernetes.

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -20,6 +22,35 @@ RegisterSnapshotFn = Callable[..., str]
 
 def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | None) -> None:
+    """PATCH /analyses/{id} with the update_key from the trigger.data message.
+
+    Cron full_pipeline has no key (it never went through POST /analyses) and
+    is skipped so a missing row does not fail the daily chain.
+    """
+    run_id = payload["run_id"]
+    if not update_key:
+        LOGGER.info("no update_key on event; skipping PATCH /analyses/%s", run_id)
+        return
+
+    body = {key: value for key, value in payload.items() if key != "run_id"}
+    request = urllib.request.Request(
+        f"{gateway_url.rstrip('/')}/analyses/{run_id}",
+        data=json.dumps(body).encode(),
+        method="PATCH",
+        headers={"Content-Type": "application/json", "X-Update-Key": update_key},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        LOGGER.error("PATCH /analyses/%s failed: %s %s", run_id, exc.code, exc.read().decode())
+        raise
+    except urllib.error.URLError as exc:
+        LOGGER.error("PATCH /analyses/%s unreachable: %s", run_id, exc.reason)
+        raise
 
 
 def run_full_pipeline(
@@ -60,7 +91,7 @@ def process_message(
         return
 
     started_at = _now()
-    publish_status({"run_id": run_id, "status": "Running", "started_at": started_at})
+    publish_status({"run_id": run_id, "status": "running", "started_at": started_at})
 
     try:
         if analysis == "full_pipeline":
@@ -79,7 +110,7 @@ def process_message(
         publish_status(
             {
                 "run_id": run_id,
-                "status": "Failed",
+                "status": "failed",
                 "started_at": started_at,
                 "finished_at": _now(),
                 "detail": {"error": str(exc)},
@@ -88,7 +119,7 @@ def process_message(
     else:
         status: dict[str, Any] = {
             "run_id": run_id,
-            "status": "Succeeded",
+            "status": "succeeded",
             "started_at": started_at,
             "finished_at": _now(),
         }
@@ -105,7 +136,7 @@ def consume_forever(settings: Settings) -> None:
     each poll so the loop wakes up to check for SIGTERM while idle."""
     import signal
 
-    from kafka import KafkaConsumer, KafkaProducer
+    from kafka import KafkaConsumer
 
     import metrics
 
@@ -118,7 +149,6 @@ def consume_forever(settings: Settings) -> None:
         consumer_timeout_ms=settings.kafka_consumer_timeout_ms,
         value_deserializer=lambda raw: json.loads(raw.decode()),
     )
-    producer = KafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
 
     stopping = False
 
@@ -129,24 +159,22 @@ def consume_forever(settings: Settings) -> None:
 
     signal.signal(signal.SIGTERM, _stop)
 
-    def publish_status(payload: dict[str, Any]) -> None:
-        producer.send(
-            settings.kafka_topic_status,
-            key=payload["run_id"].encode(),
-            value=json.dumps(payload).encode(),
-        )
-        producer.flush()
-
     try:
         while not stopping:
             for record in consumer:
+                event = record.value
                 metrics.messages_consumed.labels(
-                    analysis=record.value.get("analysis", "unknown")
+                    analysis=event.get("analysis", "unknown")
                 ).inc()
-                process_message(settings, record.value, publish_status)
+
+                def publish_status(
+                    payload: dict[str, Any], _key: str | None = event.get("update_key")
+                ) -> None:
+                    report_status(settings.gateway_url, payload, _key)
+
+                process_message(settings, event, publish_status)
                 consumer.commit()
                 if stopping:
                     break
     finally:
         consumer.close()
-        producer.close()

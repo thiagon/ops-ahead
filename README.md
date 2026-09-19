@@ -67,8 +67,7 @@ apps/                              # serviços e jobs que vão para o K8s
   ml-trainer/                      # Deployment (KEDA ScaledObject) — treino volume/breach/external-event, consome trigger.ml
   ml-burst-detector/                # Deployment — consome events.monitor, detecta rajada por entity, publica alerts.burst
   ml-model-serving/                 # Deployment — serving BentoML dos modelos volume/breach registrados no MLflow
-  ui-gateway/                       # Deployment — gateway de ingestão, fronteira HTTP → events.raw.{alert,monitor}
-  ui-orchestrator/                 # Deployment — REST/MCP → Kafka (trigger.ml/trigger.data) sob demanda
+  ui-gateway/                       # Deployment — fronteira HTTP: webhooks → events.raw.*; POST /analyses → trigger.ml/trigger.data
 
 contracts/                         # JSON Schemas compartilhados entre apps
   event-envelope.schema.json       # envelope cru, agnóstico de natureza, antes da tradução
@@ -76,7 +75,7 @@ contracts/                         # JSON Schemas compartilhados entre apps
   condition-monitor.schema.json    # entrada monitor traduzida (condição observada)
   deadline-milestone.schema.json   # marco de consumo do OLA (25/50/75/100%/abandono)
   translation-dictionary.schema.json  # dicionário de tradução por tenant e origem
-  trigger-*.schema.json            # payloads de execução sob demanda (ui-orchestrator)
+  trigger-*.schema.json            # payloads de execução sob demanda (ui-gateway)
 
 scripts/                           # utilitários locais (não vão para o K8s)
   prepare_dataset.py               # pipeline Excel → CSV
@@ -109,7 +108,6 @@ infra/
     ml-trainer/                    # app — ver apps/ acima
     ui-frontend/                   # UI Nuxt
     ui-gateway/                    # app — ver apps/ acima
-    ui-orchestrator/               # app — ver apps/ acima
   apps/                            # ArgoCD Application manifests
   bootstrap/                       # root-app (app-of-apps)
   scripts/
@@ -179,7 +177,6 @@ Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomín
 | MLflow | http://mlflow.ops-ahead.localtest.me | `MLFLOW_ADMIN_USERNAME` / `MLFLOW_ADMIN_PASSWORD` |
 | Gitea | http://gitea.ops-ahead.localtest.me | `GITEA_ADMIN_USERNAME` / `GITEA_ADMIN_PASSWORD` |
 | Prometheus | http://prometheus.ops-ahead.localtest.me | — |
-| Orchestrator | http://orchestrator.ops-ahead.localtest.me | — |
 | Gateway | http://gateway.ops-ahead.localtest.me | — |
 | UI | http://ui.ops-ahead.localtest.me | — |
 

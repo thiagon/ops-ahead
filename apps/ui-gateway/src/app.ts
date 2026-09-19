@@ -13,6 +13,8 @@ export function buildApp(options: FastifyServerOptions = {}): FastifyInstance {
   app.setSerializerCompiler(serializerCompiler);
 
   app.register(autoload, { dir: join(import.meta.dirname, 'plugins') });
+  // index.ts only — autoload would otherwise treat each services/<name> folder as a plugin
+  app.register(autoload, { dir: join(import.meta.dirname, 'services'), maxDepth: 0 });
   app.register(autoload, { dir: join(import.meta.dirname, 'modules') });
 
   return app;

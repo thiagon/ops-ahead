@@ -1,12 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import type {
-  FastifyError,
-  FastifyInstance,
-  FastifyRequest,
-  preParsingAsyncHookHandler,
-} from 'fastify';
+import type { FastifyInstance, FastifyRequest, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
+import createError from 'http-errors';
 import type { OriginCredential } from './origin-registry.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
@@ -50,13 +46,6 @@ export function checkSignature(
   return timingSafeEqual(provided, expected) ? 'valid' : 'invalid';
 }
 
-function httpError(statusCode: number, name: string, message: string): FastifyError {
-  const error = new Error(message) as FastifyError;
-  error.statusCode = statusCode;
-  error.name = name;
-  return error;
-}
-
 /**
  * Exposes `app.verifySignatureFor(credential)` — one hook per registered
  * (tenant, source) credential, each checking against that credential's own
@@ -75,7 +64,7 @@ async function hmacPlugin(fastify: FastifyInstance) {
     return async (request, _reply, payload) => {
       const credential = resolve(request);
       if (!credential) {
-        throw httpError(404, 'UnknownOrigin', 'no integration is configured for this address');
+        throw createError.NotFound('no integration is configured for this address');
       }
       if (!fastify.env.HMAC_ENABLED) return payload;
 
@@ -90,7 +79,7 @@ async function hmacPlugin(fastify: FastifyInstance) {
         const buffer = chunk as Buffer;
         size += buffer.length;
         if (size > limit) {
-          throw httpError(413, 'PayloadTooLarge', 'request body exceeds the configured limit');
+          throw createError.PayloadTooLarge('request body exceeds the configured limit');
         }
         chunks.push(buffer);
       }
@@ -114,7 +103,7 @@ async function hmacPlugin(fastify: FastifyInstance) {
           { reason: outcome, url: request.url, tenant_id: credential.tenantId },
           'rejected an unsigned request',
         );
-        throw httpError(401, 'InvalidSignature', 'missing or invalid X-Signature header');
+        throw createError.Unauthorized('missing or invalid X-Signature header');
       }
 
       // The consumed stream is handed back so parsing proceeds as usual.

@@ -26,7 +26,7 @@ kubectl wait externalsecret --all --all-namespaces --for=condition=Ready
 
 ```bash
 # ERRADO — adicionar um app exige editar o script, e o que for esquecido falha calado
-for app in data-ingest data-runner ui-orchestrator; do ...
+for app in data-ingest data-runner ui-gateway; do ...
 
 # CORRETO — quem tem o overlay é quem entra no loop
 for overlay in apps/*/chart/values-dev.yaml; do

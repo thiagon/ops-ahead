@@ -56,4 +56,16 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: infra
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ml
+      ports:
+        - port: {{ .Values.gateway.port }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - port: {{ .Values.gateway.port }}
 {{- end }}

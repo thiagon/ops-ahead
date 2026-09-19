@@ -41,12 +41,12 @@ spec:
               value: {{ .Values.train.env.kafkaBootstrapServers | quote }}
             - name: KAFKA_TOPIC
               value: {{ .Values.train.env.kafkaTopic | quote }}
-            - name: KAFKA_TOPIC_STATUS
-              value: {{ .Values.train.env.kafkaTopicStatus | quote }}
             - name: KAFKA_GROUP_ID
               value: {{ .Values.train.env.kafkaGroupId | quote }}
             - name: KAFKA_CONSUMER_TIMEOUT_MS
               value: {{ .Values.train.env.kafkaConsumerTimeoutMs | quote }}
+            - name: GATEWAY_URL
+              value: {{ .Values.train.env.gatewayUrl | quote }}
             - name: CLICKHOUSE_USER
               value: {{ .Values.train.env.clickhouseUser | quote }}
             - name: CLICKHOUSE_PASSWORD

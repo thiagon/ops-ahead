@@ -80,7 +80,7 @@ formato externo em um lugar só.
 ### Execução sob demanda — um segundo tipo de fronteira
 
 Todas as integrações acima são pub/sub assíncrono: um contexto publica, outro consome,
-sem saber quem está do outro lado. A execução sob demanda (`ui-orchestrator`, ver
+sem saber quem está do outro lado. A execução sob demanda (`ui-gateway`, ver
 [`analysis`](./ubiquitous-language.md#analysis)) é um padrão diferente — quem chama
 (dev, N1, agente de IA) pede uma ação específica de **Predição** ou **Acervo** e recebe
 de volta um identificador pra acompanhar o resultado. Não é Integração: não traduz
@@ -104,13 +104,13 @@ Integração, não fica no meio do fluxo pub/sub principal (`events.raw.*`, `eve
 | `recommendations` | Copiloto → Integração | recomendação explicável, pronta para sair |
 | `actions.taken` | Integração → Acervo | o que o operador decidiu, para avaliar o Copiloto |
 | `trigger.ml` / `trigger.data` | execução sob demanda → Predição / Acervo | `analysis` + parâmetros de um pedido validado, um tópico por domínio |
-| `trigger.status` | Predição / Acervo → execução sob demanda | estado atual de um pedido (`run_id` como key, log compactado — só a última mensagem por run sobrevive) |
 
 `events.raw.*`, `events.alert`, `events.monitor` e `deadlines.milestone` têm tráfego hoje
 entre os pontos pub/sub — os três primeiros substituem o antigo `incidents.received`, cortado
 sem alias, e o último é novo, ambos na track `incident-flow_20260819`. `trigger.ml`/
-`trigger.data`/`trigger.status` têm tráfego real desde a track `exec-trigger_20260807`.
-`alerts.burst` também tem tráfego real, desde a track `ml-models_20260806`
+`trigger.data` têm tráfego real desde a track `exec-trigger_20260807`. Status de um pedido
+volta por `PATCH /analyses/{id}` no gateway (credencial `update_key` na mensagem), não por
+tópico. `alerts.burst` também tem tráfego real, desde a track `ml-models_20260806`
 (`apps/ml-burst-detector`, consumindo `events.monitor`). `incidents.scored` e `recommendations`
 continuam reservados — declará-los cedo é o que permite implementar os contextos em qualquer
 ordem.

@@ -119,7 +119,7 @@ spec:
   hard:
     requests.cpu: "1500m"
     requests.memory: 1536Mi
-    # ui-orchestrator/ui-gateway/ui-frontend's steady-state limits didn't fit
+    # ui-gateway/ui-frontend's steady-state limits didn't fit
     # in the previous 2 CPU — a rolling update needing old+new pods
     # simultaneously got stuck in FailedCreate against the old ceiling.
     limits.cpu: "3"
@@ -344,3 +344,17 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: infra
+    # ml-trainer / data-runner PATCH /analyses/{id} with the update_key from
+    # the trigger.* message they consumed.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ml
+      ports:
+        - port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - port: 3000

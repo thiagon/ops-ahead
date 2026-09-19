@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from settings import Settings
@@ -51,8 +53,8 @@ class TestProcessMessage:
         assert calls[0].holdout_end == "2026-01-31"
         assert calls[0].mlflow_experiment_name == "volume-forecast"
 
-        assert published[0] == {"run_id": "run-1", "status": "Running", "started_at": published[0]["started_at"]}
-        assert published[1]["status"] == "Succeeded"
+        assert published[0] == {"run_id": "run-1", "status": "running", "started_at": published[0]["started_at"]}
+        assert published[1]["status"] == "succeeded"
         assert published[1]["run_id"] == "run-1"
         assert published[1]["detail"] == {"mlflow_run_id": "mlflow-run-abc"}
         assert "finished_at" in published[1]
@@ -207,10 +209,10 @@ class TestProcessMessage:
             publish_status,
         )
 
-        assert published[0]["status"] == "Running"
+        assert published[0]["status"] == "running"
         assert published[1] == {
             "run_id": "run-3",
-            "status": "Failed",
+            "status": "failed",
             "started_at": published[0]["started_at"],
             "finished_at": published[1]["finished_at"],
             "detail": {"error": "empty validation partition after temporal_split"},
@@ -230,3 +232,45 @@ class TestProcessMessage:
         )
 
         assert published == []
+
+
+class TestReportStatus:
+    def test_skips_when_the_event_has_no_update_key(self):
+        from trigger import report_status
+
+        report_status("http://gateway", {"run_id": "run-1", "status": "running"}, None)
+
+    def test_patches_the_gateway_with_the_update_key(self, monkeypatch):
+        from trigger import report_status
+
+        seen: dict[str, object] = {}
+
+        class _Response:
+            def read(self) -> bytes:
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def _urlopen(request, timeout=10):
+            seen["full_url"] = request.full_url
+            seen["method"] = request.get_method()
+            seen["headers"] = request.headers
+            seen["body"] = json.loads(request.data.decode())
+            return _Response()
+
+        monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+
+        report_status(
+            "http://gateway.ui.svc.cluster.local",
+            {"run_id": "run-1", "status": "running", "started_at": "2026-08-15T12:30:00Z"},
+            "the-key",
+        )
+
+        assert seen["full_url"] == "http://gateway.ui.svc.cluster.local/analyses/run-1"
+        assert seen["method"] == "PATCH"
+        assert seen["headers"]["X-update-key"] == "the-key"
+        assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}

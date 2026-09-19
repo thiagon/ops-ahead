@@ -25,7 +25,7 @@ describe('error handler', () => {
 
     expect(res.statusCode).toBe(404);
     expect(res.json()).toMatchObject({
-      error: 'NotFound',
+      error: 'NotFoundError',
       message: 'route GET /does-not-exist not found',
     });
   });

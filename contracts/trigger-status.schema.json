@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "trigger-status/v1",
   "title": "TriggerStatusEvent",
-  "description": "Message published to the compacted trigger.status Kafka topic (cleanup.policy=compact, key=run_id) by ml-trainer/data-runner's `consume` mode. ui-orchestrator consumes this to answer GET /runs/{run_id} without ever touching Kubernetes — see conductor/tracks/exec-trigger_20260807/spec.md. Two messages per run: `Running` when the Job picks up its message, then a terminal status when it finishes.",
+  "description": "Body of PATCH /analyses/{id} plus run_id. Trainers send this over HTTP (path id, header X-Update-Key); they no longer publish to trigger.status.",
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/running" },
@@ -16,7 +16,7 @@
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "status": { "const": "Running" },
+        "status": { "const": "running" },
         "started_at": { "$ref": "#/definitions/timestamp" }
       }
     },
@@ -26,7 +26,7 @@
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "status": { "const": "Succeeded" },
+        "status": { "const": "succeeded" },
         "started_at": { "$ref": "#/definitions/timestamp" },
         "finished_at": { "$ref": "#/definitions/timestamp" },
         "detail": { "$ref": "#/definitions/detail" }
@@ -38,7 +38,7 @@
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "status": { "const": "Failed" },
+        "status": { "const": "failed" },
         "started_at": { "$ref": "#/definitions/timestamp" },
         "finished_at": { "$ref": "#/definitions/timestamp" },
         "detail": { "$ref": "#/definitions/detail" }

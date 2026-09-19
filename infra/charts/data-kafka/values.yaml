@@ -81,8 +81,9 @@ kafkaTopics:
   - name: trigger.data
     partitions: 3
     replicas: 2
-  # Compacted — ui-orchestrator rehydrates GET /runs/{run_id} from this on
-  # startup; key=run_id keeps only the latest status per run.
+  # Compacted leftover from when status lived only on this topic. Trainers
+  # now PATCH /analyses/{id}; the topic stays so an existing cluster is not
+  # asked to delete it.
   - name: trigger.status
     partitions: 3
     replicas: 2

@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ui-gateway-migrate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ui-gateway.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  # A PreSync hook stuck on ImagePullBackOff blocks the sync operation, and at
+  # bootstrap the first attempt runs against a stale tag whose image is absent.
+  # Failing quickly releases the operation so auto-sync can roll forward to the
+  # CI write-back.
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: ui-gateway-migrate
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: {{ include "ui-gateway.image" . | quote }}
+          imagePullPolicy: {{ (index .Values "ui-gateway").image.pullPolicy }}
+          command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: UI_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.analysesDatabase.secretName }}
+                  key: POSTGRES_USER
+            - name: UI_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.analysesDatabase.secretName }}
+                  key: POSTGRES_PASSWORD
+            - name: GATEWAY_DATABASE_URL
+              value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.gateway.analysesDatabase.host }}/{{ .Values.gateway.analysesDatabase.name }}?sslmode=disable
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
