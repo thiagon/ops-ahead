@@ -37,7 +37,6 @@ export const envSchema = z
     KAFKA_TOPIC_CONFIG_ORIGIN: z.string().default('config.origin'),
     KAFKA_TOPIC_ML: z.string().default('trigger.ml'),
     KAFKA_TOPIC_DATA: z.string().default('trigger.data'),
-    KAFKA_TOPIC_STATUS: z.string().default('trigger.status'),
 
     GATEWAY_DATABASE_URL: z
       .string()

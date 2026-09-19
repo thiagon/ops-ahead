@@ -33,13 +33,11 @@ export const analysisParamsSchema = z.object({
   id: z.string().min(1),
 });
 
-export const analysisUpdateHeadersSchema = z
-  .object({
-    'x-update-key': z.string().min(1).meta({
-      description: 'Credential from the Kafka message for this run — never returned on HTTP 202',
-    }),
-  })
-  .meta({ id: 'AnalysisUpdateHeaders' });
+export const analysisUpdateHeadersSchema = z.object({
+  'x-update-key': z.string().min(1).meta({
+    description: 'Credential from the Kafka message for this run — never returned on HTTP 202',
+  }),
+});
 
 /**
  * Business-language contract only — no Kafka/Kubernetes vocabulary ever

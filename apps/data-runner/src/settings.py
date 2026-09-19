@@ -26,8 +26,8 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic: str = "trigger.data"
-    kafka_topic_status: str = "trigger.status"
     kafka_group_id: str = "data-runner"
+    gateway_url: str = "http://gateway.ui.svc.cluster.local"
     # Bounds how long consume_forever() blocks per poll before checking for
     # SIGTERM — not a hang-prevention timeout anymore, the loop never exits
     # on an empty topic.

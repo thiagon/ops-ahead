@@ -1,6 +1,0 @@
-apiVersion: v2
-name: ui-orchestrator
-description: Business-language intake for on-demand analysis runs (Fastify, REST+MCP) — ns:ui
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

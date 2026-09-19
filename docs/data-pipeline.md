@@ -120,4 +120,4 @@ sujo.
   `run_id`. Só existe pra runs da cadeia completa.
 - **Data Docs (GE):** console MinIO, bucket `ops-ahead-lake`, prefixo `ge-docs/`.
 - **Status de uma analysis:** `GET /analyses/<id>` no `ui-gateway`, sempre — reflete o
-  que o próprio consumer publicou em `trigger.status` (upsert no Postgres), nunca consulta o Kubernetes.
+  que o consumer gravou via `PATCH /analyses/{id}` (Postgres), nunca consulta o Kubernetes.

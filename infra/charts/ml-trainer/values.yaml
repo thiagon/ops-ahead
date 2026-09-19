@@ -37,9 +37,9 @@ train:
   env:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
     kafkaTopic: trigger.ml
-    kafkaTopicStatus: trigger.status
     kafkaGroupId: ml-trainer
     kafkaConsumerTimeoutMs: "30000"
+    gatewayUrl: http://gateway.ui.svc.cluster.local
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead
     clickhouseDatabase: default

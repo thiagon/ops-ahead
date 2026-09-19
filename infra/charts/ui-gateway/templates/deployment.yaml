@@ -79,8 +79,6 @@ spec:
               value: {{ .Values.gateway.env.kafkaTopicMl | quote }}
             - name: KAFKA_TOPIC_DATA
               value: {{ .Values.gateway.env.kafkaTopicData | quote }}
-            - name: KAFKA_TOPIC_STATUS
-              value: {{ .Values.gateway.env.kafkaTopicStatus | quote }}
             - name: HMAC_ENABLED
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
             - name: UI_POSTGRES_USER

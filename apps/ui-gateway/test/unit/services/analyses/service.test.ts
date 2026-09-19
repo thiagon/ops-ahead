@@ -1,20 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { AnalysesService } from '../../../../src/services/analyses/index.ts';
 import { memoryPrisma } from '../../../helpers/app.ts';
 
 const topics = { ml: 'trigger.ml', data: 'trigger.data' };
 
-function updateKeyFrom(publish: ReturnType<typeof vi.fn>): string {
-  const value = publish.mock.calls.at(-1)?.[0]?.value as string;
-  return JSON.parse(value).update_key as string;
+function updateKeyFrom(publish: { mock: { calls: unknown[][] } }): string {
+  const message = publish.mock.calls.at(-1)?.[0] as OutboundMessage | undefined;
+  return JSON.parse(message?.value ?? '{}').update_key as string;
 }
 
 describe('AnalysesService.start', () => {
-  let publish: ReturnType<typeof vi.fn>;
+  let publish: ReturnType<typeof vi.fn<(message: OutboundMessage) => Promise<void>>>;
   let analyses: AnalysesService;
 
   beforeEach(() => {
-    publish = vi.fn(async () => undefined);
+    publish = vi.fn(async (_message: OutboundMessage) => undefined);
     analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
   });
 
@@ -87,7 +88,7 @@ describe('AnalysesService status', () => {
   });
 
   it('reflects whatever update last stored for that id when the kafka key is presented', async () => {
-    const publish = vi.fn(async () => undefined);
+    const publish = vi.fn(async (_message: OutboundMessage) => undefined);
     const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
     const started = await analyses.start({ analysis: 'data_refresh' });
     const status = {
@@ -114,7 +115,7 @@ describe('AnalysesService status', () => {
   });
 
   it('rejects moving status backwards — succeeded cannot become running', async () => {
-    const publish = vi.fn(async () => undefined);
+    const publish = vi.fn(async (_message: OutboundMessage) => undefined);
     const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
     const started = await analyses.start({ analysis: 'data_refresh' });
     const key = updateKeyFrom(publish);
@@ -128,7 +129,7 @@ describe('AnalysesService status', () => {
   });
 
   it('rejects swapping a terminal status for the other', async () => {
-    const publish = vi.fn(async () => undefined);
+    const publish = vi.fn(async (_message: OutboundMessage) => undefined);
     const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
     const started = await analyses.start({ analysis: 'data_refresh' });
     const key = updateKeyFrom(publish);

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -38,6 +40,35 @@ def configure_experiment(settings: Settings, domain: str) -> None:
 
 def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | None) -> None:
+    """PATCH /analyses/{id} with the update_key from the trigger.ml message.
+
+    Cron-style events without a key are skipped — they never went through
+    POST /analyses, so the gateway has no row to update.
+    """
+    run_id = payload["run_id"]
+    if not update_key:
+        LOGGER.info("no update_key on event; skipping PATCH /analyses/%s", run_id)
+        return
+
+    body = {key: value for key, value in payload.items() if key != "run_id"}
+    request = urllib.request.Request(
+        f"{gateway_url.rstrip('/')}/analyses/{run_id}",
+        data=json.dumps(body).encode(),
+        method="PATCH",
+        headers={"Content-Type": "application/json", "X-Update-Key": update_key},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        LOGGER.error("PATCH /analyses/%s failed: %s %s", run_id, exc.code, exc.read().decode())
+        raise
+    except urllib.error.URLError as exc:
+        LOGGER.error("PATCH /analyses/%s unreachable: %s", run_id, exc.reason)
+        raise
 
 
 def process_message(
@@ -117,7 +148,7 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
     each poll so the loop wakes up to check for SIGTERM while idle."""
     import signal
 
-    from kafka import KafkaConsumer, KafkaProducer
+    from kafka import KafkaConsumer
 
     import metrics
 
@@ -130,7 +161,6 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
         consumer_timeout_ms=settings.kafka_consumer_timeout_ms,
         value_deserializer=lambda raw: json.loads(raw.decode()),
     )
-    producer = KafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
 
     stopping = False
 
@@ -141,24 +171,22 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
 
     signal.signal(signal.SIGTERM, _stop)
 
-    def publish_status(payload: dict[str, Any]) -> None:
-        producer.send(
-            settings.kafka_topic_status,
-            key=payload["run_id"].encode(),
-            value=json.dumps(payload).encode(),
-        )
-        producer.flush()
-
     try:
         while not stopping:
             for record in consumer:
+                event = record.value
                 metrics.messages_consumed.labels(
-                    analysis=record.value.get("analysis", "unknown")
+                    analysis=event.get("analysis", "unknown")
                 ).inc()
-                process_message(settings, trainers, record.value, publish_status)
+
+                def publish_status(
+                    payload: dict[str, Any], _key: str | None = event.get("update_key")
+                ) -> None:
+                    report_status(settings.gateway_url, payload, _key)
+
+                process_message(settings, trainers, event, publish_status)
                 consumer.commit()
                 if stopping:
                     break
     finally:
         consumer.close()
-        producer.close()

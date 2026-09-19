@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from settings import Settings
@@ -118,3 +120,45 @@ class TestProcessMessage:
         process_message(settings, {"run_id": "run-5", "analysis": "volume_forecast"}, publish_status)
 
         assert published == []
+
+
+class TestReportStatus:
+    def test_skips_when_the_event_has_no_update_key(self):
+        from trigger import report_status
+
+        report_status("http://gateway", {"run_id": "run-1", "status": "running"}, None)
+
+    def test_patches_the_gateway_with_the_update_key(self, monkeypatch):
+        from trigger import report_status
+
+        seen: dict[str, object] = {}
+
+        class _Response:
+            def read(self) -> bytes:
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def _urlopen(request, timeout=10):
+            seen["full_url"] = request.full_url
+            seen["method"] = request.get_method()
+            seen["headers"] = request.headers
+            seen["body"] = json.loads(request.data.decode())
+            return _Response()
+
+        monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+
+        report_status(
+            "http://gateway.ui.svc.cluster.local",
+            {"run_id": "run-1", "status": "running", "started_at": "2026-08-15T12:30:00Z"},
+            "the-key",
+        )
+
+        assert seen["full_url"] == "http://gateway.ui.svc.cluster.local/analyses/run-1"
+        assert seen["method"] == "PATCH"
+        assert seen["headers"]["X-update-key"] == "the-key"
+        assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}

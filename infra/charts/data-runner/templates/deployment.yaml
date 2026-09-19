@@ -41,12 +41,12 @@ spec:
               value: {{ .Values.run.env.kafkaBootstrapServers | quote }}
             - name: KAFKA_TOPIC
               value: {{ .Values.run.env.kafkaTopic | quote }}
-            - name: KAFKA_TOPIC_STATUS
-              value: {{ .Values.run.env.kafkaTopicStatus | quote }}
             - name: KAFKA_GROUP_ID
               value: {{ .Values.run.env.kafkaGroupId | quote }}
             - name: KAFKA_CONSUMER_TIMEOUT_MS
               value: {{ .Values.run.env.kafkaConsumerTimeoutMs | quote }}
+            - name: GATEWAY_URL
+              value: {{ .Values.run.env.gatewayUrl | quote }}
             - name: CLICKHOUSE_HOST
               value: {{ .Values.run.env.clickhouseHost | quote }}
             - name: CLICKHOUSE_DATABASE

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
-import { OriginRegistry } from '../../src/plugins/origin-registry.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
+import { OriginRegistry } from '../../src/plugins/origin-registry.ts';
 
 type Extend = (app: FastifyInstance) => void;
 

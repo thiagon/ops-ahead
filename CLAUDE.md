@@ -75,13 +75,11 @@ or `trigger.data` (Kafka, `ns: data`) — never touches Kubernetes. `ml-trainer`
 (`deployment`) each own a KEDA `ScaledObject` that scales their replica count from that
 topic's lag: **no application process ever creates a Kubernetes resource** — only the
 KEDA operator (`infra/charts/infra-keda`, installed once, `ns: infra`) does, which is
-platform infra, not code this team writes. Each message handler publishes `running` then
-a terminal status (`succeeded`/`failed`) to the compacted `trigger.status` topic;
-`ui-gateway` upserts those into its own database on the `config-postgres` instance and
-answers `GET /analyses/{id}` from Postgres. The consumer group on `trigger.status` is
-**fixed** (`gateway-trigger-status`) — Postgres is the source of truth, so a restart
-resumes from the committed offset. This is the same rule as `data-runner`/`ml-trainer`'s
-own consumer group on `trigger.data`/`trigger.ml`.
+platform infra, not code this team writes. Each message handler PATCHes `running` then a terminal status (`succeeded`/`failed`)
+to `ui-gateway` (`PATCH /analyses/{id}` with `X-Update-Key` from the trigger
+message). Postgres on the `config-postgres` instance is the source of truth for
+`GET /analyses/{id}`. `full_pipeline` from the daily CronJob has no `update_key`
+and does not PATCH — it never went through `POST /analyses`.
 
 The **daily data chain** (`dbt run → great_expectations → register-snapshot`) is the same
 mechanism, not a parallel one: a native `CronJob` (`ns: data`, part of `data-runner`'s own

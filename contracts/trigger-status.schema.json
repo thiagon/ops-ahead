@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "trigger-status/v1",
   "title": "TriggerStatusEvent",
-  "description": "Message published to the compacted trigger.status Kafka topic (cleanup.policy=compact, key=run_id) by ml-trainer/data-runner's `consume` mode. ui-gateway consumes this and upserts into Postgres to answer GET /analyses/{id} without ever touching Kubernetes. Two messages per analysis: `running` when the consumer picks up its message, then a terminal status when it finishes.",
+  "description": "Body of PATCH /analyses/{id} plus run_id. Trainers send this over HTTP (path id, header X-Update-Key); they no longer publish to trigger.status.",
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/running" },

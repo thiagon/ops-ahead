@@ -45,7 +45,7 @@ curl http://gateway.ops-ahead.localtest.me/analyses/<id>
 ```
 
 Lê a tabela `analyses` no database `gateway` da instância `config-postgres`.
-`pending` é o estado gravado no POST, antes de qualquer mensagem em `trigger.status`.
+`pending` é o estado gravado no POST, antes de qualquer PATCH do consumer.
 A resposta nunca consulta o Kubernetes.
 
 ## MCP

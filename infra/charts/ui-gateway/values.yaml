@@ -26,7 +26,6 @@ gateway:
     kafkaTopicConfigOrigin: config.origin
     kafkaTopicMl: trigger.ml
     kafkaTopicData: trigger.data
-    kafkaTopicStatus: trigger.status
     hmacEnabled: "true"
     httpsEnabled: "false"
     corsOrigins:
