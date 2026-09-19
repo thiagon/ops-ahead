@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "trigger-data/v1",
   "title": "TriggerDataEvent",
-  "description": "Message published to the trigger.data Kafka topic — by ui-orchestrator for data_refresh/data_quality_check, or by the daily native CronJob for full_pipeline (a value never exposed through POST /trigger — the caller-facing contract only knows the two on-demand analysis values). Consumed by data-runner's `consume` mode.",
+  "description": "Message published to the trigger.data Kafka topic — by ui-gateway for data_refresh/data_quality_check, or by the daily native CronJob for full_pipeline (a value never exposed through POST /analyses — the caller-facing contract only knows the two on-demand analysis values). Consumed by data-runner's `consume` mode.",
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/dataRefresh" },
@@ -12,19 +12,21 @@
   "definitions": {
     "dataRefresh": {
       "type": "object",
-      "required": ["run_id", "analysis"],
+      "required": ["run_id", "update_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "data_refresh" }
       }
     },
     "dataQualityCheck": {
       "type": "object",
-      "required": ["run_id", "analysis"],
+      "required": ["run_id", "update_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "data_quality_check" }
       }
     },
@@ -39,7 +41,11 @@
     },
     "runId": {
       "type": "string",
-      "description": "UUID for on-demand runs (minted by ui-orchestrator); deterministic `daily-<YYYY-MM-DD>` for the CronJob-triggered full_pipeline run — queryable via GET /runs without needing to discover the id from logs."
+      "description": "UUID for on-demand analyses (minted by ui-gateway, returned as `id` on POST /analyses); deterministic `daily-<YYYY-MM-DD>` for the CronJob-triggered full_pipeline run — queryable via GET /analyses/{id} without needing to discover the id from logs."
+    },
+    "updateKey": {
+      "type": "string",
+      "description": "Credential for PATCH /analyses/{id}. Travels only on this message — never in the HTTP 202 — so only the consumer can update status. Omitted on full_pipeline, which the CronJob publishes without going through the gateway."
     }
   }
 }

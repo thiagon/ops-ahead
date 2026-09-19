@@ -15,7 +15,7 @@ spec:
   # CI-pinned image tag. Sync wave 10 — after ml-trainer (wave 9), so the
   # Deployment a training run needs exists first. Registering it doesn't
   # itself run a training (a trigger.ml event does that on demand, via
-  # ui-orchestrator + ml-trainer) — /readyz tolerates neither model being
+  # ui-gateway + ml-trainer) — /readyz tolerates neither model being
   # loaded yet either way.
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead

@@ -1,5 +1,11 @@
 image: postgres:16-alpine
 
+# Additional databases on this instance. POSTGRES_DB (from the secret) is the
+# one the image creates at first init; each name here is CREATE DATABASE'd by
+# the chart Job once the StatefulSet accepts connections.
+extraDatabases:
+  - gateway
+
 monitoring:
   enabled: true
 

@@ -17,6 +17,10 @@ describe('envSchema', () => {
       KAFKA_TOPIC_RAW_ALERT: 'events.raw.alert',
       KAFKA_TOPIC_RAW_MONITOR: 'events.raw.monitor',
       KAFKA_TOPIC_CONFIG_ORIGIN: 'config.origin',
+      KAFKA_TOPIC_ML: 'trigger.ml',
+      KAFKA_TOPIC_DATA: 'trigger.data',
+      KAFKA_TOPIC_STATUS: 'trigger.status',
+      GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
     });
   });

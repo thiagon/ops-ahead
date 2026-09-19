@@ -186,28 +186,3 @@ spec:
                 name: minio
                 port:
                   number: 9001
----
-# Single Ingress/Service for both REST (/trigger, /runs, /health) and the MCP
-# transport (/mcp) — same process/port, no separate host or Service. Replaces
-# trigger-service's Ingress (exec-trigger_20260807 revision).
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ui-orchestrator
-  namespace: ui
-  annotations:
-    argocd.argoproj.io/sync-wave: "9"
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-spec:
-  ingressClassName: traefik
-  rules:
-    - host: orchestrator.ops-ahead.localtest.me
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: orchestrator
-                port:
-                  number: 80

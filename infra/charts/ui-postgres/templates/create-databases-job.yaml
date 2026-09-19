@@ -1,0 +1,67 @@
+{{- if .Values.extraDatabases }}
+# The image only creates POSTGRES_DB on the first volume init. Extra databases
+# on this instance (owned by other ns:ui apps) are created here, after the
+# StatefulSet can accept connections — never as a PreSync hook.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: config-postgres-create-databases
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ui-postgres.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 8
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: config-postgres-create-databases
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: create-databases
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          envFrom:
+            - secretRef:
+                name: postgres-config-secret
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              until pg_isready -h config-postgres -U "$POSTGRES_USER"; do
+                sleep 2
+              done
+              {{- range .Values.extraDatabases }}
+              db={{ . | quote }}
+              exists="$(psql -h config-postgres -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'")"
+              if [ "$exists" != "1" ]; then
+                psql -h config-postgres -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE \"$db\""
+              fi
+              {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

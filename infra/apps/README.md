@@ -17,7 +17,7 @@ encode; keep it in sync when adding or reordering an app.
 | 5 | `infra-gitea`, `infra-prometheus`, `data-clickhouse` | 3 (each only needs its own `ExternalSecret` to be resolvable) |
 | 6 | `data-kafka`, `data-minio`, `infra-promtail` | 4 (Kafka needs the Strimzi operator) |
 | 7 | `data-ingest`, `ml-redis`, `ml-postgres` | 5, 6 (data-ingest consumes Kafka, writes ClickHouse + MinIO) |
-| 8 | `data-runner`, `ml-mlflow`, `ui-orchestrator` | 6, 7 (data-runner's PreSync `dbt run` reads the bronze_* tables data-ingest migrates; mlflow needs its Postgres/Redis backends; orchestrator publishes to Kafka) |
+| 8 | `data-runner`, `ml-mlflow` | 6, 7 (data-runner's PreSync `dbt run` reads the bronze_* tables data-ingest migrates; mlflow needs its Postgres/Redis backends) |
 | 9 | `data-deadline-tracker`, `ml-trainer`, `ml-burst-detector`, `ui-gateway`, `ui-frontend`, `ingresses` | 2, 6, 8 (the tracker's startup reads `tenant_deadlines`/`silver_alert_open`, seeded by data-runner's PreSync hook; KEDA-scaled consumers need infra-keda + Kafka; ingresses route to Services created by earlier waves) |
 | 10 | `ml-model-serving` | 8 (serves models registered in MLflow) |
 

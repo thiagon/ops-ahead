@@ -51,8 +51,8 @@ class TestProcessMessage:
         assert calls[0].holdout_end == "2026-01-31"
         assert calls[0].mlflow_experiment_name == "volume-forecast"
 
-        assert published[0] == {"run_id": "run-1", "status": "Running", "started_at": published[0]["started_at"]}
-        assert published[1]["status"] == "Succeeded"
+        assert published[0] == {"run_id": "run-1", "status": "running", "started_at": published[0]["started_at"]}
+        assert published[1]["status"] == "succeeded"
         assert published[1]["run_id"] == "run-1"
         assert published[1]["detail"] == {"mlflow_run_id": "mlflow-run-abc"}
         assert "finished_at" in published[1]
@@ -207,10 +207,10 @@ class TestProcessMessage:
             publish_status,
         )
 
-        assert published[0]["status"] == "Running"
+        assert published[0]["status"] == "running"
         assert published[1] == {
             "run_id": "run-3",
-            "status": "Failed",
+            "status": "failed",
             "started_at": published[0]["started_at"],
             "finished_at": published[1]["finished_at"],
             "detail": {"error": "empty validation partition after temporal_split"},

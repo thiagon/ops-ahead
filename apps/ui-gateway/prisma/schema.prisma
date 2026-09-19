@@ -1,0 +1,32 @@
+// Status of an on-demand analysis. The gateway owns this database; trainers
+// PATCH /analyses/{id} with the update key from the Kafka message — only the
+// hash is stored here.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AnalysisStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+model Analysis {
+  id            String         @id
+  status        AnalysisStatus @default(pending)
+  updateKeyHash String         @map("update_key_hash")
+  startedAt     DateTime?      @map("started_at") @db.Timestamptz()
+  finishedAt    DateTime?      @map("finished_at") @db.Timestamptz()
+  detail        Json?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("analyses")
+}

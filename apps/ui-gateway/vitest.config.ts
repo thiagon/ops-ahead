@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
+const server = { deps: { inline: ['@fastify/autoload'] } };
+
 export default defineConfig({
   test: {
     projects: [
@@ -18,6 +20,7 @@ export default defineConfig({
           fileParallelism: false,
           testTimeout: 15_000,
           hookTimeout: 15_000,
+          server,
         },
       },
       {
@@ -28,6 +31,7 @@ export default defineConfig({
           fileParallelism: false,
           testTimeout: 15_000,
           hookTimeout: 15_000,
+          server,
         },
       },
     ],

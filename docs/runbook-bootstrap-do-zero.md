@@ -113,17 +113,17 @@ enviado.
 ## Passo 3 — materializar as marts
 
 ```
-POST /trigger  { "analysis": "data_refresh" }
+POST /analyses  { "analysis": "data_refresh" }
 ```
 
-No `orchestrator.ops-ahead.localtest.me`. Isso publica em `trigger.data`, o
+No `gateway.ops-ahead.localtest.me`. Isso publica em `trigger.data`, o
 KEDA escala o `data-runner`, e ele roda `dbt run` + snapshot no Redis
 (`src/steps.py:20-26`).
 
 Depois, a checagem de qualidade:
 
 ```
-POST /trigger  { "analysis": "data_quality_check" }
+POST /analyses  { "analysis": "data_quality_check" }
 ```
 
 **Verificação obrigatória antes de seguir** — é o portão que separa "sem dado"
@@ -145,8 +145,8 @@ pule-o e registre como pendência.
 
 ## Passo 4 — treinar, um a um
 
-Um `POST /trigger` por vez, aguardando `GET /runs/{run_id}` chegar a
-`Succeeded` antes do próximo. O `ml-trainer` processa uma mensagem por vez e o
+Um `POST /analyses` por vez, aguardando `GET /analyses/{id}` chegar a
+`succeeded` antes do próximo. O `ml-trainer` processa uma mensagem por vez e o
 KEDA escala por lag — disparar tudo junto só empilha réplicas competindo pelo
 mesmo ClickHouse.
 

@@ -43,10 +43,10 @@ class TestProcessMessage:
         )
 
         assert calls == [("transform",)]
-        assert published[0]["status"] == "Running"
+        assert published[0]["status"] == "running"
         assert published[1] == {
             "run_id": "run-1",
-            "status": "Succeeded",
+            "status": "succeeded",
             "started_at": published[0]["started_at"],
             "finished_at": published[1]["finished_at"],
         }
@@ -62,7 +62,7 @@ class TestProcessMessage:
         )
 
         assert calls == [("quality", ("--suite", "critical", "--upload-docs"))]
-        assert published[1]["status"] == "Succeeded"
+        assert published[1]["status"] == "succeeded"
 
     def test_full_pipeline_runs_transform_then_quality_then_register_snapshot(
         self, settings, published, publish_status
@@ -86,7 +86,7 @@ class TestProcessMessage:
             ("quality", ("--suite", "critical", "--upload-docs")),
             ("register_snapshot", "daily-2026-08-16"),
         ]
-        assert published[1]["status"] == "Succeeded"
+        assert published[1]["status"] == "succeeded"
         assert published[1]["detail"] == {"snapshot_hash": "abc123"}
 
     def test_publishes_failed_with_error_detail_when_a_step_raises(self, settings, published, publish_status):
@@ -100,10 +100,10 @@ class TestProcessMessage:
             steps={"transform": _raising_transform, "quality": lambda argv: None},
         )
 
-        assert published[0]["status"] == "Running"
+        assert published[0]["status"] == "running"
         assert published[1] == {
             "run_id": "run-3",
-            "status": "Failed",
+            "status": "failed",
             "started_at": published[0]["started_at"],
             "finished_at": published[1]["finished_at"],
             "detail": {"error": "dbt run failed: connection refused"},

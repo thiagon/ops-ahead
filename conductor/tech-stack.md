@@ -23,7 +23,8 @@
 - **`@fastify/autoload`** — plugins/modules auto-registered, per `thiagon/template-fastify`
 - **kafkajs** — producer plugin (`app.kafka`), publishes normalized events to `incidents.received`
 - **HMAC** (`X-Signature: sha256=…`) — verifies inbound webhook signatures, toggled by `HMAC_ENABLED`
-- **prom-client** — `/metrics` (events published, HMAC/Kafka failures)
+- **Prisma 7** (`prisma-client` + `@prisma/adapter-pg`) — database `gateway` na instância
+  `config-postgres`; tabela `analyses` é a fonte de verdade de `GET /analyses/{id}`
 - **Biome** (lint/format) + **vitest** (`unit`/`e2e`) — not ESLint/Jest
 
 ## Frontend (`apps/ui-frontend`)
@@ -32,7 +33,7 @@
   directly; no separate read model or API layer between the dashboard and the data
 - **Vite** native build, **Node 24**, `npm`
 - **Tailwind CSS 4** + **Biome** (lint/format) + **vitest** — same conventions as
-  `apps/ui-gateway`/`apps/ui-orchestrator`
+  `apps/ui-gateway`
 - **`@clickhouse/client`** (HTTP interface, port 8123) — server-only import, enforced by a
   test that scans the client bundle for the package name and any credential
 - Design tokens (color, typography — Poppins/Inter/JetBrains Mono) extracted from
@@ -48,8 +49,10 @@
 
 ## Database
 
-- **ClickHouse** (Altinity operator) — the single store: bronze/silver/gold layers, read
+- **ClickHouse** (Altinity operator) — bronze/silver/gold incident data, read
   directly by `ui-frontend`'s loaders. No PostgreSQL for incident data.
+- **PostgreSQL** (`config-postgres` in `ns: ui`) — two databases on one instance:
+  the frontend config registry, and `gateway` (on-demand analysis status).
 
 ## Infrastructure
 

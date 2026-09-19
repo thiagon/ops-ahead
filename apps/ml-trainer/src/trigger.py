@@ -63,7 +63,7 @@ def process_message(
         return
 
     started_at = _now()
-    publish_status({"run_id": run_id, "status": "Running", "started_at": started_at})
+    publish_status({"run_id": run_id, "status": "running", "started_at": started_at})
 
     # consume_forever reuses one Settings instance for the process's whole
     # lifetime, across messages of possibly different domains — mutating it
@@ -91,7 +91,7 @@ def process_message(
         publish_status(
             {
                 "run_id": run_id,
-                "status": "Failed",
+                "status": "failed",
                 "started_at": started_at,
                 "finished_at": _now(),
                 "detail": {"error": str(exc)},
@@ -101,7 +101,7 @@ def process_message(
         publish_status(
             {
                 "run_id": run_id,
-                "status": "Succeeded",
+                "status": "succeeded",
                 "started_at": started_at,
                 "finished_at": _now(),
                 "detail": {"mlflow_run_id": mlflow_run_id},

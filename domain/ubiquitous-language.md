@@ -179,7 +179,7 @@ pelos outros modelos da Predição — nunca pelo Copiloto diretamente.
 
 O que se pede quando se dispara uma execução sob demanda — a pergunta de negócio, não o
 mecanismo por trás dela. É o único campo discriminador do payload que entra pelo ponto de
-entrada único (`ui-orchestrator`, ver [Context Map](./context-map.md)).
+entrada único (`ui-gateway`, ver [Context Map](./context-map.md)).
 
 Valores hoje:
 
@@ -192,7 +192,7 @@ Valores hoje:
 
 `analysis` nunca é um nome de `Job`, tópico ou imagem — é vocabulário de quem pede a
 execução, não de quem a executa. A tradução para o mecanismo interno (qual tópico
-publicar, qual app consome) é responsabilidade exclusiva do `ui-orchestrator`; nenhum
+publicar, qual app consome) é responsabilidade exclusiva do `ui-gateway`; nenhum
 outro contexto precisa conhecer essa tradução.
 
 *Não use:* workload, job, trigger. São termos de infraestrutura — o que a execução *é*

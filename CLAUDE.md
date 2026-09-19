@@ -23,8 +23,7 @@ apps/                        # one folder per image you build; chart/ overlay co
   ml-trainer/                  # deployment (ns: ml) — volume/breach/external-event training, consumes trigger.ml
   ml-burst-detector/           # deployment (ns: ml) — consumes events.monitor, detects signal bursts per entity, publishes alerts.burst
   ml-model-serving/            # deployment (ns: ml) — BentoML serving for the volume/breach models registered in MLflow
-  ui-gateway/                  # deployment (ns: ui) — ingestion gateway, HTTP boundary → events.raw.{alert,monitor}
-  ui-orchestrator/             # deployment (ns: ui) — REST/MCP intake → Kafka (trigger.ml/trigger.data)
+  ui-gateway/                  # deployment (ns: ui) — HTTP boundary: webhooks → events.raw.*; POST /analyses → trigger.ml/trigger.data; GET /analyses from Postgres
 contracts/                   # shared JSON Schemas (event-envelope, incident-alert, condition-monitor, deadline-milestone, translation-dictionary, trigger-*.schema.json)
 domain/                      # domain specs (SDD): language, contexts, ACLs
 scripts/                     # local utilities, never go to K8s
@@ -69,28 +68,26 @@ steps that used to be "a pipeline's job" is now either sequential code inside on
 consumer's message handler (`data-runner`'s `analysis: full_pipeline`, see below) or simply
 doesn't exist (`ml-trainer` trains one model per message, no chaining).
 
-**On-demand execution** goes through `ui-orchestrator` (`deployment`, `ns: ui`) — the
+**On-demand execution** goes through `ui-gateway` (`deployment`, `ns: ui`) — the
 single REST/MCP entry point. It validates a business-language payload (`analysis` +
-parameters), mints a `run_id`, and publishes to `trigger.ml` or `trigger.data` (Kafka,
-`ns: data`) — never touches Kubernetes. `ml-trainer`/`data-runner` (`deployment`) each own
-a KEDA `ScaledObject` that scales their replica count from that topic's lag: **no
-application process ever creates a Kubernetes resource** — only the KEDA operator
-(`infra/charts/infra-keda`, installed once, `ns: infra`) does, which is platform infra, not
-code this team writes. Each message handler publishes `Running` then a terminal status to
-the compacted `trigger.status` topic; `ui-orchestrator` answers `GET /runs/{run_id}` from
-an in-memory map rehidrated from that topic on startup — a Kafka consumer group used for
-this must be unique per process boot (never a fixed/shared id), or replicas split
-partitions and a restart resumes from a stale committed offset instead of replaying the
-backlog. This is the opposite of `data-runner`/`ml-trainer`'s own consumer group on
-`trigger.data`/`trigger.ml`, which must stay fixed and shared across replicas — that's
-what makes Kafka split partitions between however many pods KEDA has scaled up, instead of
-every replica reading the same messages.
+parameters), mints an `id`, persists `pending` in Postgres, and publishes to `trigger.ml`
+or `trigger.data` (Kafka, `ns: data`) — never touches Kubernetes. `ml-trainer`/`data-runner`
+(`deployment`) each own a KEDA `ScaledObject` that scales their replica count from that
+topic's lag: **no application process ever creates a Kubernetes resource** — only the
+KEDA operator (`infra/charts/infra-keda`, installed once, `ns: infra`) does, which is
+platform infra, not code this team writes. Each message handler publishes `running` then
+a terminal status (`succeeded`/`failed`) to the compacted `trigger.status` topic;
+`ui-gateway` upserts those into its own database on the `config-postgres` instance and
+answers `GET /analyses/{id}` from Postgres. The consumer group on `trigger.status` is
+**fixed** (`gateway-trigger-status`) — Postgres is the source of truth, so a restart
+resumes from the committed offset. This is the same rule as `data-runner`/`ml-trainer`'s
+own consumer group on `trigger.data`/`trigger.ml`.
 
 The **daily data chain** (`dbt run → great_expectations → register-snapshot`) is the same
 mechanism, not a parallel one: a native `CronJob` (`ns: data`, part of `data-runner`'s own
 chart) publishes `{"run_id": "daily-<date>", "analysis": "full_pipeline"}` to
 `trigger.data` on schedule — `full_pipeline` is vocabulary the `CronJob` uses internally,
-never accepted from `POST /trigger`. Full contract of every payload/topic:
+never accepted from `POST /analyses`. Full contract of every payload/topic:
 `conductor/tracks/exec-trigger_20260807/payloads.md`; JSON Schema in `contracts/trigger-*.schema.json`.
 
 ## uv Workspaces

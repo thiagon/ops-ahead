@@ -60,7 +60,7 @@ def process_message(
         return
 
     started_at = _now()
-    publish_status({"run_id": run_id, "status": "Running", "started_at": started_at})
+    publish_status({"run_id": run_id, "status": "running", "started_at": started_at})
 
     try:
         if analysis == "full_pipeline":
@@ -79,7 +79,7 @@ def process_message(
         publish_status(
             {
                 "run_id": run_id,
-                "status": "Failed",
+                "status": "failed",
                 "started_at": started_at,
                 "finished_at": _now(),
                 "detail": {"error": str(exc)},
@@ -88,7 +88,7 @@ def process_message(
     else:
         status: dict[str, Any] = {
             "run_id": run_id,
-            "status": "Succeeded",
+            "status": "succeeded",
             "started_at": started_at,
             "finished_at": _now(),
         }

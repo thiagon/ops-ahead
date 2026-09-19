@@ -15,7 +15,7 @@ poucas violações). Ficam como follow-up quando `scripts/incident_producer.py` 
 instância. Decisão explícita do usuário: essa ingestão completa não bloqueia o fechamento da track
 `ml-models_20260806`.
 
-## Treino (via `ui-orchestrator` → `trigger.ml` → `ml-trainer`)
+## Treino (via `ui-gateway` → `trigger.ml` → `ml-trainer`)
 
 | Analysis | Splits (quantis 70/85/100% da amostra disponível) | Resultado |
 |----------|----------------------------------------------------|-----------|

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "trigger-ml/v1",
   "title": "TriggerMlEvent",
-  "description": "Message published to the trigger.ml Kafka topic by ui-orchestrator, consumed by ml-trainer's `consume` mode. Discriminated by `analysis` — the same business-language value ui-orchestrator received on POST /trigger, never translated into a separate internal vocabulary (see conductor/tracks/exec-trigger_20260807/payloads.md).",
+  "description": "Message published to the trigger.ml Kafka topic by ui-gateway, consumed by ml-trainer's `consume` mode. Discriminated by `analysis` — the same business-language value ui-gateway received on POST /analyses, never translated into a separate internal vocabulary (see conductor/tracks/exec-trigger_20260807/payloads.md).",
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/volumeForecast" },
@@ -13,10 +13,11 @@
   "definitions": {
     "volumeForecast": {
       "type": "object",
-      "required": ["run_id", "analysis", "train_end", "validation_end", "holdout_end"],
+      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "volume_forecast" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
@@ -25,10 +26,11 @@
     },
     "breachRisk": {
       "type": "object",
-      "required": ["run_id", "analysis", "train_end", "validation_end", "holdout_end"],
+      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "breach_risk" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
@@ -37,10 +39,11 @@
     },
     "kpiProjection": {
       "type": "object",
-      "required": ["run_id", "analysis"],
+      "required": ["run_id", "update_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "kpi_projection" },
         "n_simulations": { "type": "integer", "minimum": 1, "description": "Monte Carlo draw count. ml-trainer's own configured default applies when omitted." },
         "seed": { "type": "integer", "description": "RNG seed for reproducibility. ml-trainer's own configured default applies when omitted." }
@@ -48,17 +51,22 @@
     },
     "externalEventDetection": {
       "type": "object",
-      "required": ["run_id", "analysis"],
+      "required": ["run_id", "update_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "external_event_detection" },
         "contamination": { "type": "number", "minimum": 0, "maximum": 0.5, "description": "Expected share of days flagged anomalous. ml-trainer's own configured default applies when omitted." }
       }
     },
     "runId": {
       "type": "string",
-      "description": "Same run_id ui-orchestrator returned in the 202 response to POST /trigger."
+      "description": "Same run_id ui-gateway minted for POST /analyses (returned as `id` in the 202)."
+    },
+    "updateKey": {
+      "type": "string",
+      "description": "Credential for PATCH /analyses/{id}. Travels only on this message — never in the HTTP 202 — so only the consumer can update status."
     },
     "splitDate": {
       "type": "string",

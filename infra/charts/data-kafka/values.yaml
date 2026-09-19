@@ -81,8 +81,8 @@ kafkaTopics:
   - name: trigger.data
     partitions: 3
     replicas: 2
-  # Compacted — ui-orchestrator rehydrates GET /runs/{run_id} from this on
-  # startup; key=run_id keeps only the latest status per run.
+  # Compacted — ui-gateway upserts GET /analyses/{id} from this into Postgres;
+  # key=run_id keeps only the latest status per analysis.
   - name: trigger.status
     partitions: 3
     replicas: 2

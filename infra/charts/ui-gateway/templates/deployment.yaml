@@ -75,8 +75,26 @@ spec:
               value: {{ .Values.gateway.env.kafkaTopicRawMonitor | quote }}
             - name: KAFKA_TOPIC_CONFIG_ORIGIN
               value: {{ .Values.gateway.env.kafkaTopicConfigOrigin | quote }}
+            - name: KAFKA_TOPIC_ML
+              value: {{ .Values.gateway.env.kafkaTopicMl | quote }}
+            - name: KAFKA_TOPIC_DATA
+              value: {{ .Values.gateway.env.kafkaTopicData | quote }}
+            - name: KAFKA_TOPIC_STATUS
+              value: {{ .Values.gateway.env.kafkaTopicStatus | quote }}
             - name: HMAC_ENABLED
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
+            - name: UI_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.analysesDatabase.secretName }}
+                  key: POSTGRES_USER
+            - name: UI_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.analysesDatabase.secretName }}
+                  key: POSTGRES_PASSWORD
+            - name: GATEWAY_DATABASE_URL
+              value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.gateway.analysesDatabase.host }}/{{ .Values.gateway.analysesDatabase.name }}
             # One secret per (tenant, source) credential — sources/registry.ts
             # names the env var each credential reads.
             - name: HMAC_SECRET_LOCAWEB_ITSM
