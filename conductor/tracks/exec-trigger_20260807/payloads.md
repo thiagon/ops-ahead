@@ -62,16 +62,12 @@ Linguagem de negócio, discriminado por `analysis`. Idêntico ao contrato origin
 
 ```json
 // analysis: kpi_projection — sem datas de split; todos os campos opcionais,
-// os defaults configurados no ml-trainer valem quando omitidos. Targets do
-// PPR são input de negócio da Locaweb, sem default algum
+// os defaults configurados no ml-trainer valem quando omitidos. A meta do
+// PPR vem do seed tenant_kpi_targets (kpi_group p1_p2/p3), não do payload
 {
   "analysis": "kpi_projection",
   "n_simulations": 5000,
-  "seed": 7,
-  "kpi_target_volume_p2": 514,
-  "kpi_target_volume_p3": 1290,
-  "kpi_target_breaches_p2": 13,
-  "kpi_target_breaches_p3": 17
+  "seed": 7
 }
 ```
 
@@ -156,8 +152,7 @@ verdade (hoje em Out of Scope), o mecanismo certo é uma **referência** cadastr
 {
   "run_id": "c1d2e3f4-5678-9012-cdef-345678901234",
   "analysis": "kpi_projection",
-  "n_simulations": 5000,
-  "kpi_target_volume_p2": 514
+  "n_simulations": 5000
 }
 ```
 

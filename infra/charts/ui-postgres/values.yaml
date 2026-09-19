@@ -1,0 +1,15 @@
+image: postgres:16-alpine
+
+monitoring:
+  enabled: true
+
+primary:
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

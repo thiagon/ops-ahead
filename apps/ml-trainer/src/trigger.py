@@ -79,14 +79,6 @@ def process_message(
         "n_simulations", message_settings.kpi_projection_n_simulations
     )
     message_settings.kpi_projection_seed = event.get("seed", message_settings.kpi_projection_seed)
-    message_settings.kpi_target_volume_p2 = event.get("kpi_target_volume_p2", message_settings.kpi_target_volume_p2)
-    message_settings.kpi_target_volume_p3 = event.get("kpi_target_volume_p3", message_settings.kpi_target_volume_p3)
-    message_settings.kpi_target_breaches_p2 = event.get(
-        "kpi_target_breaches_p2", message_settings.kpi_target_breaches_p2
-    )
-    message_settings.kpi_target_breaches_p3 = event.get(
-        "kpi_target_breaches_p3", message_settings.kpi_target_breaches_p3
-    )
     message_settings.external_event_contamination = event.get(
         "contamination", message_settings.external_event_contamination
     )

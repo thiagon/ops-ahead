@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 
+from bindings import BindingRegistry
 from dictionaries import Dictionary, DictionaryRegistry
 from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
-from sources.itsm import translate_alert
+from sources.generic import translate_alert, translate_monitor
 
-#: One adapter per (source, intake) — adding an origin is adding an entry
-#: here, nothing else changes (domain/acl/itsm.md#adicionar-uma-origem).
-_ALERT_ADAPTERS = {"itsm": translate_alert}
-_MONITOR_ADAPTERS: dict[str, object] = {}
+#: One adapter per intake, not per origin: which fields an origin sends and
+#: what its values mean are configuration, so adding an origin never touches
+#: this file (domain/acl/itsm.md#adicionar-uma-origem).
+_ADAPTERS = {"alert": translate_alert, "monitor": translate_monitor}
 
 
 class UnknownSourceError(Exception):
@@ -19,15 +20,21 @@ class UnknownSourceError(Exception):
 def translate(
     envelope: EventEnvelope,
     dictionaries: DictionaryRegistry,
+    bindings: BindingRegistry,
     dictionary: Dictionary | None = None,
 ) -> BronzeAlertEvent | BronzeMonitorEvent:
     """Translate one envelope. `dictionary` pins a specific version — used by
     reprocess.py to reproduce what translation would have decided at a given
     version, instead of always reading the latest."""
-    adapters = _ALERT_ADAPTERS if envelope.intake == "alert" else _MONITOR_ADAPTERS
-    adapter = adapters.get(envelope.source)
+    adapter = _ADAPTERS.get(envelope.intake)
     if adapter is None:
-        raise UnknownSourceError(f"no adapter for source={envelope.source!r} intake={envelope.intake!r}")
+        raise UnknownSourceError(f"no adapter for intake={envelope.intake!r}")
+
+    resolved_bindings = bindings.get(envelope.tenant_id, envelope.source)
+    if resolved_bindings is None:
+        raise UnknownSourceError(
+            f"no field bindings for tenant={envelope.tenant_id!r} source={envelope.source!r}"
+        )
 
     resolved = dictionary or dictionaries.latest(envelope.tenant_id, envelope.source)
     if resolved is None:
@@ -36,4 +43,4 @@ def translate(
         )
 
     body = json.loads(envelope.payload)
-    return adapter(envelope, resolved, body)
+    return adapter(envelope, resolved, resolved_bindings, body)

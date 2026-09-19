@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Self-hosted so the app never reaches a font CDN from inside the cluster. */
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+/* Tokens carried over from docs/presentations/ — the screen is the same brand
+   the panel already saw in the decks. */
+@theme {
+  --color-bg-main: #0b0f1a;
+  --color-bg-tile: #111726;
+  --color-bg-elevated: #0d1220;
+  --color-border-base: #1f2937;
+
+  --color-text-light: #e5e9f0;
+  --color-text-muted: #8b96a8;
+  --color-text-dim: #64748b;
+
+  --color-accent-red: #f9203e;
+
+  /* Signal colors keep the meaning they carry in the deck: green is within
+     expectation, amber at risk, red breached. */
+  --color-signal-green: #10b981;
+  --color-signal-amber: #f59e0b;
+  --color-signal-blue: #3b82f6;
+  --color-signal-purple: #8b5cf6;
+
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: var(--font-mono);
+  --font-sans: var(--font-mono);
+}
+
+html,
+body {
+  background-color: var(--color-bg-main);
+  color: var(--color-text-light);
+  font-family: var(--font-mono);
+  color-scheme: dark;
+}

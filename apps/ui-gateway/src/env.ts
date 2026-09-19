@@ -32,19 +32,17 @@ export const envSchema = z
     // (domain/ubiquitous-language.md#intake).
     KAFKA_TOPIC_RAW_ALERT: z.string().default('events.raw.alert'),
     KAFKA_TOPIC_RAW_MONITOR: z.string().default('events.raw.monitor'),
+    // Compacted — which origins the gateway accepts, rehydrated at boot
+    // (plugins/origin-registry.ts).
+    KAFKA_TOPIC_CONFIG_ORIGIN: z.string().default('config.origin'),
 
     HMAC_ENABLED: z.stringbool().default(false),
-    // Keyed by sources/registry.ts's hmacSecretEnv — one secret per (tenant,
-    // source) credential, never one global secret for every origin.
-    HMAC_SECRET_LOCAWEB_ITSM: z.string().default(''),
   })
-  // Dev runs the loop unsigned; the cluster flips the toggle on with mounted
-  // secrets. Turning it on without a secret would silently accept everything
-  // signed with the empty string.
-  .refine(env => !env.HMAC_ENABLED || env.HMAC_SECRET_LOCAWEB_ITSM.length > 0, {
-    path: ['HMAC_SECRET_LOCAWEB_ITSM'],
-    message: 'required when HMAC_ENABLED is true',
-  });
+  // Each origin's secret arrives as HMAC_SECRET_<TENANT>_<SOURCE>, named after
+  // the origin the registry resolved, so the set is not known at parse time —
+  // a signed request against a missing secret fails the check rather than
+  // passing unverified.
+  .loose();
 
 export type Env = z.infer<typeof envSchema>;
 

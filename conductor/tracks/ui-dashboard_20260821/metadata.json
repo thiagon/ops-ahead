@@ -1,0 +1,17 @@
+{
+  "id": "ui-dashboard_20260821",
+  "title": "Dashboard \u2014 a camada gold vira tela",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-08-21T00:00:00Z",
+  "updated": "2026-08-21T00:00:00Z",
+  "current_phase": 6,
+  "phases": {
+    "total": 6,
+    "completed": 6
+  },
+  "tasks": {
+    "total": 34,
+    "completed": 34
+  }
+}

@@ -178,7 +178,7 @@ select
         and w.resolution_code != 'no_intervention'          as is_eligible,
     w.severity_changes
 from with_changes w
-left join {{ ref('tenant_deadlines') }} d
+left join {{ source('config', 'tenant_deadlines') }} d
     on  d.tenant_id = w.tenant_id
     and d.severity = w.severity
 

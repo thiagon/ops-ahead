@@ -1,78 +1,76 @@
-import json
-
 import pytest
 
-from dictionaries import DictionaryRegistry
+from config_stream import apply_dictionary
+from dictionaries import Dictionary, DictionaryRegistry
+
+
+def _record(version: str, mappings: dict) -> bytes:
+    import json
+
+    return json.dumps(
+        {
+            "tenant_id": "locaweb",
+            "source": "itsm",
+            "intake": "alert",
+            "dictionary_version": version,
+            "mappings": mappings,
+        }
+    ).encode()
 
 
 @pytest.fixture
-def dict_root(tmp_path):
-    tenant_dir = tmp_path / "locaweb"
-    tenant_dir.mkdir()
-    (tenant_dir / "itsm.v1.json").write_text(
-        json.dumps(
-            {
-                "tenant_id": "locaweb",
-                "source": "itsm",
-                "intake": "alert",
-                "dictionary_version": "v1",
-                "mappings": {"status": {"Encerrado": "closed"}},
-            }
-        )
+def registry() -> DictionaryRegistry:
+    registry = DictionaryRegistry()
+    apply_dictionary(registry, "locaweb:itsm", _record("v1", {"status": {"Encerrado": "closed"}}))
+    apply_dictionary(
+        registry,
+        "locaweb:itsm",
+        _record("v2", {"status": {"Encerrado": "closed", "Aguardando Problema": "waiting"}}),
     )
-    (tenant_dir / "itsm.v2.json").write_text(
-        json.dumps(
-            {
-                "tenant_id": "locaweb",
-                "source": "itsm",
-                "intake": "alert",
-                "dictionary_version": "v2",
-                "mappings": {"status": {"Encerrado": "closed", "Aguardando Problema": "waiting"}},
-            }
-        )
-    )
-    return tmp_path
+    return registry
 
 
-def test_latest_picks_the_highest_version(dict_root):
-    registry = DictionaryRegistry(dict_root)
-
-    latest = registry.latest("locaweb", "itsm")
-
-    assert latest.dictionary_version == "v2"
+def test_latest_is_the_last_record_the_log_carried(registry):
+    assert registry.latest("locaweb", "itsm").dictionary_version == "v2"
 
 
-def test_version_returns_a_specific_pinned_version(dict_root):
-    registry = DictionaryRegistry(dict_root)
+def test_version_returns_a_specific_pinned_version(registry):
+    assert registry.version("locaweb", "itsm", "v1").dictionary_version == "v1"
 
+
+def test_a_pinned_version_translates_by_its_own_mappings(registry):
     pinned = registry.version("locaweb", "itsm", "v1")
 
-    assert pinned.dictionary_version == "v1"
+    assert pinned.translate("status", "Encerrado") == "closed"
+    # v2 added this one; v1 must not answer for it.
     assert pinned.translate("status", "Aguardando Problema") is None
 
 
-def test_missing_tenant_or_source_returns_none(dict_root):
-    registry = DictionaryRegistry(dict_root)
-
-    assert registry.latest("other-tenant", "itsm") is None
-    assert registry.latest("locaweb", "datadog") is None
+def test_an_unknown_origin_has_no_dictionary_rather_than_an_empty_one():
+    assert DictionaryRegistry().latest("locaweb", "itsm") is None
 
 
-def test_translate_falls_back_to_default_for_unknown_value(dict_root):
-    registry = DictionaryRegistry(dict_root)
-    dictionary = registry.latest("locaweb", "itsm")
-
-    assert dictionary.translate("status", "Nunca Visto", default="unknown") == "unknown"
-
-
-def test_translate_strips_whitespace(dict_root):
-    registry = DictionaryRegistry(dict_root)
-    dictionary = registry.latest("locaweb", "itsm")
-
-    assert dictionary.translate("status", "  Encerrado  ") == "closed"
-
-
-def test_empty_directory_yields_no_dictionaries(tmp_path):
-    registry = DictionaryRegistry(tmp_path)
+def test_a_tombstone_forgets_the_origin(registry):
+    apply_dictionary(registry, "locaweb:itsm", None)
 
     assert registry.latest("locaweb", "itsm") is None
+
+
+def test_a_malformed_record_does_not_stop_the_rehydration(registry):
+    apply_dictionary(registry, "locaweb:itsm", b"not json")
+
+    # The record is skipped, and what the log already carried still stands.
+    assert registry.latest("locaweb", "itsm").dictionary_version == "v2"
+
+
+def test_an_unmapped_value_falls_back_instead_of_failing_the_event():
+    dictionary = Dictionary(
+        tenant_id="locaweb",
+        source="itsm",
+        intake="alert",
+        dictionary_version="v1",
+        mappings={"status": {"Encerrado": "closed"}},
+    )
+
+    assert dictionary.translate("status", "Nunca Visto", default="unknown") == "unknown"
+    assert dictionary.translate("status", "  Encerrado  ") == "closed"

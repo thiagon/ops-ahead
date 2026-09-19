@@ -13,6 +13,7 @@ from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 from settings import Settings
 from split import temporal_split
 from volume import features
+from volume.data import write_volume_forecast
 from volume.model import VolumeForecastModel
 
 HORIZONS = (1, 7)
@@ -211,10 +212,38 @@ def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str 
 
         run_id = run.info.run_id
 
+    _forecast_and_write(settings, long_df, bundled_model)
+
     if settings.auto_promote:
         promote_latest(settings, run_id)
 
     return run_id
+
+
+def _forecast_and_write(settings: Settings, long_df: pd.DataFrame, bundled_model: VolumeForecastModel) -> None:
+    """D+1/D+7 forecast as of the latest date in `long_df`, one row per
+    `priority_group`, using the same lag/rolling feature computation as
+    training — `VolumeForecastModel.predict` expects those precomputed on
+    `model_input`, the same contract `ml-model-serving` calls at inference
+    time, kept in sync by construction."""
+    as_of_date = long_df["date"].max()
+    featured = features.add_lag_features(long_df)
+    latest = featured.loc[featured["date"] == as_of_date].reset_index(drop=True)
+
+    predictions = bundled_model.predict(None, latest)
+
+    rows = [
+        {
+            "target_date": (as_of_date + pd.Timedelta(days=int(row["horizon"]))).date(),
+            "priority_group": row["priority_group"],
+            "horizon": int(row["horizon"]),
+            "yhat": float(row["yhat"]),
+            "yhat_lower": float(row["yhat_lower"]),
+            "yhat_upper": float(row["yhat_upper"]),
+        }
+        for _, row in predictions.iterrows()
+    ]
+    write_volume_forecast(settings, rows)
 
 
 def promote_latest(settings: Settings, run_id: str) -> None:

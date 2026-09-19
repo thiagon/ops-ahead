@@ -9,7 +9,7 @@
 
 -- OLA compliance per closed, KPI-eligible occurrence — deadline_seconds is
 -- the tenant's configured deadline for the severity, not a hardcoded
--- multiIf anymore (see seeds/tenant_deadlines.csv).
+-- multiIf anymore — the deadline is per-tenant configuration.
 select
     tenant_id,
     source,

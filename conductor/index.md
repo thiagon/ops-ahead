@@ -25,6 +25,7 @@ Navigation hub for project context.
 - [ml-layer2-gaps_20260817 — Conformidade da Camada 2 com a arquitetura da Sprint 2](./tracks/ml-layer2-gaps_20260817/index.md)
 
 - [incident-flow_20260819 — Fluxo do incidente (duas entradas, marcos de prazo, read model)](./tracks/incident-flow_20260819/index.md)
+- [ui-dashboard_20260821 — Dashboard: a camada gold vira tela](./tracks/ui-dashboard_20260821/index.md)
 
 <!-- Auto-populated by /conductor:new-track -->
 

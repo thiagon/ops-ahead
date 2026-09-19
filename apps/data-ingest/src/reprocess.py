@@ -10,6 +10,7 @@ a closed month's indicator does not change in silence.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import io
 import logging
 from datetime import date, timedelta
@@ -17,7 +18,7 @@ from datetime import date, timedelta
 import pyarrow.parquet as pq
 
 import metrics
-from dictionaries import DictionaryRegistry
+from config_stream import load_config_snapshot
 from models import BronzeAlertEvent, EventEnvelope
 from settings import Settings
 from translate import UnknownSourceError
@@ -73,8 +74,16 @@ def reprocess(
     date_to: date,
     dictionary_version: str,
 ) -> int:
-    writer = BatchWriter(settings, publisher=_NullPublisher())
-    dictionaries = DictionaryRegistry(settings.dictionaries_dir)
+    bindings, dictionaries = asyncio.run(
+        load_config_snapshot(
+            settings.kafka_bootstrap_servers,
+            settings.kafka_topic_config_origin,
+            settings.kafka_topic_config_dictionary,
+        )
+    )
+    writer = BatchWriter(
+        settings, publisher=_NullPublisher(), dictionaries=dictionaries, bindings=bindings
+    )
     pinned = dictionaries.version(tenant_id, source, dictionary_version)
     if pinned is None:
         raise ValueError(f"no dictionary version {dictionary_version!r} for {tenant_id}/{source}")
@@ -90,7 +99,7 @@ def reprocess(
         for key in keys:
             for envelope in _read_envelopes(writer._s3, settings.minio_bucket, key):
                 try:
-                    bronze = translate_envelope(envelope, dictionaries, dictionary=pinned)
+                    bronze = translate_envelope(envelope, dictionaries, bindings, dictionary=pinned)
                 except UnknownSourceError:
                     metrics.translation_failures.labels(source=source, intake=intake).inc()
                     continue

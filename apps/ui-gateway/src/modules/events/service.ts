@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import type { OriginCredential } from '../../plugins/origin-registry.ts';
 import { type EventEnvelope, eventEnvelopeSchema } from './schema.ts';
-import type { OriginCredential } from './sources/registry.ts';
 
 /**
  * Build the raw envelope for a body the route already authenticated. Nothing

@@ -88,6 +88,32 @@ kafkaTopics:
     replicas: 2
     config:
       cleanup.policy: compact
+  # Configuration, compacted and never deleted: a consumer that starts from
+  # zero rebuilds the whole current state by reading the log, so a service
+  # without its configuration fails readiness instead of running on a stale
+  # or embedded default (apps/ui-frontend/spec/config-ui.md).
+  # Keyed <tenant_id>:<source> — one record per origin.
+  - name: config.origin
+    partitions: 3
+    replicas: 2
+    config:
+      cleanup.policy: compact
+  - name: config.dictionary
+    partitions: 3
+    replicas: 2
+    config:
+      cleanup.policy: compact
+  # Keyed <tenant_id> — one record per tenant.
+  - name: config.deadline
+    partitions: 3
+    replicas: 2
+    config:
+      cleanup.policy: compact
+  - name: config.kpi-target
+    partitions: 3
+    replicas: 2
+    config:
+      cleanup.policy: compact
 
 monitoring:
   enabled: true

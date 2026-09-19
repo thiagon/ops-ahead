@@ -45,3 +45,31 @@ sources:
             tests: [not_null]
           - name: external_id
             tests: [not_null]
+
+  # Materialized by data-ingest from the compacted config.* topics — the same
+  # configuration the screens edit, never a seed committed next to the models.
+  - name: config
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
+    schema: "{{ env_var('CLICKHOUSE_DATABASE', 'default') }}"
+    tables:
+      - name: tenant_deadlines
+        columns:
+          - name: tenant_id
+            tests: [not_null]
+          - name: severity
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [1, 2, 3, 4, 5]
+          - name: deadline_seconds
+            tests: [not_null]
+      - name: tenant_kpi_targets
+        columns:
+          - name: tenant_id
+            tests: [not_null]
+          - name: kpi_group
+            tests: [not_null]
+          - name: max_breaches
+            tests: [not_null]
+          - name: achievement_pct
+            tests: [not_null]

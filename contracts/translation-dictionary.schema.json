@@ -42,7 +42,7 @@
     "mappings": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Only the keys relevant to this dictionary's intake are expected to be populated — status and reported_by for alert, condition for monitor.",
+      "description": "Only the keys relevant to this dictionary's intake are expected to be populated — status, severity, reported_by and resolution_code for alert; condition and severity for monitor.",
       "properties": {
         "status": {
           "type": "object",
@@ -56,6 +56,20 @@
               "resolved",
               "closed",
               "canceled"
+            ]
+          }
+        },
+        "severity": {
+          "type": "object",
+          "description": "Both intakes — the origin grades severity on its own scale ('1 - Crítica', 'Disaster'), so the label it sends is translated like any other vocabulary. Target is the domain's 1–5 scale as a string; the translator writes it as the integer the contracts declare.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
             ]
           }
         },

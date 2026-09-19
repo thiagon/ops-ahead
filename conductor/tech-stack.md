@@ -26,25 +26,30 @@
 - **prom-client** — `/metrics` (events published, HMAC/Kafka failures)
 - **Biome** (lint/format) + **vitest** (`unit`/`e2e`) — not ESLint/Jest
 
-## Frontend
+## Frontend (`apps/ui-frontend`)
 
-- **Nuxt** (Vue-based) — Lightweight configuration interface only; no heavy dashboards
-
-## Data Visualization
-
-- Code-based dataviz tool (flexible, to be selected — e.g., Observable, Evidence, Streamlit, or similar)
-- Analysis results and ML outputs rendered via dataviz layer, not the Nuxt frontend
+- **React Router 7** (framework mode) — server-side loaders read the ClickHouse gold layer
+  directly; no separate read model or API layer between the dashboard and the data
+- **Vite** native build, **Node 24**, `npm`
+- **Tailwind CSS 4** + **Biome** (lint/format) + **vitest** — same conventions as
+  `apps/ui-gateway`/`apps/ui-orchestrator`
+- **`@clickhouse/client`** (HTTP interface, port 8123) — server-only import, enforced by a
+  test that scans the client bundle for the package name and any credential
+- Design tokens (color, typography — Poppins/Inter/JetBrains Mono) extracted from
+  `docs/presentations/`
 
 ## Backend / Processing
 
-- No traditional API framework
-- **Workers** for schedulable ML jobs
-- **PySpark** for distributed data processing
-- **Airflow** for pipeline orchestration and scheduling
+- **dbt-clickhouse** (`apps/data-runner`) — bronze/silver/gold marts, materialized as
+  ClickHouse tables/views; no Airflow, no PySpark
+- **Great Expectations** — data quality checks, same `data-runner` process
+- Kafka-consuming services (`apps/data-ingest`, `apps/ml-trainer`, etc.) are all plain
+  `deployment`s scaled by KEDA `ScaledObject`s — no Argo Workflows, no per-message Jobs
 
 ## Database
 
-- **PostgreSQL** — Structured incident data, scheduling state, analysis results
+- **ClickHouse** (Altinity operator) — the single store: bronze/silver/gold layers, read
+  directly by `ui-frontend`'s loaders. No PostgreSQL for incident data.
 
 ## Infrastructure
 

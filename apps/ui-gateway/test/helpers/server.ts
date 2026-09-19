@@ -1,5 +1,5 @@
 import { buildApp } from '../../src/app.ts';
-import { stubKafka } from './app.ts';
+import { stubKafka, stubOrigins } from './app.ts';
 
 export interface TestServer {
   baseUrl: string;
@@ -9,6 +9,7 @@ export interface TestServer {
 export async function startTestServer(): Promise<TestServer> {
   const app = buildApp({ logger: false });
   stubKafka(app);
+  stubOrigins(app);
   await app.listen({ port: 0, host: '127.0.0.1' });
 
   const address = app.server.address();

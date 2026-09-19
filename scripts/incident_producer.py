@@ -61,6 +61,12 @@ def _map_row(row: pd.Series, source: str) -> dict:
         "ticket_number": payload["ticket_number"],
         "source": source,
         "opened_at": payload["opened_at"],
+        # The ACL reads the terminal timestamps off the envelope, not out of
+        # `payload`: omitting them here makes silver infer the closing instant
+        # from when the replay was ingested, and every historical duration
+        # becomes the age of the replay.
+        "resolved_at": payload.get("resolved_at"),
+        "closed_at": payload.get("closed_at"),
         "priority_code": int(payload["priority_code"]),
         "configuration_item": payload.get("configuration_item") or "",
         "status": payload.get("status") or "",
@@ -94,7 +100,7 @@ async def produce(args: argparse.Namespace) -> None:
             if secret:
                 headers["X-Signature"] = _sign(secret, body)
 
-            resp = await client.post("/webhook/incidents", content=body, headers=headers)
+            resp = await client.post(f"/webhook/v1/locaweb/{args.source}", content=body, headers=headers)
             resp.raise_for_status()
 
             if (i + 1) % 1000 == 0 or (i + 1) == total:

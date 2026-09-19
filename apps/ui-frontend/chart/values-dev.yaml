@@ -1,0 +1,5 @@
+ui-frontend:
+  image:
+    tag: "latest"
+frontend:
+  replicaCount: 1

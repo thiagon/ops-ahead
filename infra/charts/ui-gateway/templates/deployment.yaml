@@ -73,6 +73,8 @@ spec:
               value: {{ .Values.gateway.env.kafkaTopicRawAlert | quote }}
             - name: KAFKA_TOPIC_RAW_MONITOR
               value: {{ .Values.gateway.env.kafkaTopicRawMonitor | quote }}
+            - name: KAFKA_TOPIC_CONFIG_ORIGIN
+              value: {{ .Values.gateway.env.kafkaTopicConfigOrigin | quote }}
             - name: HMAC_ENABLED
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
             # One secret per (tenant, source) credential — sources/registry.ts

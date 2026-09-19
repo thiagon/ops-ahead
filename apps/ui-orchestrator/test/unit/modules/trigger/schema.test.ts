@@ -55,19 +55,28 @@ describe('triggerRequestSchema', () => {
   });
 
   it('rejects kpi_projection with a non-integer n_simulations', () => {
-    const result = triggerRequestSchema.safeParse({ analysis: 'kpi_projection', n_simulations: 5000.5 });
+    const result = triggerRequestSchema.safeParse({
+      analysis: 'kpi_projection',
+      n_simulations: 5000.5,
+    });
 
     expect(result.success).toBe(false);
   });
 
   it('accepts external_event_detection with contamination in range', () => {
-    const result = triggerRequestSchema.safeParse({ analysis: 'external_event_detection', contamination: 0.05 });
+    const result = triggerRequestSchema.safeParse({
+      analysis: 'external_event_detection',
+      contamination: 0.05,
+    });
 
     expect(result.success).toBe(true);
   });
 
   it('rejects external_event_detection with contamination out of range', () => {
-    const result = triggerRequestSchema.safeParse({ analysis: 'external_event_detection', contamination: 0.9 });
+    const result = triggerRequestSchema.safeParse({
+      analysis: 'external_event_detection',
+      contamination: 0.9,
+    });
 
     expect(result.success).toBe(false);
   });

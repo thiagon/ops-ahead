@@ -1,6 +1,36 @@
-ui:
-  replicas: 1
-  image: nginx:1.27-alpine
-  port: 80
+# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
+# same for every app.
+ui-frontend:
+  image:
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    publicGatewayUrl: http://gateway.ops-ahead.localtest.me
+    mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
+    mlModelServingTimeoutMs: "1500"
+  # ui-postgres' ExternalSecret, projected into ns:ui by the chart that
+  # provisions the database.
+  configDatabase:
+    host: config-postgres.ui.svc.cluster.local:5432
+    secretName: postgres-config-secret
+  secretName: ui-frontend-secret
   ingress:
     host: ui.ops-ahead.localtest.me
+
+monitoring:
+  enabled: true

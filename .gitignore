@@ -11,6 +11,7 @@ wheels/
 
 # Claude Code local settings
 .claude/settings.local.json
+.playwright-mcp
 
 # sensitive files
 .env
