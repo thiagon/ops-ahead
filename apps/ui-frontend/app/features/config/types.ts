@@ -302,7 +302,9 @@ export function integrationGaps(input: {
     if (!field.translated) continue;
     const known = DOMAIN_VALUES[field.field as MappingField];
     if (known.length === 0) continue;
-    const mapped = new Set((input.mappings[field.field as MappingField] ?? []).map(entry => entry.to));
+    const mapped = new Set(
+      (input.mappings[field.field as MappingField] ?? []).map(entry => entry.to),
+    );
     uncovered += known.filter(value => !mapped.has(value)).length;
   }
   return { missingFields, uncovered };

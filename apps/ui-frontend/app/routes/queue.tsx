@@ -60,9 +60,7 @@ function RiskScore({ probability }: { probability: number | null }) {
 
 function matches(row: QueueRow, query: string): boolean {
   if (!query) return true;
-  const haystack = [row.external_id, row.title, row.owner, row.source]
-    .join(' ')
-    .toLowerCase();
+  const haystack = [row.external_id, row.title, row.owner, row.source].join(' ').toLowerCase();
   return haystack.includes(query);
 }
 

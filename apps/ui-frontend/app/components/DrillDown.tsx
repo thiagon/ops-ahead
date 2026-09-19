@@ -129,7 +129,11 @@ function SimilarIncidentsList({ rows }: { rows: SimilarIncidentRow[] }) {
           </div>
           <div className="flex shrink-0 items-center gap-3 text-xs">
             <span className="text-text-muted">{formatRemaining(row.duration_seconds)}</span>
-            {row.has_breached ? <Badge tone="red">estourou</Badge> : <Badge tone="green">no prazo</Badge>}
+            {row.has_breached ? (
+              <Badge tone="red">estourou</Badge>
+            ) : (
+              <Badge tone="green">no prazo</Badge>
+            )}
           </div>
         </li>
       ))}
@@ -244,9 +248,7 @@ export function DrillDown({
               })}
             </div>
           ) : (
-            <p className="text-text-muted text-sm">
-              Score indisponível para esta ocorrência.
-            </p>
+            <p className="text-text-muted text-sm">Score indisponível para esta ocorrência.</p>
           )}
         </div>
 

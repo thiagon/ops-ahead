@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  clearTenantCache,
   ConflictError,
+  clearTenantCache,
   createIntegration,
   getIntegration,
   getTenantBySlug,

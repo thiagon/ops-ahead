@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseIntegrationTab,
+  type SampleField,
   samplePayload,
   setAtPath,
-  type SampleField,
 } from '../app/features/config/sample-payload.ts';
 
 describe('parseIntegrationTab', () => {

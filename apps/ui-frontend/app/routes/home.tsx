@@ -65,6 +65,7 @@ export default function Home({ actionData }: Route.ComponentProps) {
               id="tenant"
               name="tenant"
               required
+              // biome-ignore lint/a11y/noAutofocus: sole field of the entry screen
               autoFocus
               autoComplete="off"
               spellCheck={false}

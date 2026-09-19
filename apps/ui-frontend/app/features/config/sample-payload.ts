@@ -34,7 +34,7 @@ export function setAtPath(target: Record<string, unknown>, path: string, value: 
     }
     cursor = cursor[key] as Record<string, unknown>;
   }
-  cursor[parts[parts.length - 1]!] = value;
+  cursor[parts.at(-1) ?? ''] = value;
 }
 
 export function samplePayload(

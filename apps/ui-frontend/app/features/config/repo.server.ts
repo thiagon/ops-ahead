@@ -176,9 +176,9 @@ function compose(origin: OriginWithRelations): Integration {
 function withRelations() {
   return {
     dictionary: true,
-    bindings: { where: { status: 'active' }, orderBy: { field: 'asc' as const } },
+    bindings: { where: { status: 'active' as const }, orderBy: { field: 'asc' as const } },
     mappings: {
-      where: { status: 'active' },
+      where: { status: 'active' as const },
       orderBy: [{ mappingField: 'asc' as const }, { fromValue: 'asc' as const }],
     },
   };
@@ -349,10 +349,7 @@ export async function rotateSecret(source: string): Promise<string> {
 }
 
 /** Inactive stays in the list; archived leaves it. Rows are never deleted. */
-export async function setOriginStatus(
-  source: string,
-  status: Status,
-): Promise<Integration> {
+export async function setOriginStatus(source: string, status: Status): Promise<Integration> {
   const origin = await originRow(source);
   if (origin.status === status) return compose(origin);
   if (status === 'active' && !isIntegrationReady(compose(origin))) {

@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { data, Form, Link, redirect, useFetcher, useNavigation, useSearchParams } from 'react-router';
+import {
+  data,
+  Form,
+  Link,
+  redirect,
+  useFetcher,
+  useNavigation,
+  useSearchParams,
+} from 'react-router';
 import { Badge } from '~/components/Badge';
 import {
   Field,
@@ -34,10 +42,7 @@ import {
   upsertMapping,
   withTenant,
 } from '~/features/config/repo.server.ts';
-import {
-  parseIntegrationTab,
-  samplePayload,
-} from '~/features/config/sample-payload.ts';
+import { parseIntegrationTab, samplePayload } from '~/features/config/sample-payload.ts';
 import { takeSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
   CONTRACT_FIELDS,
@@ -478,13 +483,7 @@ function statusHint(lifecycle: Status, canActivate: boolean): string {
   return 'Só ativa quando o dicionário está completo.';
 }
 
-function StatusField({
-  lifecycle,
-  canActivate,
-}: {
-  lifecycle: Status;
-  canActivate: boolean;
-}) {
+function StatusField({ lifecycle, canActivate }: { lifecycle: Status; canActivate: boolean }) {
   const [confirmArchive, setConfirmArchive] = useState(false);
 
   return (
@@ -811,7 +810,10 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
         </p>
       )}
 
-      <nav role="tablist" aria-label="Seções da integração" className="mb-6 flex gap-1 border-border-base border-b">
+      <nav
+        aria-label="Seções da integração"
+        className="mb-6 flex gap-1 border-border-base border-b"
+      >
         <TabLink to="?tab=basic" active={tab === 'basic'}>
           Envio
         </TabLink>

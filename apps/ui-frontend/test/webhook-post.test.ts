@@ -35,7 +35,9 @@ describe('postToWebhook', () => {
       expect(String(input)).toBe('https://gateway.example/webhook/v1/locaweb/itsm');
       expect(init?.method).toBe('POST');
       expect(init?.body).toBe('{"a":1}');
-      expect(new Headers(init?.headers).get('x-signature')).toBe(signWebhookBody('sekret', '{"a":1}'));
+      expect(new Headers(init?.headers).get('x-signature')).toBe(
+        signWebhookBody('sekret', '{"a":1}'),
+      );
       return new Response('{"event_id":"abc"}', { status: 202 });
     });
     vi.stubGlobal('fetch', fetchMock);
