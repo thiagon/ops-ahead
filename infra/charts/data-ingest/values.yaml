@@ -46,8 +46,9 @@ consumer:
 scaledObject:
   pollingInterval: 15
   cooldownPeriod: 300
-  # Batch consumer (batchMaxSize above) — no need to scale on every message,
-  # only once real backlog builds up.
-  lagThreshold: "1000"
+  # Any lag must wake a replica: minReplicaCount is 0, so a threshold above 1
+  # leaves leftover messages unconsumed forever. Batching is batchMaxSize /
+  # batchMaxSeconds inside the consumer, not "don't scale yet".
+  lagThreshold: "1"
   minReplicaCount: 0
   maxReplicaCount: 5
