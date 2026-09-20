@@ -71,6 +71,12 @@ def _map_row(row: pd.Series, source: str) -> dict:
         "configuration_item": payload.get("configuration_item") or "",
         "status": payload.get("status") or "",
         "opened_by": payload.get("opened_by") or "",
+        # The ACL reads labels off the top of the body, not out of `payload`
+        # (data-ingest/src/sources/generic.py), so the free-form dimensions
+        # have to travel there to survive translation.
+        "product": payload.get("product"),
+        "category": payload.get("category"),
+        "subcategory": payload.get("subcategory"),
         "payload": payload,
     }
 

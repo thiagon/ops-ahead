@@ -5,7 +5,7 @@ import logging
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from register_snapshot import register_snapshot as _register_snapshot
@@ -18,17 +18,110 @@ LOGGER = logging.getLogger(__name__)
 ANALYSIS_STEPS = {"data_refresh": "transform", "data_quality_check": "quality"}
 
 RegisterSnapshotFn = Callable[..., str]
+StartAnalysisFn = Callable[..., str]
+
+# Trainings that need a hold-out window to evaluate against; the rest take the
+# analysis name alone (ml-trainer's SPLIT_REQUIRED_DOMAINS is the same split).
+SPLIT_REQUIRED_ANALYSES = {"volume_forecast", "entity_forecast", "breach_risk"}
 
 
 def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
+def _split_boundaries(settings: Settings, today: date) -> dict[str, str]:
+    """Rolling windows ending yesterday — the last day whose incidents are all
+    in. Fixed boundaries would silently stop moving as the data grows."""
+    holdout_end = today - timedelta(days=1)
+    validation_end = holdout_end - timedelta(days=settings.chain_holdout_days)
+    train_end = validation_end - timedelta(days=settings.chain_validation_days)
+    return {
+        "train_end": train_end.isoformat(),
+        "validation_end": validation_end.isoformat(),
+        "holdout_end": holdout_end.isoformat(),
+    }
+
+
+def start_analysis(
+    gateway_url: str, body: dict[str, Any], *, trigger: str, parent_id: str | None = None
+) -> str:
+    """POST /analyses as any other client would. The gateway mints the id, the
+    update_key and the row, so a chained training is as queryable as one
+    somebody asked for."""
+    payload = {**body, "trigger": trigger}
+    if parent_id:
+        payload["parent_id"] = parent_id
+    request = urllib.request.Request(
+        f"{gateway_url.rstrip('/')}/analyses",
+        data=json.dumps(payload).encode(),
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())["id"]
+
+
+def discover_tenants(settings: Settings) -> list[str]:
+    """The tenants the marts actually hold, read from silver_alert.
+
+    From the data, never from configuration — the same rule the scripts in
+    infra/scripts follow: adding a client must not require editing anything
+    here.
+    """
+    from clickhouse_driver import Client
+
+    client = Client.from_url(settings.clickhouse_native_url)
+    rows = client.execute("select distinct tenant_id from silver_alert order by tenant_id")
+    return [row[0] for row in rows]
+
+
+def chain_trainings(
+    settings: Settings,
+    parent_run_id: str,
+    start: StartAnalysisFn = start_analysis,
+    today: date | None = None,
+    tenants: list[str] | None = None,
+) -> dict[str, Any]:
+    """Starts the configured trainings off a finished full_pipeline, one run
+    per tenant per analysis.
+
+    Called after the quality step, never before: that ordering is the whole
+    point — a reproved suite raises and nothing here runs, so bad data cannot
+    produce a new model.
+
+    One run per tenant rather than one that loops internally, because there is
+    one model per tenant: a single row could not say whose model failed.
+    """
+    if not settings.chained_analyses:
+        return {"chained": {}, "chain_failed": {}}
+
+    splits = _split_boundaries(settings, today or datetime.now(UTC).date())
+    tenant_ids = tenants if tenants is not None else discover_tenants(settings)
+    started: dict[str, str] = {}
+    failed: dict[str, str] = {}
+    for analysis in settings.chained_analyses:
+        for tenant_id in tenant_ids:
+            key = f"{analysis}:{tenant_id}"
+            body: dict[str, Any] = {"analysis": analysis, "tenant_id": tenant_id}
+            if analysis in SPLIT_REQUIRED_ANALYSES:
+                body.update(splits)
+            try:
+                started[key] = start(
+                    settings.gateway_url, body, trigger="chained", parent_id=parent_run_id
+                )
+            except Exception as exc:
+                # One training failing to start must not cost the others, and
+                # none of it undoes the transformation that already ran.
+                LOGGER.exception("could not chain %s off run_id=%s", key, parent_run_id)
+                failed[key] = str(exc)
+    return {"chained": started, "chain_failed": failed}
+
+
 def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | None) -> None:
     """PATCH /analyses/{id} with the update_key from the trigger.data message.
 
-    Cron full_pipeline has no key (it never went through POST /analyses) and
-    is skipped so a missing row does not fail the daily chain.
+    A missing key means the message did not come from POST /analyses, which no
+    producer does anymore; the branch stays as a defence, not a path.
     """
     run_id = payload["run_id"]
     if not update_key:
@@ -58,14 +151,21 @@ def run_full_pipeline(
     dag_run_id: str,
     steps: dict[str, Callable] = _STEPS,
     register_snapshot: RegisterSnapshotFn = _register_snapshot,
+    start: StartAnalysisFn = start_analysis,
+    tenants: list[str] | None = None,
 ) -> dict[str, Any]:
-    """dbt run → great_expectations suite critical → register-snapshot, the
-    same three steps the old CronWorkflow ran, now sequential in one
-    container triggered by the native CronJob (see spec.md)."""
+    """dbt run → great_expectations → register-snapshot → chain the trainings.
+
+    Sequential in one container, and the order is the guarantee: the quality
+    step raises before anything is chained, so a reproved suite never produces
+    a new model.
+    """
     steps["transform"]()
     steps["quality"](["--suite", "critical", "--upload-docs"])
     digest = register_snapshot(settings, dag_run_id=dag_run_id)
-    return {"snapshot_hash": digest}
+    detail: dict[str, Any] = {"snapshot_hash": digest}
+    detail.update(chain_trainings(settings, dag_run_id, start=start, tenants=tenants))
+    return detail
 
 
 def process_message(

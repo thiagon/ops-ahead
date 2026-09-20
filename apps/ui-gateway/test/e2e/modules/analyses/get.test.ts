@@ -46,6 +46,8 @@ describe('GET /analyses/:id', () => {
 
     expect(res.json()).toEqual({
       id,
+      analysis: 'data_refresh',
+      trigger: 'manual',
       status: 'running',
       started_at: '2026-08-15T12:30:00.000Z',
     });
@@ -113,6 +115,8 @@ describe('PATCH /analyses/:id', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       id,
+      analysis: 'data_refresh',
+      trigger: 'manual',
       status: 'running',
       started_at: '2026-08-15T12:30:00.000Z',
     });

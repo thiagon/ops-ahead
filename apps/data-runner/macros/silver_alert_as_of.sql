@@ -178,7 +178,14 @@ select
         and w.resolution_code != 'no_intervention'          as is_eligible,
     w.severity_changes
 from with_changes w
-left join {{ source('config', 'tenant_deadlines') }} d
+-- FINAL is required, not cosmetic: tenant_deadlines is a ReplacingMergeTree
+-- and every republication of a tenant's deadlines leaves the superseded rows
+-- readable until a merge collapses them. Without it this join fans each
+-- occurrence out once per surviving version.
+left join (
+    select tenant_id, severity, deadline_seconds
+    from {{ source('config', 'tenant_deadlines') }} final
+) d
     on  d.tenant_id = w.tenant_id
     and d.severity = w.severity
 

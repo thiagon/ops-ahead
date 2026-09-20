@@ -5,6 +5,10 @@ export type { ShapContribution } from './types.ts';
 
 /** Mirrors `BreachFeatureInput` in apps/ml-model-serving/src/schemas.py. */
 export interface BreachFeatureInput {
+  /** Which tenant's model answers. The serving side requires it and never
+   * defaults: a default would serve one client's model for another's
+   * incident, and the probability would look perfectly ordinary. */
+  tenant_id: string;
   severity: number;
   owner: string;
   opened_hour: number;

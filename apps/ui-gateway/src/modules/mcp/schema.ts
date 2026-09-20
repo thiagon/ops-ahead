@@ -1,7 +1,9 @@
+import { z } from 'zod';
 import { analysisParamsSchema, analysisRequestSchema } from '../../services/analyses/schema.ts';
 import {
+  alertMappingSchema,
   deadlineSetSchema,
-  mappingSchema,
+  monitorMappingSchema,
   originParamsSchema,
   targetSetSchema,
 } from '../../services/rules/schema.ts';
@@ -23,7 +25,10 @@ export const setSourceStatusInputSchema = statusChangeSchema.extend({ source });
 
 export const rotateSourceSecretInputSchema = secretRotationSchema.extend({ source });
 
-export const setMappingInputSchema = mappingSchema.extend({ source });
+export const setMappingInputSchema = z.discriminatedUnion('intake', [
+  alertMappingSchema.extend({ source }),
+  monitorMappingSchema.extend({ source }),
+]);
 
 export const getMappingInputSchema = originParamsSchema.pick({ source: true });
 

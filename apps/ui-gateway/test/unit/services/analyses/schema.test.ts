@@ -19,6 +19,7 @@ describe('analysisRequestSchema', () => {
     analysis => {
       const result = analysisRequestSchema.safeParse({
         analysis,
+        tenant_id: 'locaweb',
         train_end: '2025-09-30',
         validation_end: '2025-10-31',
         holdout_end: '2026-01-31',
@@ -35,17 +36,19 @@ describe('analysisRequestSchema', () => {
   });
 
   it.each(['kpi_projection', 'external_event_detection'] as const)(
-    'accepts bare %s — no split dates required',
+    'accepts %s without split dates, but never without a tenant',
     analysis => {
-      const result = analysisRequestSchema.safeParse({ analysis });
-
-      expect(result.success).toBe(true);
+      expect(analysisRequestSchema.safeParse({ analysis }).success).toBe(false);
+      expect(
+        analysisRequestSchema.safeParse({ analysis, tenant_id: 'locaweb' }).success,
+      ).toBe(true);
     },
   );
 
   it('accepts kpi_projection with all its optional fields', () => {
     const result = analysisRequestSchema.safeParse({
       analysis: 'kpi_projection',
+      tenant_id: 'locaweb',
       n_simulations: 5000,
       seed: 7,
       kpi_target_volume_p2: 500,
@@ -60,6 +63,7 @@ describe('analysisRequestSchema', () => {
   it('rejects kpi_projection with a non-integer n_simulations', () => {
     const result = analysisRequestSchema.safeParse({
       analysis: 'kpi_projection',
+      tenant_id: 'locaweb',
       n_simulations: 5000.5,
     });
 
@@ -69,6 +73,7 @@ describe('analysisRequestSchema', () => {
   it('accepts external_event_detection with contamination in range', () => {
     const result = analysisRequestSchema.safeParse({
       analysis: 'external_event_detection',
+      tenant_id: 'locaweb',
       contamination: 0.05,
     });
 
@@ -78,16 +83,53 @@ describe('analysisRequestSchema', () => {
   it('rejects external_event_detection with contamination out of range', () => {
     const result = analysisRequestSchema.safeParse({
       analysis: 'external_event_detection',
+      tenant_id: 'locaweb',
       contamination: 0.9,
     });
 
     expect(result.success).toBe(false);
   });
 
-  it('rejects an unknown analysis', () => {
-    const result = analysisRequestSchema.safeParse({ analysis: 'full_pipeline' });
+  it.each(['data_refresh', 'data_quality_check', 'full_pipeline'] as const)(
+    'takes no tenant for %s, which rebuilds every mart at once',
+    analysis => {
+      expect(analysisRequestSchema.safeParse({ analysis }).success).toBe(true);
+    },
+  );
+
+  it('rejects a training without a tenant — there is one model per tenant', () => {
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'volume_forecast',
+      train_end: '2025-09-30',
+      validation_end: '2025-10-31',
+      holdout_end: '2026-01-31',
+    });
 
     expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown analysis', () => {
+    const result = analysisRequestSchema.safeParse({ analysis: 'retrain_everything' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts full_pipeline — the CronJob reaches the route like any caller', () => {
+    const result = analysisRequestSchema.safeParse({ analysis: 'full_pipeline' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts entity_forecast with the same splits volume_forecast takes', () => {
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'entity_forecast',
+      tenant_id: 'locaweb',
+      train_end: '2026-01-01',
+      validation_end: '2026-02-01',
+      holdout_end: '2026-03-01',
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it('rejects a data_source override — removed for SSRF/credential-leak risk', () => {
@@ -102,6 +144,7 @@ describe('analysisRequestSchema', () => {
   it('rejects a malformed split date', () => {
     const result = analysisRequestSchema.safeParse({
       analysis: 'volume_forecast',
+      tenant_id: 'locaweb',
       train_end: '30-09-2025',
       validation_end: '2025-10-31',
       holdout_end: '2026-01-31',

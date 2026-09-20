@@ -55,7 +55,10 @@ _CLICKHOUSE_INSERT_KPI_TARGET = """
 
 
 class Publisher(Protocol):
-    async def publish(self, message: str, topic: str) -> None: ...
+    # bytes, not str: a str payload reaches the consumer as a str, and a
+    # handler typed with its event model then gets the raw JSON text where it
+    # expects a mapping.
+    async def publish(self, message: bytes, topic: str) -> None: ...
 
 
 def _naive_utc(dt):
@@ -200,10 +203,10 @@ class BatchWriter:
 
             if isinstance(bronze, BronzeAlertEvent):
                 alert_rows.append(_alert_row(bronze))
-                await self._publisher.publish(bronze.model_dump_json(), topic=self._settings.kafka_topic_alert)
+                await self._publisher.publish(bronze.model_dump_json().encode(), topic=self._settings.kafka_topic_alert)
             else:
                 monitor_rows.append(_monitor_row(bronze))
-                await self._publisher.publish(bronze.model_dump_json(), topic=self._settings.kafka_topic_monitor)
+                await self._publisher.publish(bronze.model_dump_json().encode(), topic=self._settings.kafka_topic_monitor)
 
         if alert_rows:
             self._ch.execute(_CLICKHOUSE_INSERT_ALERT, alert_rows)

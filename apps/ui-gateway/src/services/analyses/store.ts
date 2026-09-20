@@ -1,6 +1,20 @@
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.ts';
-import { type AnalysisStatus, analysisStatusSchema } from './schema.ts';
+import { type AnalysisStatus, type AnalysisTrigger, analysisStatusSchema } from './schema.ts';
+
+export interface AnalysisOrigin {
+  analysis: string;
+  tenantId?: string;
+  trigger: AnalysisTrigger;
+  parentId?: string;
+}
+
+export interface AnalysisListFilter {
+  trigger?: AnalysisTrigger;
+  analysis?: string;
+  tenantId?: string;
+  limit: number;
+}
 
 export class AnalysisStore {
   #prisma: PrismaClient;
@@ -9,10 +23,18 @@ export class AnalysisStore {
     this.#prisma = prisma;
   }
 
-  async enqueue(id: string, updateKeyHash: string): Promise<void> {
+  async enqueue(id: string, updateKeyHash: string, origin: AnalysisOrigin): Promise<void> {
     await this.#prisma.analysis.upsert({
       where: { id },
-      create: { id, status: 'pending', updateKeyHash },
+      create: {
+        id,
+        status: 'pending',
+        updateKeyHash,
+        analysis: origin.analysis,
+        tenantId: origin.tenantId,
+        trigger: origin.trigger,
+        parentId: origin.parentId,
+      },
       update: {},
     });
   }
@@ -40,13 +62,36 @@ export class AnalysisStore {
   async getStatus(id: string): Promise<AnalysisStatus | undefined> {
     const row = await this.#prisma.analysis.findUnique({ where: { id } });
     if (!row) return undefined;
-    const detail = analysisStatusSchema.shape.detail.safeParse(row.detail);
-    return {
-      id: row.id,
-      status: row.status,
-      started_at: row.startedAt ?? undefined,
-      finished_at: row.finishedAt ?? undefined,
-      detail: detail.success ? detail.data : undefined,
-    };
+    return toStatus(row);
   }
+
+  async list(filter: AnalysisListFilter): Promise<AnalysisStatus[]> {
+    const rows = await this.#prisma.analysis.findMany({
+      where: {
+        ...(filter.trigger ? { trigger: filter.trigger } : {}),
+        ...(filter.analysis ? { analysis: filter.analysis } : {}),
+        ...(filter.tenantId ? { tenantId: filter.tenantId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: filter.limit,
+    });
+    return rows.map(toStatus);
+  }
+}
+
+type AnalysisRow = Awaited<ReturnType<PrismaClient['analysis']['findUniqueOrThrow']>>;
+
+function toStatus(row: AnalysisRow): AnalysisStatus {
+  const detail = analysisStatusSchema.shape.detail.safeParse(row.detail);
+  return {
+    id: row.id,
+    analysis: row.analysis,
+    tenant_id: row.tenantId ?? undefined,
+    trigger: row.trigger,
+    parent_id: row.parentId ?? undefined,
+    status: row.status,
+    started_at: row.startedAt ?? undefined,
+    finished_at: row.finishedAt ?? undefined,
+    detail: detail.success ? detail.data : undefined,
+  };
 }

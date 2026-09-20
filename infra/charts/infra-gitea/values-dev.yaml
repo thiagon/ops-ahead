@@ -31,6 +31,10 @@ gitea:
       type: ClusterIP
       clusterIP: ""
       port: 3000
+      # Routes this Service through the ServersTransport in infra/apps/ingresses.yaml,
+      # which raises the backend timeouts the registry push needs.
+      annotations:
+        traefik.ingress.kubernetes.io/service.serverstransport: infra-gitea-registry@kubernetescrd
   persistence:
     enabled: true
     storageClass: local-path

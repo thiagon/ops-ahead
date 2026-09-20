@@ -2,14 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from bindings import FieldBindings
+from bindings import FieldBindings, at
 from dictionaries import Dictionary
 from models import BronzeAlertEvent, BronzeMonitorEvent, EventEnvelope
 from time_utils import normalize_to_utc
-
-#: Fields carried into `labels` when the origin binds them — everything the
-#: contract does not name a field for.
-_LABEL_FIELDS = ("product", "category", "subcategory")
 
 
 def _opt_str(value: Any) -> str | None:
@@ -22,6 +18,26 @@ def _opt_str(value: Any) -> str | None:
 def _opt_datetime(value: Any):
     text = _opt_str(value)
     return normalize_to_utc(text) if text else None
+
+
+def _labels(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    labels = {str(key): text for key, item in value.items() if (text := _opt_str(item))}
+    return labels or None
+
+
+def _collect_labels(bindings: FieldBindings, body: dict[str, Any]) -> dict[str, str] | None:
+    """Join several origin fields into the bronze map, or take a map the
+    origin already sends at a single path."""
+    if bindings.label_paths:
+        labels = {
+            key: text
+            for key, path in bindings.label_paths.items()
+            if (text := _opt_str(at(body, path)))
+        }
+        return labels or None
+    return _labels(bindings.value(body, "labels"))
 
 
 def _severity(dictionary: Dictionary, raw: Any) -> int | None:
@@ -48,8 +64,6 @@ def translate_alert(
     def read(field: str) -> Any:
         return bindings.value(body, field)
 
-    labels = {name: value for name in _LABEL_FIELDS if (value := _opt_str(body.get(name)))}
-
     return BronzeAlertEvent(
         event_id=envelope.event_id,
         tenant_id=envelope.tenant_id,
@@ -74,7 +88,7 @@ def translate_alert(
             "resolution_code", _opt_str(read("resolution_code")), default=None
         ),
         resolution_summary=_opt_str(read("resolution_summary")),
-        labels=labels or None,
+        labels=_collect_labels(bindings, body),
         source_url=_opt_str(read("source_url")),
     )
 
@@ -103,6 +117,6 @@ def translate_monitor(
         entity_id=str(read("entity_id")),
         title=_opt_str(read("title")),
         description=_opt_str(read("description")),
-        labels=None,
+        labels=_collect_labels(bindings, body),
         source_url=_opt_str(read("source_url")),
     )

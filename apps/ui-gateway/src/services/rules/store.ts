@@ -1,6 +1,6 @@
 import type { PrismaClient } from '../../generated/prisma/client.ts';
 import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.ts';
-import type { DeadlineSet, Mapping, TargetSet } from './schema.ts';
+import { type DeadlineSet, type Mapping, mappingSchema, type TargetSet } from './schema.ts';
 
 /** How many published copies GET /history returns. Older rows stay stored. */
 export const HISTORY_LIMIT = 10;
@@ -119,12 +119,12 @@ function toMapping(row: {
   bindings: unknown;
   mappings: unknown;
 }): Mapping {
-  return {
+  return mappingSchema.parse({
     intake: row.intake,
     version: row.version,
-    bindings: row.bindings as Mapping['bindings'],
-    mappings: row.mappings as Mapping['mappings'],
-  };
+    bindings: row.bindings,
+    mappings: row.mappings,
+  });
 }
 
 function toDeadlines(row: { deadlines: unknown }): DeadlineSet {

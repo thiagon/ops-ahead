@@ -98,7 +98,14 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # A failed app must not hold back the ones that did publish: `needs: [build]`
+    # is only satisfied when every matrix leg succeeds, so without this a single
+    # push failure leaves every other app pinned to its previous tag. write-back
+    # pins from the registry instead, so a leg that failed here simply has no
+    # manifest to find.
+    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         app: [data-ingest, data-runner, data-deadline-tracker, ui-gateway, ui-frontend, ml-trainer, ml-burst-detector, ml-model-serving]
     steps:
@@ -127,10 +134,13 @@ jobs:
 
   write-back:
     needs: [detect-changes, build]
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    if: always() && needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Reading the registry is what decides which tags get pinned. Without it
+      # docker login still succeeds and every manifest lookup comes back empty.
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -139,20 +149,51 @@ jobs:
           CHANGED_APPS_JSON: ${{ needs.detect-changes.outputs.matrix }}
         run: |
           SHA="${{ github.sha }}"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${REGISTRY}" -u "${OWNER}" --password-stdin
 
           # Same rule for every app: pin <app>.image.tag. Keying by the app's own
           # name keeps distinct top-level keys, so a pipeline App that layers
           # several step overlays into one release never collides on `image`.
+          #
+          # The registry, not the build job, decides what gets pinned: a tag is
+          # only written once its manifest is actually pullable, so an app whose
+          # push failed keeps its previous tag and ArgoCD is never pointed at an
+          # image that does not exist.
+          # Two ways to ask, because a client-side manifest lookup can fail for
+          # reasons that have nothing to do with the image being there (token
+          # scope, TLS, the client's own registry config). The registry's own
+          # v2 API is the authority.
+          published() {
+            docker manifest inspect "${REGISTRY}/${OWNER}/$1:${SHA}" > /dev/null 2>&1 && return 0
+            curl -sfI -u "${OWNER}:${{ secrets.REGISTRY_PASSWORD }}" \
+              -H 'Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json' \
+              "http://${REGISTRY}/v2/${OWNER}/$1/manifests/${SHA}" > /dev/null 2>&1
+          }
+
+          PINNED=""; SKIPPED=""
           for app in $(echo "$CHANGED_APPS_JSON" | jq -r '.[]'); do
             FILE="apps/${app}/chart/values-dev.yaml"
-            if [ -f "$FILE" ]; then
+            [ -f "$FILE" ] || continue
+            if published "$app"; then
               APP="$app" SHA="$SHA" yq -i '.[env(APP)].image.tag = env(SHA)' "$FILE"
               git add "$FILE"
+              PINNED="${PINNED} ${app}"
+            else
+              SKIPPED="${SKIPPED} ${app}"
             fi
           done
 
-          if [ -f .ci/force-build ]; then
+          echo "pinned:${PINNED:- none}"
+          echo "skipped (no image in registry):${SKIPPED:- none}"
+
+          # Keep the marker when an app still needs building, so the next run
+          # retries it instead of diffing it away as unchanged.
+          if [ -f .ci/force-build ] && [ -z "$SKIPPED" ]; then
             git rm .ci/force-build
+          fi
+
+          if [ -n "$SKIPPED" ]; then
+            echo "::warning::these apps were not deployed:${SKIPPED}"
           fi
 
       - name: Commit & push write-back
@@ -161,3 +202,24 @@ jobs:
           git config user.email "actions@ops-ahead.local"
           git diff --staged --quiet || git commit -m "ci: pin image tags to ${{ github.sha }} [skip ci]"
           git push origin HEAD:main
+
+      # continue-on-error above lets the publishable apps through, which also
+      # means the run would otherwise report success while an app is missing.
+      # Fail here, after the write-back, so the deploys still happen and the
+      # run is still red.
+      - name: Fail if any app is missing from the registry
+        env:
+          CHANGED_APPS_JSON: ${{ needs.detect-changes.outputs.matrix }}
+        run: |
+          SHA="${{ github.sha }}"
+          MISSING=""
+          for app in $(echo "$CHANGED_APPS_JSON" | jq -r '.[]'); do
+            docker manifest inspect "${REGISTRY}/${OWNER}/${app}:${SHA}" > /dev/null 2>&1 && continue
+            curl -sfI -u "${OWNER}:${{ secrets.REGISTRY_PASSWORD }}" \
+              -H 'Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json' \
+              "http://${REGISTRY}/v2/${OWNER}/${app}/manifests/${SHA}" > /dev/null 2>&1 \
+              || MISSING="${MISSING} ${app}"
+          done
+          [ -z "$MISSING" ] && exit 0
+          echo "apps that failed to publish:${MISSING}" >&2
+          exit 1

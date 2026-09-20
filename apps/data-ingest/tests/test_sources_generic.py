@@ -129,13 +129,13 @@ def test_reads_a_nested_path_the_way_the_binding_spells_it():
             "tenant_id": "locaweb",
             "source": "service_now",
             "intake": "alert",
-            "bindings": [
-                {"field": "external_id", "path": "fields.number"},
-                {"field": "opened_at", "path": "opened_at"},
-                {"field": "severity", "path": "priority_code"},
-                {"field": "title", "path": "short_description"},
-                {"field": "status", "path": "fields.state.name"},
-            ],
+            "bindings": {
+                "external_id": "fields.number",
+                "opened_at": "opened_at",
+                "severity": "priority_code",
+                "title": "short_description",
+                "status": "fields.state.name",
+            },
         }
     )
     body = {
@@ -178,3 +178,44 @@ def test_passes_a_numeric_severity_through_when_no_mapping_exists():
     bronze = translate_alert(_envelope(), DICTIONARY, BINDINGS, BODY)
 
     assert bronze.severity == 2
+
+
+def test_reads_labels_from_the_bound_path():
+    bindings = FieldBindings(
+        tenant_id=BINDINGS.tenant_id,
+        source=BINDINGS.source,
+        intake=BINDINGS.intake,
+        paths={**BINDINGS.paths, "labels": "tags"},
+    )
+    body = {**BODY, "tags": {"product": "hosting", "tier": "gold"}}
+
+    bronze = translate_alert(_envelope(), DICTIONARY, bindings, body)
+
+    assert bronze.labels == {"product": "hosting", "tier": "gold"}
+
+
+def test_joins_several_origin_fields_into_labels():
+    bindings = parse_bindings(
+        {
+            "tenant_id": "locaweb",
+            "source": "itsm",
+            "intake": "alert",
+            "bindings": {
+                "external_id": "ticket_number",
+                "opened_at": "opened_at",
+                "severity": "priority_code",
+                "title": "short_description",
+                "status": "status",
+                "labels": [
+                    {"key": "product", "path": "product"},
+                    {"key": "category", "path": "category"},
+                    {"key": "subcategory", "path": "subcategory"},
+                ],
+            },
+        }
+    )
+    body = {**BODY, "category": "rede", "subcategory": "disco"}
+
+    bronze = translate_alert(_envelope(), DICTIONARY, bindings, body)
+
+    assert bronze.labels == {"product": "hosting", "category": "rede", "subcategory": "disco"}

@@ -18,6 +18,14 @@ def _train_volume(settings: Settings) -> str:
     return train_and_log(settings, daily, dataset_version=dataset_version(daily))
 
 
+def _train_entity_forecast(settings: Settings) -> str:
+    from entity_forecast.data import dataset_version, fetch_gold_alert_category_trends
+    from entity_forecast.train import train_and_log
+
+    trends = fetch_gold_alert_category_trends(settings)
+    return train_and_log(settings, trends, dataset_version=dataset_version(trends))
+
+
 def _train_breach(settings: Settings) -> str:
     from breach.data import (
         dataset_version,
@@ -101,16 +109,17 @@ def _run_drift(settings: Settings) -> str:
 
 TRAINERS = {
     "volume": _train_volume,
+    "entity_forecast": _train_entity_forecast,
     "breach": _train_breach,
     "external_event": _train_external_event,
     "kpi_projection": _train_kpi_projection,
     "drift": _run_drift,
 }
 
-# volume/breach need a hold-out window to evaluate against; kpi_projection
-# always forecasts from "now" forward and external_event trains unsupervised
-# on all available history — neither takes split boundaries.
-SPLIT_REQUIRED_DOMAINS = {"volume", "breach"}
+# The supervised forecasts need a hold-out window to evaluate against;
+# kpi_projection always forecasts from "now" forward and external_event trains
+# unsupervised on all available history — neither takes split boundaries.
+SPLIT_REQUIRED_DOMAINS = {"volume", "entity_forecast", "breach"}
 
 
 def _require_split_boundaries(settings: Settings) -> None:
@@ -138,7 +147,7 @@ def main() -> None:
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m main train <volume|breach|external_event|kpi_projection|drift> | consume")
+        LOGGER.error("Usage: python -m main train <volume|entity_forecast|breach|external_event|kpi_projection|drift> | consume")
         sys.exit(2)
 
     domain = sys.argv[2]

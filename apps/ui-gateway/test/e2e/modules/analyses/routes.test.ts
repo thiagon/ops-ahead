@@ -25,6 +25,7 @@ describe('POST /analyses', () => {
       url: '/analyses',
       payload: {
         analysis: 'volume_forecast',
+      tenant_id: 'locaweb',
         train_end: '2025-09-30',
         validation_end: '2025-10-31',
         holdout_end: '2026-01-31',
@@ -42,6 +43,7 @@ describe('POST /analyses', () => {
       url: '/analyses',
       payload: {
         analysis: 'breach_risk',
+      tenant_id: 'locaweb',
         train_end: '2025-02-15',
         validation_end: '2025-03-15',
         holdout_end: '2025-04-09',
@@ -55,6 +57,7 @@ describe('POST /analyses', () => {
     expect(JSON.parse(message?.value ?? '')).toMatchObject({
       run_id: res.json().id,
       analysis: 'breach_risk',
+      tenant_id: 'locaweb',
       train_end: '2025-02-15',
       update_key: expect.any(String),
     });
@@ -64,7 +67,7 @@ describe('POST /analyses', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/analyses',
-      payload: { analysis: 'kpi_projection' },
+      payload: { analysis: 'kpi_projection', tenant_id: 'locaweb' },
     });
 
     expect(res.statusCode).toBe(202);
@@ -85,7 +88,7 @@ describe('POST /analyses', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/analyses',
-      payload: { analysis: 'volume_forecast' },
+      payload: { analysis: 'volume_forecast', tenant_id: 'locaweb' },
     });
 
     expect(res.statusCode).toBe(400);

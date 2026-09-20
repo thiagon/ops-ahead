@@ -4,11 +4,11 @@ RECORD = {
     "tenant_id": "locaweb",
     "source": "service_now",
     "intake": "alert",
-    "bindings": [
-        {"field": "external_id", "path": "fields.number"},
-        {"field": "status", "path": "fields.state.name"},
-        {"field": "acknowledged_at", "path": None},
-    ],
+    "bindings": {
+        "external_id": "fields.number",
+        "status": "fields.state.name",
+        "acknowledged_at": None,
+    },
 }
 
 
@@ -38,9 +38,7 @@ def test_a_path_that_does_not_resolve_reads_as_none():
 
 
 def test_never_binds_a_field_the_pipeline_stamps_itself():
-    bindings = parse_bindings(
-        {**RECORD, "bindings": [{"field": "tenant_id", "path": "customer"}]}
-    )
+    bindings = parse_bindings({**RECORD, "bindings": {"tenant_id": "customer"}})
 
     assert bindings.paths == {}
 
@@ -51,3 +49,24 @@ def test_keys_an_origin_by_tenant_and_source():
 
     assert registry.get("locaweb", "service_now") is not None
     assert registry.get("outro", "service_now") is None
+
+
+def test_joins_label_entries_into_key_paths():
+    bindings = parse_bindings(
+        {
+            **RECORD,
+            "bindings": {
+                **RECORD["bindings"],
+                "labels": [
+                    {"key": "product", "path": "payload.product"},
+                    {"key": "category", "path": "payload.category"},
+                ],
+            },
+        }
+    )
+
+    assert "labels" not in bindings.paths
+    assert bindings.label_paths == {
+        "product": "payload.product",
+        "category": "payload.category",
+    }

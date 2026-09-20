@@ -18,6 +18,7 @@ from sklearn.metrics import average_precision_score, brier_score_loss
 
 from breach import features
 from breach.model import BreachRiskModel
+from model_names import registered_model_name
 from settings import Settings
 from split import temporal_split
 
@@ -133,6 +134,36 @@ def recall_at_top50_per_hour(holdout_df: pd.DataFrame, scores: np.ndarray) -> fl
     return float(np.mean(recalls)) if recalls else float("nan")
 
 
+def tenants_with_history(examples: pd.DataFrame, min_examples: int) -> list[str]:
+    """Tenants discovered from the mart, never from configuration. One with too
+    few examples is skipped with a log, not failed."""
+    counts = examples.groupby("tenant_id").size()
+    eligible = sorted(counts[counts >= min_examples].index)
+    for tenant_id in sorted(set(counts.index) - set(eligible)):
+        LOGGER.info(
+            "breach: skipping tenant=%s, %d examples (< %d)",
+            tenant_id,
+            counts[tenant_id],
+            min_examples,
+        )
+    return eligible
+
+
+def _requested_tenants(settings: Settings, eligible: list[str]) -> list[str]:
+    """`settings.tenant_id` narrows the run to one tenant — every training
+    message carries it. It has to be eligible: asking for a tenant with too
+    little history is an explicit error, not a silent no-op, because the
+    caller asked for a model and would otherwise get none without being told.
+    """
+    if settings.tenant_id is None:
+        return eligible
+    if settings.tenant_id not in eligible:
+        raise ValueError(
+            f"tenant {settings.tenant_id!r} has no trainable history"
+        )
+    return [settings.tenant_id]
+
+
 def train_and_log(
     settings: Settings,
     examples: pd.DataFrame,
@@ -142,8 +173,55 @@ def train_and_log(
     dataset_version: str | None = None,
     n_trials: int | None = None,
 ) -> str:
+    """A model per tenant, never one across all of them.
+
+    Partitioning happens before build_feature_frame, not after: several
+    features (the historical OLA ratios, the per-entity counters, group_load)
+    are computed across incidents, and a rate for one client's group must not
+    be established from another's traffic.
+    """
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     mlflow.set_experiment(settings.mlflow_experiment_name)
+
+    tenants = _requested_tenants(settings, tenants_with_history(examples, settings.breach_min_examples))
+    trained: dict[str, str] = {}
+    failed: dict[str, str] = {}
+
+    with mlflow.start_run() as parent:
+        mlflow.log_param("dataset_version", dataset_version or settings.dataset_version)
+        mlflow.log_param("tenants", ",".join(tenants))
+        for tenant_id in tenants:
+            try:
+                trained[tenant_id] = train_tenant(
+                    settings,
+                    examples[examples["tenant_id"] == tenant_id],
+                    signal_counts,
+                    auto_resolution_rate,
+                    severity_escalations,
+                    tenant_id,
+                    dataset_version,
+                    n_trials,
+                )
+            except Exception as exc:
+                LOGGER.exception("breach: tenant=%s failed", tenant_id)
+                failed[tenant_id] = str(exc)
+        mlflow.log_param("tenants_trained", ",".join(trained))
+        mlflow.log_param("tenants_failed", ",".join(failed))
+        mlflow.log_metric("tenants_trained_count", len(trained))
+        return parent.info.run_id
+
+
+def train_tenant(
+    settings: Settings,
+    examples: pd.DataFrame,
+    signal_counts: pd.DataFrame,
+    auto_resolution_rate: pd.DataFrame,
+    severity_escalations: pd.DataFrame,
+    tenant_id: str,
+    dataset_version: str | None = None,
+    n_trials: int | None = None,
+) -> str:
+    registered_name = registered_model_name(settings.mlflow_registered_model_name, tenant_id)
 
     frame = features.build_feature_frame(
         examples,
@@ -187,7 +265,8 @@ def train_and_log(
     # batch before it's ever registered.
     bundled_model.predict(None, split.holdout.head(min(5, len(split.holdout))))
 
-    with mlflow.start_run() as run:
+    with mlflow.start_run(nested=True, run_name=tenant_id) as run:
+        mlflow.log_param("tenant_id", tenant_id)
         mlflow.log_param("dataset_version", dataset_version or settings.dataset_version)
         mlflow.log_param("train_end", settings.train_end)
         mlflow.log_param("validation_end", settings.validation_end)
@@ -212,23 +291,20 @@ def train_and_log(
             # package (ml-model-serving) would otherwise shadow the bundled code
             # and fail to unpickle it.
             code_paths=[str(Path(__file__).resolve().parent)],
-            registered_model_name=settings.mlflow_registered_model_name
-            if settings.auto_promote
-            else None,
+            registered_model_name=registered_name if settings.auto_promote else None,
         )
         run_id = run.info.run_id
 
     if settings.auto_promote:
-        promote_latest(settings, run_id)
+        promote_latest(settings, run_id, registered_name)
 
     return run_id
 
 
-def promote_latest(settings: Settings, run_id: str) -> None:
+def promote_latest(settings: Settings, run_id: str, registered_name: str | None = None) -> None:
+    name = registered_name or settings.mlflow_registered_model_name
     client = mlflow.MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
-    versions = client.search_model_versions(
-        f"name='{settings.mlflow_registered_model_name}'"
-    )
+    versions = client.search_model_versions(f"name='{name}'")
     matching = [v for v in versions if v.run_id == run_id]
     if not matching:
         LOGGER.warning(
@@ -237,7 +313,7 @@ def promote_latest(settings: Settings, run_id: str) -> None:
         return
     version = matching[0].version
     client.transition_model_version_stage(
-        name=settings.mlflow_registered_model_name,
+        name=name,
         version=version,
         stage="Production",
         archive_existing_versions=True,

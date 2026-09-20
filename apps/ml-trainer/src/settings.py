@@ -42,6 +42,19 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic: str = "trigger.ml"
+    # Below this many days of history a tenant is skipped rather than trained:
+    # a model fitted on a handful of days is worse than none, and the first
+    # value here is an informed guess — only a real small tenant tells.
+    # Which tenant this run trains. One model per tenant, so every training
+    # message carries it (contracts/trigger-ml.schema.json).
+    tenant_id: str | None = None
+    tenant_min_history_days: int = 90
+    # Breach is one example per incident-milestone, not a daily series, so its
+    # threshold counts examples rather than days.
+    breach_min_examples: int = 500
+    # Below this many days a category×product is folded into its tenant's
+    # residual series instead of getting a model of its own.
+    entity_min_history_days: int = 60
     kafka_group_id: str = "ml-trainer"
     gateway_url: str = "http://gateway.ui.svc.cluster.local"
     # Bounds how long consume_forever() blocks per poll before checking for

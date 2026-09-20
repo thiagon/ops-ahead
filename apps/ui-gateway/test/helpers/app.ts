@@ -77,11 +77,15 @@ function seededSources(): Map<string, SourceRow> {
 
 type AnalysisRow = {
   id: string;
+  analysis: string;
+  trigger: 'manual' | 'scheduled' | 'chained';
+  parentId: string | null;
   status: 'pending' | 'running' | 'succeeded' | 'failed';
   updateKeyHash: string;
   startedAt: Date | null;
   finishedAt: Date | null;
   detail: unknown;
+  createdAt: Date;
 };
 
 type MappingRow = {
@@ -212,11 +216,15 @@ export function memoryPrisma(): PrismaClient {
         if (!current) {
           rows.set(where.id, {
             id: create.id,
+            analysis: create.analysis ?? 'unknown',
+            trigger: create.trigger ?? 'manual',
+            parentId: create.parentId ?? null,
             status: create.status,
             updateKeyHash: create.updateKeyHash,
             startedAt: create.startedAt ?? null,
             finishedAt: create.finishedAt ?? null,
             detail: create.detail ?? null,
+            createdAt: new Date(),
           });
         } else {
           rows.set(where.id, { ...current, ...update });
@@ -231,6 +239,22 @@ export function memoryPrisma(): PrismaClient {
       },
       async findUnique({ where }: { where: { id: string } }) {
         return rows.get(where.id) ?? null;
+      },
+      async findMany({
+        where,
+        take,
+      }: {
+        where?: { trigger?: AnalysisRow['trigger']; analysis?: string };
+        take?: number;
+      }) {
+        const matches = [...rows.values()]
+          .filter(
+            row =>
+              (!where?.trigger || row.trigger === where.trigger) &&
+              (!where?.analysis || row.analysis === where.analysis),
+          )
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return take ? matches.slice(0, take) : matches;
       },
     },
     mapping: {

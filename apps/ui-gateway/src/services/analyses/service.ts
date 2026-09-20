@@ -9,7 +9,7 @@ import type {
   AnalysisStatusUpdate,
   AnalysisStatusValue,
 } from './schema.ts';
-import { AnalysisStore } from './store.ts';
+import { type AnalysisListFilter, AnalysisStore } from './store.ts';
 
 export class AnalysesService {
   #store: AnalysisStore;
@@ -23,7 +23,12 @@ export class AnalysesService {
   async start(request: AnalysisRequest): Promise<{ id: string }> {
     const id = randomUUID();
     const updateKey = randomBytes(32).toString('base64url');
-    await this.#store.enqueue(id, hashUpdateKey(updateKey));
+    await this.#store.enqueue(id, hashUpdateKey(updateKey), {
+      analysis: request.analysis,
+      tenantId: 'tenant_id' in request ? request.tenant_id : undefined,
+      trigger: request.trigger,
+      parentId: request.parent_id,
+    });
     await this.#publish.send(id, request, updateKey);
     return { id };
   }
@@ -50,6 +55,10 @@ export class AnalysesService {
     const status = await this.#store.getStatus(id);
     if (!status) throw createError.NotFound('analysis not found');
     return status;
+  }
+
+  async list(filter: AnalysisListFilter): Promise<AnalysisStatus[]> {
+    return this.#store.list(filter);
   }
 }
 

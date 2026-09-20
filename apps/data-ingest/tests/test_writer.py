@@ -72,3 +72,15 @@ def test_milestone_row_defaults_missing_entity_id_to_empty_string():
 def test_milestone_row_converts_aware_datetimes_to_naive_utc():
     row = _milestone_row(_make_milestone(occurred_at="2024-03-06T22:00:00-03:00"))
     assert row[-1] == datetime(2024, 3, 7, 1, 0, 0)
+
+
+def test_publisher_protocol_carries_bytes():
+    """A str payload survives the broker as a str, and a consumer whose
+    handler is typed with the event model then receives the raw JSON text
+    instead of a mapping — see apps/data-deadline-tracker's own contract
+    test."""
+    import inspect
+
+    from writer import Publisher
+
+    assert inspect.signature(Publisher.publish).parameters["message"].annotation is bytes

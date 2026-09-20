@@ -64,16 +64,41 @@ enum SourceStatus {
   disabled
 }
 
-model Analysis {
-  id            String         @id
-  status        AnalysisStatus @default(pending)
-  updateKeyHash String         @map("update_key_hash")
-  startedAt     DateTime?      @map("started_at") @db.Timestamptz()
-  finishedAt    DateTime?      @map("finished_at") @db.Timestamptz()
-  detail        Json?
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+/// How an analysis came to run. `manual` is a caller asking for it, `scheduled`
+/// the daily CronJob, `chained` a training data-runner started off a finished
+/// full_pipeline. Three values rather than two: a chained run is neither — the
+/// clock did not ask for it, the transformation's own success did.
+enum AnalysisTrigger {
+  manual
+  scheduled
+  chained
+}
 
+model Analysis {
+  id            String          @id
+  analysis      String
+  /// Null for the data analyses, which rebuild every mart at once. Set on a
+  /// training, where there is one model per tenant and a run without an owner
+  /// could answer neither "whose model is this" nor "retrain just this one".
+  tenantId      String?         @map("tenant_id")
+  trigger       AnalysisTrigger @default(manual)
+  status        AnalysisStatus  @default(pending)
+  updateKeyHash String          @map("update_key_hash")
+  startedAt     DateTime?       @map("started_at") @db.Timestamptz()
+  finishedAt    DateTime?       @map("finished_at") @db.Timestamptz()
+  detail        Json?
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  /// The full_pipeline run a chained training was started from, so "which
+  /// models did this data produce" is a query rather than a log search.
+  parentId String?    @map("parent_id")
+  parent   Analysis?  @relation("AnalysisChain", fields: [parentId], references: [id])
+  children Analysis[] @relation("AnalysisChain")
+
+  @@index([trigger, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([analysis, createdAt])
   @@map("analyses")
 }
 

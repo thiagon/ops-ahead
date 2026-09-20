@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(date, category, product)',
+        order_by='(tenant_id, date, category, product)',
         partition_by='toYYYYMM(date)'
     )
 }}
@@ -12,6 +12,7 @@
 -- missing key reads as '' by ClickHouse Map subscript default, kept
 -- visible as its own category rather than filtered out.
 select
+    tenant_id,
     toDate(opened_at)         as date,
     labels['category']        as category,
     labels['product']         as product,
@@ -23,4 +24,4 @@ select
     countIf(severity = 5)     as p5_count,
     avg(duration_seconds)     as avg_duration_seconds
 from {{ ref('silver_alert') }}
-group by date, category, product
+group by tenant_id, date, category, product

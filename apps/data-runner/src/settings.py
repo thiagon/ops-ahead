@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     kafka_topic: str = "trigger.data"
     kafka_group_id: str = "data-runner"
     gateway_url: str = "http://gateway.ui.svc.cluster.local"
+    # Trainings started once full_pipeline finishes — after the quality suite,
+    # so a reproved run trains nothing. Empty disables chaining.
+    chained_analyses: list[str] = []
+    # How the split boundaries of a chained training are derived from the day
+    # it runs: holdout ends yesterday, and these are how far back the earlier
+    # two boundaries sit.
+    chain_holdout_days: int = 30
+    chain_validation_days: int = 60
     # Bounds how long consume_forever() blocks per poll before checking for
     # SIGTERM — not a hang-prevention timeout anymore, the loop never exits
     # on an empty topic.

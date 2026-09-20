@@ -3,6 +3,11 @@
 mapping (field bindings + value dictionary), contractual deadlines, and KPI
 targets, through the gateway's /sources and PUT /rules/* routes.
 
+The mapping is the ServiceNow → domain half of notebooks/events_dataset.ipynb
+(Locaweb CSV → ServiceNow Table API). Bindings name the Table API columns;
+the dictionary translates ServiceNow state/priority/opened_by/close_code
+into the domain vocabulary.
+
 Proves the path spec-config-producao.md describes: gateway publishes → Kafka
 carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
 here reaches MinIO or ClickHouse directly — verification is a separate step
@@ -22,39 +27,51 @@ SOURCE = "service_now"
 MAPPING = {
     "intake": "alert",
     "version": "v1",
-    "bindings": [
-        {"field": "external_id", "path": "number"},
-        {"field": "status", "path": "fields.status.name"},
-        {"field": "severity", "path": "fields.priority.name"},
-        {"field": "opened_at", "path": "fields.opened_at"},
-        {"field": "resolved_at", "path": "fields.resolved_at"},
-        {"field": "closed_at", "path": "fields.closed_at"},
-        {"field": "title", "path": "fields.short_description"},
-        {"field": "reported_by", "path": "fields.opened_by"},
-        {"field": "resolution_code", "path": "fields.close_code"},
-    ],
+    # Paths and dictionaries follow notebooks/events_dataset.ipynb: the
+    # ServiceNow Table API shape (GET /api/now/table/incident), not the
+    # Locaweb CSV. The notebook is the Locaweb → ServiceNow half; this
+    # mapping is the ServiceNow → domain half. The webhook stores the
+    # origin body verbatim, so paths are the Table API column names.
+    "bindings": {
+        "external_id": "number",
+        "opened_at": "opened_at",
+        "severity": "priority",
+        "status": "state",
+        "title": "short_description",
+        "resolved_at": "resolved_at",
+        "closed_at": "closed_at",
+        "entity_id": "cmdb_ci",
+        "owner": "assignment_group",
+        "reported_by": "opened_by",
+        "parent_id": "parent_incident",
+        "resolution_code": "close_code",
+        "resolution_summary": "close_notes",
+        "labels": [
+            {"key": "product", "path": "u_product"},
+            {"key": "category", "path": "category"},
+            {"key": "subcategory", "path": "subcategory"},
+        ],
+    },
     "mappings": {
+        # ServiceNow incident.state: 1 New, 2 In Progress, 3 On Hold,
+        # 6 Resolved, 7 Closed, 8 Canceled. The notebook already folded
+        # "Sem Intervenção" into state 7; the KPI meaning of that closing
+        # travels in close_code, not here.
         "status": {
-            "Aberto": "open",
-            "Em Andamento": "in_progress",
-            "Em Espera": "waiting",
-            "Resolvido": "resolved",
-            "Encerrado": "closed",
-            "Cancelado": "canceled",
+            "1": "open",
+            "2": "in_progress",
+            "3": "waiting",
+            "6": "resolved",
+            "7": "closed",
+            "8": "canceled",
         },
-        "severity": {
-            "1 - Crítica": "1",
-            "2 - Alta": "2",
-            "3 - Média": "3",
-            "4 - Baixa": "4",
-            "5 - Muito Baixa": "5",
-        },
+        "severity": {str(code): str(code) for code in range(1, 6)},
         "reported_by": {
-            "Monitoramento": "automatic",
-            "Cliente": "manual",
+            "monitoring.system": "automatic",
+            "itsm.operator": "manual",
         },
         "resolution_code": {
-            "Sem Intervenção": "no_intervention",
+            "No Intervention Required": "no_intervention",
         },
     },
 }

@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   analysisAcceptedSchema,
   analysisErrorSchema,
+  analysisListQuerySchema,
   analysisParamsSchema,
   analysisRequestSchema,
   analysisStatusSchema,
@@ -42,6 +43,27 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
         });
       }
     },
+  );
+
+  typed.get(
+    '/analyses',
+    {
+      schema: {
+        tags: ['analyses'],
+        summary: 'List analyses, most recent first',
+        description:
+          'Filterable by origin and by analysis — what makes a scheduled run distinguishable from one someone asked for, rather than only stored that way.',
+        querystring: analysisListQuerySchema,
+        response: { 200: analysisStatusSchema.array() },
+      },
+    },
+    async request =>
+      analyses.list({
+        trigger: request.query.trigger,
+        analysis: request.query.analysis,
+        tenantId: request.query.tenant_id,
+        limit: request.query.limit,
+      }),
   );
 
   typed.get(

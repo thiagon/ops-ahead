@@ -1,10 +1,10 @@
 {{- if .Values.cron.enabled }}
-# Native CronJob — publishes 1 event to trigger.data at the scheduled time
-# and exits. Doesn't need the data-runner image at all: a minimal Kafka
-# producer image is enough, and this is the only piece of the daily chain
-# that still runs on a schedule instead of on demand (see spec.md,
-# "Removido nesta revisão"). `run_id` is deterministic (`daily-<date>`), so
-# GET /runs/daily-2026-08-16 works without digging through logs for the id.
+# Native CronJob — asks the gateway to start one full_pipeline and exits.
+# It goes through POST /analyses like any other client instead of publishing
+# to Kafka directly, so the daily run gets a row, a status and an update_key:
+# no execution exists that GET /analyses cannot answer for. `trigger` marks it
+# as the clock's, which is what tells it apart from a run someone asked for.
+# The id is minted by the gateway and printed here.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -43,12 +43,10 @@ spec:
               args:
                 - |
                   set -eu
-                  RUN_ID="daily-$(date -u +%Y-%m-%d)"
-                  printf '%s:{"run_id":"%s","analysis":"full_pipeline"}' "$RUN_ID" "$RUN_ID" \
-                    | kcat -P -b "$KAFKA_BOOTSTRAP_SERVERS" -t "$KAFKA_TOPIC" -K:
+                  curl -sS --fail-with-body -X POST "$GATEWAY_URL/analyses" \
+                    -H 'Content-Type: application/json' \
+                    -d '{"analysis":"full_pipeline","trigger":"scheduled"}'
               env:
-                - name: KAFKA_BOOTSTRAP_SERVERS
-                  value: {{ .Values.run.env.kafkaBootstrapServers | quote }}
-                - name: KAFKA_TOPIC
-                  value: {{ .Values.run.env.kafkaTopic | quote }}
+                - name: GATEWAY_URL
+                  value: {{ .Values.run.env.gatewayUrl | quote }}
 {{- end }}

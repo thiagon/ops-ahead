@@ -33,13 +33,13 @@ def bindings():
                 "tenant_id": "locaweb",
                 "source": "itsm",
                 "intake": "alert",
-                "bindings": [
-                    {"field": "external_id", "path": "ticket_number"},
-                    {"field": "opened_at", "path": "opened_at"},
-                    {"field": "severity", "path": "priority_code"},
-                    {"field": "status", "path": "status"},
-                    {"field": "title", "path": "short_description"},
-                ],
+                "bindings": {
+                    "external_id": "ticket_number",
+                    "opened_at": "opened_at",
+                    "severity": "priority_code",
+                    "status": "status",
+                    "title": "short_description",
+                },
             }
         )
     )
