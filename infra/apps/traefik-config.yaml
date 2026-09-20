@@ -4,6 +4,10 @@
 # readTimeout default é 60s e vale para a leitura do request inteiro, não para
 # ociosidade — um `docker push` cujo blob leve mais que isso é cortado no meio
 # e o registry registra `unexpected EOF`. As camadas do ml-trainer passam disso.
+#
+# Vai em additionalArguments porque o chart que o k3s empacota (27.x) ainda não
+# tem `ports.<entrypoint>.transport`: naquela versão a chave é ignorada em
+# silêncio, sem erro de instalação.
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
@@ -13,16 +17,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   valuesContent: |-
-    ports:
-      web:
-        transport:
-          respondingTimeouts:
-            readTimeout: 1h
-            writeTimeout: 1h
-            idleTimeout: 3m
-      websecure:
-        transport:
-          respondingTimeouts:
-            readTimeout: 1h
-            writeTimeout: 1h
-            idleTimeout: 3m
+    additionalArguments:
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=1h"
+      - "--entrypoints.web.transport.respondingTimeouts.writeTimeout=1h"
+      - "--entrypoints.web.transport.respondingTimeouts.idleTimeout=3m"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=1h"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=1h"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=3m"
