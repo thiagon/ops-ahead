@@ -69,6 +69,23 @@ spec:
                 port:
                   number: 3000
 ---
+# Camadas do ml-trainer (prophet, shap, optuna, scikit-learn) levam minutos para
+# subir e o Gitea só responde o header quando terminou de recebê-las. Sem isso o
+# Traefik desiste no meio do `docker push` e o registry devolve 504.
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: gitea-registry
+  namespace: infra
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+spec:
+  forwardingTimeouts:
+    dialTimeout: 30s
+    responseHeaderTimeout: 1h
+    idleConnTimeout: 10m
+
+---
 # Router HTTPS separado só pro `docker push`: registries em insecure-registries
 # fazem o docker preferir HTTPS, e sem router no 443 o Traefik responde 404. Fica
 # num Ingress próprio porque `router.tls` vale pro router inteiro — se fosse no
