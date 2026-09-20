@@ -3,22 +3,32 @@ import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import type { AcceptedOrigin } from '../services/origins/service.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';
 
 const DEFAULT_BODY_LIMIT = 1024 * 1024;
 
+/**
+ * What the hook needs of whoever signed: the secret to check against, and the
+ * pair that labels a rejection. Declared here rather than imported from a
+ * service so this plugin stays a leaf — it loads before they do.
+ */
+export interface SigningOrigin {
+  tenantId: string;
+  source: string;
+  secret: string;
+}
+
 declare module 'fastify' {
   interface FastifyInstance {
     /**
      * `resolve` names the origin this address belongs to: which one signs a
-     * request is only known once the URL is matched, and the lookup reads the
-     * origins table (services/origins/).
+     * request is only known once the URL is matched, and the lookup is the
+     * caller's to make.
      */
     verifySignatureFor: (
-      resolve: (request: FastifyRequest) => Promise<AcceptedOrigin | undefined>,
+      resolve: (request: FastifyRequest) => Promise<SigningOrigin | undefined>,
     ) => preParsingAsyncHookHandler;
   }
 }
@@ -59,7 +69,7 @@ export function checkSignature(
  */
 async function hmacPlugin(fastify: FastifyInstance) {
   const verifySignatureFor = (
-    resolve: (request: FastifyRequest) => Promise<AcceptedOrigin | undefined>,
+    resolve: (request: FastifyRequest) => Promise<SigningOrigin | undefined>,
   ): preParsingAsyncHookHandler => {
     return async (request, _reply, payload) => {
       const origin = await resolve(request);
