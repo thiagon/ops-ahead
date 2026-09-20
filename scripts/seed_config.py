@@ -22,37 +22,40 @@ SOURCE = "service_now"
 MAPPING = {
     "intake": "alert",
     "version": "v1",
+    # Paths follow what scripts/incident_producer.py puts on the wire: the
+    # untouched ITSM record under `payload`, already renamed to English.
     "bindings": [
-        {"field": "external_id", "path": "number"},
-        {"field": "status", "path": "fields.status.name"},
-        {"field": "severity", "path": "fields.priority.name"},
-        {"field": "opened_at", "path": "fields.opened_at"},
-        {"field": "resolved_at", "path": "fields.resolved_at"},
-        {"field": "closed_at", "path": "fields.closed_at"},
-        {"field": "title", "path": "fields.short_description"},
-        {"field": "reported_by", "path": "fields.opened_by"},
-        {"field": "resolution_code", "path": "fields.close_code"},
+        {"field": "external_id", "path": "payload.ticket_number"},
+        {"field": "status", "path": "payload.status"},
+        {"field": "severity", "path": "payload.priority_code"},
+        {"field": "opened_at", "path": "payload.opened_at"},
+        {"field": "resolved_at", "path": "payload.resolved_at"},
+        {"field": "closed_at", "path": "payload.closed_at"},
+        {"field": "title", "path": "payload.short_description"},
+        {"field": "entity_id", "path": "payload.configuration_item"},
+        {"field": "owner", "path": "payload.assignment_group"},
+        {"field": "reported_by", "path": "payload.opened_by"},
+        {"field": "parent_id", "path": "payload.parent_incident"},
+        {"field": "resolution_code", "path": "payload.close_code"},
     ],
     "mappings": {
+        # "Sem Intervenção" is a closing state in the ITSM, not a lifecycle of
+        # its own — what it means for the KPI travels in resolution_code.
         "status": {
-            "Aberto": "open",
-            "Em Andamento": "in_progress",
-            "Em Espera": "waiting",
-            "Resolvido": "resolved",
+            "Sem Intervenção": "closed",
+            "Encerrado Automaticamente": "closed",
             "Encerrado": "closed",
-            "Cancelado": "canceled",
+            "Aguardando Problema": "waiting",
         },
-        "severity": {
-            "1 - Crítica": "1",
-            "2 - Alta": "2",
-            "3 - Média": "3",
-            "4 - Baixa": "4",
-            "5 - Muito Baixa": "5",
-        },
+        # priority_code already travels as 1-5; the dictionary is identity so
+        # the binding stays declarative instead of special-cased in code.
+        "severity": {str(code): str(code) for code in range(1, 6)},
         "reported_by": {
             "Monitoramento": "automatic",
-            "Cliente": "manual",
+            "Manual": "manual",
         },
+        # Only the codes the KPI rules care about are translated; the rest
+        # reach bronze as they are.
         "resolution_code": {
             "Sem Intervenção": "no_intervention",
         },

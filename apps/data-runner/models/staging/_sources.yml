@@ -67,7 +67,7 @@ sources:
         columns:
           - name: tenant_id
             tests: [not_null]
-          - name: kpi_group
+          - name: severities
             tests: [not_null]
           - name: max_breaches
             tests: [not_null]

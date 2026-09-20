@@ -2,29 +2,50 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(tenant_id, kpi_group, year, month)',
+        order_by='(tenant_id, severities, year, month)',
         partition_by='toYYYYMM(month)'
     )
 }}
 
--- Cumulative KPI achievement against the annual band, as configured per tenant.
--- P1 and P2 share one band (kpi_group = 'p1_p2' — the kickoff never scores P1
--- alone, always "P1+P2"); P3 has its own. breached_ytd resets every year.
-with monthly as (
+-- Cumulative KPI achievement against the annual band each tenant configured.
+-- The band is whatever `tenant_kpi_targets.severities` lists, so a tenant that
+-- measures [1,2,4] gets that band without any severity being named here.
+-- breached_ytd resets every year.
+-- FINAL is required, not cosmetic: tenant_kpi_targets is a
+-- ReplacingMergeTree and every republication of a tenant's targets leaves the
+-- superseded rows readable until a merge collapses them. Joining without it
+-- counts the same band once per surviving version.
+with targets as (
+
+    select tenant_id, severities, max_breaches, achievement_pct
+    from {{ source('config', 'tenant_kpi_targets') }} final
+
+),
+
+bands as (
 
     select
         tenant_id,
-        toYear(opened_at)          as year,
-        toStartOfMonth(opened_at)  as month,
-        -- '' instead of null: the WHERE below already restricts to severity
-        -- in (1,2,3), so this branch never actually fires — but a null
-        -- branch types the column Nullable, which MergeTree rejects in
-        -- order_by (allow_nullable_key is off).
-        multiIf(severity in (1, 2), 'p1_p2', severity = 3, 'p3', '') as kpi_group,
-        countIf(is_eligible and has_breached)                          as breached_in_month
-    from {{ ref('silver_alert') }}
-    where severity in (1, 2, 3) and closed_at is not null
-    group by tenant_id, year, month, kpi_group
+        severities,
+        arrayJoin(severities) as severity
+    from targets
+
+),
+
+monthly as (
+
+    select
+        a.tenant_id                                          as tenant_id,
+        b.severities                                         as severities,
+        toYear(a.opened_at)                                  as year,
+        toStartOfMonth(a.opened_at)                          as month,
+        countIf(a.is_eligible and a.has_breached)            as breached_in_month
+    from {{ ref('silver_alert') }} a
+    inner join bands b
+        on  b.tenant_id = a.tenant_id
+        and b.severity  = a.severity
+    where a.closed_at is not null
+    group by tenant_id, severities, year, month
 
 ),
 
@@ -32,12 +53,12 @@ cumulative as (
 
     select
         tenant_id,
+        severities,
         year,
         month,
-        kpi_group,
         breached_in_month,
         sum(breached_in_month) over (
-            partition by tenant_id, kpi_group, year
+            partition by tenant_id, severities, year
             order by month
             rows between unbounded preceding and current row
         ) as breached_ytd
@@ -49,14 +70,14 @@ select
     c.tenant_id,
     c.year,
     c.month,
-    c.kpi_group,
+    c.severities,
     c.breached_in_month,
     c.breached_ytd,
     t.achievement_pct
 from cumulative c
-inner join {{ source('config', 'tenant_kpi_targets') }} t
-    on  t.tenant_id = c.tenant_id
-    and t.kpi_group = c.kpi_group
+inner join targets t
+    on  t.tenant_id  = c.tenant_id
+    and t.severities = c.severities
 where t.max_breaches >= c.breached_ytd
-order by c.tenant_id, c.year, c.month, c.kpi_group, t.max_breaches asc
-limit 1 by c.tenant_id, c.year, c.month, c.kpi_group
+order by c.tenant_id, c.year, c.month, c.severities, t.max_breaches asc
+limit 1 by c.tenant_id, c.year, c.month, c.severities
