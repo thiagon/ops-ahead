@@ -1,6 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
-import type { FastifyInstance } from 'fastify';
+import apiReference from '@scalar/fastify-api-reference';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import {
   createJsonSchemaTransform,
@@ -27,6 +28,14 @@ const zodToJsonConfig = {
   },
 };
 
+function cspHeader(reply: FastifyReply): string {
+  const header = reply.getHeader('content-security-policy');
+  if (Array.isArray(header)) {
+    return header.join(';');
+  }
+  return String(header ?? '');
+}
+
 async function swaggerPlugin(fastify: FastifyInstance) {
   await fastify.register(swagger, {
     openapi: {
@@ -39,17 +48,24 @@ async function swaggerPlugin(fastify: FastifyInstance) {
     transformObject: createJsonSchemaTransformObject({ zodToJsonConfig }),
   });
 
-  await fastify.register(swaggerUi, {
+  // Scalar stamps this onto the bootstrap <script>; it is read once at register time.
+  const docsNonce = randomBytes(16).toString('hex');
+
+  await fastify.register(apiReference, {
     routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list', deepLinking: false },
-    // The UI overrides helmet's CSP on /docs, so it is settled again here.
-    staticCSP: true,
-    transformStaticCSP: header => {
-      const csp = header.replace(
-        "style-src 'self' https:",
-        "style-src 'self' https: 'unsafe-inline'",
-      );
-      return fastify.env.HTTPS_ENABLED ? csp : csp.replace(/\s*upgrade-insecure-requests;/, '');
+    openApiDocumentEndpoints: { json: '/json', yaml: '/yaml' },
+    configuration: { nonce: docsNonce },
+    hooks: {
+      onRequest(_request, reply, done) {
+        const header = cspHeader(reply);
+        if (header.includes('script-src')) {
+          reply.header(
+            'content-security-policy',
+            header.replace(/script-src [^;]+/, `script-src 'self' 'nonce-${docsNonce}'`),
+          );
+        }
+        done();
+      },
     },
   });
 }
