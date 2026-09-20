@@ -97,11 +97,11 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: GATEWAY_DATABASE_URL
               value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.gateway.analysesDatabase.host }}/{{ .Values.gateway.analysesDatabase.name }}
-            - name: HMAC_SECRET
+            - name: ORIGINS
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.gateway.secretName }}
-                  key: HMAC_SECRET
+                  key: ORIGINS
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           livenessProbe:

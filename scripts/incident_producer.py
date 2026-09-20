@@ -100,7 +100,7 @@ async def produce(args: argparse.Namespace) -> None:
             if secret:
                 headers["X-Signature"] = _sign(secret, body)
 
-            resp = await client.post(f"/webhook/v1/locaweb/{args.source}", content=body, headers=headers)
+            resp = await client.post(f"/webhook/{args.tenant}/{args.source}", content=body, headers=headers)
             resp.raise_for_status()
 
             if (i + 1) % 1000 == 0 or (i + 1) == total:
@@ -113,6 +113,7 @@ async def produce(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Post incidents.csv rows to the gateway webhook")
     parser.add_argument("--gateway-url", default="http://localhost:8080")
+    parser.add_argument("--tenant", default="locaweb")
     parser.add_argument("--source", default="itsm")
     parser.add_argument("--speed", type=float, default=0,
                         help="Events per second (0 = as fast as possible)")

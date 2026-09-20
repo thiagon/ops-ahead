@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
+import { OriginRegistry } from '../../src/plugins/origins.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
@@ -8,9 +9,36 @@ export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
+  stubOrigins(app);
   stubPrisma(app);
   await app.ready();
   return app;
+}
+
+/** The secret TEST_ORIGIN signs with — what a test signs its bodies with. */
+export const TEST_SECRET = 'itsm-shared-secret';
+
+/**
+ * The origin the ITSM loop has always run on. A test that needs another
+ * origin decorates `origins` itself before this fills in.
+ */
+export const TEST_ORIGIN = {
+  tenantId: 'locaweb',
+  source: 'itsm',
+  intake: 'alert' as const,
+  secret: TEST_SECRET,
+};
+
+/** No test reads ORIGINS out of the environment. */
+export function stubOrigins(app: FastifyInstance): void {
+  if (app.hasDecorator('origins')) return;
+  app.decorate(
+    'origins',
+    new OriginRegistry({
+      'locaweb:itsm': { intake: 'alert', secret: TEST_SECRET },
+      'locaweb:zabbix': { intake: 'monitor', secret: TEST_SECRET },
+    }),
+  );
 }
 
 /**

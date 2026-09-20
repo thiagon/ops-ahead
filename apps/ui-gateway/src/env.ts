@@ -46,9 +46,35 @@ export const envSchema = z
       .default('postgres://admin:ops-ahead-dev@localhost:5432/gateway'),
 
     HMAC_ENABLED: z.stringbool().default(false),
-    // One secret for every webhook while a single integration is in
-    // validation; per-origin secrets come back when more than one exists.
-    HMAC_SECRET: z.string().default(''),
+
+    /**
+     * Every origin the gateway accepts, keyed `"tenant:source"`. Being in
+     * here is what makes an origin real — a webhook against any other address
+     * is refused. Added by hand for now, so the gateway reads no
+     * configuration off the bus to answer a request.
+     */
+    ORIGINS: z
+      .string()
+      .default('{}')
+      .transform((value, ctx) => {
+        try {
+          return JSON.parse(value) as unknown;
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'must be a JSON object of origins' });
+          return z.NEVER;
+        }
+      })
+      .pipe(
+        z.record(
+          z.string().regex(/^[^:]+:[^:]+$/, 'key must be "tenant:source"'),
+          z.object({
+            // Which raw topic this origin's events are carried on
+            // (domain/ubiquitous-language.md#intake).
+            intake: z.enum(['alert', 'monitor']),
+            secret: z.string(),
+          }),
+        ),
+      ),
   })
   .loose();
 

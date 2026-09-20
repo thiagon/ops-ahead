@@ -2,10 +2,9 @@ import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
-import { createTestApp } from '../../../helpers/app.ts';
+import { createTestApp, TEST_SECRET as SECRET } from '../../../helpers/app.ts';
 
-const SECRET = 'itsm-shared-secret';
-const ROUTE = '/webhook/alert/locaweb/itsm';
+const ROUTE = '/webhook/locaweb/itsm';
 
 const publish = vi.fn(async (_message: OutboundMessage) => undefined);
 
@@ -23,14 +22,12 @@ describe('GET /metrics', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    process.env.HMAC_SECRET = SECRET;
     app = await createTestApp(instance => instance.decorate('kafka', { publish }));
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.HMAC_ENABLED;
-    delete process.env.HMAC_SECRET;
   });
 
   function post(body: object, signed = true) {
@@ -79,6 +76,7 @@ describe('GET /metrics', () => {
     expect(failureLine).toContain('source="itsm"');
     expect(failureLine).toMatch(/} 1$/);
     expect(signatureLine).toContain('reason="missing"');
+    expect(signatureLine).toContain('tenant_id="locaweb"');
     expect(signatureLine).toMatch(/} 1$/);
   });
 

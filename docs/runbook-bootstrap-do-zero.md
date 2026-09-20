@@ -12,15 +12,17 @@ Antes de qualquer envio, duas coisas precisam existir:
 
 | # | Pré-condição | Estado |
 |---|--------------|--------|
-| 1 | O secret HMAC no Vault, path `gateway`, key `HMAC_SECRET` | Semeado por `make up` a partir do `.env` |
+| 1 | A origem em `ORIGINS`, no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
 | 2 | O gateway alcançável de fora do cluster | **Bloqueador — não tem Ingress** |
 
-O gateway não valida origem: ele envelopa o que chega em
-`/webhook/:intake/:tenant/:source` e publica no tópico raw do intake. Quem
-decide se um evento vira linha bronze é o `data-ingest`, contra as regras de
-mapeamento em `rules.mapping` — um evento sem mapeamento fica cru no lake em
-vez de ser recusado na borda. Cadastrar a origem deixou de ser pré-condição
-para ingerir; é pré-condição para **traduzir**.
+`ORIGINS` é um JSON de `"tenant:source"` para `{intake, secret}` — estar nele é
+o que torna uma origem real, e um webhook contra qualquer outro endereço leva
+404. Adicionar origem é editar esse JSON por enquanto, sem passar pelo
+barramento.
+
+Traduzir é outra coisa: quem decide se um evento vira linha bronze é o
+`data-ingest`, contra as regras em `rules.mapping`. Um evento de origem aceita
+mas sem mapeamento entra no lake cru em vez de virar bronze.
 
 ### Bloqueador — o gateway não é alcançável de fora
 
@@ -37,13 +39,6 @@ Service. Opções, em ordem de preferência:
    permite (`from: podSelector: {}`), e é o caminho que não muda a superfície
    exposta.
 2. Adicionar um Ingress para o gateway em `ingresses.yaml`.
-
-### O producer usa a rota antiga
-
-`scripts/incident_producer.py:103` posta em `/webhook/v1/locaweb/{source}`. A
-rota atual é `/webhook/:intake/:tenant/:source`, com `/:version` opcional no
-fim (`apps/ui-gateway/src/modules/events/routes.ts`). O producer precisa de um
-`--tenant` e montar `/webhook/alert/{tenant}/{source}`.
 
 ---
 
@@ -70,7 +65,8 @@ uv run python scripts/seed_config.py --gateway-url http://localhost:8080
 
 Publica o mapeamento do `service_now` (bindings + dicionário, um record só),
 os prazos e as metas de KPI. Sem isso o gateway aceita os eventos do mesmo
-jeito, mas o `data-ingest` não consegue traduzi-los e eles ficam só no lake.
+jeito — a origem está em `ORIGINS` —, mas o `data-ingest` não consegue
+traduzi-los e eles ficam só no lake.
 
 **Verificação:** `rules.mapping` tem um registro sob a chave
 `<tenant>:<source>`, e o `data-ingest` loga a aplicação dele.
@@ -234,13 +230,11 @@ make up
 ## Dívidas que este runbook expõe
 
 1. **Gateway sem Ingress** — o producer local não o alcança.
-2. **`incident_producer.py` na rota antiga** — falta `--tenant` e a rota por
-   intake.
-3. **Boundaries manuais** — deveriam ser derivados do range real de
+2. **Boundaries manuais** — deveriam ser derivados do range real de
    `gold_alert_daily_features` quando omitidos, em vez de exigir que o operador
    saiba as datas.
-4. **"Sem dado" indistinguível de "erro"** — `ValueError` de partição vazia vira
+3. **"Sem dado" indistinguível de "erro"** — `ValueError` de partição vazia vira
    `status: Failed` genérico em `trigger.status`; deveria ser um estado próprio,
    checado antes de carregar Prophet/LightGBM.
-5. **Nenhuma fonte de `events.raw.monitor`** — `external_event_detection` e as
+4. **Nenhuma fonte de `events.raw.monitor`** — `external_event_detection` e as
    marts `gold_monitor_*` ficam ociosas.

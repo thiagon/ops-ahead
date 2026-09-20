@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import type { FastifyInstance, preParsingAsyncHookHandler } from 'fastify';
+import type { FastifyInstance, FastifyRequest, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
+import type { AcceptedOrigin } from './origins.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';
@@ -11,7 +12,13 @@ const DEFAULT_BODY_LIMIT = 1024 * 1024;
 
 declare module 'fastify' {
   interface FastifyInstance {
-    verifySignature: preParsingAsyncHookHandler;
+    /**
+     * `resolve` names the origin this address belongs to: which one signs a
+     * request is only known once the URL is matched (plugins/origins.ts).
+     */
+    verifySignatureFor: (
+      resolve: (request: FastifyRequest) => AcceptedOrigin | undefined,
+    ) => preParsingAsyncHookHandler;
   }
 }
 
@@ -39,55 +46,72 @@ export function checkSignature(
 }
 
 /**
- * Exposes `app.verifySignature` — one shared secret for every webhook, read
- * from HMAC_SECRET. A route opts in with `preParsing: app.verifySignature`;
- * nothing else on the app pays for it.
+ * Exposes `app.verifySignatureFor(resolve)` — one hook per route, each
+ * checking against the secret of the origin that address belongs to. A route
+ * opts in with `preParsing: app.verifySignatureFor(resolve)`; nothing else on
+ * the app pays for it, and no address can be verified against another
+ * tenant's secret.
  *
  * It runs at preParsing, before the body is parsed: the signature covers the
  * bytes on the wire, and an unsigned caller never gets a payload parsed on its
  * behalf, so a malformed body answers 401 instead of a parser error.
  */
 async function hmacPlugin(fastify: FastifyInstance) {
-  const verifySignature: preParsingAsyncHookHandler = async (request, _reply, payload) => {
-    if (!fastify.env.HMAC_ENABLED) return payload;
-
-    const limit =
-      request.routeOptions.bodyLimit ?? fastify.initialConfig.bodyLimit ?? DEFAULT_BODY_LIMIT;
-
-    // Buffering takes over what the content-type parser would do, so the body
-    // limit has to be honored here too.
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of payload) {
-      const buffer = chunk as Buffer;
-      size += buffer.length;
-      if (size > limit) {
-        throw createError.PayloadTooLarge('request body exceeds the configured limit');
+  const verifySignatureFor = (
+    resolve: (request: FastifyRequest) => AcceptedOrigin | undefined,
+  ): preParsingAsyncHookHandler => {
+    return async (request, _reply, payload) => {
+      const origin = resolve(request);
+      if (!origin) {
+        throw createError.NotFound('no integration is configured for this address');
       }
-      chunks.push(buffer);
-    }
-    const body = Buffer.concat(chunks);
+      if (!fastify.env.HMAC_ENABLED) return payload;
 
-    const header = request.headers[SIGNATURE_HEADER];
-    const outcome = checkSignature(
-      typeof header === 'string' ? header : undefined,
-      body,
-      fastify.env.HMAC_SECRET,
-    );
+      const limit =
+        request.routeOptions.bodyLimit ?? fastify.initialConfig.bodyLimit ?? DEFAULT_BODY_LIMIT;
 
-    if (outcome !== 'valid') {
-      // app.metrics is read here, not at registration: autoload brings the
-      // metrics plugin up after this one, and by request time it is decorated.
-      fastify.metrics.signatureFailures.inc({ reason: outcome });
-      request.log.warn({ reason: outcome, url: request.url }, 'rejected an unsigned request');
-      throw createError.Unauthorized('missing or invalid X-Signature header');
-    }
+      // Buffering takes over what the content-type parser would do, so the body
+      // limit has to be honored here too.
+      const chunks: Buffer[] = [];
+      let size = 0;
+      for await (const chunk of payload) {
+        const buffer = chunk as Buffer;
+        size += buffer.length;
+        if (size > limit) {
+          throw createError.PayloadTooLarge('request body exceeds the configured limit');
+        }
+        chunks.push(buffer);
+      }
+      const body = Buffer.concat(chunks);
 
-    // The consumed stream is handed back so parsing proceeds as usual.
-    return Readable.from(body);
+      const header = request.headers[SIGNATURE_HEADER];
+      const outcome = checkSignature(
+        typeof header === 'string' ? header : undefined,
+        body,
+        origin.secret,
+      );
+
+      if (outcome !== 'valid') {
+        // app.metrics is read here, not at registration: autoload brings the
+        // metrics plugin up after this one, and by request time it is decorated.
+        fastify.metrics.signatureFailures.inc({
+          reason: outcome,
+          tenant_id: origin.tenantId,
+          source: origin.source,
+        });
+        request.log.warn(
+          { reason: outcome, url: request.url, tenant_id: origin.tenantId },
+          'rejected an unsigned request',
+        );
+        throw createError.Unauthorized('missing or invalid X-Signature header');
+      }
+
+      // The consumed stream is handed back so parsing proceeds as usual.
+      return Readable.from(body);
+    };
   };
 
-  fastify.decorate('verifySignature', verifySignature);
+  fastify.decorate('verifySignatureFor', verifySignatureFor);
 }
 
 export default fp(hmacPlugin, { name: 'hmac', dependencies: ['env'] });

@@ -3,5 +3,5 @@ import { registerIncidentRoutes } from './routes.ts';
 
 export default fp(registerIncidentRoutes, {
   name: 'incidents-route',
-  dependencies: ['env', 'hmac', 'kafka', 'metrics'],
+  dependencies: ['env', 'hmac', 'kafka', 'metrics', 'origins'],
 });

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
-const ROUTE = '/webhook/alert/locaweb/itsm';
+const ROUTE = '/webhook/locaweb/itsm';
 
 // The broker is out of scope here: what matters is that an accepted event
 // reaches the publisher, on the right topic, and that a publisher failure
@@ -21,7 +21,7 @@ const itsmEvent = {
   opened_by: 'Monitoramento',
 };
 
-describe('POST /webhook/:intake/:tenant/:source', () => {
+describe('POST /webhook/:tenant/:source', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -64,19 +64,15 @@ describe('POST /webhook/:intake/:tenant/:source', () => {
     expect(JSON.parse(envelope.payload)).toEqual(itsmEvent);
   });
 
-  it('routes a monitor event to the monitor raw topic', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/webhook/monitor/locaweb/zabbix',
-      payload: itsmEvent,
-    });
+  it("carries a monitor origin's events to the monitor raw topic", async () => {
+    await app.inject({ method: 'POST', url: '/webhook/locaweb/zabbix', payload: itsmEvent });
 
     const message = publish.mock.calls[0]?.[0];
     expect(message?.topic).toBe('events.raw.monitor');
     expect(JSON.parse(message?.value ?? '')).toMatchObject({ intake: 'monitor' });
   });
 
-  it('stamps latest when the caller pins no version', async () => {
+  it('stamps latest when the caller pins no mapping version', async () => {
     await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(JSON.parse(publish.mock.calls[0]?.[0]?.value ?? '')).toMatchObject({
@@ -84,21 +80,21 @@ describe('POST /webhook/:intake/:tenant/:source', () => {
     });
   });
 
-  it('carries the version the caller pinned', async () => {
+  it('carries the mapping version the caller pinned', async () => {
     await app.inject({ method: 'POST', url: `${ROUTE}/v2`, payload: itsmEvent });
 
     expect(JSON.parse(publish.mock.calls[0]?.[0]?.value ?? '')).toMatchObject({ version: 'v2' });
   });
 
-  it('accepts an origin it has no mapping for — translation is data-ingest’s call', async () => {
+  it('answers 404 for an origin nobody configured', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/webhook/alert/locaweb/datadog',
+      url: '/webhook/locaweb/datadog',
       payload: itsmEvent,
     });
 
-    expect(res.statusCode).toBe(202);
-    expect(publish).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(404);
+    expect(publish).not.toHaveBeenCalled();
   });
 
   it('answers 502 when the event does not reach the bus', async () => {
@@ -122,11 +118,11 @@ describe('POST /webhook/:intake/:tenant/:source', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('publishes one parameterized ingest route per intake, not one per origin', async () => {
+  it('publishes one parameterized ingest route, not one per origin', async () => {
     const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
 
-    expect(paths['/webhook/alert/{tenant}/{source}']).toBeDefined();
-    expect(paths['/webhook/monitor/{tenant}/{source}']).toBeDefined();
+    expect(paths['/webhook/{tenant}/{source}']).toBeDefined();
+    expect(paths['/webhook/{tenant}/{source}/{version}']).toBeDefined();
   });
 
   it('documents the envelope published to the bus', async () => {

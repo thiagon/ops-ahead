@@ -23,7 +23,7 @@ describe('envSchema', () => {
       KAFKA_TOPIC_DATA: 'trigger.data',
       GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
-      HMAC_SECRET: '',
+      ORIGINS: {},
     });
   });
 
@@ -52,11 +52,30 @@ describe('envSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('carries the shared webhook secret', () => {
-    const result = envSchema.safeParse({ HMAC_ENABLED: 'true', HMAC_SECRET: 'sekret' });
+  it("reads each origin's intake and secret out of ORIGINS", () => {
+    const result = envSchema.safeParse({
+      HMAC_ENABLED: 'true',
+      ORIGINS: JSON.stringify({ 'locaweb:itsm': { intake: 'alert', secret: 'sekret' } }),
+    });
 
     expect(result.success).toBe(true);
-    expect(result.data?.HMAC_SECRET).toBe('sekret');
+    expect(result.data?.ORIGINS['locaweb:itsm']).toEqual({ intake: 'alert', secret: 'sekret' });
+  });
+
+  it('rejects an origin key that is not tenant:source', () => {
+    const result = envSchema.safeParse({
+      ORIGINS: JSON.stringify({ itsm: { intake: 'alert', secret: 'sekret' } }),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an intake outside the two the contracts declare', () => {
+    const result = envSchema.safeParse({
+      ORIGINS: JSON.stringify({ 'locaweb:itsm': { intake: 'webhook', secret: 'sekret' } }),
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 
