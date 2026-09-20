@@ -1,0 +1,28 @@
+# Traefik vem embutido no k3s: o HelmChartConfig é o ponto de customização do
+# chart que o próprio k3s instala, e o valuesContent é mesclado por cima dele.
+#
+# readTimeout default é 60s e vale para a leitura do request inteiro, não para
+# ociosidade — um `docker push` cujo blob leve mais que isso é cortado no meio
+# e o registry registra `unexpected EOF`. As camadas do ml-trainer passam disso.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        transport:
+          respondingTimeouts:
+            readTimeout: 1h
+            writeTimeout: 1h
+            idleTimeout: 3m
+      websecure:
+        transport:
+          respondingTimeouts:
+            readTimeout: 1h
+            writeTimeout: 1h
+            idleTimeout: 3m
