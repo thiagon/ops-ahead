@@ -85,9 +85,26 @@ describe('analysisRequestSchema', () => {
   });
 
   it('rejects an unknown analysis', () => {
-    const result = analysisRequestSchema.safeParse({ analysis: 'full_pipeline' });
+    const result = analysisRequestSchema.safeParse({ analysis: 'retrain_everything' });
 
     expect(result.success).toBe(false);
+  });
+
+  it('accepts full_pipeline — the CronJob reaches the route like any caller', () => {
+    const result = analysisRequestSchema.safeParse({ analysis: 'full_pipeline' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts entity_forecast with the same splits volume_forecast takes', () => {
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'entity_forecast',
+      train_end: '2026-01-01',
+      validation_end: '2026-02-01',
+      holdout_end: '2026-03-01',
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it('rejects a data_source override — removed for SSRF/credential-leak risk', () => {

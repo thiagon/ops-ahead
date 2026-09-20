@@ -25,10 +25,55 @@ describe('AnalysesService.start', () => {
 
     expect(result).toEqual({ id: result.id });
     expect(result.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(await analyses.getStatus(result.id)).toEqual({ id: result.id, status: 'pending' });
+    expect(await analyses.getStatus(result.id)).toEqual({
+      id: result.id,
+      analysis: 'data_refresh',
+      trigger: 'manual',
+      status: 'pending',
+    });
     expect(event).toMatchObject({ run_id: result.id, analysis: 'data_refresh' });
     expect(event.update_key).toEqual(expect.any(String));
     expect(event.update_key).not.toBe(result.id);
+  });
+
+  it('defaults a run nobody labelled to manual', async () => {
+    const result = await analyses.start({ analysis: 'data_refresh', trigger: 'manual' });
+
+    expect(await analyses.getStatus(result.id)).toMatchObject({
+      analysis: 'data_refresh',
+      trigger: 'manual',
+    });
+  });
+
+  it('records a chained run against the full_pipeline it came from', async () => {
+    const parent = await analyses.start({ analysis: 'full_pipeline', trigger: 'scheduled' });
+    const child = await analyses.start({
+      analysis: 'kpi_projection',
+      trigger: 'chained',
+      parent_id: parent.id,
+    });
+
+    expect(await analyses.getStatus(child.id)).toMatchObject({
+      trigger: 'chained',
+      parent_id: parent.id,
+    });
+  });
+
+  it('keeps provenance out of the Kafka event — the contracts forbid extra keys', async () => {
+    await analyses.start({ analysis: 'data_refresh', trigger: 'scheduled' });
+    const event = JSON.parse(publish.mock.calls[0]?.[0]?.value ?? '');
+
+    expect(event).not.toHaveProperty('trigger');
+    expect(event).not.toHaveProperty('parent_id');
+  });
+
+  it('lists by origin, so a scheduled run is distinguishable from one asked for', async () => {
+    await analyses.start({ analysis: 'data_refresh', trigger: 'manual' });
+    const scheduled = await analyses.start({ analysis: 'full_pipeline', trigger: 'scheduled' });
+
+    const listed = await analyses.list({ trigger: 'scheduled', limit: 50 });
+
+    expect(listed.map(row => row.id)).toEqual([scheduled.id]);
   });
 
   it('mints a fresh id per call', async () => {
@@ -98,7 +143,12 @@ describe('AnalysesService status', () => {
 
     await analyses.update(started.id, status, updateKeyFrom(publish));
 
-    expect(await analyses.getStatus(started.id)).toEqual({ id: started.id, ...status });
+    expect(await analyses.getStatus(started.id)).toEqual({
+      id: started.id,
+      analysis: 'data_refresh',
+      trigger: 'manual',
+      ...status,
+    });
   });
 
   it('rejects an update with the wrong key', async () => {

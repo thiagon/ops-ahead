@@ -89,6 +89,8 @@ spec:
               value: {{ .Values.run.env.source | quote }}
             - name: SNAPSHOT_MARTS
               value: {{ .Values.run.env.snapshotMarts | toJson | quote }}
+            - name: CHAINED_ANALYSES
+              value: {{ .Values.run.env.chainedAnalyses | toJson | quote }}
           resources:
             {{- toYaml .Values.run.resources | nindent 12 }}
           livenessProbe:

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
 import pytest
 
 from settings import Settings
-from trigger import process_message
+from trigger import chain_trainings, process_message, run_full_pipeline
 
 
 @pytest.fixture
@@ -89,7 +90,13 @@ class TestProcessMessage:
             ("register_snapshot", "daily-2026-08-16"),
         ]
         assert published[1]["status"] == "succeeded"
-        assert published[1]["detail"] == {"snapshot_hash": "abc123"}
+        # chained/chain_failed ride along empty: this Settings configures no
+        # chained analysis, and the daily run reports what it started.
+        assert published[1]["detail"] == {
+            "snapshot_hash": "abc123",
+            "chained": {},
+            "chain_failed": {},
+        }
 
     def test_publishes_failed_with_error_detail_when_a_step_raises(self, settings, published, publish_status):
         def _raising_transform() -> None:
@@ -162,3 +169,102 @@ class TestReportStatus:
         assert seen["method"] == "PATCH"
         assert seen["headers"]["X-update-key"] == "the-key"
         assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}
+
+
+class TestChainTrainings:
+    """What the chaining buys is not convenience — it is that a reproved
+    quality suite cannot produce a new model. These cover that ordering."""
+
+    def _settings(self, **overrides) -> Settings:
+        return Settings(
+            source="itsm",
+            chained_analyses=["volume_forecast", "kpi_projection"],
+            **overrides,
+        )
+
+    def test_nothing_is_chained_when_the_quality_suite_raises(self):
+        started: list[dict] = []
+
+        def _start(url, body, *, trigger, parent_id=None):
+            started.append(body)
+            return "id"
+
+        def _quality(argv):
+            raise RuntimeError("critical suite failed")
+
+        steps = {"transform": lambda: None, "quality": _quality}
+
+        with pytest.raises(RuntimeError):
+            run_full_pipeline(
+                self._settings(),
+                "daily-1",
+                steps=steps,
+                register_snapshot=lambda *a, **kw: "sha",
+                start=_start,
+            )
+
+        assert started == []
+
+    def test_chains_each_configured_analysis_as_a_child_of_the_run(self):
+        seen: list[tuple] = []
+
+        def _start(url, body, *, trigger, parent_id=None):
+            seen.append((body["analysis"], trigger, parent_id))
+            return f"id-{body['analysis']}"
+
+        detail = run_full_pipeline(
+            self._settings(),
+            "daily-1",
+            steps={"transform": lambda: None, "quality": lambda argv: None},
+            register_snapshot=lambda *a, **kw: "sha",
+            start=_start,
+        )
+
+        assert seen == [
+            ("volume_forecast", "chained", "daily-1"),
+            ("kpi_projection", "chained", "daily-1"),
+        ]
+        assert detail["chained"] == {
+            "volume_forecast": "id-volume_forecast",
+            "kpi_projection": "id-kpi_projection",
+        }
+
+    def test_only_the_trainings_that_evaluate_against_a_hold_out_get_splits(self):
+        bodies: dict[str, dict] = {}
+
+        def _start(url, body, *, trigger, parent_id=None):
+            bodies[body["analysis"]] = body
+            return "id"
+
+        chain_trainings(self._settings(), "daily-1", start=_start, today=date(2026, 3, 2))
+
+        assert bodies["volume_forecast"]["holdout_end"] == "2026-03-01"
+        assert bodies["volume_forecast"]["validation_end"] == "2026-01-30"
+        assert bodies["volume_forecast"]["train_end"] == "2025-12-01"
+        assert "holdout_end" not in bodies["kpi_projection"]
+
+    def test_one_training_failing_to_start_leaves_the_others_and_the_snapshot(self):
+        def _start(url, body, *, trigger, parent_id=None):
+            if body["analysis"] == "volume_forecast":
+                raise RuntimeError("gateway unreachable")
+            return "id-kpi"
+
+        detail = run_full_pipeline(
+            self._settings(),
+            "daily-1",
+            steps={"transform": lambda: None, "quality": lambda argv: None},
+            register_snapshot=lambda *a, **kw: "sha",
+            start=_start,
+        )
+
+        assert detail["snapshot_hash"] == "sha"
+        assert detail["chained"] == {"kpi_projection": "id-kpi"}
+        assert "gateway unreachable" in detail["chain_failed"]["volume_forecast"]
+
+    def test_chaining_is_off_when_no_analysis_is_configured(self):
+        def _start(url, body, *, trigger, parent_id=None):
+            raise AssertionError("should not be called")
+
+        detail = chain_trainings(Settings(source="itsm"), "daily-1", start=_start)
+
+        assert detail == {"chained": {}, "chain_failed": {}}

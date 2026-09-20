@@ -6,6 +6,7 @@
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/volumeForecast" },
+    { "$ref": "#/definitions/entityForecast" },
     { "$ref": "#/definitions/breachRisk" },
     { "$ref": "#/definitions/kpiProjection" },
     { "$ref": "#/definitions/externalEventDetection" }
@@ -19,6 +20,19 @@
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "volume_forecast" },
+        "train_end": { "$ref": "#/definitions/splitDate" },
+        "validation_end": { "$ref": "#/definitions/splitDate" },
+        "holdout_end": { "$ref": "#/definitions/splitDate" }
+      }
+    },
+    "entityForecast": {
+      "type": "object",
+      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
+        "analysis": { "const": "entity_forecast" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
         "holdout_end": { "$ref": "#/definitions/splitDate" }

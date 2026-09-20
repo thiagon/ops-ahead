@@ -35,6 +35,13 @@ run:
     kafkaGroupId: data-runner
     kafkaConsumerTimeoutMs: "30000"
     gatewayUrl: http://gateway.ui.svc.cluster.local
+    # Trainings started once full_pipeline finishes — after the quality suite,
+    # so a reproved run trains nothing. Empty disables chaining.
+    chainedAnalyses:
+      - volume_forecast
+      - entity_forecast
+      - kpi_projection
+      - external_event_detection
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead
     clickhouseDatabase: default
@@ -59,12 +66,11 @@ run:
       - kpi_monthly_state
   secretName: data-runner-secret
 
-# Native CronJob — publishes {run_id: daily-<date>, analysis: full_pipeline}
-# to trigger.data at the scheduled time, consumed by the Deployment above
-# (no parallel execution path — see spec.md). schedule/enabled ported
-# from pipelines/data-itsm-daily/values.yaml, which is removed in Fase 10
-# along with the data-pipeline chart/ApplicationSet path it depended on.
+# Native CronJob — POSTs {analysis: full_pipeline} to the gateway at the
+# scheduled time, like any other client: the gateway mints the id and the row,
+# so the daily run is as queryable as one somebody asked for. The clock is the
+# only schedule in the system; the trainings chain off this run's success.
 cron:
   enabled: true
   schedule: "0 2 * * *"
-  image: edenhill/kcat:1.7.1
+  image: curlimages/curl:8.11.1

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic: str = "trigger.ml"
+    # Below this many days of history a category×product is folded into its
+    # tenant's residual series instead of getting a model of its own.
+    entity_min_history_days: int = 60
     kafka_group_id: str = "ml-trainer"
     gateway_url: str = "http://gateway.ui.svc.cluster.local"
     # Bounds how long consume_forever() blocks per poll before checking for

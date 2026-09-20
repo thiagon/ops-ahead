@@ -14,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 ANALYSIS_TRAINERS = {
     "volume_forecast": "volume",
+    "entity_forecast": "entity_forecast",
     "breach_risk": "breach",
     "kpi_projection": "kpi_projection",
     "external_event_detection": "external_event",
@@ -22,6 +23,7 @@ ANALYSIS_TRAINERS = {
 
 EXPERIMENT_NAMES = {
     "volume": "volume-forecast",
+    "entity_forecast": "entity-forecast",
     "breach": "breach-risk",
     "external_event": "external-event-detection",
     "kpi_projection": "kpi-monthly-projection",
