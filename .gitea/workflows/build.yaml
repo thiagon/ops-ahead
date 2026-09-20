@@ -4,12 +4,17 @@ on:
   create:
   push:
     branches: [main]
-    paths-ignore:
-      - "apps/*/chart/**"
-      - "infra/**"
-      - "docs/**"
-      - "conductor/**"
-      - "**.md"
+    # An inclusion list, not paths-ignore: the force marker has to be able to
+    # trigger the workflow on its own. paths-ignore is evaluated before any job
+    # starts, so a snapshot touching only ignored paths never reaches
+    # detect-changes and FORCE=1 has nothing to act on.
+    paths:
+      - "apps/**"
+      - "!apps/*/chart/**"
+      - "contracts/**"
+      - "scripts/**"
+      - ".gitea/workflows/**"
+      - ".ci/**"
   workflow_dispatch: {}
 
 env:
