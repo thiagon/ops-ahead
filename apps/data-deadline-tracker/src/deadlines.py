@@ -53,7 +53,7 @@ def apply_deadline(table: DeadlineTable, key: str | None, raw: bytes | None) -> 
     try:
         table.record(
             record["tenant_id"],
-            {int(entry["severity"]): int(entry["deadline_seconds"]) for entry in record["deadlines"]},
+            {int(entry["severity"]): int(entry["seconds"]) for entry in record["deadlines"]},
         )
     except (KeyError, TypeError, ValueError):
         logger.warning("rules.deadline record is malformed, skipping")

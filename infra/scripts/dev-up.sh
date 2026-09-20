@@ -65,9 +65,12 @@ CLUSTER_EXISTS=0
 if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
   CLUSTER_EXISTS=1
   info "Cluster exists — ensuring it is started..."
-  k3d cluster start ops-ahead > /dev/null 2>&1 || true
+  k3d cluster start ops-ahead
 else
   info "Creating cluster 'ops-ahead'..."
+  # A new cluster must not reattach another cluster's PVCs. Stop/start (make
+  # down) keeps .data; only create wipes leftovers from a previous delete.
+  wipe_data_dir
   mkdir -p "$ROOT_DIR/.data"
   k3d cluster create ops-ahead \
     --image "$K3S_IMAGE" \
@@ -104,11 +107,16 @@ if [ "$CLUSTER_EXISTS" = "1" ] && [ -f "$VAULT_INIT_FILE" ] \
   exit 0
 fi
 
+if [ "$CLUSTER_EXISTS" = "1" ]; then
+  info "Cluster exists but GitOps is not bootstrapped yet — continuing full bootstrap"
+fi
+
 step "Chart dependencies"
 for chart_dir in infra/charts/*/; do
   grep -q "^dependencies:" "${chart_dir}Chart.yaml" 2>/dev/null || continue
-  helm dependency build "./$chart_dir" > /dev/null 2>&1 || \
-  helm dependency update "./$chart_dir" > /dev/null
+  if ! helm dependency build "./$chart_dir" > /dev/null 2>&1; then
+    helm dependency update "./$chart_dir"
+  fi
   info "$(basename "$chart_dir") OK"
 done
 
@@ -138,14 +146,14 @@ helm upgrade --install infra-argocd ./infra/charts/infra-argocd \
   -n infra \
   -f infra/charts/infra-argocd/values.yaml \
   -f infra/charts/infra-argocd/values-dev.yaml \
-  --wait --timeout 10m 2>/dev/null
+  --wait --timeout 10m
 info "ArgoCD ready"
 
 helm upgrade --install infra-vault ./infra/charts/infra-vault \
   -n infra \
   -f infra/charts/infra-vault/values.yaml \
   -f infra/charts/infra-vault/values-dev.yaml \
-  --timeout 5m 2>/dev/null
+  --timeout 5m
 info "Vault deployed (standalone)"
 
 # Vault standalone starts sealed — wait for pod to exist, then Running, then respond.
@@ -213,7 +221,7 @@ helm upgrade --install infra-gitea ./infra/charts/infra-gitea \
   -n infra \
   -f infra/charts/infra-gitea/values.yaml \
   -f infra/charts/infra-gitea/values-dev.yaml \
-  --timeout 5m 2>/dev/null
+  --timeout 5m
 info "Gitea installed"
 
 step "Push working dir to Gitea"
@@ -317,7 +325,7 @@ step "Root Application (App-of-Apps)"
 GITHUB_REPO="https://github.com/thiagon/ops-ahead"
 SED_REPO="s#${GITHUB_REPO}#${GITEA_REPO_URL%.git}#g"
 
-sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f - 2>/dev/null
+sed "${SED_REPO}" infra/bootstrap/root-app.yaml | kubectl apply -f -
 info "ops-ahead-root → ${GITEA_REPO_URL}"
 
 reconcile_child_apps

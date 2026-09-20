@@ -50,7 +50,7 @@ def apply_mapping(
                 tenant_id=record["tenant_id"],
                 source=record["source"],
                 intake=record["intake"],
-                dictionary_version=record["dictionary_version"],
+                version=record["version"],
                 mappings=record.get("mappings", {}),
             )
         )
@@ -130,7 +130,7 @@ def apply_deadline_rows(key: str | None, raw: bytes | None) -> list[tuple] | Non
         return None
     now = datetime.now(UTC).replace(tzinfo=None)
     return [
-        (record["tenant_id"], int(entry["severity"]), int(entry["deadline_seconds"]), now)
+        (record["tenant_id"], int(entry["severity"]), int(entry["seconds"]), now)
         for entry in record.get("deadlines", [])
     ]
 

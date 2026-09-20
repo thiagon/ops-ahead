@@ -29,14 +29,14 @@ function createMetrics(): Metrics {
 
     eventsPublished: new Counter({
       name: 'gateway_events_published_total',
-      help: 'Incident envelopes published to the bus',
+      help: 'Event envelopes published to the bus',
       labelNames: ['source', 'intake'],
       registers: [registry],
     }),
 
     publishFailures: new Counter({
       name: 'gateway_publish_failures_total',
-      help: 'Incident envelopes the gateway could not publish to the bus',
+      help: 'Event envelopes the gateway could not publish to the bus',
       labelNames: ['source', 'intake'],
       registers: [registry],
     }),

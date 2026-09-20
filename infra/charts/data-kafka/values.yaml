@@ -18,11 +18,6 @@ kafka:
     jvmOptions:
       "-Xms": "512m"
       "-Xmx": "1g"
-  zookeeper:
-    replicas: 3
-    storage:
-      type: persistent-claim
-      size: 5Gi
 
 kafkaTopics:
   # Raw, one per intake — only data-ingest reads these, translating into the

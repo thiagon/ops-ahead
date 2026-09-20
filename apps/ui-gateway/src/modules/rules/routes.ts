@@ -1,11 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import createError from 'http-errors';
+import { z } from 'zod';
 import {
+  deadlineHistorySchema,
   deadlineSetSchema,
+  mappingHistorySchema,
   mappingSchema,
   originParamsSchema,
   rulesAcceptedSchema,
   rulesErrorSchema,
+  targetHistorySchema,
   targetSetSchema,
   tenantParamsSchema,
 } from '../../services/rules/schema.ts';
@@ -27,6 +32,7 @@ export function registerRulesRoutes(app: FastifyInstance): void {
         response: {
           202: rulesAcceptedSchema,
           400: rulesErrorSchema,
+          404: rulesErrorSchema,
           502: rulesErrorSchema,
         },
       },
@@ -37,12 +43,45 @@ export function registerRulesRoutes(app: FastifyInstance): void {
         const result = await rules.setMapping(tenant, source, request.body);
         return reply.status(202).send(result);
       } catch (err) {
+        if (createError.isHttpError(err)) throw err;
         request.log.error({ err }, 'failed to publish mapping rule');
         return reply.status(502).send({
           error: 'PublishFailed',
           message: 'could not publish the event to the bus',
         });
       }
+    },
+  );
+
+  typed.get(
+    '/rules/mappings/:tenant/:source',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: 'Read the current mapping for an origin',
+        params: originParamsSchema,
+        response: { 200: mappingSchema, 404: rulesErrorSchema },
+      },
+    },
+    async request => {
+      const { tenant, source } = request.params;
+      return rules.getMapping(tenant, source);
+    },
+  );
+
+  typed.get(
+    '/rules/mappings/:tenant/:source/history',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: 'List the last ten published mappings, newest first',
+        params: originParamsSchema,
+        response: { 200: z.array(mappingHistorySchema) },
+      },
+    },
+    async request => {
+      const { tenant, source } = request.params;
+      return rules.listMappingHistory(tenant, source);
     },
   );
 
@@ -75,6 +114,32 @@ export function registerRulesRoutes(app: FastifyInstance): void {
     },
   );
 
+  typed.get(
+    '/rules/deadlines/:tenant',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: "Read this tenant's current deadlines",
+        params: tenantParamsSchema,
+        response: { 200: deadlineSetSchema, 404: rulesErrorSchema },
+      },
+    },
+    async request => rules.getDeadlines(request.params.tenant),
+  );
+
+  typed.get(
+    '/rules/deadlines/:tenant/history',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: 'List the last ten published deadlines, newest first',
+        params: tenantParamsSchema,
+        response: { 200: z.array(deadlineHistorySchema) },
+      },
+    },
+    async request => rules.listDeadlineHistory(request.params.tenant),
+  );
+
   typed.put(
     '/rules/targets/:tenant',
     {
@@ -102,5 +167,31 @@ export function registerRulesRoutes(app: FastifyInstance): void {
         });
       }
     },
+  );
+
+  typed.get(
+    '/rules/targets/:tenant',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: "Read this tenant's current KPI targets",
+        params: tenantParamsSchema,
+        response: { 200: targetSetSchema, 404: rulesErrorSchema },
+      },
+    },
+    async request => rules.getTargets(request.params.tenant),
+  );
+
+  typed.get(
+    '/rules/targets/:tenant/history',
+    {
+      schema: {
+        tags: ['rules'],
+        summary: 'List the last ten published targets, newest first',
+        params: tenantParamsSchema,
+        response: { 200: z.array(targetHistorySchema) },
+      },
+    },
+    async request => rules.listTargetHistory(request.params.tenant),
   );
 }

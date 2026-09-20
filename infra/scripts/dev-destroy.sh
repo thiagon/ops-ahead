@@ -13,15 +13,5 @@ else
   warn "Cluster 'ops-ahead' not found"
 fi
 
-if [ -d "$ROOT_DIR/.data" ]; then
-  info "Wiping persisted state ($ROOT_DIR/.data)..."
-  # PVC dirs are created by containers running as root (and other uids), so a
-  # plain rm fails with EPERM. Try it first; on failure, let Docker (already
-  # root) do the delete so we never need host sudo.
-  if ! rm -rf "$ROOT_DIR/.data" 2>/dev/null; then
-    warn "Some files are root-owned; wiping via a throwaway Docker container..."
-    docker run --rm -v "$ROOT_DIR/.data:/data" busybox sh -c 'rm -rf /data/..?* /data/.[!.]* /data/*' 2>/dev/null || true
-    rmdir "$ROOT_DIR/.data" 2>/dev/null || true
-  fi
-fi
+wipe_data_dir
 info "Done — next 'make up' bootstraps from scratch"

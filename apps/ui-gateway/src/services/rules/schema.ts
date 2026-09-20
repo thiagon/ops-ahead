@@ -40,8 +40,8 @@ const resolutionCodeMapping = z.record(z.string(), z.string());
 export const mappingSchema = z
   .object({
     intake: z.enum(['alert', 'monitor']),
-    dictionary_version: z.string().min(1).meta({
-      description: 'Stamped into every translated line this mapping produces',
+    version: z.string().min(1).meta({
+      description: 'Stamped as dictionary_version into every translated line this mapping produces',
     }),
     bindings: z
       .array(
@@ -81,11 +81,26 @@ export const deadlineSetSchema = z
         z
           .object({
             severity,
-            deadline_seconds: z.coerce.number().int().positive(),
+            seconds: z.coerce.number().int().positive(),
           })
           .strict(),
       )
-      .min(1),
+      .min(1)
+      .check(ctx => {
+        const seen = new Set<number>();
+        for (const [index, deadline] of ctx.value.entries()) {
+          if (seen.has(deadline.severity)) {
+            ctx.issues.push({
+              code: 'custom',
+              message: 'each severity can appear only once',
+              path: [index, 'severity'],
+              input: deadline.severity,
+              continue: true,
+            });
+          }
+          seen.add(deadline.severity);
+        }
+      }),
   })
   .strict()
   .meta({
@@ -126,6 +141,21 @@ export const originParamsSchema = z.object({
   tenant: tenantId,
   source: z.string().min(1).meta({ description: 'The origin system, e.g. service_now' }),
 });
+
+const historyMeta = {
+  id: z.number().int().positive(),
+  created_at: z.iso.datetime(),
+};
+
+export const mappingHistorySchema = mappingSchema
+  .extend(historyMeta)
+  .meta({ id: 'MappingHistory' });
+export const deadlineHistorySchema = deadlineSetSchema
+  .extend(historyMeta)
+  .meta({ id: 'DeadlineHistory' });
+export const targetHistorySchema = targetSetSchema
+  .extend(historyMeta)
+  .meta({ id: 'TargetHistory' });
 
 export const rulesAcceptedSchema = z
   .object({

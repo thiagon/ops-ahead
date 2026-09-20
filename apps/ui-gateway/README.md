@@ -3,7 +3,7 @@
 Fronteira HTTP do `ns: ui`. Um processo, um host (`gateway.ops-ahead.localtest.me`):
 
 - webhooks autenticados → `events.raw.{alert,monitor}`
-- `POST /analyses` / `GET /analyses/{id}` / MCP `/mcp` → `trigger.ml` / `trigger.data`, status no Postgres
+- `POST /analyses` / `GET /analyses/{id}` / MCP `/mcp/{tenant}` → `trigger.ml` / `trigger.data`, status no Postgres
 
 ## `POST /analyses`
 
@@ -50,8 +50,16 @@ A resposta nunca consulta o Kubernetes.
 
 ## MCP
 
-As mesmas operações como tools (`start_analysis`, `get_analysis_status`) em `/mcp`
-(streamable HTTP, modo stateless), no mesmo processo/porta.
+As mesmas operações de negócio como tools em `/mcp/{tenant}` (streamable HTTP,
+modo stateless), no mesmo processo/porta. O tenant vem da URL — as tools nunca
+aceitam `tenant` no payload, então uma conexão opera um cliente por vez.
+
+Configuração (mapeamento, prazos, metas) grava cada documento publicado.
+O GET de histórico mostra as 10 mais recentes; o restante fica no banco.
+Para voltar a um antigo, o caller lê o histórico e faz um PUT novo.
+
+Não viram tool: `PATCH /analyses/{id}` (consumer interno) e `POST /webhook/...`
+(origem assina com HMAC).
 
 ## Desenvolvimento
 

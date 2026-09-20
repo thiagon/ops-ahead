@@ -6,7 +6,7 @@ const publish = vi.fn(async (_message: { topic: string; key: string; value: stri
 
 const mapping = {
   intake: 'alert',
-  dictionary_version: 'v1',
+  version: 'v1',
   bindings: [{ field: 'status', path: 'fields.status' }],
   mappings: { status: { Aberto: 'open' } },
 };
@@ -29,19 +29,19 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
   it('publishes bindings and dictionary as one record and answers 202', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/rules/mappings/locaweb/service_now',
+      url: '/rules/mappings/locaweb/itsm',
       payload: mapping,
     });
 
     expect(res.statusCode).toBe(202);
-    expect(res.json()).toEqual({ key: 'locaweb:service_now', topic: 'rules.mapping' });
+    expect(res.json()).toEqual({ key: 'locaweb:itsm', topic: 'rules.mapping' });
     expect(publish).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a mapping with no bindings with 400', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/rules/mappings/locaweb/service_now',
+      url: '/rules/mappings/locaweb/itsm',
       payload: { ...mapping, bindings: [] },
     });
 
@@ -54,7 +54,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
 
     const res = await app.inject({
       method: 'PUT',
-      url: '/rules/mappings/locaweb/service_now',
+      url: '/rules/mappings/locaweb/itsm',
       payload: mapping,
     });
 
@@ -81,7 +81,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
-      payload: { deadlines: [{ severity: 1, deadline_seconds: 14400 }] },
+      payload: { deadlines: [{ severity: 1, seconds: 14400 }] },
     });
 
     expect(res.statusCode).toBe(202);
@@ -93,6 +93,22 @@ describe('PUT /rules/deadlines/:tenant', () => {
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
       payload: { deadlines: [] },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects a repeated severity with 400', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/rules/deadlines/locaweb',
+      payload: {
+        deadlines: [
+          { severity: 1, seconds: 14400 },
+          { severity: 1, seconds: 7200 },
+        ],
+      },
     });
 
     expect(res.statusCode).toBe(400);
@@ -138,5 +154,43 @@ describe('PUT /rules/targets/:tenant', () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('GET and history', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('reads the current deadlines after a PUT', async () => {
+    const body = { deadlines: [{ severity: 1, seconds: 14400 }] };
+    await app.inject({ method: 'PUT', url: '/rules/deadlines/locaweb', payload: body });
+
+    const res = await app.inject({ method: 'GET', url: '/rules/deadlines/locaweb' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(body);
+  });
+
+  it('lists the last published documents so a caller can PUT an older one again', async () => {
+    await app.inject({
+      method: 'PUT',
+      url: '/rules/deadlines/locaweb',
+      payload: { deadlines: [{ severity: 1, seconds: 7200 }] },
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/rules/deadlines/locaweb/history' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()[0]).toMatchObject({
+      deadlines: [{ severity: 1, seconds: 7200 }],
+      id: expect.any(Number),
+    });
   });
 });

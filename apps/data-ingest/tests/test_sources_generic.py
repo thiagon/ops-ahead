@@ -9,7 +9,7 @@ DICTIONARY = Dictionary(
     tenant_id="locaweb",
     source="itsm",
     intake="alert",
-    dictionary_version="v1",
+    version="v1",
     mappings={
         "status": {
             "Encerrado": "closed",
@@ -164,7 +164,7 @@ def test_translates_severity_off_the_origins_own_scale():
         tenant_id="locaweb",
         source="service_now",
         intake="alert",
-        dictionary_version="v1",
+        version="v1",
         mappings={**DICTIONARY.mappings, "severity": {"1 - Crítica": "1"}},
     )
     body = {**BODY, "priority_code": "1 - Crítica"}

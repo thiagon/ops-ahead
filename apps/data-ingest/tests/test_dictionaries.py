@@ -13,7 +13,7 @@ def _record(version: str, mappings: dict) -> bytes:
             "tenant_id": "locaweb",
             "source": "itsm",
             "intake": "alert",
-            "dictionary_version": version,
+            "version": version,
             "bindings": [{"field": "status", "path": "fields.status"}],
             "mappings": mappings,
         }
@@ -37,11 +37,11 @@ def registry() -> DictionaryRegistry:
 
 
 def test_latest_is_the_last_record_the_log_carried(registry):
-    assert registry.latest("locaweb", "itsm").dictionary_version == "v2"
+    assert registry.latest("locaweb", "itsm").version == "v2"
 
 
 def test_version_returns_a_specific_pinned_version(registry):
-    assert registry.version("locaweb", "itsm", "v1").dictionary_version == "v1"
+    assert registry.version("locaweb", "itsm", "v1").version == "v1"
 
 
 def test_a_pinned_version_translates_by_its_own_mappings(registry):
@@ -66,7 +66,7 @@ def test_a_malformed_record_does_not_stop_the_rehydration(registry):
     _apply(registry, "locaweb:itsm", b"not json")
 
     # The record is skipped, and what the log already carried still stands.
-    assert registry.latest("locaweb", "itsm").dictionary_version == "v2"
+    assert registry.latest("locaweb", "itsm").version == "v2"
 
 
 def test_an_unmapped_value_falls_back_instead_of_failing_the_event():
@@ -74,7 +74,7 @@ def test_an_unmapped_value_falls_back_instead_of_failing_the_event():
         tenant_id="locaweb",
         source="itsm",
         intake="alert",
-        dictionary_version="v1",
+        version="v1",
         mappings={"status": {"Encerrado": "closed"}},
     )
 

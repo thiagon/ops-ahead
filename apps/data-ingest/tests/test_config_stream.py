@@ -15,8 +15,8 @@ def test_apply_deadline_rows_one_row_per_severity():
         {
             "tenant_id": "locaweb",
             "deadlines": [
-                {"severity": 1, "deadline_seconds": 14400},
-                {"severity": 2, "deadline_seconds": 14400},
+                {"severity": 1, "seconds": 14400},
+                {"severity": 2, "seconds": 14400},
             ],
         }
     )
@@ -87,12 +87,12 @@ def test_load_snapshot_from_store_populates_registries_and_rows():
             "tenant_id": "locaweb",
             "source": "service_now",
             "intake": "alert",
-            "dictionary_version": "v1",
+            "version": "v1",
             "bindings": [{"field": "status", "path": "fields.status"}],
             "mappings": {},
         },
     )
-    store.save_deadlines("locaweb", {"tenant_id": "locaweb", "deadlines": [{"severity": 1, "deadline_seconds": 14400}]})
+    store.save_deadlines("locaweb", {"tenant_id": "locaweb", "deadlines": [{"severity": 1, "seconds": 14400}]})
     store.save_targets(
         "locaweb",
         {"tenant_id": "locaweb", "targets": [{"severities": [1, 2], "max_breaches": 5, "achievement_pct": 95.0}]},

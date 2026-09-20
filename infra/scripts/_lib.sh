@@ -13,6 +13,20 @@ warn()  { echo -e "${YELLOW}⚠${NC}  $*"; }
 error() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 step()  { echo -e "\n${GREEN}━━━ $* ━━━${NC}"; }
 
+# k3d bind-mounts .data over k3s local-path. PVC dirs are created as root (and
+# other uids), so a plain rm fails with EPERM — fall back to a throwaway
+# container instead of asking for host sudo.
+wipe_data_dir() {
+  [ -d "$ROOT_DIR/.data" ] || return 0
+  info "Wiping persisted state ($ROOT_DIR/.data)..."
+  if ! rm -rf "$ROOT_DIR/.data" 2>/dev/null; then
+    warn "Some files are root-owned; wiping via a throwaway Docker container..."
+    docker run --rm -v "$ROOT_DIR/.data:/data" busybox \
+      sh -c 'rm -rf /data/..?* /data/.[!.]* /data/*' 2>/dev/null || true
+    rmdir "$ROOT_DIR/.data" 2>/dev/null || true
+  fi
+}
+
 # Reconcile the child Application manifests straight from the working tree via
 # client-side apply, rewriting the GitHub repoURL to the internal Gitea. This is
 # what makes structural changes converge: client-side apply's 3-way merge PRUNES

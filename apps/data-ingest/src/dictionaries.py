@@ -8,7 +8,7 @@ class Dictionary:
     tenant_id: str
     source: str
     intake: str
-    dictionary_version: str
+    version: str
     mappings: dict[str, dict[str, str]]
 
     def translate(self, field: str, raw: str | None, default: str | None = None) -> str | None:
@@ -30,7 +30,7 @@ class DictionaryRegistry:
 
     def record(self, dictionary: Dictionary) -> None:
         key = (dictionary.tenant_id, dictionary.source)
-        self._by_version[(*key, dictionary.dictionary_version)] = dictionary
+        self._by_version[(*key, dictionary.version)] = dictionary
         self._latest[key] = dictionary
 
     def forget(self, tenant_id: str, source: str) -> None:
@@ -39,8 +39,8 @@ class DictionaryRegistry:
     def latest(self, tenant_id: str, source: str) -> Dictionary | None:
         return self._latest.get((tenant_id, source))
 
-    def version(self, tenant_id: str, source: str, dictionary_version: str) -> Dictionary | None:
-        return self._by_version.get((tenant_id, source, dictionary_version))
+    def version(self, tenant_id: str, source: str, version: str) -> Dictionary | None:
+        return self._by_version.get((tenant_id, source, version))
 
     def __len__(self) -> int:
         return len(self._latest)

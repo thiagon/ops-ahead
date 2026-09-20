@@ -1,32 +1,17 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import createError from 'http-errors';
-import { z } from 'zod';
-import { rawTopicFor } from '../../env.ts';
 import {
+  addressParamsSchema,
+  versionParam,
   webhookAcceptedSchema,
   webhookBodySchema,
   webhookErrorSchema,
   webhookHeadersSchema,
-} from './schema.ts';
-import { buildEnvelope } from './service.ts';
+  webhookParamsSchema,
+} from '../../services/events/schema.ts';
 
-const addressParamsSchema = z.object({
-  tenant: z.string().min(1),
-  source: z.string().min(1),
-});
-
-// The default belongs to the contract, not to the handler: it is what the
-// published document tells a caller an unpinned request translates by. Each
-// route declares its own params, or the shorter one would document a path
-// segment it does not have.
-const versionParam = z.string().min(1).default('latest').meta({
-  description: 'Which mapping version data-ingest translates this event by',
-});
-
-const webhookParamsSchema = addressParamsSchema.extend({ version: versionParam });
-
-type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof addressParamsSchema> }>;
+type WebhookRequest = FastifyRequest<{ Params: { tenant: string; source: string } }>;
 
 /**
  * One route for every origin: which (tenant, source) pairs are accepted comes
@@ -40,7 +25,10 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof addressParamsSchem
  * pins it per request and `latest` follows whatever the origin is configured
  * with today.
  */
-export function registerIncidentRoutes(app: FastifyInstance): void {
+export function registerEventRoutes(app: FastifyInstance): void {
+  const events = app.services.events;
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
   const resolve = async (request: FastifyRequest) => {
     const { tenant, source } = (request as WebhookRequest).params;
     const found = await app.services.sources.find(tenant, source);
@@ -51,8 +39,6 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
     }
     return found;
   };
-
-  const typed = app.withTypeProvider<ZodTypeProvider>();
 
   for (const [path, params] of [
     ['/webhook/:tenant/:source', addressParamsSchema],
@@ -65,7 +51,7 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
         // signed surface for that (tenant, source) pair.
         preParsing: app.verifySignatureFor(resolve),
         schema: {
-          tags: ['incidents'],
+          tags: ['events'],
           summary: 'Ingest an event from a configured origin',
           description:
             'The body is opaque: preserved verbatim in the raw envelope, never parsed or typed here. See domain/acl/itsm.md.',
@@ -93,43 +79,28 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
 
         // Absent on the shorter route, where the schema's default fills in.
         const pinned = (request.params as { version?: string }).version;
-        const envelope = buildEnvelope(
-          { ...origin, version: versionParam.parse(pinned) },
-          request.body,
-        );
-        const topic = rawTopicFor(request.server.env, origin.intake);
-
         try {
-          await request.server.kafka.publish({
-            topic,
-            key: envelope.event_id,
-            value: JSON.stringify(envelope),
+          const result = await events.ingest(
+            { ...origin, version: versionParam.parse(pinned) },
+            request.body,
+          );
+          request.server.metrics.eventsPublished.inc({
+            source: origin.source,
+            intake: origin.intake,
           });
+          // 202, not 201: the bus owns the event now, the gateway holds nothing.
+          return reply.status(202).send(result);
         } catch (err) {
           request.server.metrics.publishFailures.inc({
-            source: envelope.source,
-            intake: envelope.intake,
+            source: origin.source,
+            intake: origin.intake,
           });
-          request.log.error(
-            { err, event_id: envelope.event_id },
-            'failed to publish incident envelope',
-          );
+          request.log.error({ err }, 'failed to publish event envelope');
           return reply.status(502).send({
             error: 'PublishFailed',
             message: 'could not publish the event to the bus',
           });
         }
-
-        request.server.metrics.eventsPublished.inc({
-          source: envelope.source,
-          intake: envelope.intake,
-        });
-        // 202, not 201: the bus owns the event now, the gateway holds nothing.
-        return reply.status(202).send({
-          event_id: envelope.event_id,
-          tenant_id: envelope.tenant_id,
-          source: envelope.source,
-        });
       },
     );
   }
