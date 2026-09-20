@@ -23,7 +23,8 @@ describe('envSchema', () => {
       KAFKA_TOPIC_DATA: 'trigger.data',
       GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
-      ORIGINS: {},
+      ORIGIN_SECRET_KEY: '',
+      ORIGIN_CACHE_TTL_MS: 10_000,
     });
   });
 
@@ -52,30 +53,8 @@ describe('envSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it("reads each origin's intake and secret out of ORIGINS", () => {
-    const result = envSchema.safeParse({
-      HMAC_ENABLED: 'true',
-      ORIGINS: JSON.stringify({ 'locaweb:itsm': { intake: 'alert', secret: 'sekret' } }),
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.data?.ORIGINS['locaweb:itsm']).toEqual({ intake: 'alert', secret: 'sekret' });
-  });
-
-  it('rejects an origin key that is not tenant:source', () => {
-    const result = envSchema.safeParse({
-      ORIGINS: JSON.stringify({ itsm: { intake: 'alert', secret: 'sekret' } }),
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an intake outside the two the contracts declare', () => {
-    const result = envSchema.safeParse({
-      ORIGINS: JSON.stringify({ 'locaweb:itsm': { intake: 'webhook', secret: 'sekret' } }),
-    });
-
-    expect(result.success).toBe(false);
+  it('coerces the origin cache ttl to a number', () => {
+    expect(envSchema.parse({ ORIGIN_CACHE_TTL_MS: '500' }).ORIGIN_CACHE_TTL_MS).toBe(500);
   });
 });
 

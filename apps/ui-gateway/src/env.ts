@@ -48,33 +48,17 @@ export const envSchema = z
     HMAC_ENABLED: z.stringbool().default(false),
 
     /**
-     * Every origin the gateway accepts, keyed `"tenant:source"`. Being in
-     * here is what makes an origin real — a webhook against any other address
-     * is refused. Added by hand for now, so the gateway reads no
-     * configuration off the bus to answer a request.
+     * Decrypts the webhook secrets stored in the origins table
+     * (services/origins/cipher.ts). One key for the whole table: registering
+     * an origin is an insert, never a write to the Vault.
      */
-    ORIGINS: z
-      .string()
-      .default('{}')
-      .transform((value, ctx) => {
-        try {
-          return JSON.parse(value) as unknown;
-        } catch {
-          ctx.addIssue({ code: 'custom', message: 'must be a JSON object of origins' });
-          return z.NEVER;
-        }
-      })
-      .pipe(
-        z.record(
-          z.string().regex(/^[^:]+:[^:]+$/, 'key must be "tenant:source"'),
-          z.object({
-            // Which raw topic this origin's events are carried on
-            // (domain/ubiquitous-language.md#intake).
-            intake: z.enum(['alert', 'monitor']),
-            secret: z.string(),
-          }),
-        ),
-      ),
+    ORIGIN_SECRET_KEY: z.string().default(''),
+    /**
+     * How long a resolved origin is reused before the table is read again.
+     * Short enough that a rotation takes effect on its own, long enough that
+     * a replay is not one query per event.
+     */
+    ORIGIN_CACHE_TTL_MS: z.coerce.number().default(10_000),
   })
   .loose();
 

@@ -1,15 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
-import { OriginRegistry } from '../../src/plugins/origins.ts';
+import { SecretCipher } from '../../src/services/origins/cipher.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
 export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
+  process.env.ORIGIN_SECRET_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
-  stubOrigins(app);
   stubPrisma(app);
   await app.ready();
   return app;
@@ -18,28 +18,8 @@ export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
 /** The secret TEST_ORIGIN signs with — what a test signs its bodies with. */
 export const TEST_SECRET = 'itsm-shared-secret';
 
-/**
- * The origin the ITSM loop has always run on. A test that needs another
- * origin decorates `origins` itself before this fills in.
- */
-export const TEST_ORIGIN = {
-  tenantId: 'locaweb',
-  source: 'itsm',
-  intake: 'alert' as const,
-  secret: TEST_SECRET,
-};
-
-/** No test reads ORIGINS out of the environment. */
-export function stubOrigins(app: FastifyInstance): void {
-  if (app.hasDecorator('origins')) return;
-  app.decorate(
-    'origins',
-    new OriginRegistry({
-      'locaweb:itsm': { intake: 'alert', secret: TEST_SECRET },
-      'locaweb:zabbix': { intake: 'monitor', secret: TEST_SECRET },
-    }),
-  );
-}
+/** A key of the right size, so tests never reach a Vault. */
+export const TEST_SECRET_KEY = Buffer.alloc(32, 7).toString('base64');
 
 /**
  * No test reaches a broker: unless the test provided its own publisher, the app
@@ -50,10 +30,32 @@ export function stubKafka(app: FastifyInstance): void {
   app.decorate('kafka', { publish: async () => undefined });
 }
 
-/** No test reaches Postgres. */
+/**
+ * No test reaches Postgres. The ITSM origin the loop has always run on is
+ * seeded, so a webhook test has an address that resolves.
+ */
 export function stubPrisma(app: FastifyInstance): void {
   if (app.hasDecorator('prisma')) return;
   app.decorate('prisma', memoryPrisma());
+}
+
+type OriginRow = {
+  tenantId: string;
+  source: string;
+  intake: 'alert' | 'monitor';
+  encryptedSecret: string;
+};
+
+function seededOrigins(): Map<string, OriginRow> {
+  const cipher = new SecretCipher(TEST_SECRET_KEY);
+  const encryptedSecret = cipher.encrypt(TEST_SECRET);
+  return new Map([
+    ['locaweb:itsm', { tenantId: 'locaweb', source: 'itsm', intake: 'alert', encryptedSecret }],
+    [
+      'locaweb:zabbix',
+      { tenantId: 'locaweb', source: 'zabbix', intake: 'monitor', encryptedSecret },
+    ],
+  ]);
 }
 
 type AnalysisRow = {
@@ -65,11 +67,49 @@ type AnalysisRow = {
   detail: unknown;
 };
 
-/** Map behind the Prisma calls the service makes. */
+/** Map behind the Prisma calls the services make. */
 export function memoryPrisma(): PrismaClient {
   const rows = new Map<string, AnalysisRow>();
+  const origins = seededOrigins();
+  const originKey = (where: { tenantId: string; source: string }) =>
+    `${where.tenantId}:${where.source}`;
 
   return {
+    origin: {
+      async findUnique({ where }: { where: { tenantId_source: OriginRow } }) {
+        return origins.get(originKey(where.tenantId_source)) ?? null;
+      },
+      async findMany() {
+        return [...origins.values()];
+      },
+      async upsert({
+        where,
+        create,
+        update,
+      }: {
+        where: { tenantId_source: { tenantId: string; source: string } };
+        create: OriginRow;
+        update: Partial<OriginRow>;
+      }) {
+        const key = originKey(where.tenantId_source);
+        const current = origins.get(key);
+        origins.set(key, current ? { ...current, ...update } : create);
+        return origins.get(key);
+      },
+      async updateMany({
+        where,
+        data,
+      }: {
+        where: { tenantId: string; source: string };
+        data: Partial<OriginRow>;
+      }) {
+        const key = originKey(where);
+        const current = origins.get(key);
+        if (!current) return { count: 0 };
+        origins.set(key, { ...current, ...data });
+        return { count: 1 };
+      },
+    },
     analysis: {
       async upsert({
         where,

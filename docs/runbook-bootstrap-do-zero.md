@@ -12,13 +12,14 @@ Antes de qualquer envio, duas coisas precisam existir:
 
 | # | Pré-condição | Estado |
 |---|--------------|--------|
-| 1 | A origem em `ORIGINS`, no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
-| 2 | O gateway alcançável de fora do cluster | **Bloqueador — não tem Ingress** |
+| 1 | `ORIGIN_SECRET_KEY` no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
+| 2 | A origem cadastrada em `PUT /origins/{tenant}/{source}` | Passo 1 |
+| 3 | O gateway alcançável de fora do cluster | **Bloqueador — não tem Ingress** |
 
-`ORIGINS` é um JSON de `"tenant:source"` para `{intake, secret}` — estar nele é
-o que torna uma origem real, e um webhook contra qualquer outro endereço leva
-404. Adicionar origem é editar esse JSON por enquanto, sem passar pelo
-barramento.
+Uma origem só existe se estiver na tabela `origins`; um webhook contra
+qualquer outro endereço leva 404. O secret com que ela assina é guardado
+cifrado ali, e `ORIGIN_SECRET_KEY` é o que o decifra — uma chave só, que não
+muda quando se adiciona origem.
 
 Traduzir é outra coisa: quem decide se um evento vira linha bronze é o
 `data-ingest`, contra as regras em `rules.mapping`. Um evento de origem aceita
@@ -57,16 +58,20 @@ Termina com tudo verde **e vazio**. Estados esperados, que não são falha:
 - Marts gold materializadas e vazias — o PreSync `data-runner-build` roda
   `dbt run` contra bronze vazio, que é seguro por desenho (`src/steps.py:11-17`).
 
-## Passo 1 — publicar as regras da origem
+## Passo 1 — cadastrar a origem e publicar suas regras
 
 ```bash
-uv run python scripts/seed_config.py --gateway-url http://localhost:8080
+uv run python scripts/seed_config.py \
+  --gateway-url http://localhost:8080 --secret ops-ahead-dev
 ```
 
-Publica o mapeamento do `service_now` (bindings + dicionário, um record só),
-os prazos e as metas de KPI. Sem isso o gateway aceita os eventos do mesmo
-jeito — a origem está em `ORIGINS` —, mas o `data-ingest` não consegue
-traduzi-los e eles ficam só no lake.
+Cadastra o `service_now` e publica o mapeamento dele (bindings + dicionário,
+um record só), os prazos e as metas de KPI. Sem `--secret` o gateway gera um e
+o imprime — é a única vez que ele aparece.
+
+Cadastrar é o que faz o endereço responder; as regras são o que permite
+traduzir o que chega nele. Sem as regras o evento é aceito e fica no lake, sem
+virar bronze.
 
 **Verificação:** `rules.mapping` tem um registro sob a chave
 `<tenant>:<source>`, e o `data-ingest` loga a aplicação dele.
@@ -217,7 +222,7 @@ além do que treinou.
 
 ```
 make up
-  └─ seed_config.py → regras em rules.mapping/deadline/target
+  └─ seed_config.py → origem cadastrada + regras publicadas
        └─ producer 122k eventos (Job em ns:ui)     → bronze populado
             └─ data_refresh → data_quality_check → marts gold
                       └─ volume_forecast

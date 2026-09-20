@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Publishes the service_now rules end to end: the origin mapping (field
-bindings + value dictionary), contractual deadlines, and KPI targets, all
-through the gateway's PUT /rules/* routes.
+"""Registers the service_now origin and publishes its rules end to end: the
+mapping (field bindings + value dictionary), contractual deadlines, and KPI
+targets, through the gateway's /origins and PUT /rules/* routes.
 
 Proves the path spec-config-producao.md describes: gateway publishes → Kafka
 carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
@@ -9,7 +9,7 @@ here reaches MinIO or ClickHouse directly — verification is a separate step
 that reads the ClickHouse tables data-ingest wrote to
 (docs/spec-config-producao.md#semear-e-verificar).
 
-    python -m seed_config --gateway-url http://localhost:8080
+    python -m seed_config --gateway-url http://localhost:8080 --secret ops-ahead-dev
 """
 
 import argparse
@@ -78,8 +78,18 @@ TARGETS = {
 }
 
 
-def seed(gateway_url: str) -> None:
+def seed(gateway_url: str, secret: str | None) -> None:
     with httpx.Client(base_url=gateway_url, timeout=10) as client:
+        # Registering is what makes the address answer at all; the rules below
+        # are what lets data-ingest translate what arrives on it.
+        body = {"intake": MAPPING["intake"]}
+        if secret:
+            body["secret"] = secret
+        origin = client.put(f"/origins/{TENANT}/{SOURCE}", json=body)
+        origin.raise_for_status()
+        print(f"origin: {origin.status_code} {origin.json()['origin']}")
+        print(f"  secret: {origin.json()['secret']}")
+
         mapping = client.put(f"/rules/mappings/{TENANT}/{SOURCE}", json=MAPPING)
         mapping.raise_for_status()
         print(f"mapping: {mapping.status_code} {mapping.json()}")
@@ -96,8 +106,9 @@ def seed(gateway_url: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gateway-url", default="http://localhost:8080")
+    parser.add_argument("--secret", help="Leave it out to have the gateway mint one")
     args = parser.parse_args()
-    seed(args.gateway_url)
+    seed(args.gateway_url, args.secret)
 
 
 if __name__ == "__main__":

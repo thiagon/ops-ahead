@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import type { AcceptedOrigin } from './origins.ts';
+import type { AcceptedOrigin } from '../services/origins/service.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';
@@ -14,10 +14,11 @@ declare module 'fastify' {
   interface FastifyInstance {
     /**
      * `resolve` names the origin this address belongs to: which one signs a
-     * request is only known once the URL is matched (plugins/origins.ts).
+     * request is only known once the URL is matched, and the lookup reads the
+     * origins table (services/origins/).
      */
     verifySignatureFor: (
-      resolve: (request: FastifyRequest) => AcceptedOrigin | undefined,
+      resolve: (request: FastifyRequest) => Promise<AcceptedOrigin | undefined>,
     ) => preParsingAsyncHookHandler;
   }
 }
@@ -58,10 +59,10 @@ export function checkSignature(
  */
 async function hmacPlugin(fastify: FastifyInstance) {
   const verifySignatureFor = (
-    resolve: (request: FastifyRequest) => AcceptedOrigin | undefined,
+    resolve: (request: FastifyRequest) => Promise<AcceptedOrigin | undefined>,
   ): preParsingAsyncHookHandler => {
     return async (request, _reply, payload) => {
-      const origin = resolve(request);
+      const origin = await resolve(request);
       if (!origin) {
         throw createError.NotFound('no integration is configured for this address');
       }

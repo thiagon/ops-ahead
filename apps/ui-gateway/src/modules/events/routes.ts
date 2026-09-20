@@ -24,7 +24,7 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchem
 /**
  * One route for every origin: which (tenant, source) pairs are accepted comes
  * from configuration, not from code, so the route matches on the path and the
- * registry decides whether that origin exists (plugins/origins.ts).
+ * origins table decides whether that origin exists (services/origins/).
  *
  * The origin the registry returns — never the URL or the payload — is what
  * assigns tenant_id, source and intake to the envelope
@@ -34,9 +34,9 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchem
  * with today.
  */
 export function registerIncidentRoutes(app: FastifyInstance): void {
-  const resolve = (request: FastifyRequest) => {
+  const resolve = async (request: FastifyRequest) => {
     const { tenant, source } = (request as WebhookRequest).params;
-    return app.origins.find(tenant, source);
+    return app.services.origins.find(tenant, source);
   };
 
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -66,7 +66,7 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
         },
       },
       async (request, reply) => {
-        const origin = resolve(request);
+        const origin = await resolve(request);
         if (!origin) {
           return reply.status(404).send({
             error: 'UnknownOrigin',
