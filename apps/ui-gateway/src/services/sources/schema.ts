@@ -27,11 +27,21 @@ export const secretRotationSchema = z
   .strict()
   .meta({ id: 'SecretRotation' });
 
+export const sourceStatusSchema = z.enum(['active', 'disabled']).meta({
+  description: 'A disabled source keeps its configuration; its webhooks stop being answered',
+});
+
+export const statusChangeSchema = z
+  .object({ status: sourceStatusSchema })
+  .strict()
+  .meta({ id: 'SourceStatusChange' });
+
 export const sourceSummarySchema = z
   .object({
     tenant_id: z.string(),
     source: z.string(),
     intake: z.enum(['alert', 'monitor']),
+    status: sourceStatusSchema,
   })
   .meta({ id: 'Source', description: 'A registered source — never its secret' });
 

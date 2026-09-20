@@ -23,12 +23,13 @@ enum AnalysisStatus {
 /// than hashed: verifying a signature means recomputing it, which needs the
 /// secret itself.
 model Source {
-  tenantId        String   @map("tenant_id")
+  tenantId        String       @map("tenant_id")
   name            String
   intake          Intake
-  encryptedSecret String   @map("encrypted_secret")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  status          SourceStatus @default(active)
+  encryptedSecret String       @map("encrypted_secret")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@id([tenantId, name])
   @@map("sources")
@@ -37,6 +38,13 @@ model Source {
 enum Intake {
   alert
   monitor
+}
+
+/// A disabled source keeps its configuration and its secret; it just stops
+/// being answered, so turning it back on is one call and no re-registration.
+enum SourceStatus {
+  active
+  disabled
 }
 
 model Analysis {

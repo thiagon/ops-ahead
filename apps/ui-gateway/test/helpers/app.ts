@@ -43,15 +43,35 @@ type SourceRow = {
   tenantId: string;
   name: string;
   intake: 'alert' | 'monitor';
+  status: 'active' | 'disabled';
   encryptedSecret: string;
 };
 
 function seededSources(): Map<string, SourceRow> {
   const cipher = new SecretCipher(TEST_SECRET_KEY);
   const encryptedSecret = cipher.encrypt(TEST_SECRET);
+  const active = 'active' as const;
   return new Map([
-    ['locaweb:itsm', { tenantId: 'locaweb', name: 'itsm', intake: 'alert', encryptedSecret }],
-    ['locaweb:zabbix', { tenantId: 'locaweb', name: 'zabbix', intake: 'monitor', encryptedSecret }],
+    [
+      'locaweb:itsm',
+      {
+        tenantId: 'locaweb',
+        name: 'itsm',
+        intake: 'alert' as const,
+        status: active,
+        encryptedSecret,
+      },
+    ],
+    [
+      'locaweb:zabbix',
+      {
+        tenantId: 'locaweb',
+        name: 'zabbix',
+        intake: 'monitor' as const,
+        status: active,
+        encryptedSecret,
+      },
+    ],
   ]);
 }
 

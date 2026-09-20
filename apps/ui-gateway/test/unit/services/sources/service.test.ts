@@ -19,6 +19,7 @@ describe('SourcesService.find', () => {
       tenantId: 'locaweb',
       source: 'itsm',
       intake: 'alert',
+      status: 'active',
       secret: TEST_SECRET,
     });
   });
@@ -72,7 +73,12 @@ describe('SourcesService.register', () => {
 
     const result = await sources.register('locaweb', 'datadog', 'monitor');
 
-    expect(result.source).toEqual({ tenant_id: 'locaweb', source: 'datadog', intake: 'monitor' });
+    expect(result.source).toEqual({
+      tenant_id: 'locaweb',
+      source: 'datadog',
+      intake: 'monitor',
+      status: 'active',
+    });
     expect(result.secret).toEqual(expect.any(String));
     expect(await sources.find('locaweb', 'datadog')).toMatchObject({ secret: result.secret });
   });
@@ -142,7 +148,12 @@ describe('SourcesService.listByTenant', () => {
 
     const listed = await sources.listByTenant('locaweb');
 
-    expect(listed).toContainEqual({ tenant_id: 'locaweb', source: 'itsm', intake: 'alert' });
+    expect(listed).toContainEqual({
+      tenant_id: 'locaweb',
+      source: 'itsm',
+      intake: 'alert',
+      status: 'active',
+    });
     for (const source of listed) expect(source).not.toHaveProperty('secret');
   });
 
@@ -153,5 +164,63 @@ describe('SourcesService.listByTenant', () => {
     const listed = await sources.listByTenant('locaweb');
 
     expect(listed.every(source => source.tenant_id === 'locaweb')).toBe(true);
+  });
+});
+
+describe('SourcesService.setStatus', () => {
+  it('disables a source without losing its secret', async () => {
+    const { sources } = build(0);
+
+    const disabled = await sources.setStatus('locaweb', 'itsm', 'disabled');
+
+    expect(disabled.status).toBe('disabled');
+    // Still resolvable, so a webhook can tell "turned off" from "never existed".
+    expect(await sources.find('locaweb', 'itsm')).toMatchObject({
+      status: 'disabled',
+      secret: TEST_SECRET,
+    });
+  });
+
+  it('enables a source back with the secret it already had', async () => {
+    const { sources } = build(0);
+    await sources.setStatus('locaweb', 'itsm', 'disabled');
+
+    await sources.setStatus('locaweb', 'itsm', 'active');
+
+    expect(await sources.find('locaweb', 'itsm')).toMatchObject({
+      status: 'active',
+      secret: TEST_SECRET,
+    });
+  });
+
+  it('keeps a disabled source disabled when it is registered again', async () => {
+    const { sources } = build(0);
+    await sources.setStatus('locaweb', 'itsm', 'disabled');
+
+    const result = await sources.register('locaweb', 'itsm', 'alert');
+
+    expect(result.source.status).toBe('disabled');
+  });
+
+  it('refuses to change a source nobody registered', async () => {
+    const { sources } = build();
+
+    await expect(sources.setStatus('locaweb', 'datadog', 'disabled')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  it('shows the status in the listing', async () => {
+    const { sources } = build(0);
+    await sources.setStatus('locaweb', 'zabbix', 'disabled');
+
+    const listed = await sources.listByTenant('locaweb');
+
+    expect(listed).toContainEqual({
+      tenant_id: 'locaweb',
+      source: 'zabbix',
+      intake: 'monitor',
+      status: 'disabled',
+    });
   });
 });

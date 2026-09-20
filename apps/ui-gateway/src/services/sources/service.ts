@@ -3,10 +3,13 @@ import type { PrismaClient } from '../../generated/prisma/client.ts';
 import { generateSecret, type SecretCipher } from './cipher.ts';
 import { SourceStore } from './store.ts';
 
+export type SourceStatus = 'active' | 'disabled';
+
 export interface AcceptedSource {
   tenantId: string;
   source: string;
   intake: 'alert' | 'monitor';
+  status: SourceStatus;
   /** Decrypted for the signature check, never for a response body. */
   secret: string;
 }
@@ -16,6 +19,7 @@ export interface SourceSummary {
   tenant_id: string;
   source: string;
   intake: 'alert' | 'monitor';
+  status: SourceStatus;
 }
 
 interface CacheEntry {
@@ -44,6 +48,11 @@ export class SourcesService {
     this.#ttlMs = ttlMs;
   }
 
+  /**
+   * Resolves whether the address exists at all — a disabled source is still
+   * returned, so the caller can tell "turned off" from "never existed" and
+   * answer accordingly.
+   */
   async find(tenantId: string, source: string): Promise<AcceptedSource | undefined> {
     const key = `${tenantId}:${source}`;
     const cached = this.#cache.get(key);
@@ -55,6 +64,7 @@ export class SourcesService {
           tenantId: row.tenantId,
           source: row.name,
           intake: row.intake,
+          status: row.status,
           secret: this.#cipher.decrypt(row.encryptedSecret),
         }
       : null;
@@ -65,7 +75,7 @@ export class SourcesService {
   /** Always scoped to one tenant: no caller has business seeing another's. */
   async listByTenant(tenantId: string): Promise<SourceSummary[]> {
     const rows = await this.#store.listByTenant(tenantId);
-    return rows.map(row => ({ tenant_id: row.tenantId, source: row.name, intake: row.intake }));
+    return rows.map(row => summary(row.tenantId, row.name, row.intake, row.status));
   }
 
   /**
@@ -79,14 +89,19 @@ export class SourcesService {
     secret?: string,
   ): Promise<{ source: SourceSummary; secret: string }> {
     const minted = secret ?? generateSecret();
+    // Re-registering keeps whatever status the source had: turning one back
+    // on is an explicit call, never a side effect of rewriting its secret.
+    const current = await this.#store.find(tenantId, source);
+    const status = current?.status ?? 'active';
     await this.#store.upsert({
       tenantId,
       name: source,
       intake,
+      status,
       encryptedSecret: this.#cipher.encrypt(minted),
     });
     this.#cache.delete(`${tenantId}:${source}`);
-    return { source: { tenant_id: tenantId, source, intake }, secret: minted };
+    return { source: summary(tenantId, source, intake, status), secret: minted };
   }
 
   /**
@@ -105,16 +120,39 @@ export class SourcesService {
       source,
       this.#cipher.encrypt(minted),
     );
-    if (!replaced) {
-      throw createError.NotFound('no source is registered under this tenant and name');
-    }
+    if (!replaced) throw notFound();
 
     const row = await this.#store.find(tenantId, source);
     this.#cache.delete(`${tenantId}:${source}`);
-    // The row was just written, so intake is whatever it already carried.
-    return {
-      source: { tenant_id: tenantId, source, intake: row?.intake ?? 'alert' },
-      secret: minted,
-    };
+    if (!row) throw notFound();
+    return { source: summary(tenantId, source, row.intake, row.status), secret: minted };
   }
+
+  /**
+   * Turns a source off or back on. Disabling keeps the record and the
+   * secret — it stops being answered, and enabling it again needs no
+   * re-registration.
+   */
+  async setStatus(tenantId: string, source: string, status: SourceStatus): Promise<SourceSummary> {
+    const changed = await this.#store.setStatus(tenantId, source, status);
+    if (!changed) throw notFound();
+
+    const row = await this.#store.find(tenantId, source);
+    this.#cache.delete(`${tenantId}:${source}`);
+    if (!row) throw notFound();
+    return summary(tenantId, source, row.intake, row.status);
+  }
+}
+
+function summary(
+  tenantId: string,
+  source: string,
+  intake: 'alert' | 'monitor',
+  status: SourceStatus,
+): SourceSummary {
+  return { tenant_id: tenantId, source, intake, status };
+}
+
+function notFound() {
+  return createError.NotFound('no source is registered under this tenant and name');
 }

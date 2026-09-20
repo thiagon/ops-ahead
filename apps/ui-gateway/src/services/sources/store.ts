@@ -4,6 +4,7 @@ export interface SourceRow {
   tenantId: string;
   name: string;
   intake: 'alert' | 'monitor';
+  status: 'active' | 'disabled';
   encryptedSecret: string;
 }
 
@@ -26,12 +27,20 @@ export class SourceStore {
   }
 
   async upsert(row: SourceRow): Promise<void> {
-    const { tenantId, name, intake, encryptedSecret } = row;
+    const { tenantId, name, intake, status, encryptedSecret } = row;
     await this.#prisma.source.upsert({
       where: { tenantId_name: { tenantId, name } },
-      create: { tenantId, name, intake, encryptedSecret },
-      update: { intake, encryptedSecret },
+      create: { tenantId, name, intake, status, encryptedSecret },
+      update: { intake, status, encryptedSecret },
     });
+  }
+
+  async setStatus(tenantId: string, name: string, status: 'active' | 'disabled'): Promise<boolean> {
+    const { count } = await this.#prisma.source.updateMany({
+      where: { tenantId, name },
+      data: { status },
+    });
+    return count > 0;
   }
 
   async replaceSecret(tenantId: string, name: string, encryptedSecret: string): Promise<boolean> {

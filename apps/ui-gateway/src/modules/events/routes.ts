@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import createError from 'http-errors';
 import { z } from 'zod';
 import { rawTopicFor } from '../../env.ts';
 import {
@@ -36,7 +37,13 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchem
 export function registerIncidentRoutes(app: FastifyInstance): void {
   const resolve = async (request: FastifyRequest) => {
     const { tenant, source } = (request as WebhookRequest).params;
-    return app.services.sources.find(tenant, source);
+    const found = await app.services.sources.find(tenant, source);
+    // A source that exists but is turned off is told so, rather than being
+    // made to look like an address nobody ever configured.
+    if (found?.status === 'disabled') {
+      throw createError.Forbidden('this source is disabled');
+    }
+    return found;
   };
 
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -60,6 +67,7 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
             202: webhookAcceptedSchema,
             400: webhookErrorSchema,
             401: webhookErrorSchema,
+            403: webhookErrorSchema,
             404: webhookErrorSchema,
             502: webhookErrorSchema,
           },

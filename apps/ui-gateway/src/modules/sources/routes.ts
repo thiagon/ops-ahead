@@ -8,20 +8,23 @@ import {
   sourceRegistrationSchema,
   sourceSummarySchema,
   sourceWithSecretSchema,
+  statusChangeSchema,
   tenantParamsSchema,
 } from '../../services/sources/schema.ts';
 
 /**
- * Every route hangs off a tenant: a source only means anything inside one,
+ * A source only means anything inside a tenant, so every route carries one
  * and there is no listing that spans them
- * (domain/ubiquitous-language.md#tenant).
+ * (domain/ubiquitous-language.md#tenant). The tenant is a path parameter
+ * while nothing authenticates these routes; once something does, it comes
+ * from the caller instead.
  */
 export function registerSourceRoutes(app: FastifyInstance): void {
   const sources = app.services.sources;
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.get(
-    '/tenants/:tenant/sources',
+    '/sources/:tenant',
     {
       schema: {
         tags: ['sources'],
@@ -35,13 +38,13 @@ export function registerSourceRoutes(app: FastifyInstance): void {
   );
 
   typed.put(
-    '/tenants/:tenant/sources/:source',
+    '/sources/:tenant/:source',
     {
       schema: {
         tags: ['sources'],
         summary: 'Register a source',
         description:
-          'Answers with the secret this source signs with, this once and never again. Idempotent on the pair — a second PUT replaces the secret.',
+          'Answers with the secret this source signs with, this once and never again. Idempotent on the pair — a second PUT replaces the secret and keeps the status.',
         params: sourceParamsSchema,
         body: sourceRegistrationSchema,
         response: { 200: sourceWithSecretSchema, 400: sourceErrorSchema },
@@ -54,8 +57,31 @@ export function registerSourceRoutes(app: FastifyInstance): void {
     },
   );
 
+  typed.put(
+    '/sources/:tenant/:source/status',
+    {
+      schema: {
+        tags: ['sources'],
+        summary: 'Turn a source off or back on',
+        description:
+          'A disabled source keeps its configuration and its secret; its webhooks answer 403 until it is enabled again.',
+        params: sourceParamsSchema,
+        body: statusChangeSchema,
+        response: {
+          200: sourceSummarySchema,
+          400: sourceErrorSchema,
+          404: sourceErrorSchema,
+        },
+      },
+    },
+    async request => {
+      const { tenant, source } = request.params;
+      return sources.setStatus(tenant, source, request.body.status);
+    },
+  );
+
   typed.post(
-    '/tenants/:tenant/sources/:source/secret',
+    '/sources/:tenant/:source/secret',
     {
       schema: {
         tags: ['sources'],
