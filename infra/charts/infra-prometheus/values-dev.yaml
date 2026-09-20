@@ -1,7 +1,8 @@
 kube-prometheus-stack:
   prometheus:
     prometheusSpec:
-      retention: 24h
+      retention: 1h
+      retentionSize: 1500MB
       resources:
         requests:
           cpu: 100m
@@ -19,3 +20,20 @@ kube-prometheus-stack:
       limits:
         cpu: 200m
         memory: 256Mi
+  # k3d roda o control plane num processo só: o /metrics do kubelet reexpõe as
+  # séries do apiserver, que assim entram duas vezes. Só cadvisor e probes.
+  kubelet:
+    serviceMonitor:
+      resource: false
+      cAdvisor: true
+      probes: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: "(apiserver|etcd|workqueue)_.*_bucket"
+          action: drop
+  kubeApiServer:
+    serviceMonitor:
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: "(apiserver|etcd|workqueue)_.*_bucket"
+          action: drop
