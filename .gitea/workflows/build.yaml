@@ -159,11 +159,22 @@ jobs:
           # only written once its manifest is actually pullable, so an app whose
           # push failed keeps its previous tag and ArgoCD is never pointed at an
           # image that does not exist.
+          # Two ways to ask, because a client-side manifest lookup can fail for
+          # reasons that have nothing to do with the image being there (token
+          # scope, TLS, the client's own registry config). The registry's own
+          # v2 API is the authority.
+          published() {
+            docker manifest inspect "${REGISTRY}/${OWNER}/$1:${SHA}" > /dev/null 2>&1 && return 0
+            curl -sfI -u "${OWNER}:${{ secrets.REGISTRY_PASSWORD }}" \
+              -H 'Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json' \
+              "http://${REGISTRY}/v2/${OWNER}/$1/manifests/${SHA}" > /dev/null 2>&1
+          }
+
           PINNED=""; SKIPPED=""
           for app in $(echo "$CHANGED_APPS_JSON" | jq -r '.[]'); do
             FILE="apps/${app}/chart/values-dev.yaml"
             [ -f "$FILE" ] || continue
-            if docker manifest inspect "${REGISTRY}/${OWNER}/${app}:${SHA}" > /dev/null 2>&1; then
+            if published "$app"; then
               APP="$app" SHA="$SHA" yq -i '.[env(APP)].image.tag = env(SHA)' "$FILE"
               git add "$FILE"
               PINNED="${PINNED} ${app}"
@@ -200,9 +211,13 @@ jobs:
         env:
           CHANGED_APPS_JSON: ${{ needs.detect-changes.outputs.matrix }}
         run: |
+          SHA="${{ github.sha }}"
           MISSING=""
           for app in $(echo "$CHANGED_APPS_JSON" | jq -r '.[]'); do
-            docker manifest inspect "${REGISTRY}/${OWNER}/${app}:${{ github.sha }}" > /dev/null 2>&1 \
+            docker manifest inspect "${REGISTRY}/${OWNER}/${app}:${SHA}" > /dev/null 2>&1 && continue
+            curl -sfI -u "${OWNER}:${{ secrets.REGISTRY_PASSWORD }}" \
+              -H 'Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json' \
+              "http://${REGISTRY}/v2/${OWNER}/${app}/manifests/${SHA}" > /dev/null 2>&1 \
               || MISSING="${MISSING} ${app}"
           done
           [ -z "$MISSING" ] && exit 0
