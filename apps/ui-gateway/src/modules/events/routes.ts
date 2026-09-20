@@ -11,16 +11,22 @@ import {
 } from './schema.ts';
 import { buildEnvelope } from './service.ts';
 
-/** Stamped when the caller pins none: translate against the current mapping. */
-const DEFAULT_VERSION = 'latest';
-
-const webhookParamsSchema = z.object({
+const addressParamsSchema = z.object({
   tenant: z.string().min(1),
   source: z.string().min(1),
-  version: z.string().min(1).optional(),
 });
 
-type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchema> }>;
+// The default belongs to the contract, not to the handler: it is what the
+// published document tells a caller an unpinned request translates by. Each
+// route declares its own params, or the shorter one would document a path
+// segment it does not have.
+const versionParam = z.string().min(1).default('latest').meta({
+  description: 'Which mapping version data-ingest translates this event by',
+});
+
+const webhookParamsSchema = addressParamsSchema.extend({ version: versionParam });
+
+type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof addressParamsSchema> }>;
 
 /**
  * One route for every origin: which (tenant, source) pairs are accepted comes
@@ -48,7 +54,10 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
 
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
-  for (const path of ['/webhook/:tenant/:source', '/webhook/:tenant/:source/:version']) {
+  for (const [path, params] of [
+    ['/webhook/:tenant/:source', addressParamsSchema],
+    ['/webhook/:tenant/:source/:version', webhookParamsSchema],
+  ] as const) {
     typed.post(
       path,
       {
@@ -60,7 +69,7 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
           summary: 'Ingest an event from a configured origin',
           description:
             'The body is opaque: preserved verbatim in the raw envelope, never parsed or typed here. See domain/acl/itsm.md.',
-          params: webhookParamsSchema,
+          params,
           headers: webhookHeadersSchema,
           body: webhookBodySchema,
           response: {
@@ -82,8 +91,10 @@ export function registerIncidentRoutes(app: FastifyInstance): void {
           });
         }
 
+        // Absent on the shorter route, where the schema's default fills in.
+        const pinned = (request.params as { version?: string }).version;
         const envelope = buildEnvelope(
-          { ...origin, version: request.params.version ?? DEFAULT_VERSION },
+          { ...origin, version: versionParam.parse(pinned) },
           request.body,
         );
         const topic = rawTopicFor(request.server.env, origin.intake);

@@ -118,6 +118,22 @@ describe('POST /webhook/:tenant/:source', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
+  it('documents the version default, and only on the route that takes one', async () => {
+    const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
+    const pathParams = (path: string) =>
+      paths[path].post.parameters.filter((p: { in: string }) => p.in === 'path');
+
+    // The shorter route must not advertise a segment it does not have.
+    expect(pathParams('/webhook/{tenant}/{source}').map((p: { name: string }) => p.name)).toEqual([
+      'tenant',
+      'source',
+    ]);
+    const version = pathParams('/webhook/{tenant}/{source}/{version}').find(
+      (p: { name: string }) => p.name === 'version',
+    );
+    expect(version.schema.default).toBe('latest');
+  });
+
   it('publishes one parameterized ingest route, not one per origin', async () => {
     const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
 
