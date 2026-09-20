@@ -28,10 +28,7 @@ def test_each_category_product_pair_is_its_own_series():
         _trends({("cat1", "prodA"): 90, ("cat2", "prodB"): 90}), min_history_days=60
     )
 
-    assert set(long_df["priority_group"]) == {
-        "locaweb|cat1|prodA",
-        "locaweb|cat2|prodB",
-    }
+    assert set(long_df["priority_group"]) == {"cat1|prodA", "cat2|prodB"}
 
 
 def test_a_thin_series_is_folded_into_the_residual_rather_than_dropped():
@@ -40,28 +37,20 @@ def test_a_thin_series_is_folded_into_the_residual_rather_than_dropped():
     long_df = features.to_long_format(trends, min_history_days=60)
 
     groups = set(long_df["priority_group"])
-    assert "locaweb|cat2|prodB" not in groups
-    assert f"locaweb|{features.RESIDUAL_LABEL}|{features.RESIDUAL_LABEL}" in groups
+    assert "cat2|prodB" not in groups
+    assert f"{features.RESIDUAL_LABEL}|{features.RESIDUAL_LABEL}" in groups
     # Nothing leaves the total: a forecast whose parts do not add up to the
     # whole cannot be reconciled with volume_forecast.
     assert long_df["count"].sum() == trends["total_incidents"].sum()
 
 
-def test_residual_is_per_tenant_so_clients_are_never_summed_together():
-    trends = pd.concat(
-        [
-            _trends({("cat1", "prodA"): 5}),
-            _trends({("cat1", "prodA"): 5}).assign(tenant_id="acme"),
-        ]
-    )
+def test_the_frame_is_one_tenant_so_the_series_never_carries_it():
+    """Training loops per tenant (train.tenants_with_history), so the tenant is
+    the frame and cannot leak into a series key — which is what would let one
+    client's volume be summed onto another's."""
+    long_df = features.to_long_format(_trends({("cat1", "prodA"): 90}), min_history_days=60)
 
-    long_df = features.to_long_format(trends, min_history_days=60)
-
-    residuals = {g for g in long_df["priority_group"] if features.RESIDUAL_LABEL in g}
-    assert residuals == {
-        f"locaweb|{features.RESIDUAL_LABEL}|{features.RESIDUAL_LABEL}",
-        f"acme|{features.RESIDUAL_LABEL}|{features.RESIDUAL_LABEL}",
-    }
+    assert all("locaweb" not in group for group in long_df["priority_group"])
 
 
 def test_feature_frame_targets_the_forecast_day_not_the_feature_day():

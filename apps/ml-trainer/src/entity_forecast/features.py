@@ -4,10 +4,12 @@ import pandas as pd
 
 from volume import features as volume_features
 
-# The series key. `volume.features` builds lags, targets and calendar columns
-# grouped by a column literally named `priority_group`, so the series is
-# renamed into that name rather than duplicating the window logic here.
-SERIES_COLUMNS = ["tenant_id", "category", "product"]
+# The series key inside one tenant. Training is per tenant (see train.py), so
+# the tenant is the frame, never part of the key. `volume.features` builds
+# lags, targets and calendar columns grouped by a column literally named
+# `priority_group`, so the series is renamed into that name rather than
+# duplicating the window logic here.
+SERIES_COLUMNS = ["category", "product"]
 
 RESIDUAL_LABEL = "__other__"
 
@@ -31,11 +33,12 @@ def series_key(row: pd.Series) -> str:
 
 
 def to_long_format(trends: pd.DataFrame, min_history_days: int) -> pd.DataFrame:
-    """One row per (date, series), where a series is tenant×category×product.
+    """One row per (date, series) for a single tenant's rows, where a series is
+    category×product.
 
     Combinations below `min_history_days` are summed into one residual series
-    per tenant instead of being dropped: most of the volume lives in the tail,
-    and a forecast whose parts do not add up to the whole is not usable.
+    instead of being dropped: most of the volume lives in the tail, and a
+    forecast whose parts do not add up to the whole is not usable.
     """
     df = trends.copy()
     df["date"] = pd.to_datetime(df["date"])
@@ -46,7 +49,7 @@ def to_long_format(trends: pd.DataFrame, min_history_days: int) -> pd.DataFrame:
 
     df["priority_group"] = df["series"].where(
         ~df["series"].isin(sparse),
-        df["tenant_id"] + "|" + RESIDUAL_LABEL + "|" + RESIDUAL_LABEL,
+        RESIDUAL_LABEL + "|" + RESIDUAL_LABEL,
     )
 
     collapsed = (
