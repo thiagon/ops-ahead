@@ -3,6 +3,11 @@
 mapping (field bindings + value dictionary), contractual deadlines, and KPI
 targets, through the gateway's /sources and PUT /rules/* routes.
 
+The mapping is the ServiceNow → domain half of notebooks/events_dataset.ipynb
+(Locaweb CSV → ServiceNow Table API). Bindings name the Table API columns;
+the dictionary translates ServiceNow state/priority/opened_by/close_code
+into the domain vocabulary.
+
 Proves the path spec-config-producao.md describes: gateway publishes → Kafka
 carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
 here reaches MinIO or ClickHouse directly — verification is a separate step
@@ -22,42 +27,51 @@ SOURCE = "service_now"
 MAPPING = {
     "intake": "alert",
     "version": "v1",
-    # Paths follow what scripts/incident_producer.py puts on the wire: the
-    # untouched ITSM record under `payload`, already renamed to English.
-    "bindings": [
-        {"field": "external_id", "path": "payload.ticket_number"},
-        {"field": "status", "path": "payload.status"},
-        {"field": "severity", "path": "payload.priority_code"},
-        {"field": "opened_at", "path": "payload.opened_at"},
-        {"field": "resolved_at", "path": "payload.resolved_at"},
-        {"field": "closed_at", "path": "payload.closed_at"},
-        {"field": "title", "path": "payload.short_description"},
-        {"field": "entity_id", "path": "payload.configuration_item"},
-        {"field": "owner", "path": "payload.assignment_group"},
-        {"field": "reported_by", "path": "payload.opened_by"},
-        {"field": "parent_id", "path": "payload.parent_incident"},
-        {"field": "resolution_code", "path": "payload.close_code"},
-    ],
+    # Paths and dictionaries follow notebooks/events_dataset.ipynb: the
+    # ServiceNow Table API shape (GET /api/now/table/incident), not the
+    # Locaweb CSV. The notebook is the Locaweb → ServiceNow half; this
+    # mapping is the ServiceNow → domain half. The webhook stores the
+    # origin body verbatim, so paths are the Table API column names.
+    "bindings": {
+        "external_id": "number",
+        "opened_at": "opened_at",
+        "severity": "priority",
+        "status": "state",
+        "title": "short_description",
+        "resolved_at": "resolved_at",
+        "closed_at": "closed_at",
+        "entity_id": "cmdb_ci",
+        "owner": "assignment_group",
+        "reported_by": "opened_by",
+        "parent_id": "parent_incident",
+        "resolution_code": "close_code",
+        "resolution_summary": "close_notes",
+        "labels": [
+            {"key": "product", "path": "u_product"},
+            {"key": "category", "path": "category"},
+            {"key": "subcategory", "path": "subcategory"},
+        ],
+    },
     "mappings": {
-        # "Sem Intervenção" is a closing state in the ITSM, not a lifecycle of
-        # its own — what it means for the KPI travels in resolution_code.
+        # ServiceNow incident.state: 1 New, 2 In Progress, 3 On Hold,
+        # 6 Resolved, 7 Closed, 8 Canceled. The notebook already folded
+        # "Sem Intervenção" into state 7; the KPI meaning of that closing
+        # travels in close_code, not here.
         "status": {
-            "Sem Intervenção": "closed",
-            "Encerrado Automaticamente": "closed",
-            "Encerrado": "closed",
-            "Aguardando Problema": "waiting",
+            "1": "open",
+            "2": "in_progress",
+            "3": "waiting",
+            "6": "resolved",
+            "7": "closed",
+            "8": "canceled",
         },
-        # priority_code already travels as 1-5; the dictionary is identity so
-        # the binding stays declarative instead of special-cased in code.
         "severity": {str(code): str(code) for code in range(1, 6)},
         "reported_by": {
-            "Monitoramento": "automatic",
-            "Manual": "manual",
+            "monitoring.system": "automatic",
+            "itsm.operator": "manual",
         },
-        # Only the codes the KPI rules care about are translated; the rest
-        # reach bronze as they are.
         "resolution_code": {
-            "Sem Intervenção": "no_intervention",
+            "No Intervention Required": "no_intervention",
         },
     },
 }

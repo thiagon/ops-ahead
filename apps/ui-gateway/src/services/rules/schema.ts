@@ -32,41 +32,141 @@ const reportedByMapping = z.record(z.string(), z.enum(['automatic', 'manual']));
 const resolutionCodeMapping = z.record(z.string(), z.string());
 
 /**
- * How one origin's payload becomes the translated contract: where each field
- * is read, and what its values mean. The two halves travel as one record
- * because neither works alone — a dictionary entry translating "1 - Crítica"
- * to severity 1 says nothing without the binding naming the field it lives in.
+ * Where a bronze column is read in the origin payload. Origins almost never
+ * use the translated names, so each bound column points at a path of its own.
+ * Omit a column the origin does not send — only the contract's required
+ * fields must be present.
  */
-export const mappingSchema = z
+const originPath = z
+  .string()
+  .regex(/^[^.]+(\.[^.]+)*$/)
+  .meta({
+    description:
+      "Dotted path into the origin's payload, e.g. 'fields.status.name'. The origin almost never names fields the way bronze does.",
+  });
+
+function optionalPath(description: string) {
+  return originPath.optional().meta({ description });
+}
+
+/**
+ * Bronze `labels` is a map. An origin either already sends one (a single
+ * path) or scatters the entries across fields — product, category, … — that
+ * get joined here.
+ */
+const labelEntry = z
   .object({
-    intake: z.enum(['alert', 'monitor']),
-    version: z.string().min(1).meta({
-      description: 'Stamped as dictionary_version into every translated line this mapping produces',
+    key: z.string().min(1).meta({
+      description: 'Name written into the bronze labels map, e.g. product or category',
     }),
-    bindings: z
-      .array(
-        z
-          .object({
-            field: z.string().min(1),
-            path: z
-              .string()
-              .regex(/^[^.]+(\.[^.]+)*$/)
-              .nullable(),
-          })
-          .strict(),
-      )
-      .min(1),
-    mappings: z
-      .object({
-        status: statusMapping.optional(),
-        severity: severityMapping.optional(),
-        condition: conditionMapping.optional(),
-        reported_by: reportedByMapping.optional(),
-        resolution_code: resolutionCodeMapping.optional(),
-      })
-      .strict(),
+    path: originPath,
   })
-  .strict()
+  .strict();
+
+const labelsBinding = z
+  .union([
+    originPath,
+    z.array(labelEntry).min(1).meta({
+      description: 'Origin fields joined into the bronze labels map',
+    }),
+  ])
+  .optional()
+  .meta({
+    description:
+      'Path to a map the origin already sends, or several origin fields joined into labels (product, category, …).',
+  });
+
+/** Pipeline-stamped: event_id, tenant_id, source, version, dictionary_version, received_at. */
+const alertBindings = z
+  .object({
+    external_id: originPath.meta({ description: 'Identity in the origin, e.g. a ticket number' }),
+    opened_at: originPath.meta({ description: 'When the incident was opened' }),
+    acknowledged_at: optionalPath('When someone took ownership'),
+    resolved_at: optionalPath('When the cause was resolved'),
+    closed_at: optionalPath('When the incident was closed'),
+    severity: originPath.meta({
+      description: "Origin's own severity/priority label, translated to 1–5",
+    }),
+    status: originPath.meta({ description: 'Lifecycle state, translated by the dictionary' }),
+    entity_id: optionalPath('What was affected'),
+    title: originPath.meta({ description: 'One-line summary' }),
+    description: optionalPath('Full description'),
+    owner: optionalPath('Who currently holds the incident'),
+    reported_by: optionalPath('How it was opened — translated to automatic/manual'),
+    parent_id: optionalPath('Parent incident, when the origin has one'),
+    resolution_code: optionalPath('How the incident ended, translated by the dictionary'),
+    resolution_summary: optionalPath('What was done to close it'),
+    labels: labelsBinding,
+    source_url: optionalPath('Link back to the incident in the origin'),
+  })
+  .strict();
+
+const monitorBindings = z
+  .object({
+    external_id: originPath.meta({ description: 'Identity in the origin' }),
+    started_at: originPath.meta({ description: 'When the condition started firing' }),
+    ended_at: optionalPath('When it cleared — omit while the origin has no end'),
+    severity: optionalPath("Origin's own severity label, translated to 1–5"),
+    condition: originPath.meta({ description: 'firing/cleared, translated by the dictionary' }),
+    entity_id: originPath.meta({ description: 'The only correlation key with the alert chain' }),
+    title: optionalPath('One-line summary'),
+    description: optionalPath('Full description'),
+    labels: labelsBinding,
+    source_url: optionalPath('Link back to the signal in the origin'),
+  })
+  .strict();
+
+const mappingVersion = z.string().min(1).meta({
+  description: 'Stamped as dictionary_version into every translated line this mapping produces',
+});
+
+const alertMappings = z
+  .object({
+    status: statusMapping.optional(),
+    severity: severityMapping.optional(),
+    reported_by: reportedByMapping.optional(),
+    resolution_code: resolutionCodeMapping.optional(),
+  })
+  .strict();
+
+const monitorMappings = z
+  .object({
+    condition: conditionMapping.optional(),
+    severity: severityMapping.optional(),
+  })
+  .strict();
+
+/**
+ * How one origin's payload becomes the translated contract: where each bronze
+ * column is read, and what its values mean. The two halves travel as one
+ * record because neither works alone — a dictionary entry translating
+ * "1 - Crítica" to severity 1 says nothing without the binding naming the
+ * field it lives in.
+ *
+ * Bindings are the bronze columns data-ingest writes to ClickHouse, not the
+ * origin's own keys. Required columns need a path; the rest are omitted when
+ * the origin does not send them.
+ */
+export const alertMappingSchema = z
+  .object({
+    intake: z.literal('alert'),
+    version: mappingVersion,
+    bindings: alertBindings,
+    mappings: alertMappings,
+  })
+  .strict();
+
+export const monitorMappingSchema = z
+  .object({
+    intake: z.literal('monitor'),
+    version: mappingVersion,
+    bindings: monitorBindings,
+    mappings: monitorMappings,
+  })
+  .strict();
+
+export const mappingSchema = z
+  .discriminatedUnion('intake', [alertMappingSchema, monitorMappingSchema])
   .meta({
     id: 'OriginMapping',
     description: "Field bindings and value dictionary for one origin's intake",
@@ -147,8 +247,11 @@ const historyMeta = {
   created_at: z.iso.datetime(),
 };
 
-export const mappingHistorySchema = mappingSchema
-  .extend(historyMeta)
+export const mappingHistorySchema = z
+  .discriminatedUnion('intake', [
+    alertMappingSchema.extend(historyMeta),
+    monitorMappingSchema.extend(historyMeta),
+  ])
   .meta({ id: 'MappingHistory' });
 export const deadlineHistorySchema = deadlineSetSchema
   .extend(historyMeta)

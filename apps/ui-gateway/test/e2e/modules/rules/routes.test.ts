@@ -1,15 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestApp } from '../../../helpers/app.ts';
+import { alertMapping } from '../../../helpers/mapping.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
-
-const mapping = {
-  intake: 'alert',
-  version: 'v1',
-  bindings: [{ field: 'status', path: 'fields.status' }],
-  mappings: { status: { Aberto: 'open' } },
-};
 
 describe('PUT /rules/mappings/:tenant/:source', () => {
   let app: FastifyInstance;
@@ -30,7 +24,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
-      payload: mapping,
+      payload: alertMapping,
     });
 
     expect(res.statusCode).toBe(202);
@@ -38,11 +32,35 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
     expect(publish).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects a mapping with no bindings with 400', async () => {
+  it('accepts a mapping with only the required bronze columns', async () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
-      payload: { ...mapping, bindings: [] },
+      payload: {
+        intake: 'alert',
+        version: 'v1',
+        bindings: {
+          external_id: 'payload.ticket_number',
+          opened_at: 'payload.opened_at',
+          severity: 'payload.priority_code',
+          status: 'fields.status',
+          title: 'payload.short_description',
+        },
+        mappings: {},
+      },
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a mapping that omits a required bronze column with 400', async () => {
+    const { status, ...rest } = alertMapping.bindings;
+    expect(status).toBeDefined();
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/rules/mappings/locaweb/itsm',
+      payload: { ...alertMapping, bindings: rest },
     });
 
     expect(res.statusCode).toBe(400);
@@ -55,7 +73,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
-      payload: mapping,
+      payload: alertMapping,
     });
 
     expect(res.statusCode).toBe(502);

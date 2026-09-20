@@ -1,13 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { alertMapping } from '../../../helpers/mapping.ts';
 import { startTestServer, type TestServer } from '../../../helpers/server.ts';
 
-const mapping = {
-  source: 'itsm',
-  intake: 'alert',
-  version: 'v1',
-  bindings: [{ field: 'status', path: 'fields.status' }],
-  mappings: { status: { Aberto: 'open' } },
-};
+const mapping = { source: 'itsm', ...alertMapping };
 
 /** The transport always answers over SSE, even for a single response — pull
  * the JSON-RPC payload out of the `data:` line. */
@@ -198,6 +193,20 @@ describe('MCP over http', () => {
     );
     for (const tool of message.result.tools) {
       expect(tool.inputSchema?.properties ?? {}).not.toHaveProperty('tenant');
+    }
+
+    const setMapping = message.result.tools.find(
+      (tool: { name: string }) => tool.name === 'set_mapping',
+    );
+    const branches = setMapping.inputSchema.oneOf ?? setMapping.inputSchema.anyOf;
+    expect(
+      branches?.map(
+        (branch: { properties: { intake: { const: string } } }) => branch.properties.intake.const,
+      ),
+    ).toEqual(['alert', 'monitor']);
+    for (const branch of branches) {
+      expect(branch.properties.bindings.type).toBe('object');
+      expect(branch.properties.bindings).not.toHaveProperty('items');
     }
   });
 

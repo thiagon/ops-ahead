@@ -88,7 +88,7 @@ def test_load_snapshot_from_store_populates_registries_and_rows():
             "source": "service_now",
             "intake": "alert",
             "version": "v1",
-            "bindings": [{"field": "status", "path": "fields.status"}],
+            "bindings": {"status": "fields.status"},
             "mappings": {},
         },
     )

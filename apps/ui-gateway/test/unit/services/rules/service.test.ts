@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { HISTORY_LIMIT, RulesService } from '../../../../src/services/rules/index.ts';
 import { memoryPrisma } from '../../../helpers/app.ts';
+import { alertMapping } from '../../../helpers/mapping.ts';
 
 const topics = {
   mapping: 'rules.mapping',
@@ -9,12 +10,7 @@ const topics = {
   target: 'rules.target',
 };
 
-const mapping = {
-  intake: 'alert' as const,
-  version: 'v1',
-  bindings: [{ field: 'status', path: 'fields.status' }],
-  mappings: { status: { Aberto: 'open' as const } },
-};
+const mapping = alertMapping;
 
 function build() {
   const publish = vi.fn(async (_message: OutboundMessage) => undefined);
@@ -41,7 +37,8 @@ describe('RulesService.setMapping', () => {
       source: 'itsm',
       version: 'v1',
     });
-    expect(record.bindings).toHaveLength(1);
+    expect(record.bindings.status).toBe('fields.status');
+    expect(record.bindings.external_id).toBe('payload.ticket_number');
     expect(record.mappings.status).toEqual({ Aberto: 'open' });
   });
 

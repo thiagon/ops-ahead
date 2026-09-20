@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "field-binding/v1",
   "title": "FieldBindingSet",
-  "description": "Per-origin, per-intake map from each field of the translated contract to where it is read in the origin's own payload. Travels in the same record as its value dictionary (translation-dictionary.schema.json): a mapped value means nothing without the binding naming the field it was read from, and version versions the pair. Fields the pipeline itself stamps — event_id, tenant_id, source, version, dictionary_version, received_at — are never bound here. See domain/acl/itsm.md#adicionar-uma-origem.",
+  "description": "Per-origin, per-intake map from each bronze column of the translated contract to where it is read in the origin's own payload. Travels in the same record as its value dictionary (translation-dictionary.schema.json): a mapped value means nothing without the binding naming the field it was read from, and version versions the pair. Fields the pipeline itself stamps — event_id, tenant_id, source, version, dictionary_version, received_at — are never bound here. Only the contract's required columns must be bound; omit a column the origin does not send. See domain/acl/itsm.md#adicionar-uma-origem.",
   "type": "object",
   "required": [
     "tenant_id",
@@ -30,29 +30,215 @@
       "description": "Which translated contract these bindings feed — incident-alert.schema.json or condition-monitor.schema.json."
     },
     "bindings": {
-      "type": "array",
-      "description": "One entry per bindable field of the contract this intake feeds. A required field left unbound is a configuration the translator refuses.",
-      "items": {
-        "type": "object",
-        "required": [
-          "field",
-          "path"
-        ],
-        "additionalProperties": false,
+      "type": "object",
+      "description": "Bronze columns this intake writes to ClickHouse, keyed by the translated name. Required columns must be present; optional ones are omitted when the origin does not send them."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
         "properties": {
-          "field": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Property name in the translated contract, e.g. 'external_id'."
-          },
-          "path": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Dotted path into the origin's payload, e.g. 'fields.status.name'. Null leaves the field unbound: the translated line carries null, or the event is refused when the contract requires the field.",
-            "pattern": "^[^.]+(\\.[^.]+)*$"
+          "intake": {
+            "const": "alert"
           }
+        },
+        "required": [
+          "intake"
+        ]
+      },
+      "then": {
+        "properties": {
+          "bindings": {
+            "$ref": "#/definitions/alertBindings"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intake": {
+            "const": "monitor"
+          }
+        },
+        "required": [
+          "intake"
+        ]
+      },
+      "then": {
+        "properties": {
+          "bindings": {
+            "$ref": "#/definitions/monitorBindings"
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "originPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^.]+(\\.[^.]+)*$",
+      "description": "Dotted path into the origin's payload, e.g. 'fields.status.name'."
+    },
+    "labelsBinding": {
+      "description": "Path to a map the origin already sends, or several origin fields joined into the bronze labels map (product, category, …).",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/originPath"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "path"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Name written into the bronze labels map, e.g. product or category."
+              },
+              "path": {
+                "$ref": "#/definitions/originPath"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "alertBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_id",
+        "opened_at",
+        "severity",
+        "status",
+        "title"
+      ],
+      "properties": {
+        "external_id": {
+          "$ref": "#/definitions/originPath",
+          "description": "Identity in the origin, e.g. a ticket number."
+        },
+        "opened_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When the incident was opened."
+        },
+        "acknowledged_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When someone took ownership."
+        },
+        "resolved_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When the cause was resolved."
+        },
+        "closed_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When the incident was closed."
+        },
+        "severity": {
+          "$ref": "#/definitions/originPath",
+          "description": "Origin's own severity/priority label, translated to 1–5."
+        },
+        "status": {
+          "$ref": "#/definitions/originPath",
+          "description": "Lifecycle state, translated by the dictionary."
+        },
+        "entity_id": {
+          "$ref": "#/definitions/originPath",
+          "description": "What was affected."
+        },
+        "title": {
+          "$ref": "#/definitions/originPath",
+          "description": "One-line summary."
+        },
+        "description": {
+          "$ref": "#/definitions/originPath",
+          "description": "Full description."
+        },
+        "owner": {
+          "$ref": "#/definitions/originPath",
+          "description": "Who currently holds the incident."
+        },
+        "reported_by": {
+          "$ref": "#/definitions/originPath",
+          "description": "How it was opened — translated to automatic/manual."
+        },
+        "parent_id": {
+          "$ref": "#/definitions/originPath",
+          "description": "Parent incident, when the origin has one."
+        },
+        "resolution_code": {
+          "$ref": "#/definitions/originPath",
+          "description": "How the incident ended, translated by the dictionary."
+        },
+        "resolution_summary": {
+          "$ref": "#/definitions/originPath",
+          "description": "What was done to close it."
+        },
+        "labels": {
+          "$ref": "#/definitions/labelsBinding"
+        },
+        "source_url": {
+          "$ref": "#/definitions/originPath",
+          "description": "Link back to the incident in the origin."
+        }
+      }
+    },
+    "monitorBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_id",
+        "started_at",
+        "condition",
+        "entity_id"
+      ],
+      "properties": {
+        "external_id": {
+          "$ref": "#/definitions/originPath",
+          "description": "Identity in the origin."
+        },
+        "started_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When the condition started firing."
+        },
+        "ended_at": {
+          "$ref": "#/definitions/originPath",
+          "description": "When it cleared — omit while the origin has no end."
+        },
+        "severity": {
+          "$ref": "#/definitions/originPath",
+          "description": "Origin's own severity label, translated to 1–5."
+        },
+        "condition": {
+          "$ref": "#/definitions/originPath",
+          "description": "firing/cleared, translated by the dictionary."
+        },
+        "entity_id": {
+          "$ref": "#/definitions/originPath",
+          "description": "The only correlation key with the alert chain."
+        },
+        "title": {
+          "$ref": "#/definitions/originPath",
+          "description": "One-line summary."
+        },
+        "description": {
+          "$ref": "#/definitions/originPath",
+          "description": "Full description."
+        },
+        "labels": {
+          "$ref": "#/definitions/labelsBinding"
+        },
+        "source_url": {
+          "$ref": "#/definitions/originPath",
+          "description": "Link back to the signal in the origin."
         }
       }
     }

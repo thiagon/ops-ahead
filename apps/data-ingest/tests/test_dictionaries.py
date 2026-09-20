@@ -14,7 +14,7 @@ def _record(version: str, mappings: dict) -> bytes:
             "source": "itsm",
             "intake": "alert",
             "version": version,
-            "bindings": [{"field": "status", "path": "fields.status"}],
+            "bindings": {"status": "fields.status"},
             "mappings": mappings,
         }
     ).encode()
