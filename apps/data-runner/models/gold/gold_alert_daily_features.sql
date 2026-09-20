@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(date, source)',
+        order_by='(tenant_id, date, source)',
         partition_by='toYYYYMM(date)'
     )
 }}
@@ -16,6 +16,7 @@
 -- managed incidents, mixing in monitor signal volume would blend two
 -- different things.
 select
+    tenant_id,
     toDate(opened_at)                                               as date,
     source,
     count()                                                         as total_incidents,
@@ -37,4 +38,4 @@ select
     quantile(0.5)(duration_seconds)                                 as median_duration_seconds,
     quantile(0.95)(duration_seconds)                                as p95_duration_seconds
 from {{ ref('silver_alert') }}
-group by date, source
+group by tenant_id, date, source
