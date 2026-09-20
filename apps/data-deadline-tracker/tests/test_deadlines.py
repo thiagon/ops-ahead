@@ -10,7 +10,7 @@ def _record(deadlines: list[tuple[int, int]], tenant_id: str = "locaweb") -> byt
         {
             "tenant_id": tenant_id,
             "deadlines": [
-                {"severity": severity, "deadline_seconds": seconds}
+                {"severity": severity, "seconds": seconds}
                 for severity, seconds in deadlines
             ],
         }

@@ -81,11 +81,26 @@ export const deadlineSetSchema = z
         z
           .object({
             severity,
-            deadline_seconds: z.coerce.number().int().positive(),
+            seconds: z.coerce.number().int().positive(),
           })
           .strict(),
       )
-      .min(1),
+      .min(1)
+      .check(ctx => {
+        const seen = new Set<number>();
+        for (const [index, deadline] of ctx.value.entries()) {
+          if (seen.has(deadline.severity)) {
+            ctx.issues.push({
+              code: 'custom',
+              message: 'each severity can appear only once',
+              path: [index, 'severity'],
+              input: deadline.severity,
+              continue: true,
+            });
+          }
+          seen.add(deadline.severity);
+        }
+      }),
   })
   .strict()
   .meta({

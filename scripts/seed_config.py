@@ -62,11 +62,11 @@ MAPPING = {
 # P1/P2 ≤ 4h · P3 ≤ 12h · P4 ≤ 24h · P5 ≤ 96h (docs/context/data-dictionary.md).
 DEADLINES = {
     "deadlines": [
-        {"severity": 1, "deadline_seconds": 4 * 3600},
-        {"severity": 2, "deadline_seconds": 4 * 3600},
-        {"severity": 3, "deadline_seconds": 12 * 3600},
-        {"severity": 4, "deadline_seconds": 24 * 3600},
-        {"severity": 5, "deadline_seconds": 96 * 3600},
+        {"severity": 1, "seconds": 4 * 3600},
+        {"severity": 2, "seconds": 4 * 3600},
+        {"severity": 3, "seconds": 12 * 3600},
+        {"severity": 4, "seconds": 24 * 3600},
+        {"severity": 5, "seconds": 96 * 3600},
     ]
 }
 

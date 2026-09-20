@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { type EventEnvelope, eventEnvelopeSchema } from './schema.ts';
+import type { EventPublisher } from '../../plugins/kafka.ts';
+import { EventsPublish, type EventsTopics } from './publish.ts';
+import { type EventEnvelope, eventEnvelopeSchema, type WebhookAccepted } from './schema.ts';
 
 /**
  * Who sent the event and which mapping version to translate it by. The
@@ -29,4 +31,22 @@ export function buildEnvelope(origin: EventOrigin, body: Record<string, unknown>
     received_at: new Date().toISOString(),
     payload: JSON.stringify(body),
   });
+}
+
+export class EventsService {
+  #publish: EventsPublish;
+
+  constructor(publish: EventPublisher, topics: EventsTopics) {
+    this.#publish = new EventsPublish(publish, topics);
+  }
+
+  async ingest(origin: EventOrigin, body: Record<string, unknown>): Promise<WebhookAccepted> {
+    const envelope = buildEnvelope(origin, body);
+    await this.#publish.send(envelope);
+    return {
+      event_id: envelope.event_id,
+      tenant_id: envelope.tenant_id,
+      source: envelope.source,
+    };
+  }
 }

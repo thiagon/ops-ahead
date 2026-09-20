@@ -81,7 +81,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
-      payload: { deadlines: [{ severity: 1, deadline_seconds: 14400 }] },
+      payload: { deadlines: [{ severity: 1, seconds: 14400 }] },
     });
 
     expect(res.statusCode).toBe(202);
@@ -93,6 +93,22 @@ describe('PUT /rules/deadlines/:tenant', () => {
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
       payload: { deadlines: [] },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects a repeated severity with 400', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/rules/deadlines/locaweb',
+      payload: {
+        deadlines: [
+          { severity: 1, seconds: 14400 },
+          { severity: 1, seconds: 7200 },
+        ],
+      },
     });
 
     expect(res.statusCode).toBe(400);

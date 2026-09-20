@@ -52,6 +52,8 @@ export const webhookAcceptedSchema = z
   })
   .meta({ id: 'WebhookAccepted', description: 'The bus owns the event now' });
 
+export type WebhookAccepted = z.infer<typeof webhookAcceptedSchema>;
+
 export const webhookErrorSchema = z
   .object({
     error: z.string().meta({ description: 'Machine-readable error name' }),
@@ -62,3 +64,18 @@ export const webhookErrorSchema = z
       .meta({ description: 'Which fields broke the contract, when the body was the problem' }),
   })
   .meta({ id: 'ErrorResponse' });
+
+export const addressParamsSchema = z.object({
+  tenant: z.string().min(1),
+  source: z.string().min(1),
+});
+
+// The default belongs to the contract, not to the handler: it is what the
+// published document tells a caller an unpinned request translates by. Each
+// route declares its own params, or the shorter one would document a path
+// segment it does not have.
+export const versionParam = z.string().min(1).default('latest').meta({
+  description: 'Which mapping version data-ingest translates this event by',
+});
+
+export const webhookParamsSchema = addressParamsSchema.extend({ version: versionParam });

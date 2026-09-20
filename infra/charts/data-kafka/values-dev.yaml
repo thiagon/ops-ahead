@@ -16,33 +16,28 @@ kafka:
     jvmOptions:
       "-Xms": "256m"
       "-Xmx": "512m"
-  zookeeper:
-    replicas: 1
-    storage:
-      type: persistent-claim
-      size: 1Gi
 
 kafkaTopics:
   - name: events.raw.alert
     partitions: 3
     replicas: 1
     config:
-      retention.ms: "86400000"    # 24 hours
+      retention.ms: "3600000"     # 1 hour
   - name: events.raw.monitor
     partitions: 3
     replicas: 1
     config:
-      retention.ms: "86400000"    # 24 hours
+      retention.ms: "3600000"     # 1 hour
   - name: events.alert
     partitions: 3
     replicas: 1
     config:
-      retention.ms: "86400000"    # 24 hours
+      retention.ms: "3600000"     # 1 hour
   - name: events.monitor
     partitions: 3
     replicas: 1
     config:
-      retention.ms: "86400000"    # 24 hours
+      retention.ms: "3600000"     # 1 hour
   - name: incidents.scored
     partitions: 1
     replicas: 1
@@ -64,20 +59,12 @@ kafkaTopics:
   - name: trigger.status
     partitions: 1
     replicas: 1
-    config:
-      cleanup.policy: compact
   - name: rules.mapping
     partitions: 1
     replicas: 1
-    config:
-      cleanup.policy: compact
   - name: rules.deadline
     partitions: 1
     replicas: 1
-    config:
-      cleanup.policy: compact
   - name: rules.target
     partitions: 1
     replicas: 1
-    config:
-      cleanup.policy: compact

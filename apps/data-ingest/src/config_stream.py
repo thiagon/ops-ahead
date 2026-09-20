@@ -130,7 +130,7 @@ def apply_deadline_rows(key: str | None, raw: bytes | None) -> list[tuple] | Non
         return None
     now = datetime.now(UTC).replace(tzinfo=None)
     return [
-        (record["tenant_id"], int(entry["severity"]), int(entry["deadline_seconds"]), now)
+        (record["tenant_id"], int(entry["severity"]), int(entry["seconds"]), now)
         for entry in record.get("deadlines", [])
     ]
 

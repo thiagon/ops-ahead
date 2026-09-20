@@ -45,7 +45,7 @@ describe('RulesService.setDeadlines', () => {
     const rules = new RulesService({ publish }, topics);
 
     const result = await rules.setDeadlines('locaweb', {
-      deadlines: [{ severity: 1, deadline_seconds: 14400 }],
+      deadlines: [{ severity: 1, seconds: 14400 }],
     });
 
     expect(result).toEqual({ key: 'locaweb', topic: 'rules.deadline' });

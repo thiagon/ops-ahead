@@ -13,7 +13,7 @@ encode; keep it in sync when adding or reordering an app.
 | 1 | `infra-vault` | 0 (secret backend must be reachable before `infra-secrets` wires a store to it) |
 | 2 | `infra-eso`, `infra-keda` | 1 (operators/CRDs must be registered before anything creates a `ClusterSecretStore` or `ScaledObject`) |
 | 3 | `infra-secrets` | 2 (creates the `vault-kv` `ClusterSecretStore` — every `ExternalSecret` below needs this) |
-| 4 | `data-strimzi`, `infra-loki` | 3 (Strimzi's CRDs/operator must exist before `data-kafka`'s Kafka/Zookeeper CR; Loki has no real dependency) |
+| 4 | `data-strimzi`, `infra-loki` | 3 (Strimzi's CRDs/operator must exist before `data-kafka`'s Kafka CR; Loki has no real dependency) |
 | 5 | `infra-gitea`, `infra-prometheus`, `data-clickhouse` | 3 (each only needs its own `ExternalSecret` to be resolvable) |
 | 6 | `data-kafka`, `data-minio`, `infra-promtail` | 4 (Kafka needs the Strimzi operator) |
 | 7 | `data-ingest`, `ml-redis`, `ml-postgres` | 5, 6 (data-ingest consumes Kafka, writes ClickHouse + MinIO) |

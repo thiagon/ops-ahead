@@ -3,9 +3,9 @@ name: data-strimzi
 description: Strimzi — Kafka operator (installs CRDs)
 type: application
 version: 0.1.0
-appVersion: "0.43.0"
+appVersion: "1.2.0"
 dependencies:
   - name: strimzi-kafka-operator
     alias: strimzi
-    version: "0.43.0"
+    version: "1.2.0"
     repository: "https://strimzi.io/charts/"
