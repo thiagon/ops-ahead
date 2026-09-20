@@ -79,8 +79,9 @@ A troca vai até o ClickHouse: `tenant_kpi_targets` passa a ter `severities`.
 **Dentro:** publicação de bindings, dicionário, prazos e metas; persistência no MinIO; o
 caminho até as tabelas do ClickHouse.
 
-**Fora:** cadastro de origem — vive em `POST /origins`, com o secret cifrado no Postgres
-e a chave que o decifra no Vault. As rotas de regra não o aceitam nem o devolvem. Também fora: o front, a inativação, e o conserto do consumo
+**Fora:** cadastro de origem — vive em `/tenants/{tenant}/sources`, com o secret cifrado
+no Postgres e a chave que o decifra no Vault. As rotas de regra não o aceitam nem o
+devolvem. Também fora: o front, a inativação, e o conserto do consumo
 analítico descrito em "Débito assumido".
 
 ## Desenho

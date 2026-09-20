@@ -5,7 +5,7 @@ const IV_BYTES = 12;
 const KEY_BYTES = 32;
 
 /**
- * Encrypts an origin's webhook secret for storage. The signature check needs
+ * Encrypts a source's webhook secret for storage. The signature check needs
  * the secret itself to recompute the digest, so it cannot be hashed the way
  * an analysis update key is — it is encrypted instead, and the key that
  * decrypts it lives in the Vault, never in the database. A dump of the
@@ -20,7 +20,7 @@ export class SecretCipher {
   constructor(key: string) {
     const parsed = Buffer.from(key, 'base64');
     if (parsed.length !== KEY_BYTES) {
-      throw new Error(`ORIGIN_SECRET_KEY must be ${KEY_BYTES} base64-encoded bytes`);
+      throw new Error(`SOURCE_SECRET_KEY must be ${KEY_BYTES} base64-encoded bytes`);
     }
     this.#key = parsed;
   }

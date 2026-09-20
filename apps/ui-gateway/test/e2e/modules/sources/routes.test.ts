@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../../helpers/app.ts';
 
-describe('origin routes', () => {
+describe('source routes', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -14,8 +14,8 @@ describe('origin routes', () => {
     await app.close();
   });
 
-  it('lists the registered origins without their secrets', async () => {
-    const res = await app.inject({ method: 'GET', url: '/origins' });
+  it("lists a tenant's sources without their secrets", async () => {
+    const res = await app.inject({ method: 'GET', url: '/tenants/locaweb/sources' });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toContainEqual({
@@ -23,19 +23,25 @@ describe('origin routes', () => {
       source: 'itsm',
       intake: 'alert',
     });
-    for (const origin of res.json()) expect(origin).not.toHaveProperty('secret');
+    for (const source of res.json()) expect(source).not.toHaveProperty('secret');
   });
 
-  it('registers an origin and answers with the minted secret', async () => {
+  it("never lists another tenant's sources", async () => {
+    const res = await app.inject({ method: 'GET', url: '/tenants/outro-tenant/sources' });
+
+    expect(res.json()).toEqual([]);
+  });
+
+  it('registers a source and answers with the minted secret', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/origins/locaweb/datadog',
+      url: '/tenants/locaweb/sources/datadog',
       payload: { intake: 'monitor' },
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      origin: { tenant_id: 'locaweb', source: 'datadog', intake: 'monitor' },
+      source: { tenant_id: 'locaweb', source: 'datadog', intake: 'monitor' },
       secret: expect.any(String),
     });
   });
@@ -43,7 +49,7 @@ describe('origin routes', () => {
   it('accepts a webhook signed with the secret it just handed out', async () => {
     const registered = await app.inject({
       method: 'PUT',
-      url: '/origins/locaweb/opsgenie',
+      url: '/tenants/locaweb/sources/opsgenie',
       payload: { intake: 'alert' },
     });
     const { secret } = registered.json();
@@ -65,7 +71,7 @@ describe('origin routes', () => {
   it('rejects an intake the contracts do not declare', async () => {
     const res = await app.inject({
       method: 'PUT',
-      url: '/origins/locaweb/datadog',
+      url: '/tenants/locaweb/sources/datadog',
       payload: { intake: 'webhook' },
     });
 
@@ -75,13 +81,13 @@ describe('origin routes', () => {
   it('rotates a secret and answers with the new one', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/origins/locaweb/itsm/secret',
+      url: '/tenants/locaweb/sources/itsm/secret',
       payload: {},
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().secret).toEqual(expect.any(String));
-    expect(res.json().origin).toEqual({
+    expect(res.json().source).toEqual({
       tenant_id: 'locaweb',
       source: 'itsm',
       intake: 'alert',
@@ -91,26 +97,26 @@ describe('origin routes', () => {
   it('takes a secret the caller chose on rotation', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/origins/locaweb/zabbix/secret',
+      url: '/tenants/locaweb/sources/zabbix/secret',
       payload: { secret: 'a-secret-long-enough' },
     });
 
     expect(res.json().secret).toBe('a-secret-long-enough');
   });
 
-  it('answers 404 rotating an origin nobody registered', async () => {
+  it('answers 404 rotating a source nobody registered', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/origins/locaweb/nowhere/secret',
+      url: '/tenants/locaweb/sources/nowhere/secret',
       payload: {},
     });
 
     expect(res.statusCode).toBe(404);
   });
 
-  it('never documents a secret on the way in as required', async () => {
+  it('never documents a secret on the listed source', async () => {
     const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
 
-    expect(doc.components.schemas.Origin.properties).not.toHaveProperty('secret');
+    expect(doc.components.schemas.Source.properties).not.toHaveProperty('secret');
   });
 });

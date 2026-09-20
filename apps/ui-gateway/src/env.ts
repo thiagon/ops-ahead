@@ -48,17 +48,17 @@ export const envSchema = z
     HMAC_ENABLED: z.stringbool().default(false),
 
     /**
-     * Decrypts the webhook secrets stored in the origins table
-     * (services/origins/cipher.ts). One key for the whole table: registering
-     * an origin is an insert, never a write to the Vault.
+     * Decrypts the webhook secrets stored in the sources table
+     * (services/sources/cipher.ts). One key for the whole table: registering
+     * a source is an insert, never a write to the Vault.
      */
-    ORIGIN_SECRET_KEY: z.string().default(''),
+    SOURCE_SECRET_KEY: z.string().default(''),
     /**
-     * How long a resolved origin is reused before the table is read again.
+     * How long a resolved source is reused before the table is read again.
      * Short enough that a rotation takes effect on its own, long enough that
      * a replay is not one query per event.
      */
-    ORIGIN_CACHE_TTL_MS: z.coerce.number().default(10_000),
+    SOURCE_CACHE_TTL_MS: z.coerce.number().default(10_000),
   })
   .loose();
 

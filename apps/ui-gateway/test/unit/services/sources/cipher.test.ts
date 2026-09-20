@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateSecret, SecretCipher } from '../../../../src/services/origins/cipher.ts';
+import { generateSecret, SecretCipher } from '../../../../src/services/sources/cipher.ts';
 
 const KEY = Buffer.alloc(32, 7).toString('base64');
 const OTHER_KEY = Buffer.alloc(32, 9).toString('base64');

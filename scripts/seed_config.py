@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Registers the service_now origin and publishes its rules end to end: the
+"""Registers the service_now source and publishes its rules end to end: the
 mapping (field bindings + value dictionary), contractual deadlines, and KPI
-targets, through the gateway's /origins and PUT /rules/* routes.
+targets, through the gateway's /tenants/{tenant}/sources and PUT /rules/*
+routes.
 
 Proves the path spec-config-producao.md describes: gateway publishes → Kafka
 carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
@@ -85,10 +86,10 @@ def seed(gateway_url: str, secret: str | None) -> None:
         body = {"intake": MAPPING["intake"]}
         if secret:
             body["secret"] = secret
-        origin = client.put(f"/origins/{TENANT}/{SOURCE}", json=body)
-        origin.raise_for_status()
-        print(f"origin: {origin.status_code} {origin.json()['origin']}")
-        print(f"  secret: {origin.json()['secret']}")
+        registered = client.put(f"/tenants/{TENANT}/sources/{SOURCE}", json=body)
+        registered.raise_for_status()
+        print(f"source: {registered.status_code} {registered.json()['source']}")
+        print(f"  secret: {registered.json()['secret']}")
 
         mapping = client.put(f"/rules/mappings/{TENANT}/{SOURCE}", json=MAPPING)
         mapping.raise_for_status()

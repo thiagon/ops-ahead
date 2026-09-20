@@ -7,7 +7,7 @@ export interface TestServer {
 }
 
 export async function startTestServer(): Promise<TestServer> {
-  process.env.ORIGIN_SECRET_KEY ??= TEST_SECRET_KEY;
+  process.env.SOURCE_SECRET_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   stubKafka(app);
   stubPrisma(app);

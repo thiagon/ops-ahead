@@ -18,19 +18,20 @@ enum AnalysisStatus {
   failed
 }
 
-/// An origin the gateway accepts events from. The secret is stored encrypted
-/// (services/origins/cipher.ts) rather than hashed: verifying a signature
-/// means recomputing it, which needs the secret itself.
-model Origin {
+/// A system the gateway accepts events from, named by the tenant it belongs
+/// to. The secret is stored encrypted (services/sources/cipher.ts) rather
+/// than hashed: verifying a signature means recomputing it, which needs the
+/// secret itself.
+model Source {
   tenantId        String   @map("tenant_id")
-  source          String
+  name            String
   intake          Intake
   encryptedSecret String   @map("encrypted_secret")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  @@id([tenantId, source])
-  @@map("origins")
+  @@id([tenantId, name])
+  @@map("sources")
 }
 
 enum Intake {

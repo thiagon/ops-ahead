@@ -24,9 +24,9 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchem
 /**
  * One route for every origin: which (tenant, source) pairs are accepted comes
  * from configuration, not from code, so the route matches on the path and the
- * origins table decides whether that origin exists (services/origins/).
+ * sources table decides whether that source exists (services/sources/).
  *
- * The origin the registry returns — never the URL or the payload — is what
+ * The source the registry returns — never the URL or the payload — is what
  * assigns tenant_id, source and intake to the envelope
  * (domain/ubiquitous-language.md#tenant). `version` is the exception: it
  * selects which mapping version data-ingest translates by, so the caller
@@ -36,7 +36,7 @@ type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchem
 export function registerIncidentRoutes(app: FastifyInstance): void {
   const resolve = async (request: FastifyRequest) => {
     const { tenant, source } = (request as WebhookRequest).params;
-    return app.services.origins.find(tenant, source);
+    return app.services.sources.find(tenant, source);
   };
 
   const typed = app.withTypeProvider<ZodTypeProvider>();

@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
-import { SecretCipher } from '../../src/services/origins/cipher.ts';
+import { SecretCipher } from '../../src/services/sources/cipher.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
 export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
-  process.env.ORIGIN_SECRET_KEY ??= TEST_SECRET_KEY;
+  process.env.SOURCE_SECRET_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
@@ -15,7 +15,7 @@ export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
   return app;
 }
 
-/** The secret TEST_ORIGIN signs with — what a test signs its bodies with. */
+/** The secret the seeded sources sign with — what a test signs its bodies with. */
 export const TEST_SECRET = 'itsm-shared-secret';
 
 /** A key of the right size, so tests never reach a Vault. */
@@ -39,22 +39,19 @@ export function stubPrisma(app: FastifyInstance): void {
   app.decorate('prisma', memoryPrisma());
 }
 
-type OriginRow = {
+type SourceRow = {
   tenantId: string;
-  source: string;
+  name: string;
   intake: 'alert' | 'monitor';
   encryptedSecret: string;
 };
 
-function seededOrigins(): Map<string, OriginRow> {
+function seededSources(): Map<string, SourceRow> {
   const cipher = new SecretCipher(TEST_SECRET_KEY);
   const encryptedSecret = cipher.encrypt(TEST_SECRET);
   return new Map([
-    ['locaweb:itsm', { tenantId: 'locaweb', source: 'itsm', intake: 'alert', encryptedSecret }],
-    [
-      'locaweb:zabbix',
-      { tenantId: 'locaweb', source: 'zabbix', intake: 'monitor', encryptedSecret },
-    ],
+    ['locaweb:itsm', { tenantId: 'locaweb', name: 'itsm', intake: 'alert', encryptedSecret }],
+    ['locaweb:zabbix', { tenantId: 'locaweb', name: 'zabbix', intake: 'monitor', encryptedSecret }],
   ]);
 }
 
@@ -70,43 +67,44 @@ type AnalysisRow = {
 /** Map behind the Prisma calls the services make. */
 export function memoryPrisma(): PrismaClient {
   const rows = new Map<string, AnalysisRow>();
-  const origins = seededOrigins();
-  const originKey = (where: { tenantId: string; source: string }) =>
-    `${where.tenantId}:${where.source}`;
+  const sources = seededSources();
+  const sourceKey = (where: { tenantId: string; name: string }) =>
+    `${where.tenantId}:${where.name}`;
 
   return {
-    origin: {
-      async findUnique({ where }: { where: { tenantId_source: OriginRow } }) {
-        return origins.get(originKey(where.tenantId_source)) ?? null;
+    source: {
+      async findUnique({ where }: { where: { tenantId_name: SourceRow } }) {
+        return sources.get(sourceKey(where.tenantId_name)) ?? null;
       },
-      async findMany() {
-        return [...origins.values()];
+      async findMany({ where }: { where?: { tenantId?: string } } = {}) {
+        const all = [...sources.values()];
+        return where?.tenantId ? all.filter(row => row.tenantId === where.tenantId) : all;
       },
       async upsert({
         where,
         create,
         update,
       }: {
-        where: { tenantId_source: { tenantId: string; source: string } };
-        create: OriginRow;
-        update: Partial<OriginRow>;
+        where: { tenantId_name: { tenantId: string; name: string } };
+        create: SourceRow;
+        update: Partial<SourceRow>;
       }) {
-        const key = originKey(where.tenantId_source);
-        const current = origins.get(key);
-        origins.set(key, current ? { ...current, ...update } : create);
-        return origins.get(key);
+        const key = sourceKey(where.tenantId_name);
+        const current = sources.get(key);
+        sources.set(key, current ? { ...current, ...update } : create);
+        return sources.get(key);
       },
       async updateMany({
         where,
         data,
       }: {
-        where: { tenantId: string; source: string };
-        data: Partial<OriginRow>;
+        where: { tenantId: string; name: string };
+        data: Partial<SourceRow>;
       }) {
-        const key = originKey(where);
-        const current = origins.get(key);
+        const key = sourceKey(where);
+        const current = sources.get(key);
         if (!current) return { count: 0 };
-        origins.set(key, { ...current, ...data });
+        sources.set(key, { ...current, ...data });
         return { count: 1 };
       },
     },

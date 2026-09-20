@@ -12,14 +12,14 @@ Antes de qualquer envio, duas coisas precisam existir:
 
 | # | Pré-condição | Estado |
 |---|--------------|--------|
-| 1 | `ORIGIN_SECRET_KEY` no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
-| 2 | A origem cadastrada em `PUT /origins/{tenant}/{source}` | Passo 1 |
+| 1 | `SOURCE_SECRET_KEY` no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
+| 2 | A origem cadastrada em `PUT /tenants/{tenant}/sources/{source}` | Passo 1 |
 | 3 | O gateway alcançável de fora do cluster | **Bloqueador — não tem Ingress** |
 
-Uma origem só existe se estiver na tabela `origins`; um webhook contra
-qualquer outro endereço leva 404. O secret com que ela assina é guardado
-cifrado ali, e `ORIGIN_SECRET_KEY` é o que o decifra — uma chave só, que não
-muda quando se adiciona origem.
+Uma origem só existe se estiver na tabela `sources`, sempre sob um tenant; um
+webhook contra qualquer outro endereço leva 404. O secret com que ela assina é
+guardado cifrado ali, e `SOURCE_SECRET_KEY` é o que o decifra — uma chave só,
+que não muda quando se adiciona origem.
 
 Traduzir é outra coisa: quem decide se um evento vira linha bronze é o
 `data-ingest`, contra as regras em `rules.mapping`. Um evento de origem aceita

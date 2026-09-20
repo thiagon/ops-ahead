@@ -23,8 +23,8 @@ describe('envSchema', () => {
       KAFKA_TOPIC_DATA: 'trigger.data',
       GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
-      ORIGIN_SECRET_KEY: '',
-      ORIGIN_CACHE_TTL_MS: 10_000,
+      SOURCE_SECRET_KEY: '',
+      SOURCE_CACHE_TTL_MS: 10_000,
     });
   });
 
@@ -53,8 +53,8 @@ describe('envSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('coerces the origin cache ttl to a number', () => {
-    expect(envSchema.parse({ ORIGIN_CACHE_TTL_MS: '500' }).ORIGIN_CACHE_TTL_MS).toBe(500);
+  it('coerces the source cache ttl to a number', () => {
+    expect(envSchema.parse({ SOURCE_CACHE_TTL_MS: '500' }).SOURCE_CACHE_TTL_MS).toBe(500);
   });
 });
 
