@@ -50,7 +50,7 @@ def apply_mapping(
                 tenant_id=record["tenant_id"],
                 source=record["source"],
                 intake=record["intake"],
-                dictionary_version=record["dictionary_version"],
+                version=record["version"],
                 mappings=record.get("mappings", {}),
             )
         )

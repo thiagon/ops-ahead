@@ -28,6 +28,11 @@ export class SourceStore {
 
   async upsert(row: SourceRow): Promise<void> {
     const { tenantId, name, intake, status, encryptedSecret } = row;
+    await this.#prisma.tenant.upsert({
+      where: { id: tenantId },
+      create: { id: tenantId },
+      update: {},
+    });
     await this.#prisma.source.upsert({
       where: { tenantId_name: { tenantId, name } },
       create: { tenantId, name, intake, status, encryptedSecret },

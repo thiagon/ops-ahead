@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "field-binding/v1",
   "title": "FieldBindingSet",
-  "description": "Per-origin, per-intake map from each field of the translated contract to where it is read in the origin's own payload. Travels in the same record as its value dictionary (translation-dictionary.schema.json): a mapped value means nothing without the binding naming the field it was read from, and dictionary_version versions the pair. Fields the pipeline itself stamps — event_id, tenant_id, source, version, dictionary_version, received_at — are never bound here. See domain/acl/itsm.md#adicionar-uma-origem.",
+  "description": "Per-origin, per-intake map from each field of the translated contract to where it is read in the origin's own payload. Travels in the same record as its value dictionary (translation-dictionary.schema.json): a mapped value means nothing without the binding naming the field it was read from, and version versions the pair. Fields the pipeline itself stamps — event_id, tenant_id, source, version, dictionary_version, received_at — are never bound here. See domain/acl/itsm.md#adicionar-uma-origem.",
   "type": "object",
   "required": [
     "tenant_id",

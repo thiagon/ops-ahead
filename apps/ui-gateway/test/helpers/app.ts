@@ -84,14 +84,80 @@ type AnalysisRow = {
   detail: unknown;
 };
 
+type MappingRow = {
+  id: number;
+  tenantId: string;
+  source: string;
+  intake: 'alert' | 'monitor';
+  version: string;
+  bindings: unknown;
+  mappings: unknown;
+  createdAt: Date;
+};
+
+type DeadlineRow = {
+  id: number;
+  tenantId: string;
+  deadlines: unknown;
+  createdAt: Date;
+};
+
+type TargetRow = {
+  id: number;
+  tenantId: string;
+  targets: unknown;
+  createdAt: Date;
+};
+
+function newestFirst<T extends { id: number; createdAt: Date }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
+}
+
+function copies<T extends { id: number; createdAt: Date }>() {
+  const rows: T[] = [];
+  let nextId = 1;
+  return {
+    findFirst(match: (row: T) => boolean): T | null {
+      return newestFirst(rows.filter(match))[0] ?? null;
+    },
+    findMany(match: (row: T) => boolean, take?: number): T[] {
+      const matched = newestFirst(rows.filter(match));
+      return take === undefined ? matched : matched.slice(0, take);
+    },
+    create(data: Omit<T, 'id' | 'createdAt'>): T {
+      const row = { id: nextId++, createdAt: new Date(), ...data } as T;
+      rows.push(row);
+      return row;
+    },
+  };
+}
+
 /** Map behind the Prisma calls the services make. */
 export function memoryPrisma(): PrismaClient {
   const rows = new Map<string, AnalysisRow>();
   const sources = seededSources();
+  const tenants = new Set([...sources.values()].map(row => row.tenantId));
   const sourceKey = (where: { tenantId: string; name: string }) =>
     `${where.tenantId}:${where.name}`;
 
-  return {
+  const mappings = copies<MappingRow>();
+  const deadlines = copies<DeadlineRow>();
+  const targets = copies<TargetRow>();
+
+  const client = {
+    tenant: {
+      async upsert({
+        where,
+        create,
+      }: {
+        where: { id: string };
+        create: { id: string };
+        update: object;
+      }) {
+        tenants.add(where.id);
+        return { id: create.id, createdAt: new Date(), updatedAt: new Date() };
+      },
+    },
     source: {
       async findUnique({ where }: { where: { tenantId_name: SourceRow } }) {
         return sources.get(sourceKey(where.tenantId_name)) ?? null;
@@ -167,5 +233,54 @@ export function memoryPrisma(): PrismaClient {
         return rows.get(where.id) ?? null;
       },
     },
-  } as unknown as PrismaClient;
+    mapping: {
+      async findFirst({ where }: { where: { tenantId: string; source: string } }) {
+        return mappings.findFirst(
+          row => row.tenantId === where.tenantId && row.source === where.source,
+        );
+      },
+      async findMany({
+        where,
+        take,
+      }: {
+        where: { tenantId: string; source: string };
+        take?: number;
+      }) {
+        return mappings.findMany(
+          row => row.tenantId === where.tenantId && row.source === where.source,
+          take,
+        );
+      },
+      async create({ data }: { data: Omit<MappingRow, 'id' | 'createdAt'> }) {
+        return mappings.create(data);
+      },
+    },
+    deadline: {
+      async findFirst({ where }: { where: { tenantId: string } }) {
+        return deadlines.findFirst(row => row.tenantId === where.tenantId);
+      },
+      async findMany({ where, take }: { where: { tenantId: string }; take?: number }) {
+        return deadlines.findMany(row => row.tenantId === where.tenantId, take);
+      },
+      async create({ data }: { data: Omit<DeadlineRow, 'id' | 'createdAt'> }) {
+        return deadlines.create(data);
+      },
+    },
+    target: {
+      async findFirst({ where }: { where: { tenantId: string } }) {
+        return targets.findFirst(row => row.tenantId === where.tenantId);
+      },
+      async findMany({ where, take }: { where: { tenantId: string }; take?: number }) {
+        return targets.findMany(row => row.tenantId === where.tenantId, take);
+      },
+      async create({ data }: { data: Omit<TargetRow, 'id' | 'createdAt'> }) {
+        return targets.create(data);
+      },
+    },
+    async $transaction<T>(fn: (tx: PrismaClient) => Promise<T>): Promise<T> {
+      return fn(this as unknown as PrismaClient);
+    },
+  };
+
+  return client as unknown as PrismaClient;
 }

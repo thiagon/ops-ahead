@@ -53,7 +53,7 @@ Kafka, então um pod que sobe depois o processa.
 
 Um dicionário que diz "o valor `1 - Crítica` significa severidade 1" não significa nada
 sem o binding que diz de qual campo do payload esse valor é lido. As duas metades nascem
-juntas, vivem juntas e são versionadas juntas por `dictionary_version`.
+juntas, vivem juntas e são versionadas juntas por `version`.
 
 Um tópico (`rules.mapping`), um record, uma rota. Some o estado meio-configurado.
 

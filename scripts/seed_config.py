@@ -21,7 +21,7 @@ SOURCE = "service_now"
 
 MAPPING = {
     "intake": "alert",
-    "dictionary_version": "v1",
+    "version": "v1",
     "bindings": [
         {"field": "external_id", "path": "number"},
         {"field": "status", "path": "fields.status.name"},

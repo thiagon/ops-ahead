@@ -34,11 +34,15 @@ async function servicesPlugin(fastify: FastifyInstance) {
       new SecretCipher(fastify.env.SOURCE_SECRET_KEY),
       fastify.env.SOURCE_CACHE_TTL_MS,
     ),
-    rules: new RulesService(fastify.kafka, {
-      mapping: fastify.env.KAFKA_TOPIC_RULES_MAPPING,
-      deadline: fastify.env.KAFKA_TOPIC_RULES_DEADLINE,
-      target: fastify.env.KAFKA_TOPIC_RULES_TARGET,
-    }),
+    rules: new RulesService(
+      fastify.kafka,
+      {
+        mapping: fastify.env.KAFKA_TOPIC_RULES_MAPPING,
+        deadline: fastify.env.KAFKA_TOPIC_RULES_DEADLINE,
+        target: fastify.env.KAFKA_TOPIC_RULES_TARGET,
+      },
+      fastify.prisma,
+    ),
   });
 }
 

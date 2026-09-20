@@ -8,7 +8,7 @@
     "tenant_id",
     "source",
     "intake",
-    "dictionary_version",
+    "version",
     "mappings"
   ],
   "additionalProperties": false,
@@ -35,7 +35,7 @@
       ],
       "description": "Which translated contract the mapped fields feed — incident-alert.schema.json or condition-monitor.schema.json."
     },
-    "dictionary_version": {
+    "version": {
       "type": "string",
       "description": "Stamped as dictionary_version into every translated line this dictionary produces."
     },

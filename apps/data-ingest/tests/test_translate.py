@@ -17,7 +17,7 @@ def dictionaries():
             tenant_id="locaweb",
             source="itsm",
             intake="alert",
-            dictionary_version="v1",
+            version="v1",
             mappings={"status": {"Encerrado": "closed"}},
         )
     )
@@ -104,7 +104,7 @@ def _record_v2(registry: DictionaryRegistry) -> None:
             tenant_id="locaweb",
             source="itsm",
             intake="alert",
-            dictionary_version="v2",
+            version="v2",
             mappings={"status": {"Encerrado": "canceled"}},
         )
     )

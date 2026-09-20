@@ -18,6 +18,20 @@ enum AnalysisStatus {
   failed
 }
 
+/// The client a source, mapping, deadline set or target set belongs to. The
+/// id is the same string the URL carries (domain/ubiquitous-language.md#tenant).
+model Tenant {
+  id        String   @id
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  sources   Source[]
+  deadlines Deadline[]
+  targets   Target[]
+
+  @@map("tenants")
+}
+
 /// A system the gateway accepts events from, named by the tenant it belongs
 /// to. The secret is stored encrypted (services/sources/cipher.ts) rather
 /// than hashed: verifying a signature means recomputing it, which needs the
@@ -30,6 +44,9 @@ model Source {
   encryptedSecret String       @map("encrypted_secret")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  mappings Mapping[]
 
   @@id([tenantId, name])
   @@map("sources")
@@ -58,4 +75,46 @@ model Analysis {
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("analyses")
+}
+
+/// A published origin mapping. A later PUT inserts another row. GET lists
+/// the last ten; older copies stay in the table. The pair (tenant, source)
+/// must already exist as a Source.
+model Mapping {
+  id                Int      @id @default(autoincrement())
+  tenantId          String   @map("tenant_id")
+  source            String
+  intake            Intake
+  version           String
+  bindings          Json
+  mappings          Json
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  sourceRecord      Source   @relation(fields: [tenantId, source], references: [tenantId, name])
+
+  @@index([tenantId, source, createdAt])
+  @@map("mappings")
+}
+
+/// A published deadline set for a tenant. GET lists the last ten.
+model Deadline {
+  id        Int      @id @default(autoincrement())
+  tenantId  String   @map("tenant_id")
+  deadlines Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("deadlines")
+}
+
+/// A published KPI target set for a tenant. GET lists the last ten.
+model Target {
+  id        Int      @id @default(autoincrement())
+  tenantId  String   @map("tenant_id")
+  targets   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("targets")
 }
