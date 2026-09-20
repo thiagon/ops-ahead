@@ -46,7 +46,7 @@ class _NullPublisher:
     topic — a downstream consumer that already saw the original event would
     otherwise see it twice for one period."""
 
-    async def publish(self, message: str, topic: str) -> None:
+    async def publish(self, message: bytes, topic: str) -> None:
         return None
 
 
