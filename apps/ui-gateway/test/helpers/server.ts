@@ -1,5 +1,5 @@
 import { buildApp } from '../../src/app.ts';
-import { stubKafka, stubOrigins, stubPrisma } from './app.ts';
+import { stubKafka, stubPrisma, TEST_SECRET_KEY } from './app.ts';
 
 export interface TestServer {
   baseUrl: string;
@@ -7,9 +7,9 @@ export interface TestServer {
 }
 
 export async function startTestServer(): Promise<TestServer> {
+  process.env.SOURCE_SECRET_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   stubKafka(app);
-  stubOrigins(app);
   stubPrisma(app);
   await app.listen({ port: 0, host: '127.0.0.1' });
 

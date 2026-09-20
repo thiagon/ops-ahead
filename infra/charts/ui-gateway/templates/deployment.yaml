@@ -73,8 +73,12 @@ spec:
               value: {{ .Values.gateway.env.kafkaTopicRawAlert | quote }}
             - name: KAFKA_TOPIC_RAW_MONITOR
               value: {{ .Values.gateway.env.kafkaTopicRawMonitor | quote }}
-            - name: KAFKA_TOPIC_CONFIG_ORIGIN
-              value: {{ .Values.gateway.env.kafkaTopicConfigOrigin | quote }}
+            - name: KAFKA_TOPIC_RULES_MAPPING
+              value: {{ .Values.gateway.env.kafkaTopicRulesMapping | quote }}
+            - name: KAFKA_TOPIC_RULES_DEADLINE
+              value: {{ .Values.gateway.env.kafkaTopicRulesDeadline | quote }}
+            - name: KAFKA_TOPIC_RULES_TARGET
+              value: {{ .Values.gateway.env.kafkaTopicRulesTarget | quote }}
             - name: KAFKA_TOPIC_ML
               value: {{ .Values.gateway.env.kafkaTopicMl | quote }}
             - name: KAFKA_TOPIC_DATA
@@ -93,13 +97,11 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: GATEWAY_DATABASE_URL
               value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.gateway.analysesDatabase.host }}/{{ .Values.gateway.analysesDatabase.name }}
-            # One secret per (tenant, source) credential — sources/registry.ts
-            # names the env var each credential reads.
-            - name: HMAC_SECRET_LOCAWEB_ITSM
+            - name: SOURCE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.gateway.secretName }}
-                  key: HMAC_SECRET_LOCAWEB_ITSM
+                  key: SOURCE_SECRET_KEY
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           livenessProbe:

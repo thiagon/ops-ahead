@@ -8,36 +8,25 @@ data-ingest → ClickHouse → dbt.
 
 ## Pré-condições que hoje bloqueiam o fluxo
 
-Antes de qualquer envio, três coisas precisam existir e **duas delas não
-existem no código hoje**:
+Antes de qualquer envio, duas coisas precisam existir:
 
 | # | Pré-condição | Estado |
 |---|--------------|--------|
-| 1 | Uma origem `(tenant, source)` cadastrada em `config.origin` | **Bloqueador — ninguém publica nesse tópico** |
-| 2 | O secret HMAC dessa origem no Vault, path `gateway` | Depende de (1) |
+| 1 | `SOURCE_SECRET_KEY` no Vault, path `gateway` | Semeada por `make up` a partir do `.env` |
+| 2 | A origem cadastrada em `PUT /sources/{tenant}/{source}` | Passo 1 |
 | 3 | O gateway alcançável de fora do cluster | **Bloqueador — não tem Ingress** |
 
-### Bloqueador 1 — `config.origin` não tem produtor
+Uma origem só existe se estiver na tabela `sources`, sempre sob um tenant; um
+webhook contra qualquer outro endereço leva 404, e contra uma origem
+desabilitada leva 403. O secret com que ela assina é
+guardado cifrado ali, e `SOURCE_SECRET_KEY` é o que o decifra — uma chave só,
+que não muda quando se adiciona origem.
 
-`apps/ui-gateway/src/plugins/origin-registry.ts` reidrata as origens aceitas do
-tópico compactado `config.origin`, e `modules/events/routes.ts` devolve
-`404 UnknownOrigin` para qualquer endereço que não esteja no registry. O
-registry de configuração migrou do `ui-orchestrator` para o `ui-frontend`
-(commit `28cb43c`), mas o `ui-frontend` **não tem `kafkajs` no
-`package.json`** — o Prisma grava em Postgres e nada republica nos tópicos
-`config.*`. Ou seja: o gateway sobe com registry vazio, falha readiness, e
-rejeita 100% dos POSTs.
+Traduzir é outra coisa: quem decide se um evento vira linha bronze é o
+`data-ingest`, contra as regras em `rules.mapping`. Um evento de origem aceita
+mas sem mapeamento entra no lake cru em vez de virar bronze.
 
-Precisa ser resolvido antes do passo 1. Duas saídas:
-
-- **Definitiva:** devolver ao `ui-frontend` o publisher que existia em
-  `ui-orchestrator/src/modules/config/service.ts` (ver `git show f6071c5`) — cada
-  escrita grava a revisão no Postgres e republica o estado no tópico compactado.
-- **Desbloqueio imediato:** um job de seed que publica um registro de origem
-  direto em `config.origin` e escreve o secret no Vault, só para destravar o
-  bootstrap local.
-
-### Bloqueador 2 — o gateway não é alcançável de fora
+### Bloqueador — o gateway não é alcançável de fora
 
 `infra/apps/ingresses.yaml` expõe vault, argocd, gitea, grafana, prometheus,
 mlflow, minio e orchestrator. **Não expõe o gateway** — ele tem só Service
@@ -52,14 +41,6 @@ Service. Opções, em ordem de preferência:
    permite (`from: podSelector: {}`), e é o caminho que não muda a superfície
    exposta.
 2. Adicionar um Ingress para o gateway em `ingresses.yaml`.
-
-### Bloqueador 3 — o producer usa a rota antiga
-
-`scripts/incident_producer.py:103` posta em `/webhook/v1/locaweb/{source}`. A
-rota atual é `/webhook/:version/:tenant/:source`
-(`apps/ui-gateway/src/modules/events/routes.ts:39`), e o envelope é montado a
-partir da credencial resolvida, não da URL. O producer precisa de um
-`--tenant` e montar `/webhook/v1/{tenant}/{source}`.
 
 ---
 
@@ -78,19 +59,27 @@ Termina com tudo verde **e vazio**. Estados esperados, que não são falha:
 - Marts gold materializadas e vazias — o PreSync `data-runner-build` roda
   `dbt run` contra bronze vazio, que é seguro por desenho (`src/steps.py:11-17`).
 
-## Passo 1 — cadastrar a origem
+## Passo 1 — cadastrar a origem e publicar suas regras
 
-Resolver o bloqueador 1. Ao final, `config.origin` precisa ter um registro com
-`tenant_id`, `source`, `intake: "alert"`, `envelope_version: "v1"`,
-`enabled: true`, e o secret correspondente no Vault (path `gateway`, key
-`HMAC_SECRET_LOCAWEB_ITSM`).
+```bash
+uv run python scripts/seed_config.py \
+  --gateway-url http://localhost:8080 --secret ops-ahead-dev
+```
 
-**Verificação:** o pod do `ui-gateway` passa a `ready` (readiness depende do
-registry não estar vazio).
+Cadastra o `service_now` e publica o mapeamento dele (bindings + dicionário,
+um record só), os prazos e as metas de KPI. Sem `--secret` o gateway gera um e
+o imprime — é a única vez que ele aparece.
+
+Cadastrar é o que faz o endereço responder; as regras são o que permite
+traduzir o que chega nele. Sem as regras o evento é aceito e fica no lake, sem
+virar bronze.
+
+**Verificação:** `rules.mapping` tem um registro sob a chave
+`<tenant>:<source>`, e o `data-ingest` loga a aplicação dele.
 
 ## Passo 2 — enviar os eventos históricos
 
-Com a origem cadastrada, rodar o producer como Job em `ns: ui`:
+Rodar o producer como Job em `ns: ui`:
 
 ```bash
 uv run python scripts/incident_producer.py \
@@ -234,10 +223,9 @@ além do que treinou.
 
 ```
 make up
-  └─ (bloqueador) publisher de config.origin
-       └─ cadastrar origem + secret no Vault      → gateway fica ready
-            └─ producer 122k eventos (Job em ns:ui) → bronze populado
-                 └─ data_refresh → data_quality_check → marts gold
+  └─ seed_config.py → origem cadastrada + regras publicadas
+       └─ producer 122k eventos (Job em ns:ui)     → bronze populado
+            └─ data_refresh → data_quality_check → marts gold
                       └─ volume_forecast
                       └─ breach_risk
                       └─ external_event_detection  (se houver monitor)
@@ -247,14 +235,12 @@ make up
 
 ## Dívidas que este runbook expõe
 
-1. **`config.origin` sem produtor** — bloqueia todo o bootstrap.
-2. **Gateway sem Ingress** — o producer local não o alcança.
-3. **`incident_producer.py` na rota antiga** — falta `--tenant`.
-4. **Boundaries manuais** — deveriam ser derivados do range real de
+1. **Gateway sem Ingress** — o producer local não o alcança.
+2. **Boundaries manuais** — deveriam ser derivados do range real de
    `gold_alert_daily_features` quando omitidos, em vez de exigir que o operador
    saiba as datas.
-5. **"Sem dado" indistinguível de "erro"** — `ValueError` de partição vazia vira
+3. **"Sem dado" indistinguível de "erro"** — `ValueError` de partição vazia vira
    `status: Failed` genérico em `trigger.status`; deveria ser um estado próprio,
    checado antes de carregar Prophet/LightGBM.
-6. **Nenhuma fonte de `events.raw.monitor`** — `external_event_detection` e as
+4. **Nenhuma fonte de `events.raw.monitor`** — `external_event_detection` e as
    marts `gold_monitor_*` ficam ociosas.

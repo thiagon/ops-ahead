@@ -1,11 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import { AnalysesService } from './analyses/service.ts';
+import { RulesService } from './rules/service.ts';
+import { SecretCipher } from './sources/cipher.ts';
+import { SourcesService } from './sources/service.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
     services: {
       analyses: AnalysesService;
+      sources: SourcesService;
+      rules: RulesService;
     };
   }
 }
@@ -17,6 +22,16 @@ async function servicesPlugin(fastify: FastifyInstance) {
     analyses: new AnalysesService(fastify.prisma, fastify.kafka, {
       ml: fastify.env.KAFKA_TOPIC_ML,
       data: fastify.env.KAFKA_TOPIC_DATA,
+    }),
+    sources: new SourcesService(
+      fastify.prisma,
+      new SecretCipher(fastify.env.SOURCE_SECRET_KEY),
+      fastify.env.SOURCE_CACHE_TTL_MS,
+    ),
+    rules: new RulesService(fastify.kafka, {
+      mapping: fastify.env.KAFKA_TOPIC_RULES_MAPPING,
+      deadline: fastify.env.KAFKA_TOPIC_RULES_DEADLINE,
+      target: fastify.env.KAFKA_TOPIC_RULES_TARGET,
     }),
   });
 }

@@ -48,7 +48,7 @@ class FieldBindings:
 
 
 def parse_bindings(record: dict[str, Any]) -> FieldBindings:
-    """One config.origin record as the registry publishes it."""
+    """One rules.mapping record as the registry publishes it."""
     paths = {
         entry["field"]: entry["path"]
         for entry in record.get("bindings", [])
@@ -64,7 +64,7 @@ def parse_bindings(record: dict[str, Any]) -> FieldBindings:
 
 class BindingRegistry:
     """Every origin's bindings, keyed by (tenant_id, source). Rehydrated from
-    the compacted config.origin topic — a source absent here has no
+    the compacted rules.mapping topic — a source absent here has no
     configuration, and its events are refused rather than guessed at."""
 
     def __init__(self) -> None:

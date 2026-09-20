@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class DeadlineTable:
     """(tenant_id, severity) -> deadline_seconds. Rehydrated from the compacted
-    config.deadline topic, the same configuration silver_alert joins against —
+    rules.deadline topic, the same rules silver_alert joins against —
     never a constant here (domain/ubiquitous-language.md#tenant)."""
 
     def __init__(self) -> None:
@@ -37,7 +37,7 @@ class DeadlineTable:
 
 
 def apply_deadline(table: DeadlineTable, key: str | None, raw: bytes | None) -> None:
-    """One config.deadline record, keyed by tenant_id."""
+    """One rules.deadline record, keyed by tenant_id."""
     if not raw:
         if key:
             table.forget(key)
@@ -56,13 +56,13 @@ def apply_deadline(table: DeadlineTable, key: str | None, raw: bytes | None) -> 
             {int(entry["severity"]): int(entry["deadline_seconds"]) for entry in record["deadlines"]},
         )
     except (KeyError, TypeError, ValueError):
-        logger.warning("config.deadline record is malformed, skipping")
+        logger.warning("rules.deadline record is malformed, skipping")
 
 
 def _load(raw: bytes) -> dict[str, Any] | None:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("config.deadline record is not valid json, skipping")
+        logger.warning("rules.deadline record is not valid json, skipping")
         return None
     return parsed if isinstance(parsed, dict) else None

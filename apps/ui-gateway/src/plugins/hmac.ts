@@ -3,22 +3,32 @@ import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest, preParsingAsyncHookHandler } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import type { OriginCredential } from './origin-registry.ts';
 
 const SIGNATURE_HEADER = 'x-signature';
 const SIGNATURE_PREFIX = 'sha256=';
 
 const DEFAULT_BODY_LIMIT = 1024 * 1024;
 
+/**
+ * What the hook needs of whoever signed: the secret to check against, and the
+ * pair that labels a rejection. Declared here rather than imported from a
+ * service so this plugin stays a leaf — it loads before they do.
+ */
+export interface SigningOrigin {
+  tenantId: string;
+  source: string;
+  secret: string;
+}
+
 declare module 'fastify' {
   interface FastifyInstance {
     /**
-     * `credential` is resolved per request: the accepted origins come from
-     * configuration, so which credential signs a request is known only once
-     * the URL is matched (see plugins/origin-registry.ts).
+     * `resolve` names the origin this address belongs to: which one signs a
+     * request is only known once the URL is matched, and the lookup is the
+     * caller's to make.
      */
     verifySignatureFor: (
-      resolve: (request: FastifyRequest) => OriginCredential | undefined,
+      resolve: (request: FastifyRequest) => Promise<SigningOrigin | undefined>,
     ) => preParsingAsyncHookHandler;
   }
 }
@@ -47,11 +57,11 @@ export function checkSignature(
 }
 
 /**
- * Exposes `app.verifySignatureFor(credential)` — one hook per registered
- * (tenant, source) credential, each checking against that credential's own
- * secret. A route opts in with `preParsing: app.verifySignatureFor(credential)`;
- * nothing else on the app pays for it, and no route can be verified against
- * another tenant's secret.
+ * Exposes `app.verifySignatureFor(resolve)` — one hook per route, each
+ * checking against the secret of the origin that address belongs to. A route
+ * opts in with `preParsing: app.verifySignatureFor(resolve)`; nothing else on
+ * the app pays for it, and no address can be verified against another
+ * tenant's secret.
  *
  * It runs at preParsing, before the body is parsed: the signature covers the
  * bytes on the wire, and an unsigned caller never gets a payload parsed on its
@@ -59,11 +69,11 @@ export function checkSignature(
  */
 async function hmacPlugin(fastify: FastifyInstance) {
   const verifySignatureFor = (
-    resolve: (request: FastifyRequest) => OriginCredential | undefined,
+    resolve: (request: FastifyRequest) => Promise<SigningOrigin | undefined>,
   ): preParsingAsyncHookHandler => {
     return async (request, _reply, payload) => {
-      const credential = resolve(request);
-      if (!credential) {
+      const origin = await resolve(request);
+      if (!origin) {
         throw createError.NotFound('no integration is configured for this address');
       }
       if (!fastify.env.HMAC_ENABLED) return payload;
@@ -85,22 +95,23 @@ async function hmacPlugin(fastify: FastifyInstance) {
       }
       const body = Buffer.concat(chunks);
 
-      const secret =
-        (fastify.env as unknown as Record<string, string | undefined>)[credential.hmacSecretEnv] ??
-        '';
       const header = request.headers[SIGNATURE_HEADER];
-      const outcome = checkSignature(typeof header === 'string' ? header : undefined, body, secret);
+      const outcome = checkSignature(
+        typeof header === 'string' ? header : undefined,
+        body,
+        origin.secret,
+      );
 
       if (outcome !== 'valid') {
         // app.metrics is read here, not at registration: autoload brings the
         // metrics plugin up after this one, and by request time it is decorated.
         fastify.metrics.signatureFailures.inc({
           reason: outcome,
-          tenant_id: credential.tenantId,
-          source: credential.source,
+          tenant_id: origin.tenantId,
+          source: origin.source,
         });
         request.log.warn(
-          { reason: outcome, url: request.url, tenant_id: credential.tenantId },
+          { reason: outcome, url: request.url, tenant_id: origin.tenantId },
           'rejected an unsigned request',
         );
         throw createError.Unauthorized('missing or invalid X-Signature header');

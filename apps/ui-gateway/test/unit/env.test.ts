@@ -16,11 +16,15 @@ describe('envSchema', () => {
       KAFKA_BOOTSTRAP_SERVERS: 'localhost:9092',
       KAFKA_TOPIC_RAW_ALERT: 'events.raw.alert',
       KAFKA_TOPIC_RAW_MONITOR: 'events.raw.monitor',
-      KAFKA_TOPIC_CONFIG_ORIGIN: 'config.origin',
+      KAFKA_TOPIC_RULES_MAPPING: 'rules.mapping',
+      KAFKA_TOPIC_RULES_DEADLINE: 'rules.deadline',
+      KAFKA_TOPIC_RULES_TARGET: 'rules.target',
       KAFKA_TOPIC_ML: 'trigger.ml',
       KAFKA_TOPIC_DATA: 'trigger.data',
       GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
+      SOURCE_SECRET_KEY: '',
+      SOURCE_CACHE_TTL_MS: 10_000,
     });
   });
 
@@ -49,19 +53,8 @@ describe('envSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it("carries each origin's own secret, named after the origin", () => {
-    const result = envSchema.safeParse({
-      HMAC_ENABLED: 'true',
-      HMAC_SECRET_LOCAWEB_ITSM: 'sekret',
-    });
-
-    // Which origins exist comes from configuration, so the set of secrets is
-    // not known at parse time and each is read by the name the registry
-    // resolved (plugins/origin-registry.ts).
-    expect(result.success).toBe(true);
-    expect((result.data as unknown as Record<string, string>).HMAC_SECRET_LOCAWEB_ITSM).toBe(
-      'sekret',
-    );
+  it('coerces the source cache ttl to a number', () => {
+    expect(envSchema.parse({ SOURCE_CACHE_TTL_MS: '500' }).SOURCE_CACHE_TTL_MS).toBe(500);
   });
 });
 

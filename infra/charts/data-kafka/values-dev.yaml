@@ -66,22 +66,17 @@ kafkaTopics:
     replicas: 1
     config:
       cleanup.policy: compact
-  - name: config.origin
+  - name: rules.mapping
     partitions: 1
     replicas: 1
     config:
       cleanup.policy: compact
-  - name: config.dictionary
+  - name: rules.deadline
     partitions: 1
     replicas: 1
     config:
       cleanup.policy: compact
-  - name: config.deadline
-    partitions: 1
-    replicas: 1
-    config:
-      cleanup.policy: compact
-  - name: config.kpi-target
+  - name: rules.target
     partitions: 1
     replicas: 1
     config:

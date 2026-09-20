@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     kafka_topic_milestones: str = "deadlines.milestone"
     # Compacted — the OLA deadlines, rehydrated at boot. Each replica reads the
     # whole log, so the group id is unique per boot.
-    kafka_topic_config_deadline: str = "config.deadline"
+    kafka_topic_rules_deadline: str = "rules.deadline"
     # Unique per boot, not fixed: on restart the open-occurrence set is
     # reconstructed from ClickHouse (see tracker.py), so this only needs to
     # pick up events from here forward — replaying a stale committed offset

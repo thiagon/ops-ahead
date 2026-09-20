@@ -49,7 +49,7 @@ _CLICKHOUSE_INSERT_DEADLINE = """
 
 _CLICKHOUSE_INSERT_KPI_TARGET = """
     INSERT INTO tenant_kpi_targets
-    (tenant_id, kpi_group, max_breaches, achievement_pct, updated_at)
+    (tenant_id, severities, max_breaches, achievement_pct, updated_at)
     VALUES
 """
 

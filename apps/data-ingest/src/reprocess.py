@@ -77,8 +77,7 @@ def reprocess(
     bindings, dictionaries = asyncio.run(
         load_config_snapshot(
             settings.kafka_bootstrap_servers,
-            settings.kafka_topic_config_origin,
-            settings.kafka_topic_config_dictionary,
+            settings.kafka_topic_rules_mapping,
         )
     )
     writer = BatchWriter(

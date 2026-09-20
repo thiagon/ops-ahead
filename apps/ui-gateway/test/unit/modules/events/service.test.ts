@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildEnvelope } from '../../../../src/modules/events/service.ts';
-import type { OriginCredential } from '../../../../src/plugins/origin-registry.ts';
+import { buildEnvelope, type EventOrigin } from '../../../../src/modules/events/service.ts';
 
-const ITSM_CREDENTIAL: OriginCredential = {
+const ITSM_ORIGIN: EventOrigin = {
   tenantId: 'locaweb',
   source: 'itsm',
   intake: 'alert',
-  envelopeVersion: 'v1',
-  hmacSecretEnv: 'HMAC_SECRET_LOCAWEB_ITSM',
+  version: 'v1',
 };
 
 // One row of assets/incidents.csv, as scripts/incident_producer.py posts it.
@@ -21,8 +19,8 @@ const itsmBody = {
 };
 
 describe('buildEnvelope', () => {
-  it('assigns identity, tenant, source, and intake from the credential — nothing from the body', () => {
-    const envelope = buildEnvelope(ITSM_CREDENTIAL, itsmBody);
+  it('assigns identity, tenant, source, and intake from the origin — nothing from the body', () => {
+    const envelope = buildEnvelope(ITSM_ORIGIN, itsmBody);
 
     expect(envelope).toMatchObject({
       tenant_id: 'locaweb',
@@ -33,13 +31,13 @@ describe('buildEnvelope', () => {
   });
 
   it('keeps the origin body verbatim, opaque, in payload', () => {
-    const envelope = buildEnvelope(ITSM_CREDENTIAL, itsmBody);
+    const envelope = buildEnvelope(ITSM_ORIGIN, itsmBody);
 
     expect(JSON.parse(envelope.payload)).toEqual(itsmBody);
   });
 
   it('is not influenced by a body that tries to declare its own source or tenant', () => {
-    const envelope = buildEnvelope(ITSM_CREDENTIAL, {
+    const envelope = buildEnvelope(ITSM_ORIGIN, {
       ...itsmBody,
       source: 'datadog',
       tenant_id: 'someone-else',
@@ -50,8 +48,8 @@ describe('buildEnvelope', () => {
   });
 
   it('gives every event its own id', () => {
-    expect(buildEnvelope(ITSM_CREDENTIAL, itsmBody).event_id).not.toBe(
-      buildEnvelope(ITSM_CREDENTIAL, itsmBody).event_id,
+    expect(buildEnvelope(ITSM_ORIGIN, itsmBody).event_id).not.toBe(
+      buildEnvelope(ITSM_ORIGIN, itsmBody).event_id,
     );
   });
 });

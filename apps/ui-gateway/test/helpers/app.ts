@@ -1,39 +1,25 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
-import { OriginRegistry } from '../../src/plugins/origin-registry.ts';
+import { SecretCipher } from '../../src/services/sources/cipher.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
 export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
+  process.env.SOURCE_SECRET_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
-  stubOrigins(app);
   stubPrisma(app);
   await app.ready();
   return app;
 }
 
-/**
- * The credential the ITSM loop has always run on. A test that needs another
- * origin decorates `origins` itself before this fills in.
- */
-export const TEST_CREDENTIAL = {
-  tenantId: 'locaweb',
-  source: 'itsm',
-  intake: 'alert' as const,
-  envelopeVersion: 'v1',
-  hmacSecretEnv: 'HMAC_SECRET_LOCAWEB_ITSM',
-};
+/** The secret the seeded sources sign with — what a test signs its bodies with. */
+export const TEST_SECRET = 'itsm-shared-secret';
 
-/** No test reaches a broker to rehydrate the accepted origins. */
-export function stubOrigins(app: FastifyInstance): void {
-  if (app.hasDecorator('origins')) return;
-  const registry = new OriginRegistry();
-  registry.record(TEST_CREDENTIAL);
-  app.decorate('origins', registry);
-}
+/** A key of the right size, so tests never reach a Vault. */
+export const TEST_SECRET_KEY = Buffer.alloc(32, 7).toString('base64');
 
 /**
  * No test reaches a broker: unless the test provided its own publisher, the app
@@ -44,10 +30,49 @@ export function stubKafka(app: FastifyInstance): void {
   app.decorate('kafka', { publish: async () => undefined });
 }
 
-/** No test reaches Postgres. */
+/**
+ * No test reaches Postgres. The ITSM origin the loop has always run on is
+ * seeded, so a webhook test has an address that resolves.
+ */
 export function stubPrisma(app: FastifyInstance): void {
   if (app.hasDecorator('prisma')) return;
   app.decorate('prisma', memoryPrisma());
+}
+
+type SourceRow = {
+  tenantId: string;
+  name: string;
+  intake: 'alert' | 'monitor';
+  status: 'active' | 'disabled';
+  encryptedSecret: string;
+};
+
+function seededSources(): Map<string, SourceRow> {
+  const cipher = new SecretCipher(TEST_SECRET_KEY);
+  const encryptedSecret = cipher.encrypt(TEST_SECRET);
+  const active = 'active' as const;
+  return new Map([
+    [
+      'locaweb:itsm',
+      {
+        tenantId: 'locaweb',
+        name: 'itsm',
+        intake: 'alert' as const,
+        status: active,
+        encryptedSecret,
+      },
+    ],
+    [
+      'locaweb:zabbix',
+      {
+        tenantId: 'locaweb',
+        name: 'zabbix',
+        intake: 'monitor' as const,
+        status: active,
+        encryptedSecret,
+      },
+    ],
+  ]);
 }
 
 type AnalysisRow = {
@@ -59,11 +84,50 @@ type AnalysisRow = {
   detail: unknown;
 };
 
-/** Map behind the Prisma calls the service makes. */
+/** Map behind the Prisma calls the services make. */
 export function memoryPrisma(): PrismaClient {
   const rows = new Map<string, AnalysisRow>();
+  const sources = seededSources();
+  const sourceKey = (where: { tenantId: string; name: string }) =>
+    `${where.tenantId}:${where.name}`;
 
   return {
+    source: {
+      async findUnique({ where }: { where: { tenantId_name: SourceRow } }) {
+        return sources.get(sourceKey(where.tenantId_name)) ?? null;
+      },
+      async findMany({ where }: { where?: { tenantId?: string } } = {}) {
+        const all = [...sources.values()];
+        return where?.tenantId ? all.filter(row => row.tenantId === where.tenantId) : all;
+      },
+      async upsert({
+        where,
+        create,
+        update,
+      }: {
+        where: { tenantId_name: { tenantId: string; name: string } };
+        create: SourceRow;
+        update: Partial<SourceRow>;
+      }) {
+        const key = sourceKey(where.tenantId_name);
+        const current = sources.get(key);
+        sources.set(key, current ? { ...current, ...update } : create);
+        return sources.get(key);
+      },
+      async updateMany({
+        where,
+        data,
+      }: {
+        where: { tenantId: string; name: string };
+        data: Partial<SourceRow>;
+      }) {
+        const key = sourceKey(where);
+        const current = sources.get(key);
+        if (!current) return { count: 0 };
+        sources.set(key, { ...current, ...data });
+        return { count: 1 };
+      },
+    },
     analysis: {
       async upsert({
         where,

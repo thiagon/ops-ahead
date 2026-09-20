@@ -13,7 +13,7 @@ def run_build() -> None:
     # data, which is exactly what a freshly bootstrapped cluster looks like
     # before its first trigger.data message, so this is safe to run standalone
     # as the chart's PreSync hook. The per-tenant configuration silver_alert
-    # joins is a source table data-ingest materializes from config.deadline,
+    # joins is a source table data-ingest materializes from rules.deadline,
     # so nothing is seeded here.
     subprocess.run(["dbt", "run", "--profiles-dir", "/dbt"], check=True)
 
