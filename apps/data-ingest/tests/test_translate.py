@@ -96,3 +96,40 @@ def test_pinning_a_dictionary_version_is_deterministic(dictionaries, bindings):
 
     assert first.model_dump() == second.model_dump()
     assert first.dictionary_version == "v1"
+
+
+def _record_v2(registry: DictionaryRegistry) -> None:
+    registry.record(
+        Dictionary(
+            tenant_id="locaweb",
+            source="itsm",
+            intake="alert",
+            dictionary_version="v2",
+            mappings={"status": {"Encerrado": "canceled"}},
+        )
+    )
+
+
+def test_latest_follows_the_newest_mapping(dictionaries, bindings):
+    _record_v2(dictionaries)
+
+    bronze = translate(_envelope(version="latest"), dictionaries, bindings)
+
+    assert bronze.dictionary_version == "v2"
+    assert bronze.status == "canceled"
+
+
+def test_a_pinned_version_translates_by_the_rules_in_force_back_then(dictionaries, bindings):
+    # A backfill of historical data asks for the version it was written under,
+    # so today's mapping does not rewrite what an older one decided.
+    _record_v2(dictionaries)
+
+    bronze = translate(_envelope(version="v1"), dictionaries, bindings)
+
+    assert bronze.dictionary_version == "v1"
+    assert bronze.status == "closed"
+
+
+def test_refuses_a_version_the_origin_never_had(dictionaries, bindings):
+    with pytest.raises(UnknownSourceError):
+        translate(_envelope(version="v9"), dictionaries, bindings)

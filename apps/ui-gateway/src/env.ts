@@ -32,9 +32,12 @@ export const envSchema = z
     // (domain/ubiquitous-language.md#intake).
     KAFKA_TOPIC_RAW_ALERT: z.string().default('events.raw.alert'),
     KAFKA_TOPIC_RAW_MONITOR: z.string().default('events.raw.monitor'),
-    // Compacted — which origins the gateway accepts, rehydrated at boot
-    // (plugins/origin-registry.ts).
-    KAFKA_TOPIC_CONFIG_ORIGIN: z.string().default('config.origin'),
+    // Compacted — the rules data-ingest translates against. Published here,
+    // never consumed: the gateway envelopes what arrives without consulting
+    // them (services/rules/).
+    KAFKA_TOPIC_RULES_MAPPING: z.string().default('rules.mapping'),
+    KAFKA_TOPIC_RULES_DEADLINE: z.string().default('rules.deadline'),
+    KAFKA_TOPIC_RULES_TARGET: z.string().default('rules.target'),
     KAFKA_TOPIC_ML: z.string().default('trigger.ml'),
     KAFKA_TOPIC_DATA: z.string().default('trigger.data'),
 
@@ -43,11 +46,10 @@ export const envSchema = z
       .default('postgres://admin:ops-ahead-dev@localhost:5432/gateway'),
 
     HMAC_ENABLED: z.stringbool().default(false),
+    // One secret for every webhook while a single integration is in
+    // validation; per-origin secrets come back when more than one exists.
+    HMAC_SECRET: z.string().default(''),
   })
-  // Each origin's secret arrives as HMAC_SECRET_<TENANT>_<SOURCE>, named after
-  // the origin the registry resolved, so the set is not known at parse time —
-  // a signed request against a missing secret fails the check rather than
-  // passing unverified.
   .loose();
 
 export type Env = z.infer<typeof envSchema>;

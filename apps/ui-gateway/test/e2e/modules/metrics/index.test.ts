@@ -5,7 +5,7 @@ import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
 const SECRET = 'itsm-shared-secret';
-const ROUTE = '/webhook/v1/locaweb/itsm';
+const ROUTE = '/webhook/alert/locaweb/itsm';
 
 const publish = vi.fn(async (_message: OutboundMessage) => undefined);
 
@@ -23,14 +23,14 @@ describe('GET /metrics', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    process.env.HMAC_SECRET_LOCAWEB_ITSM = SECRET;
+    process.env.HMAC_SECRET = SECRET;
     app = await createTestApp(instance => instance.decorate('kafka', { publish }));
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.HMAC_ENABLED;
-    delete process.env.HMAC_SECRET_LOCAWEB_ITSM;
+    delete process.env.HMAC_SECRET;
   });
 
   function post(body: object, signed = true) {
@@ -79,7 +79,6 @@ describe('GET /metrics', () => {
     expect(failureLine).toContain('source="itsm"');
     expect(failureLine).toMatch(/} 1$/);
     expect(signatureLine).toContain('reason="missing"');
-    expect(signatureLine).toContain('tenant_id="locaweb"');
     expect(signatureLine).toMatch(/} 1$/);
   });
 

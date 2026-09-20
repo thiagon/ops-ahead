@@ -1,6 +1,7 @@
 import pytest
 
-from config_stream import apply_dictionary
+from bindings import BindingRegistry
+from config_stream import apply_mapping
 from dictionaries import Dictionary, DictionaryRegistry
 
 
@@ -13,16 +14,21 @@ def _record(version: str, mappings: dict) -> bytes:
             "source": "itsm",
             "intake": "alert",
             "dictionary_version": version,
+            "bindings": [{"field": "status", "path": "fields.status"}],
             "mappings": mappings,
         }
     ).encode()
 
 
+def _apply(registry: DictionaryRegistry, key: str | None, raw: bytes | None) -> None:
+    apply_mapping(BindingRegistry(), registry, key, raw)
+
+
 @pytest.fixture
 def registry() -> DictionaryRegistry:
     registry = DictionaryRegistry()
-    apply_dictionary(registry, "locaweb:itsm", _record("v1", {"status": {"Encerrado": "closed"}}))
-    apply_dictionary(
+    _apply(registry, "locaweb:itsm", _record("v1", {"status": {"Encerrado": "closed"}}))
+    _apply(
         registry,
         "locaweb:itsm",
         _record("v2", {"status": {"Encerrado": "closed", "Aguardando Problema": "waiting"}}),
@@ -51,13 +57,13 @@ def test_an_unknown_origin_has_no_dictionary_rather_than_an_empty_one():
 
 
 def test_a_tombstone_forgets_the_origin(registry):
-    apply_dictionary(registry, "locaweb:itsm", None)
+    _apply(registry, "locaweb:itsm", None)
 
     assert registry.latest("locaweb", "itsm") is None
 
 
 def test_a_malformed_record_does_not_stop_the_rehydration(registry):
-    apply_dictionary(registry, "locaweb:itsm", b"not json")
+    _apply(registry, "locaweb:itsm", b"not json")
 
     # The record is skipped, and what the log already carried still stands.
     assert registry.latest("locaweb", "itsm").dictionary_version == "v2"

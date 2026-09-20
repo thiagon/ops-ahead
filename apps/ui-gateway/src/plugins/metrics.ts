@@ -6,7 +6,7 @@ export interface Metrics {
   registry: Registry;
   eventsPublished: Counter<'source' | 'intake'>;
   publishFailures: Counter<'source' | 'intake'>;
-  signatureFailures: Counter<'reason' | 'tenant_id' | 'source'>;
+  signatureFailures: Counter<'reason'>;
 }
 
 declare module 'fastify' {
@@ -44,7 +44,7 @@ function createMetrics(): Metrics {
     signatureFailures: new Counter({
       name: 'gateway_signature_failures_total',
       help: 'Requests rejected by HMAC signature verification',
-      labelNames: ['reason', 'tenant_id', 'source'],
+      labelNames: ['reason'],
       registers: [registry],
     }),
   };

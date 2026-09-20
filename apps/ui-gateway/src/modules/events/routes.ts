@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { rawTopicFor } from '../../env.ts';
@@ -10,98 +10,96 @@ import {
 } from './schema.ts';
 import { buildEnvelope } from './service.ts';
 
+const INTAKES = ['alert', 'monitor'] as const;
+
+/** Stamped when the caller does not pin one: the envelope format in use. */
+const DEFAULT_VERSION = 'latest';
+
 const webhookParamsSchema = z.object({
-  version: z.string().min(1),
   tenant: z.string().min(1),
   source: z.string().min(1),
+  version: z.string().min(1).optional(),
 });
 
-type WebhookRequest = FastifyRequest<{ Params: z.infer<typeof webhookParamsSchema> }>;
-
 /**
- * One route for every origin: which (tenant, source) pairs are accepted comes
- * from configuration, not from code, so the route matches on the path and the
- * registry decides whether that origin exists (plugins/origin-registry.ts).
+ * One route per intake, since the nature of what arrives decides which raw
+ * topic carries it (domain/ubiquitous-language.md#intake) and nothing else
+ * downstream can recover it from an opaque body.
  *
- * The credential the registry returns — never the URL or the payload — is what
- * assigns tenant_id, source and intake to the envelope
- * (domain/ubiquitous-language.md#tenant).
+ * The gateway does not decide whether an origin is known: it envelopes what
+ * it receives and publishes. Whether the pipeline can translate that event is
+ * data-ingest's question, answered against the mapping rules — an event with
+ * no mapping stays raw in the lake instead of being refused here.
  */
 export function registerIncidentRoutes(app: FastifyInstance): void {
-  const resolve = (request: FastifyRequest) => {
-    const { tenant, source, version } = (request as WebhookRequest).params;
-    const credential = app.origins.find(tenant, source);
-    // A credential registered under another envelope version does not answer
-    // this address.
-    return credential?.envelopeVersion === version ? credential : undefined;
-  };
+  const typed = app.withTypeProvider<ZodTypeProvider>();
 
-  app.withTypeProvider<ZodTypeProvider>().post(
-    '/webhook/:version/:tenant/:source',
-    {
-      // The origin signs what it posts with its own secret; this is the signed
-      // surface for that (tenant, source) pair.
-      preParsing: app.verifySignatureFor(resolve),
-      schema: {
-        tags: ['incidents'],
-        summary: 'Ingest an event from a configured origin',
-        description:
-          'The body is opaque: preserved verbatim in the raw envelope, never parsed or typed here. See domain/acl/itsm.md.',
-        params: webhookParamsSchema,
-        headers: webhookHeadersSchema,
-        body: webhookBodySchema,
-        response: {
-          202: webhookAcceptedSchema,
-          400: webhookErrorSchema,
-          401: webhookErrorSchema,
-          404: webhookErrorSchema,
-          502: webhookErrorSchema,
+  for (const intake of INTAKES) {
+    for (const path of [
+      `/webhook/${intake}/:tenant/:source`,
+      `/webhook/${intake}/:tenant/:source/:version`,
+    ]) {
+      typed.post(
+        path,
+        {
+          preParsing: app.verifySignature,
+          schema: {
+            tags: ['incidents'],
+            summary: `Ingest a ${intake} event`,
+            description:
+              'The body is opaque: preserved verbatim in the raw envelope, never parsed or typed here. See domain/acl/itsm.md.',
+            params: webhookParamsSchema,
+            headers: webhookHeadersSchema,
+            body: webhookBodySchema,
+            response: {
+              202: webhookAcceptedSchema,
+              400: webhookErrorSchema,
+              401: webhookErrorSchema,
+              502: webhookErrorSchema,
+            },
+          },
         },
-      },
-    },
-    async (request, reply) => {
-      const credential = resolve(request);
-      if (!credential) {
-        return reply.status(404).send({
-          error: 'UnknownOrigin',
-          message: 'no integration is configured for this address',
-        });
-      }
+        async (request, reply) => {
+          const { tenant, source, version } = request.params;
+          const envelope = buildEnvelope(
+            { tenantId: tenant, source, intake, version: version ?? DEFAULT_VERSION },
+            request.body,
+          );
+          const topic = rawTopicFor(request.server.env, intake);
 
-      const envelope = buildEnvelope(credential, request.body);
-      const topic = rawTopicFor(request.server.env, credential.intake);
+          try {
+            await request.server.kafka.publish({
+              topic,
+              key: envelope.event_id,
+              value: JSON.stringify(envelope),
+            });
+          } catch (err) {
+            request.server.metrics.publishFailures.inc({
+              source: envelope.source,
+              intake: envelope.intake,
+            });
+            request.log.error(
+              { err, event_id: envelope.event_id },
+              'failed to publish incident envelope',
+            );
+            return reply.status(502).send({
+              error: 'PublishFailed',
+              message: 'could not publish the event to the bus',
+            });
+          }
 
-      try {
-        await request.server.kafka.publish({
-          topic,
-          key: envelope.event_id,
-          value: JSON.stringify(envelope),
-        });
-      } catch (err) {
-        request.server.metrics.publishFailures.inc({
-          source: envelope.source,
-          intake: envelope.intake,
-        });
-        request.log.error(
-          { err, event_id: envelope.event_id },
-          'failed to publish incident envelope',
-        );
-        return reply.status(502).send({
-          error: 'PublishFailed',
-          message: 'could not publish the event to the bus',
-        });
-      }
-
-      request.server.metrics.eventsPublished.inc({
-        source: envelope.source,
-        intake: envelope.intake,
-      });
-      // 202, not 201: the bus owns the event now, the gateway holds nothing.
-      return reply.status(202).send({
-        event_id: envelope.event_id,
-        tenant_id: envelope.tenant_id,
-        source: envelope.source,
-      });
-    },
-  );
+          request.server.metrics.eventsPublished.inc({
+            source: envelope.source,
+            intake: envelope.intake,
+          });
+          // 202, not 201: the bus owns the event now, the gateway holds nothing.
+          return reply.status(202).send({
+            event_id: envelope.event_id,
+            tenant_id: envelope.tenant_id,
+            source: envelope.source,
+          });
+        },
+      );
+    }
+  }
 }

@@ -40,7 +40,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
     group_id = f"{settings.kafka_group_id_prefix}-{uuid4()}"
 
     @broker.subscriber(
-        settings.kafka_topic_config_deadline, group_id=group_id, auto_offset_reset="earliest"
+        settings.kafka_topic_rules_deadline, group_id=group_id, auto_offset_reset="earliest"
     )
     async def handle_config_deadline(msg: KafkaMessage) -> None:
         raw_key = getattr(msg.raw_message, "key", None)
@@ -63,7 +63,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         metrics.open_occurrences.set(len(tracker))
         logger.info("reconstructed %d open occurrences", len(tracker))
 
-        # The deadlines stay current on their own: the config.deadline
+        # The deadlines stay current on their own: the rules.deadline
         # consumer applies every change as it arrives, so the tick only has to
         # cross the thresholds that time alone made due.
         async def _tick() -> None:

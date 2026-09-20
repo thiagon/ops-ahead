@@ -5,7 +5,7 @@ import { checkSignature } from '../../../src/plugins/hmac.ts';
 import { createTestApp } from '../../helpers/app.ts';
 
 const SECRET = 'itsm-shared-secret';
-const ROUTE = '/webhook/v1/locaweb/itsm';
+const ROUTE = '/webhook/alert/locaweb/itsm';
 
 const itsmEvent = { ticket_number: 'INC0012345', priority_code: 2, status: 'Encerrado' };
 
@@ -46,14 +46,14 @@ describe('signature verification enabled', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    process.env.HMAC_SECRET_LOCAWEB_ITSM = SECRET;
+    process.env.HMAC_SECRET = SECRET;
     app = await createTestApp();
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.HMAC_ENABLED;
-    delete process.env.HMAC_SECRET_LOCAWEB_ITSM;
+    delete process.env.HMAC_SECRET;
   });
 
   it('accepts a signed request', async () => {

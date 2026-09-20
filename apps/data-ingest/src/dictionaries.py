@@ -20,7 +20,7 @@ class Dictionary:
 
 class DictionaryRegistry:
     """Every dictionary this consumer knows, keyed by (tenant_id, source).
-    Rehydrated from the compacted config.dictionary topic, which carries the
+    Rehydrated from the compacted rules.mapping topic, which carries the
     current version of each — reprocessing pins an explicit version instead
     (see reprocess.py)."""
 

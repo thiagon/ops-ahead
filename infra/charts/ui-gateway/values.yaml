@@ -23,7 +23,9 @@ gateway:
     kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
     kafkaTopicRawAlert: events.raw.alert
     kafkaTopicRawMonitor: events.raw.monitor
-    kafkaTopicConfigOrigin: config.origin
+    kafkaTopicRulesMapping: rules.mapping
+    kafkaTopicRulesDeadline: rules.deadline
+    kafkaTopicRulesTarget: rules.target
     kafkaTopicMl: trigger.ml
     kafkaTopicData: trigger.data
     hmacEnabled: "true"

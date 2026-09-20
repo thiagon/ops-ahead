@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
 import { createTestApp } from '../../../helpers/app.ts';
 
-const ROUTE = '/webhook/v1/locaweb/itsm';
+const ROUTE = '/webhook/alert/locaweb/itsm';
 
 // The broker is out of scope here: what matters is that an accepted event
 // reaches the publisher, on the right topic, and that a publisher failure
@@ -21,7 +21,7 @@ const itsmEvent = {
   opened_by: 'Monitoramento',
 };
 
-describe('POST /webhook/v1/locaweb/itsm', () => {
+describe('POST /webhook/:intake/:tenant/:source', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -64,6 +64,43 @@ describe('POST /webhook/v1/locaweb/itsm', () => {
     expect(JSON.parse(envelope.payload)).toEqual(itsmEvent);
   });
 
+  it('routes a monitor event to the monitor raw topic', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/webhook/monitor/locaweb/zabbix',
+      payload: itsmEvent,
+    });
+
+    const message = publish.mock.calls[0]?.[0];
+    expect(message?.topic).toBe('events.raw.monitor');
+    expect(JSON.parse(message?.value ?? '')).toMatchObject({ intake: 'monitor' });
+  });
+
+  it('stamps latest when the caller pins no version', async () => {
+    await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
+
+    expect(JSON.parse(publish.mock.calls[0]?.[0]?.value ?? '')).toMatchObject({
+      version: 'latest',
+    });
+  });
+
+  it('carries the version the caller pinned', async () => {
+    await app.inject({ method: 'POST', url: `${ROUTE}/v2`, payload: itsmEvent });
+
+    expect(JSON.parse(publish.mock.calls[0]?.[0]?.value ?? '')).toMatchObject({ version: 'v2' });
+  });
+
+  it('accepts an origin it has no mapping for — translation is data-ingest’s call', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhook/alert/locaweb/datadog',
+      payload: itsmEvent,
+    });
+
+    expect(res.statusCode).toBe(202);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
   it('answers 502 when the event does not reach the bus', async () => {
     publish.mockRejectedValueOnce(new Error('broker down'));
 
@@ -71,17 +108,6 @@ describe('POST /webhook/v1/locaweb/itsm', () => {
 
     expect(res.statusCode).toBe(502);
     expect(res.json()).toMatchObject({ error: 'PublishFailed' });
-  });
-
-  it('answers 404 for a credential the gateway does not have', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/webhook/v1/locaweb/datadog',
-      payload: itsmEvent,
-    });
-
-    expect(res.statusCode).toBe(404);
-    expect(publish).not.toHaveBeenCalled();
   });
 
   it('rejects a non-object body', async () => {
@@ -96,10 +122,11 @@ describe('POST /webhook/v1/locaweb/itsm', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('publishes one parameterized ingest route, not one per origin', async () => {
-    const res = await app.inject({ method: 'GET', url: '/docs/json' });
+  it('publishes one parameterized ingest route per intake, not one per origin', async () => {
+    const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
 
-    expect(res.json().paths['/webhook/{version}/{tenant}/{source}']).toBeDefined();
+    expect(paths['/webhook/alert/{tenant}/{source}']).toBeDefined();
+    expect(paths['/webhook/monitor/{tenant}/{source}']).toBeDefined();
   });
 
   it('documents the envelope published to the bus', async () => {
