@@ -1,8 +1,9 @@
-# Same PreSync-hook pattern data-ingest's migration Job uses: dbt run
-# materializes every view/table this app owns — including
-# tenant_deadlines and silver_alert_open — before the rest of this app's
-# sync proceeds, and, via sync-wave ordering, before data-deadline-tracker's
-# wave starts, since its startup reads both.
+# Same PreSync-hook pattern data-ingest's migration Job uses, narrowed to
+# what a deploy actually depends on: the read models data-deadline-tracker
+# selects from at boot (silver_alert_open, candidate_open) must exist before
+# its sync-wave starts. The analytical marts are computed by the daily
+# full_pipeline instead, so a broken mart fails that run and not the deploy —
+# the app stays Healthy and waits for data rather than going Missing.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -31,7 +32,7 @@ spec:
         - name: build
           image: {{ include "data-runner.image" . | quote }}
           imagePullPolicy: {{ (index .Values "data-runner").image.pullPolicy }}
-          command: ["python", "-m", "main", "run", "build"]
+          command: ["python", "-m", "main", "run", "structure"]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
