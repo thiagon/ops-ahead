@@ -55,7 +55,8 @@ def test_volume_predict_request_requires_at_least_one_feature_row():
 def test_breach_feature_input_rejects_severity_outside_p1_p3():
     with pytest.raises(ValidationError):
         BreachFeatureInput(
-            severity=4,  # only P1-P3 are KPI-eligible
+            tenant_id="locaweb",
+        severity=4,  # only P1-P3 are KPI-eligible
             owner="Team14",
             opened_hour=10,
             opened_dayofweek=2,
@@ -81,6 +82,7 @@ def test_breach_feature_input_allows_missing_historical_ratio_and_auto_resolutio
     # no monitor-chain history yet, is legitimate (see ml-breach-model's
     # add_historical_group_severity_features / add_monitor_context_features).
     feature = BreachFeatureInput(
+        tenant_id="locaweb",
         severity=2,
         owner="Team14",
         opened_hour=10,

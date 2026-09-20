@@ -4,6 +4,7 @@ import { type AnalysisStatus, type AnalysisTrigger, analysisStatusSchema } from 
 
 export interface AnalysisOrigin {
   analysis: string;
+  tenantId?: string;
   trigger: AnalysisTrigger;
   parentId?: string;
 }
@@ -11,6 +12,7 @@ export interface AnalysisOrigin {
 export interface AnalysisListFilter {
   trigger?: AnalysisTrigger;
   analysis?: string;
+  tenantId?: string;
   limit: number;
 }
 
@@ -29,6 +31,7 @@ export class AnalysisStore {
         status: 'pending',
         updateKeyHash,
         analysis: origin.analysis,
+        tenantId: origin.tenantId,
         trigger: origin.trigger,
         parentId: origin.parentId,
       },
@@ -67,6 +70,7 @@ export class AnalysisStore {
       where: {
         ...(filter.trigger ? { trigger: filter.trigger } : {}),
         ...(filter.analysis ? { analysis: filter.analysis } : {}),
+        ...(filter.tenantId ? { tenantId: filter.tenantId } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: filter.limit,
@@ -82,6 +86,7 @@ function toStatus(row: AnalysisRow): AnalysisStatus {
   return {
     id: row.id,
     analysis: row.analysis,
+    tenant_id: row.tenantId ?? undefined,
     trigger: row.trigger,
     parent_id: row.parentId ?? undefined,
     status: row.status,

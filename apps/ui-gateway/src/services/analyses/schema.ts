@@ -26,6 +26,7 @@ export const analysisStatusSchema = z
   .object({
     id: z.string(),
     analysis: z.string().optional(),
+    tenant_id: z.string().optional(),
     trigger: analysisTriggerSchema.optional(),
     parent_id: z.string().optional(),
     status: analysisStatusValueSchema,
@@ -38,7 +39,7 @@ export const analysisStatusSchema = z
 export type AnalysisStatus = z.infer<typeof analysisStatusSchema>;
 
 export const analysisStatusUpdateSchema = analysisStatusSchema
-  .omit({ id: true, analysis: true, trigger: true, parent_id: true })
+  .omit({ id: true, analysis: true, tenant_id: true, trigger: true, parent_id: true })
   .meta({ id: 'AnalysisStatusUpdate' });
 
 export type AnalysisStatusUpdate = z.infer<typeof analysisStatusUpdateSchema>;
@@ -50,6 +51,7 @@ export const analysisParamsSchema = z.object({
 export const analysisListQuerySchema = z.object({
   trigger: analysisTriggerSchema.optional(),
   analysis: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional(),
   limit: z.coerce.number().int().positive().max(200).default(50),
 });
 
@@ -77,9 +79,18 @@ const provenance = {
   parent_id: z.string().min(1).optional(),
 };
 
+/**
+ * Required on every training: there is one model per tenant, so a run without
+ * one has no owner — neither "whose model is this" nor "retrain just this
+ * client" would be answerable. The data analyses stay tenant-wide, since a
+ * transformation rebuilds every mart at once.
+ */
+const tenantScoped = { tenant_id: z.string().min(1) };
+
 export const volumeForecastRequestSchema = z
   .object({
     analysis: z.literal('volume_forecast'),
+    ...tenantScoped,
     ...provenance,
     train_end: splitDate,
     validation_end: splitDate,
@@ -91,6 +102,7 @@ export const volumeForecastRequestSchema = z
 export const breachRiskRequestSchema = z
   .object({
     analysis: z.literal('breach_risk'),
+    ...tenantScoped,
     ...provenance,
     train_end: splitDate,
     validation_end: splitDate,
@@ -102,6 +114,7 @@ export const breachRiskRequestSchema = z
 export const kpiProjectionRequestSchema = z
   .object({
     analysis: z.literal('kpi_projection'),
+    ...tenantScoped,
     ...provenance,
     n_simulations: z.number().int().positive().optional(),
     seed: z.number().int().optional(),
@@ -116,6 +129,7 @@ export const kpiProjectionRequestSchema = z
 export const externalEventDetectionRequestSchema = z
   .object({
     analysis: z.literal('external_event_detection'),
+    ...tenantScoped,
     ...provenance,
     contamination: z.number().min(0).max(0.5).optional(),
   })
@@ -125,6 +139,7 @@ export const externalEventDetectionRequestSchema = z
 export const entityForecastRequestSchema = z
   .object({
     analysis: z.literal('entity_forecast'),
+    ...tenantScoped,
     ...provenance,
     train_end: splitDate,
     validation_end: splitDate,

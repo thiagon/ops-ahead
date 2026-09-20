@@ -77,6 +77,10 @@ enum AnalysisTrigger {
 model Analysis {
   id            String          @id
   analysis      String
+  /// Null for the data analyses, which rebuild every mart at once. Set on a
+  /// training, where there is one model per tenant and a run without an owner
+  /// could answer neither "whose model is this" nor "retrain just this one".
+  tenantId      String?         @map("tenant_id")
   trigger       AnalysisTrigger @default(manual)
   status        AnalysisStatus  @default(pending)
   updateKeyHash String          @map("update_key_hash")
@@ -93,6 +97,7 @@ model Analysis {
   children Analysis[] @relation("AnalysisChain")
 
   @@index([trigger, createdAt])
+  @@index([tenantId, createdAt])
   @@index([analysis, createdAt])
   @@map("analyses")
 }

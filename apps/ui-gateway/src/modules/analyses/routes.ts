@@ -57,7 +57,13 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
         response: { 200: analysisStatusSchema.array() },
       },
     },
-    async request => analyses.list(request.query),
+    async request =>
+      analyses.list({
+        trigger: request.query.trigger,
+        analysis: request.query.analysis,
+        tenantId: request.query.tenant_id,
+        limit: request.query.limit,
+      }),
   );
 
   typed.get(

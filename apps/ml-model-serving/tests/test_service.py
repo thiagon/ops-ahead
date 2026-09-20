@@ -9,6 +9,7 @@ from schemas import BreachFeatureInput, VolumePredictRequest
 from service import ModelNotLoaded, ModelServing, RequestedModelVersionNotFound
 
 VOLUME_PAYLOAD = {
+    "tenant_id": "locaweb",
     "features": [
         {
             "priority_group": "total",
@@ -24,6 +25,7 @@ VOLUME_PAYLOAD = {
 }
 
 BREACH_PAYLOAD = {
+    "tenant_id": "locaweb",
     "severity": 2,
     "owner": "Team14",
     "opened_hour": 10,
@@ -174,7 +176,7 @@ def test_model_registry_raises_model_version_not_found_directly(monkeypatch):
 
     service = _service(monkeypatch, _raise)
     with pytest.raises(ModelVersionNotFound):
-        service.registry.breach_model_for("42")
+        service.registry.breach_model_for("locaweb", "42")
 
 
 def test_predict_volume_and_breach_over_http(monkeypatch):

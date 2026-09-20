@@ -7,7 +7,7 @@ from volume.features import to_long_format
 from volume.train import train_and_log, train_horizon
 
 
-def _synthetic_daily(days: int = 240) -> pd.DataFrame:
+def _synthetic_daily(days: int = 240, tenant_id: str = "locaweb") -> pd.DataFrame:
     dates = pd.date_range("2025-01-01", periods=days, freq="D")
     rng = np.random.default_rng(7)
     rows = []
@@ -16,6 +16,7 @@ def _synthetic_daily(days: int = 240) -> pd.DataFrame:
         total = max(int((25 + 5 * np.sin(date.dayofyear / 30)) * weekday_factor + rng.integers(-2, 3)), 5)
         rows.append(
             {
+                "tenant_id": tenant_id,
                 "date": date,
                 "source": "itsm",
                 "total_incidents": total,
@@ -76,3 +77,26 @@ def test_train_and_log_writes_one_row_per_priority_group_and_horizon(synthetic_s
     for row in written:
         assert row["yhat"] >= 0
         assert row["yhat_lower"] <= row["yhat_upper"]
+
+
+def test_train_and_log_trains_one_set_of_models_per_tenant(synthetic_settings, monkeypatch):
+    """A shared model would learn the weighted average of both operations,
+    worst exactly for the smaller one."""
+    written = []
+    monkeypatch.setattr("volume.train.write_volume_forecast", lambda settings, rows: written.extend(rows))
+    daily = pd.concat([_synthetic_daily(), _synthetic_daily(tenant_id="acme")])
+
+    train_and_log(synthetic_settings, daily)
+
+    assert {row["tenant_id"] for row in written} == {"acme", "locaweb"}
+
+
+def test_a_tenant_without_enough_history_is_skipped_not_failed(synthetic_settings, monkeypatch):
+    written = []
+    monkeypatch.setattr("volume.train.write_volume_forecast", lambda settings, rows: written.extend(rows))
+    daily = pd.concat([_synthetic_daily(), _synthetic_daily(days=10, tenant_id="acme")])
+
+    run_id = train_and_log(synthetic_settings, daily)
+
+    assert run_id
+    assert {row["tenant_id"] for row in written} == {"locaweb"}

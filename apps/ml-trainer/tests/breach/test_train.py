@@ -6,7 +6,7 @@ from breach.train import train_and_log
 from settings import Settings
 
 
-def _synthetic_examples(n: int = 300) -> pd.DataFrame:
+def _synthetic_examples(n: int = 300, tenant_id: str = "locaweb") -> pd.DataFrame:
     rng = np.random.default_rng(11)
     dates = pd.date_range("2025-01-01", periods=n, freq="8h")
     owners = rng.choice(["Team14", "TeamX", "TeamY"], size=n)
@@ -26,7 +26,7 @@ def _synthetic_examples(n: int = 300) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "milestone_id": [f"m{i}" for i in range(n)],
-            "tenant_id": ["locaweb"] * n,
+            "tenant_id": [tenant_id] * n,
             "source": ["itsm"] * n,
             "external_id": [f"INC{i}" for i in range(n)],
             "entity_id": [f"ic{i % 5}" for i in range(n)],
@@ -88,3 +88,37 @@ def test_train_and_log_completes_and_logs_a_run(synthetic_settings):
     )
 
     assert run_id
+
+
+def test_each_tenant_gets_its_own_model(synthetic_settings, monkeypatch):
+    """Partitioning happens before the features are built: an OLA rate for one
+    client's group must not be established from another client's traffic."""
+    seen: dict[str, set] = {}
+
+    def _fake_train_tenant(settings, examples, *args, **kwargs):
+        tenant_id = args[3] if len(args) > 3 else kwargs["tenant_id"]
+        seen[tenant_id] = set(examples["tenant_id"])
+        return f"run-{tenant_id}"
+
+    monkeypatch.setattr("breach.train.train_tenant", _fake_train_tenant)
+    monkeypatch.setattr(synthetic_settings, "breach_min_examples", 100)
+    examples = pd.concat(
+        [_synthetic_examples(), _synthetic_examples(tenant_id="acme")], ignore_index=True
+    )
+    signal_counts, auto_resolution_rate, severity_escalations = _synthetic_monitor_context()
+
+    train_and_log(
+        synthetic_settings, examples, signal_counts, auto_resolution_rate, severity_escalations
+    )
+
+    assert seen == {"locaweb": {"locaweb"}, "acme": {"acme"}}
+
+
+def test_a_tenant_with_too_few_examples_is_skipped():
+    from breach.train import tenants_with_history
+
+    examples = pd.concat(
+        [_synthetic_examples(), _synthetic_examples(tenant_id="acme").head(5)], ignore_index=True
+    )
+
+    assert tenants_with_history(examples, 100) == ["locaweb"]

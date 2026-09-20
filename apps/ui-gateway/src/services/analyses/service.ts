@@ -25,6 +25,7 @@ export class AnalysesService {
     const updateKey = randomBytes(32).toString('base64url');
     await this.#store.enqueue(id, hashUpdateKey(updateKey), {
       analysis: request.analysis,
+      tenantId: 'tenant_id' in request ? request.tenant_id : undefined,
       trigger: request.trigger,
       parentId: request.parent_id,
     });

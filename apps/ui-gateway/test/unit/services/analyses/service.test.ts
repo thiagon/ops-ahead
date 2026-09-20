@@ -49,6 +49,7 @@ describe('AnalysesService.start', () => {
     const parent = await analyses.start({ analysis: 'full_pipeline', trigger: 'scheduled' });
     const child = await analyses.start({
       analysis: 'kpi_projection',
+      tenant_id: 'locaweb',
       trigger: 'chained',
       parent_id: parent.id,
     });
@@ -86,6 +87,7 @@ describe('AnalysesService.start', () => {
   it('carries volume_forecast split dates into the trigger.ml event', async () => {
     const request = {
       analysis: 'volume_forecast' as const,
+      tenant_id: 'locaweb',
       train_end: '2025-09-30',
       validation_end: '2025-10-31',
       holdout_end: '2026-01-31',

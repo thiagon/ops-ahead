@@ -105,6 +105,7 @@ def process_message(
     # breach_risk message set it first). A fresh copy per message, seeded
     # from the process's own env-derived settings, can never leak.
     message_settings = settings.model_copy()
+    message_settings.tenant_id = event.get("tenant_id")
     message_settings.train_end = event.get("train_end")
     message_settings.validation_end = event.get("validation_end")
     message_settings.holdout_end = event.get("holdout_end")

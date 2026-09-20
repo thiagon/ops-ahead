@@ -10,6 +10,7 @@ import pandas as pd
 from prophet import Prophet
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 
+from model_names import registered_model_name
 from settings import Settings
 from split import temporal_split
 from volume import features
@@ -161,18 +162,83 @@ def train_horizon(daily: pd.DataFrame, long_df: pd.DataFrame, settings: Settings
     }
 
 
+def tenants_with_history(daily: pd.DataFrame, min_history_days: int) -> list[str]:
+    """Tenants discovered from the mart, never from configuration: adding a
+    client must not require editing anything here. One without enough history
+    is skipped with a log, not failed."""
+    history = daily.groupby("tenant_id")["date"].nunique()
+    eligible = sorted(history[history >= min_history_days].index)
+    for tenant_id in sorted(set(history.index) - set(eligible)):
+        LOGGER.info(
+            "volume: skipping tenant=%s, %d days of history (< %d)",
+            tenant_id,
+            history[tenant_id],
+            min_history_days,
+        )
+    return eligible
+
+
+def _requested_tenants(settings: Settings, eligible: list[str]) -> list[str]:
+    """`settings.tenant_id` narrows the run to one tenant — every training
+    message carries it. It has to be eligible: asking for a tenant with too
+    little history is an explicit error, not a silent no-op, because the
+    caller asked for a model and would otherwise get none without being told.
+    """
+    if settings.tenant_id is None:
+        return eligible
+    if settings.tenant_id not in eligible:
+        raise ValueError(
+            f"tenant {settings.tenant_id!r} has no trainable history"
+        )
+    return [settings.tenant_id]
+
+
 def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str | None = None) -> str:
-    """Train both horizons, log one MLflow run bundling everything, and — when
-    `settings.auto_promote` — register + promote it to `Production`. Returns
-    the run id."""
+    """A set of models per tenant, never one across all of them: two operations
+    have different seasonality, severity mix and base volume, and a shared model
+    learns the weighted average — worst exactly for the smaller client, where
+    the relative error hurts most.
+
+    One tenant failing does not cost the others; the parent run records which
+    ones trained.
+    """
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     mlflow.set_experiment(settings.mlflow_experiment_name)
+
+    tenants = _requested_tenants(settings, tenants_with_history(daily, settings.tenant_min_history_days))
+    trained: dict[str, str] = {}
+    failed: dict[str, str] = {}
+
+    with mlflow.start_run() as parent:
+        mlflow.log_param("dataset_version", dataset_version or settings.dataset_version)
+        mlflow.log_param("tenants", ",".join(tenants))
+        for tenant_id in tenants:
+            try:
+                trained[tenant_id] = train_tenant(
+                    settings, daily[daily["tenant_id"] == tenant_id], tenant_id, dataset_version
+                )
+            except Exception as exc:
+                LOGGER.exception("volume: tenant=%s failed", tenant_id)
+                failed[tenant_id] = str(exc)
+        mlflow.log_param("tenants_trained", ",".join(trained))
+        mlflow.log_param("tenants_failed", ",".join(failed))
+        mlflow.log_metric("tenants_trained_count", len(trained))
+        return parent.info.run_id
+
+
+def train_tenant(
+    settings: Settings, daily: pd.DataFrame, tenant_id: str, dataset_version: str | None = None
+) -> str:
+    """Both horizons for one tenant, logged as a nested run and registered
+    under a name carrying the tenant so inference can resolve which to serve."""
+    registered_name = registered_model_name(settings.mlflow_registered_model_name, tenant_id)
 
     long_df = features.to_long_format(daily)
 
     results = {horizon: train_horizon(daily, long_df, settings, horizon) for horizon in HORIZONS}
 
-    with mlflow.start_run() as run:
+    with mlflow.start_run(nested=True, run_name=tenant_id) as run:
+        mlflow.log_param("tenant_id", tenant_id)
         mlflow.log_param("dataset_version", dataset_version or settings.dataset_version)
         mlflow.log_param("train_end", settings.train_end)
         mlflow.log_param("validation_end", settings.validation_end)
@@ -207,20 +273,22 @@ def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str 
             # process with its own top-level `src` package (ml-model-serving)
             # would otherwise shadow the bundled code and fail to unpickle it.
             code_paths=[str(Path(__file__).resolve().parent)],
-            registered_model_name=settings.mlflow_registered_model_name if settings.auto_promote else None,
+            registered_model_name=registered_name if settings.auto_promote else None,
         )
 
         run_id = run.info.run_id
 
-    _forecast_and_write(settings, long_df, bundled_model)
+    _forecast_and_write(settings, long_df, bundled_model, tenant_id)
 
     if settings.auto_promote:
-        promote_latest(settings, run_id)
+        promote_latest(settings, run_id, registered_name)
 
     return run_id
 
 
-def _forecast_and_write(settings: Settings, long_df: pd.DataFrame, bundled_model: VolumeForecastModel) -> None:
+def _forecast_and_write(
+    settings: Settings, long_df: pd.DataFrame, bundled_model: VolumeForecastModel, tenant_id: str
+) -> None:
     """D+1/D+7 forecast as of the latest date in `long_df`, one row per
     `priority_group`, using the same lag/rolling feature computation as
     training — `VolumeForecastModel.predict` expects those precomputed on
@@ -234,6 +302,7 @@ def _forecast_and_write(settings: Settings, long_df: pd.DataFrame, bundled_model
 
     rows = [
         {
+            "tenant_id": tenant_id,
             "target_date": (as_of_date + pd.Timedelta(days=int(row["horizon"]))).date(),
             "priority_group": row["priority_group"],
             "horizon": int(row["horizon"]),
@@ -246,16 +315,17 @@ def _forecast_and_write(settings: Settings, long_df: pd.DataFrame, bundled_model
     write_volume_forecast(settings, rows)
 
 
-def promote_latest(settings: Settings, run_id: str) -> None:
+def promote_latest(settings: Settings, run_id: str, registered_name: str | None = None) -> None:
+    name = registered_name or settings.mlflow_registered_model_name
     client = mlflow.MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
-    versions = client.search_model_versions(f"name='{settings.mlflow_registered_model_name}'")
+    versions = client.search_model_versions(f"name='{name}'")
     matching = [v for v in versions if v.run_id == run_id]
     if not matching:
         LOGGER.warning("No registered model version found for run %s — skipping promotion.", run_id)
         return
     version = matching[0].version
     client.transition_model_version_stage(
-        name=settings.mlflow_registered_model_name,
+        name=name,
         version=version,
         stage="Production",
         archive_existing_versions=True,

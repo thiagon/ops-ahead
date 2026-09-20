@@ -201,16 +201,19 @@ class TestChainTrainings:
                 steps=steps,
                 register_snapshot=lambda *a, **kw: "sha",
                 start=_start,
+                tenants=["locaweb"],
             )
 
         assert started == []
 
-    def test_chains_each_configured_analysis_as_a_child_of_the_run(self):
+    def test_chains_one_run_per_tenant_per_analysis(self):
+        """One model per tenant, so one row per tenant: a single run could not
+        say whose model failed."""
         seen: list[tuple] = []
 
         def _start(url, body, *, trigger, parent_id=None):
-            seen.append((body["analysis"], trigger, parent_id))
-            return f"id-{body['analysis']}"
+            seen.append((body["analysis"], body["tenant_id"], trigger, parent_id))
+            return f"id-{body['analysis']}-{body['tenant_id']}"
 
         detail = run_full_pipeline(
             self._settings(),
@@ -218,16 +221,16 @@ class TestChainTrainings:
             steps={"transform": lambda: None, "quality": lambda argv: None},
             register_snapshot=lambda *a, **kw: "sha",
             start=_start,
+            tenants=["locaweb", "acme"],
         )
 
         assert seen == [
-            ("volume_forecast", "chained", "daily-1"),
-            ("kpi_projection", "chained", "daily-1"),
+            ("volume_forecast", "locaweb", "chained", "daily-1"),
+            ("volume_forecast", "acme", "chained", "daily-1"),
+            ("kpi_projection", "locaweb", "chained", "daily-1"),
+            ("kpi_projection", "acme", "chained", "daily-1"),
         ]
-        assert detail["chained"] == {
-            "volume_forecast": "id-volume_forecast",
-            "kpi_projection": "id-kpi_projection",
-        }
+        assert detail["chained"]["volume_forecast:acme"] == "id-volume_forecast-acme"
 
     def test_only_the_trainings_that_evaluate_against_a_hold_out_get_splits(self):
         bodies: dict[str, dict] = {}
@@ -236,7 +239,9 @@ class TestChainTrainings:
             bodies[body["analysis"]] = body
             return "id"
 
-        chain_trainings(self._settings(), "daily-1", start=_start, today=date(2026, 3, 2))
+        chain_trainings(
+            self._settings(), "daily-1", start=_start, today=date(2026, 3, 2), tenants=["locaweb"]
+        )
 
         assert bodies["volume_forecast"]["holdout_end"] == "2026-03-01"
         assert bodies["volume_forecast"]["validation_end"] == "2026-01-30"
@@ -255,16 +260,19 @@ class TestChainTrainings:
             steps={"transform": lambda: None, "quality": lambda argv: None},
             register_snapshot=lambda *a, **kw: "sha",
             start=_start,
+            tenants=["locaweb"],
         )
 
         assert detail["snapshot_hash"] == "sha"
-        assert detail["chained"] == {"kpi_projection": "id-kpi"}
-        assert "gateway unreachable" in detail["chain_failed"]["volume_forecast"]
+        assert detail["chained"] == {"kpi_projection:locaweb": "id-kpi"}
+        assert "gateway unreachable" in detail["chain_failed"]["volume_forecast:locaweb"]
 
     def test_chaining_is_off_when_no_analysis_is_configured(self):
         def _start(url, body, *, trigger, parent_id=None):
             raise AssertionError("should not be called")
 
-        detail = chain_trainings(Settings(source="itsm"), "daily-1", start=_start)
+        detail = chain_trainings(
+            Settings(source="itsm"), "daily-1", start=_start, tenants=["locaweb"]
+        )
 
         assert detail == {"chained": {}, "chain_failed": {}}

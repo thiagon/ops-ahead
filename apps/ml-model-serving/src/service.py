@@ -8,7 +8,7 @@ from prometheus_client import Counter
 
 import bentoml
 from bentoml.exceptions import BentoMLException, InvalidArgument
-from models_loader import ModelRegistry, ModelVersionNotFound
+from models_loader import ModelNotFoundForTenant, ModelRegistry, ModelVersionNotFound
 from schemas import (
     BreachFeatureInput,
     BreachPredictResponse,
@@ -59,11 +59,11 @@ class ModelServing:
         # `IODescriptor.from_input`'s `positional_only_param` branch.
         version = ctx.request.headers.get(MODEL_VERSION_HEADER)
         try:
-            model = self.registry.volume_model_for(version)
+            model = self.registry.volume_model_for(request.tenant_id, version)
         except ModelVersionNotFound as exc:
             raise RequestedModelVersionNotFound(str(exc)) from exc
-        if model is None:
-            raise ModelNotLoaded("volume model not loaded")
+        except ModelNotFoundForTenant as exc:
+            raise ModelNotLoaded(str(exc)) from exc
 
         model_input = pd.DataFrame([f.model_dump() for f in request.features])
         result = model.predict(model_input)
@@ -85,13 +85,14 @@ class ModelServing:
     def predict_breach(self, request: BreachFeatureInput, /, ctx: bentoml.Context) -> BreachPredictResponse:
         version = ctx.request.headers.get(MODEL_VERSION_HEADER)
         try:
-            model = self.registry.breach_model_for(version)
+            model = self.registry.breach_model_for(request.tenant_id, version)
         except ModelVersionNotFound as exc:
             raise RequestedModelVersionNotFound(str(exc)) from exc
-        if model is None:
-            raise ModelNotLoaded("breach model not loaded")
+        except ModelNotFoundForTenant as exc:
+            raise ModelNotLoaded(str(exc)) from exc
 
-        model_input = pd.DataFrame([request.model_dump()])
+        # tenant_id selected the model; it is not one of its features.
+        model_input = pd.DataFrame([request.model_dump(exclude={"tenant_id"})])
         # A single-row frame infers `object` dtype for a column whose only
         # value is None (the legitimate "no prior history" case) instead of
         # float64+NaN — LightGBM rejects object dtypes outright.

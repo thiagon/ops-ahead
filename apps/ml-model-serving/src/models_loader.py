@@ -8,63 +8,69 @@ from settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
+# Same rule ml-trainer registers under (apps/ml-trainer/src/model_names.py).
+# Duplicated rather than imported because the two apps ship as separate images;
+# a change on either side has to move both, which the contract test in
+# tests/test_models_loader.py is there to catch.
+SEPARATOR = "__"
+
 
 class ModelVersionNotFound(Exception):
     """A version requested via the A/B header doesn't exist in the MLflow registry."""
 
 
+class ModelNotFoundForTenant(Exception):
+    """No model is promoted for this tenant.
+
+    Distinct from a model still loading: answering with another tenant's model
+    would be a plausible-looking probability computed for the wrong client, and
+    nothing downstream could tell. An explicit error turns a silent wrong answer
+    into an operational problem that has an owner.
+    """
+
+
+def registered_model_name(base_name: str, tenant_id: str) -> str:
+    return f"{base_name}{SEPARATOR}{tenant_id}"
+
+
 class ModelRegistry:
-    """Holds the loaded `Production`-stage pyfunc models. `volume_model` /
-    `breach_model` stay `None` until `load()` runs (app startup) — tests build
-    a registry and set these directly, skipping the real MLflow round-trip.
+    """Resolves the `Production` pyfunc model for a given tenant, on demand.
+
+    Nothing is loaded at startup: with one model per tenant, eager-loading
+    would make the pod's readiness depend on every tenant having a promoted
+    model. A pod being ready means "able to serve", not "found every model".
 
     Non-`Production` versions requested through the A/B header (see
-    `service.py`) are loaded lazily on first request and cached per version —
-    eager-loading every version up front would defeat the point of A/B being
-    opt-in per request."""
+    `service.py`) are cached the same way, keyed by version as well.
+    """
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.volume_model = None
-        self.breach_model = None
-        self._version_cache: dict[tuple[str, str], object] = {}
+        self._cache: dict[tuple[str, str], object] = {}
 
     def load(self) -> None:
-        """Best-effort: a model that isn't in `Production` yet (no training
-        run has promoted one) is a normal, expected startup state — not a
-        reason to crash the process. Letting `mlflow.pyfunc.load_model` raise
-        past this point would take the whole app down before it ever binds a
-        port, so the readiness probe could never report *why* it's not ready,
-        and Kubernetes would crash-loop it forever instead of just holding it
-        at `not ready` until a Production model shows up on a later rollout."""
+        """Only points MLflow at the tracking server — see the class docstring
+        for why no model is fetched here."""
         mlflow.set_tracking_uri(self.settings.mlflow_tracking_uri)
 
-        try:
-            LOGGER.info("Loading %s/Production ...", self.settings.volume_model_name)
-            self.volume_model = mlflow.pyfunc.load_model(f"models:/{self.settings.volume_model_name}/Production")
-        except Exception:
-            LOGGER.warning("%s/Production not available yet.", self.settings.volume_model_name, exc_info=True)
+    def _resolve(self, base_name: str, tenant_id: str, version: str | None) -> object:
+        name = registered_model_name(base_name, tenant_id)
+        stage = version or "Production"
+        cache_key = (name, stage)
 
-        try:
-            LOGGER.info("Loading %s/Production ...", self.settings.breach_model_name)
-            self.breach_model = mlflow.pyfunc.load_model(f"models:/{self.settings.breach_model_name}/Production")
-        except Exception:
-            LOGGER.warning("%s/Production not available yet.", self.settings.breach_model_name, exc_info=True)
-
-    def _model_for_version(self, model_name: str, production_model: object | None, version: str | None) -> object:
-        if version is None:
-            return production_model
-
-        cache_key = (model_name, version)
-        if cache_key not in self._version_cache:
+        if cache_key not in self._cache:
             try:
-                self._version_cache[cache_key] = mlflow.pyfunc.load_model(f"models:/{model_name}/{version}")
+                self._cache[cache_key] = mlflow.pyfunc.load_model(f"models:/{name}/{stage}")
             except Exception as exc:
-                raise ModelVersionNotFound(f"{model_name} version {version!r} not found") from exc
-        return self._version_cache[cache_key]
+                if version is not None:
+                    raise ModelVersionNotFound(f"{name} version {version!r} not found") from exc
+                raise ModelNotFoundForTenant(
+                    f"no {base_name} model promoted for tenant {tenant_id!r}"
+                ) from exc
+        return self._cache[cache_key]
 
-    def volume_model_for(self, version: str | None) -> object:
-        return self._model_for_version(self.settings.volume_model_name, self.volume_model, version)
+    def volume_model_for(self, tenant_id: str, version: str | None = None) -> object:
+        return self._resolve(self.settings.volume_model_name, tenant_id, version)
 
-    def breach_model_for(self, version: str | None) -> object:
-        return self._model_for_version(self.settings.breach_model_name, self.breach_model, version)
+    def breach_model_for(self, tenant_id: str, version: str | None = None) -> object:
+        return self._resolve(self.settings.breach_model_name, tenant_id, version)

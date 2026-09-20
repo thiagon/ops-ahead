@@ -14,12 +14,13 @@
   "definitions": {
     "volumeForecast": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
+      "required": ["run_id", "update_key", "analysis", "tenant_id", "train_end", "validation_end", "holdout_end"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "volume_forecast" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
         "holdout_end": { "$ref": "#/definitions/splitDate" }
@@ -27,12 +28,13 @@
     },
     "entityForecast": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
+      "required": ["run_id", "update_key", "analysis", "tenant_id", "train_end", "validation_end", "holdout_end"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "entity_forecast" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
         "holdout_end": { "$ref": "#/definitions/splitDate" }
@@ -40,12 +42,13 @@
     },
     "breachRisk": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis", "train_end", "validation_end", "holdout_end"],
+      "required": ["run_id", "update_key", "analysis", "tenant_id", "train_end", "validation_end", "holdout_end"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "breach_risk" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
         "train_end": { "$ref": "#/definitions/splitDate" },
         "validation_end": { "$ref": "#/definitions/splitDate" },
         "holdout_end": { "$ref": "#/definitions/splitDate" }
@@ -53,26 +56,32 @@
     },
     "kpiProjection": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis"],
+      "required": ["run_id", "update_key", "analysis", "tenant_id"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "kpi_projection" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
         "n_simulations": { "type": "integer", "minimum": 1, "description": "Monte Carlo draw count. ml-trainer's own configured default applies when omitted." },
         "seed": { "type": "integer", "description": "RNG seed for reproducibility. ml-trainer's own configured default applies when omitted." }
       }
     },
     "externalEventDetection": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis"],
+      "required": ["run_id", "update_key", "analysis", "tenant_id"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
         "update_key": { "$ref": "#/definitions/updateKey" },
         "analysis": { "const": "external_event_detection" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
         "contamination": { "type": "number", "minimum": 0, "maximum": 0.5, "description": "Expected share of days flagged anomalous. ml-trainer's own configured default applies when omitted." }
       }
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Which tenant this training is for. One model per tenant, so a run without one has no owner \u2014 the trainer would not know which model to register, nor inference which to serve."
     },
     "runId": {
       "type": "string",

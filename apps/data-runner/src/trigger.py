@@ -61,34 +61,59 @@ def start_analysis(
         return json.loads(response.read())["id"]
 
 
+def discover_tenants(settings: Settings) -> list[str]:
+    """The tenants the marts actually hold, read from silver_alert.
+
+    From the data, never from configuration — the same rule the scripts in
+    infra/scripts follow: adding a client must not require editing anything
+    here.
+    """
+    from clickhouse_driver import Client
+
+    client = Client.from_url(settings.clickhouse_native_url)
+    rows = client.execute("select distinct tenant_id from silver_alert order by tenant_id")
+    return [row[0] for row in rows]
+
+
 def chain_trainings(
     settings: Settings,
     parent_run_id: str,
     start: StartAnalysisFn = start_analysis,
     today: date | None = None,
+    tenants: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Starts the configured trainings off a finished full_pipeline.
+    """Starts the configured trainings off a finished full_pipeline, one run
+    per tenant per analysis.
 
     Called after the quality step, never before: that ordering is the whole
     point — a reproved suite raises and nothing here runs, so bad data cannot
     produce a new model.
+
+    One run per tenant rather than one that loops internally, because there is
+    one model per tenant: a single row could not say whose model failed.
     """
+    if not settings.chained_analyses:
+        return {"chained": {}, "chain_failed": {}}
+
     splits = _split_boundaries(settings, today or datetime.now(UTC).date())
+    tenant_ids = tenants if tenants is not None else discover_tenants(settings)
     started: dict[str, str] = {}
     failed: dict[str, str] = {}
     for analysis in settings.chained_analyses:
-        body: dict[str, Any] = {"analysis": analysis}
-        if analysis in SPLIT_REQUIRED_ANALYSES:
-            body.update(splits)
-        try:
-            started[analysis] = start(
-                settings.gateway_url, body, trigger="chained", parent_id=parent_run_id
-            )
-        except Exception as exc:
-            # One training failing to start must not cost the others, and none
-            # of it undoes the transformation that already ran.
-            LOGGER.exception("could not chain %s off run_id=%s", analysis, parent_run_id)
-            failed[analysis] = str(exc)
+        for tenant_id in tenant_ids:
+            key = f"{analysis}:{tenant_id}"
+            body: dict[str, Any] = {"analysis": analysis, "tenant_id": tenant_id}
+            if analysis in SPLIT_REQUIRED_ANALYSES:
+                body.update(splits)
+            try:
+                started[key] = start(
+                    settings.gateway_url, body, trigger="chained", parent_id=parent_run_id
+                )
+            except Exception as exc:
+                # One training failing to start must not cost the others, and
+                # none of it undoes the transformation that already ran.
+                LOGGER.exception("could not chain %s off run_id=%s", key, parent_run_id)
+                failed[key] = str(exc)
     return {"chained": started, "chain_failed": failed}
 
 
@@ -127,6 +152,7 @@ def run_full_pipeline(
     steps: dict[str, Callable] = _STEPS,
     register_snapshot: RegisterSnapshotFn = _register_snapshot,
     start: StartAnalysisFn = start_analysis,
+    tenants: list[str] | None = None,
 ) -> dict[str, Any]:
     """dbt run → great_expectations → register-snapshot → chain the trainings.
 
@@ -138,7 +164,7 @@ def run_full_pipeline(
     steps["quality"](["--suite", "critical", "--upload-docs"])
     digest = register_snapshot(settings, dag_run_id=dag_run_id)
     detail: dict[str, Any] = {"snapshot_hash": digest}
-    detail.update(chain_trainings(settings, dag_run_id, start=start))
+    detail.update(chain_trainings(settings, dag_run_id, start=start, tenants=tenants))
     return detail
 
 

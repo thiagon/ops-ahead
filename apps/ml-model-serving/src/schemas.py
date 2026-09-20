@@ -28,6 +28,10 @@ class VolumeFeatureInput(BaseModel):
 class VolumePredictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # Which tenant's model answers. Required, never defaulted: a default would
+    # silently serve one client's model for another's incident, and the answer
+    # would look perfectly ordinary.
+    tenant_id: str = Field(min_length=1)
     features: list[VolumeFeatureInput] = Field(min_length=1)
 
 
@@ -53,6 +57,8 @@ class VolumePredictResponse(BaseModel):
 class BreachFeatureInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # See VolumePredictRequest.tenant_id.
+    tenant_id: str = Field(min_length=1)
     severity: int = Field(ge=1, le=3)
     owner: str
     opened_hour: int = Field(ge=0, le=23)

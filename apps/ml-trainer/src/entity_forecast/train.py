@@ -151,6 +151,21 @@ def train_tenant(settings: Settings, trends: pd.DataFrame, tenant_id: str, datas
     return run_id
 
 
+def _requested_tenants(settings: Settings, eligible: list[str]) -> list[str]:
+    """`settings.tenant_id` narrows the run to one tenant — every training
+    message carries it. It has to be eligible: asking for a tenant with too
+    little history is an explicit error, not a silent no-op, because the
+    caller asked for a model and would otherwise get none without being told.
+    """
+    if settings.tenant_id is None:
+        return eligible
+    if settings.tenant_id not in eligible:
+        raise ValueError(
+            f"tenant {settings.tenant_id!r} has no trainable history"
+        )
+    return [settings.tenant_id]
+
+
 def train_and_log(settings: Settings, trends: pd.DataFrame, dataset_version: str | None = None) -> str:
     """A set of models per tenant, never one across all of them: two operations
     have different seasonality, severity mix and base volume, and a shared model
@@ -163,7 +178,7 @@ def train_and_log(settings: Settings, trends: pd.DataFrame, dataset_version: str
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
-    tenants = tenants_with_history(trends, settings.entity_min_history_days)
+    tenants = _requested_tenants(settings, tenants_with_history(trends, settings.entity_min_history_days))
     trained: dict[str, str] = {}
     failed: dict[str, str] = {}
 

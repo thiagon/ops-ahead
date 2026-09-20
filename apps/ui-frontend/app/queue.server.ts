@@ -36,6 +36,7 @@ export function buildBreachFeatures(
   const precursorLength = context?.p4_precursor_length ?? 0;
 
   return {
+    tenant_id: row.tenant_id,
     severity: row.severity,
     owner: row.owner,
     opened_hour: openedAt.getUTCHours(),
