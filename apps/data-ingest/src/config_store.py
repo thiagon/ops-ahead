@@ -1,8 +1,8 @@
 """Configuration persisted in MinIO — the source of truth, not the Kafka
 topic it arrives on. Dev's broker is ephemeral (data-kafka values-dev.yaml)
 and loses its compacted log on every restart; MinIO survives that. The
-gateway never writes here directly (spec-config-producao.md#só-o-data-ingest-
-conhece-o-minio) — this module is the only writer and the only reader.
+gateway never writes here directly — this module is the only writer and the
+only reader.
 
 Append-only, same as the topics it mirrors: save replaces the object under a
 key, nothing deletes one.

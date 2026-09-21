@@ -8,11 +8,10 @@ The mapping is the ServiceNow → domain half of notebooks/events_dataset.ipynb
 the dictionary translates ServiceNow state/priority/opened_by/close_code
 into the domain vocabulary.
 
-Proves the path spec-config-producao.md describes: gateway publishes → Kafka
+Proves the configuration path end to end: gateway publishes → Kafka
 carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
 here reaches MinIO or ClickHouse directly — verification is a separate step
-that reads the ClickHouse tables data-ingest wrote to
-(docs/spec-config-producao.md#semear-e-verificar).
+that reads the ClickHouse tables data-ingest wrote to.
 
     python -m seed_config --gateway-url http://localhost:8080 --secret ops-ahead-dev
 """
