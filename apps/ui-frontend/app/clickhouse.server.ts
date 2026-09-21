@@ -16,13 +16,14 @@ export type {
 } from './types.ts';
 
 /**
- * One row per tenant_id × as_of_date × kpi_group, written by ml-trainer's
- * kpi_projection analysis.
+ * One row per tenant_id × as_of_date × severities, written by ml-trainer's
+ * kpi_projection analysis. `severities` is the band itself — the text on the
+ * axis is formatted here, never stored.
  */
 export interface KpiProjectionRow {
   tenant_id: string;
   as_of_date: string;
-  kpi_group: string;
+  severities: number[];
   median_breaches_ytd: number;
   ci80_lower: number;
   ci80_upper: number;
@@ -76,13 +77,41 @@ export interface BreachContextRow {
   p4_precursor_length: number;
 }
 
-/** One row per year × month × kpi_group, cumulative against the annual band. */
+/** One row per year × month × severities, cumulative against the annual band. */
 export interface KpiAchievementRow {
   year: number;
   month: string;
-  kpi_group: string;
+  severities: number[];
   breached_ytd: number;
   achievement_pct: number;
+}
+
+/**
+ * One row per target_date × category × product × horizon, from
+ * gold_entity_forecast — the forecast that names which products to look at,
+ * as opposed to the aggregate volume one.
+ */
+export interface EntityForecastRow {
+  target_date: string;
+  category: string;
+  product: string;
+  horizon: number;
+  yhat: number;
+  yhat_lower: number;
+  yhat_upper: number;
+}
+
+/**
+ * One behaviour group, from gold_recurring_cause_groups. `silhouette` is how
+ * separable the grouping was — a low score means no structure was found, and
+ * the screen says so rather than drawing groups.
+ */
+export interface RecurringCauseGroupRow {
+  group_id: number;
+  entity_count: number;
+  silhouette: number;
+  distinguishing_features: string;
+  top_products: string;
 }
 
 /** One row per date × category × product, severities never collapsed. */
@@ -161,26 +190,25 @@ export async function query<T>(sql: string, params: Record<string, unknown>): Pr
 
 export async function fetchKpiProjection(asOfLimit = 1): Promise<KpiProjectionRow[]> {
   return await query<KpiProjectionRow>(
-    `select tenant_id, toString(as_of_date) as as_of_date, kpi_group,
+    `select tenant_id, toString(as_of_date) as as_of_date, severities,
             median_breaches_ytd, ci80_lower, ci80_upper, p_within_target
      from gold_kpi_projection
      where tenant_id = {tenant_id:String}
-     order by as_of_date desc, kpi_group
-     limit {limit:UInt32} by kpi_group`,
+     order by as_of_date desc, severities
+     limit {limit:UInt32} by severities`,
     { tenant_id: (await currentTenant()).slug, limit: asOfLimit },
   );
 }
 
-// gold_volume_forecast carries no tenant_id — ml-trainer writes it per run,
-// not per tenant.
 export async function fetchVolumeForecast(): Promise<VolumeForecastRow[]> {
   return await query<VolumeForecastRow>(
     `select toString(target_date) as target_date, priority_group, horizon,
             yhat, yhat_lower, yhat_upper
      from gold_volume_forecast
+     where tenant_id = {tenant_id:String}
      order by target_date desc, priority_group, horizon
      limit 1 by priority_group, horizon`,
-    {},
+    { tenant_id: (await currentTenant()).slug },
   );
 }
 
@@ -206,15 +234,45 @@ export async function fetchKpiAchievement(monthsBack = 12): Promise<KpiAchieveme
     // resolve the WHERE clause against the String alias instead of the
     // underlying Date column ("no supertype for String, Date"). Filtering
     // and ordering in an inner scope, before the rename, avoids the clash.
-    `select year, toString(month) as month, kpi_group, breached_ytd, achievement_pct
+    `select year, toString(month) as month, severities, breached_ytd, achievement_pct
      from (
-       select year, month, kpi_group, breached_ytd, achievement_pct
+       select year, month, severities, breached_ytd, achievement_pct
        from gold_alert_kpi_achievement
        where tenant_id = {tenant_id:String}
          and month >= toStartOfMonth(now()) - toIntervalMonth({months_back:UInt32})
-       order by month asc, kpi_group
+       order by month asc, severities
      )`,
     { tenant_id: (await currentTenant()).slug, months_back: monthsBack },
+  );
+}
+
+export async function fetchEntityForecast(): Promise<EntityForecastRow[]> {
+  return await query<EntityForecastRow>(
+    // The latest run's forecast per series, not a history: `limit 1 by`
+    // keeps the most recent target_date for each product × horizon.
+    `select toString(target_date) as target_date, category, product, horizon,
+            yhat, yhat_lower, yhat_upper
+     from gold_entity_forecast
+     where tenant_id = {tenant_id:String}
+     order by target_date desc, yhat desc
+     limit 1 by category, product, horizon`,
+    { tenant_id: (await currentTenant()).slug },
+  );
+}
+
+export async function fetchRecurringCauseGroups(): Promise<RecurringCauseGroupRow[]> {
+  return await query<RecurringCauseGroupRow>(
+    // The latest run only: groups from two different runs are not comparable
+    // side by side, since the group ids are per run.
+    `select group_id, entity_count, silhouette, distinguishing_features, top_products
+     from gold_recurring_cause_groups
+     where tenant_id = {tenant_id:String}
+       and as_of_date = (
+         select max(as_of_date) from gold_recurring_cause_groups
+         where tenant_id = {tenant_id:String}
+       )
+     order by entity_count desc`,
+    { tenant_id: (await currentTenant()).slug },
   );
 }
 
@@ -228,10 +286,11 @@ export async function fetchCategoryTrends(daysBack = 30): Promise<CategoryTrendR
        select date, category, product, total_incidents,
               p1_count, p2_count, p3_count, p4_count, p5_count, avg_duration_seconds
        from gold_alert_category_trends
-       where date >= today() - {days_back:UInt32}
+       where tenant_id = {tenant_id:String}
+         and date >= today() - {days_back:UInt32}
        order by date desc, total_incidents desc
      )`,
-    { days_back: daysBack },
+    { tenant_id: (await currentTenant()).slug, days_back: daysBack },
   );
 }
 
@@ -469,13 +528,15 @@ export async function fetchAlertDailyFeatures(daysBack = 14): Promise<AlertDaily
        select date, source, total_incidents, p1_share, critical_share,
               no_intervention_share, incidents_per_entity, median_duration_seconds
        from gold_alert_daily_features
-       where date in (
-         select date from gold_alert_daily_features
-         group by date order by date desc limit {days_back:UInt32}
-       )
+       where tenant_id = {tenant_id:String}
+         and date in (
+           select date from gold_alert_daily_features
+           where tenant_id = {tenant_id:String}
+           group by date order by date desc limit {days_back:UInt32}
+         )
        order by date desc
      )`,
-    { days_back: daysBack },
+    { tenant_id: (await currentTenant()).slug, days_back: daysBack },
   );
 }
 
@@ -496,14 +557,16 @@ export async function fetchRecurringPatterns(
             sum(breached) as breached,
             avg(avg_duration_seconds) as avg_duration_seconds
      from gold_alert_category_entity_breakdown
-     where date in (
-       select date from gold_alert_category_entity_breakdown
-       group by date order by date desc limit {days_back:UInt32}
-     )
+     where tenant_id = {tenant_id:String}
+       and date in (
+         select date from gold_alert_category_entity_breakdown
+         where tenant_id = {tenant_id:String}
+         group by date order by date desc limit {days_back:UInt32}
+       )
      group by category, product, entity_id, severity
      having incident_count > 1
      order by incident_count desc
      limit {limit:UInt32}`,
-    { days_back: daysBack, limit },
+    { tenant_id: (await currentTenant()).slug, days_back: daysBack, limit },
   );
 }

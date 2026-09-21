@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
   CategoryTrendRow,
+  EntityForecastRow,
   GroupLoadRow,
   KpiAchievementRow,
   KpiProjectionRow,
   NoisyEntityRow,
+  RecurringCauseGroupRow,
   VolumeForecastRow,
 } from '../app/clickhouse.server.ts';
 import { buildDashboard } from '../app/dashboard.server.ts';
@@ -13,7 +15,7 @@ function kpiAchievementRow(overrides: Partial<KpiAchievementRow> = {}): KpiAchie
   return {
     year: 2026,
     month: '2026-08-01',
-    kpi_group: 'p1_p2',
+    severities: [1, 2],
     breached_ytd: 20,
     achievement_pct: 100,
     ...overrides,
@@ -24,7 +26,7 @@ function kpiProjectionRow(overrides: Partial<KpiProjectionRow> = {}): KpiProject
   return {
     tenant_id: 'locaweb',
     as_of_date: '2026-08-21',
-    kpi_group: 'p1_p2',
+    severities: [1, 2],
     median_breaches_ytd: 32,
     ci80_lower: 28,
     ci80_upper: 38,
@@ -61,6 +63,32 @@ function categoryTrendRow(overrides: Partial<CategoryTrendRow> = {}): CategoryTr
   };
 }
 
+function entityForecastRow(overrides: Partial<EntityForecastRow> = {}): EntityForecastRow {
+  return {
+    target_date: '2026-08-22',
+    category: 'rede',
+    product: 'vps',
+    horizon: 1,
+    yhat: 12,
+    yhat_lower: 9,
+    yhat_upper: 15,
+    ...overrides,
+  };
+}
+
+function recurringCauseGroupRow(
+  overrides: Partial<RecurringCauseGroupRow> = {},
+): RecurringCauseGroupRow {
+  return {
+    group_id: 0,
+    entity_count: 12,
+    silhouette: 0.62,
+    distinguishing_features: 'breach_rate +140%; duration_mean +80%',
+    top_products: 'vps (7), cloud (5)',
+    ...overrides,
+  };
+}
+
 function groupLoadRow(overrides: Partial<GroupLoadRow> = {}): GroupLoadRow {
   return {
     owner: 'infra',
@@ -80,10 +108,10 @@ function noisyEntityRow(overrides: Partial<NoisyEntityRow> = {}): NoisyEntityRow
 }
 
 describe('KPI achievement panel', () => {
-  it('reads gold_alert_kpi_achievement grouped by kpi_group', async () => {
+  it('reads gold_alert_kpi_achievement grouped by the configured band', async () => {
     const fetchKpiAchievement = vi.fn(async () => [
-      kpiAchievementRow({ kpi_group: 'p1_p2' }),
-      kpiAchievementRow({ kpi_group: 'p3' }),
+      kpiAchievementRow({ severities: [1, 2] }),
+      kpiAchievementRow({ severities: [3] }),
     ]);
 
     const dashboard = await buildDashboard({
@@ -93,10 +121,12 @@ describe('KPI achievement panel', () => {
       fetchCategoryTrends: async () => [],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(fetchKpiAchievement).toHaveBeenCalled();
-    expect(dashboard.kpiAchievement.map(row => row.kpi_group)).toEqual(['p1_p2', 'p3']);
+    expect(dashboard.kpiAchievement.map(row => row.severities)).toEqual([[1, 2], [3]]);
   });
 
   it('keeps the rest of the dashboard when one panel has nothing to show', async () => {
@@ -107,6 +137,8 @@ describe('KPI achievement panel', () => {
       fetchCategoryTrends: async () => [categoryTrendRow()],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.kpiAchievement).toHaveLength(1);
@@ -114,23 +146,42 @@ describe('KPI achievement panel', () => {
     expect(dashboard.categoryTrends).toHaveLength(1);
   });
 
-  it('never collapses p1_p2 and p3 into one severity bucket', async () => {
+  it('never collapses two bands into one severity bucket', async () => {
     const dashboard = await buildDashboard({
       fetchKpiAchievement: async () => [
-        kpiAchievementRow({ kpi_group: 'p1_p2', breached_ytd: 20 }),
-        kpiAchievementRow({ kpi_group: 'p3', breached_ytd: 150 }),
+        kpiAchievementRow({ severities: [1, 2], breached_ytd: 20 }),
+        kpiAchievementRow({ severities: [3], breached_ytd: 150 }),
       ],
       fetchKpiProjection: async () => [],
       fetchVolumeForecast: async () => [],
       fetchCategoryTrends: async () => [],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
-    const p1p2 = dashboard.kpiAchievement.find(row => row.kpi_group === 'p1_p2');
-    const p3 = dashboard.kpiAchievement.find(row => row.kpi_group === 'p3');
+    const p1p2 = dashboard.kpiAchievement.find(row => row.severities.join() === '1,2');
+    const p3 = dashboard.kpiAchievement.find(row => row.severities.join() === '3');
     expect(p1p2?.breached_ytd).toBe(20);
     expect(p3?.breached_ytd).toBe(150);
+  });
+
+  it('carries a band the Locaweb dataset never had', async () => {
+    // Nothing in the read path knows which severities form a band, so a
+    // tenant measuring [1,2,4] reaches the panel like any other.
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [kpiAchievementRow({ severities: [1, 2, 4] })],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
+    });
+
+    expect(dashboard.kpiAchievement[0]?.severities).toEqual([1, 2, 4]);
   });
 });
 
@@ -143,10 +194,12 @@ describe('closing projection panel', () => {
       fetchCategoryTrends: async () => [],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.kpiProjection[0]).toMatchObject({
-      kpi_group: 'p1_p2',
+      severities: [1, 2],
       ci80_lower: 28,
       ci80_upper: 38,
       p_within_target: 0.7,
@@ -166,6 +219,8 @@ describe('volume forecast panel', () => {
       fetchCategoryTrends: async () => [],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.volumeForecast.map(row => row.horizon)).toEqual([1, 7]);
@@ -181,6 +236,8 @@ describe('category trends panel', () => {
       fetchCategoryTrends: async () => [categoryTrendRow({ p2_count: 3, p3_count: 9 })],
       fetchGroupLoad: async () => [],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.categoryTrends[0]).toMatchObject({ p2_count: 3, p3_count: 9 });
@@ -196,6 +253,8 @@ describe('group load and noisy resources panel', () => {
       fetchCategoryTrends: async () => [],
       fetchGroupLoad: async () => [groupLoadRow({ owner: 'infra', incidents_open: 4 })],
       fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.groupLoad[0]).toMatchObject({ owner: 'infra', incidents_open: 4 });
@@ -212,8 +271,85 @@ describe('group load and noisy resources panel', () => {
         noisyEntityRow({ entity_id: 'srv-quiet', signal_count: 5 }),
         noisyEntityRow({ entity_id: 'srv-noisy', signal_count: 90 }),
       ],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [],
     });
 
     expect(dashboard.noisyEntities.map(row => row.entity_id)).toEqual(['srv-noisy', 'srv-quiet']);
+  });
+});
+
+describe('entity forecast panel', () => {
+  it('names the products with the most incidents forecast', async () => {
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [
+        entityForecastRow({ product: 'vps', yhat: 4 }),
+        entityForecastRow({ product: 'cloud', yhat: 21 }),
+      ],
+      fetchRecurringCauseGroups: async () => [],
+    });
+
+    expect(dashboard.entityForecast.map(row => row.product)).toEqual(['cloud', 'vps']);
+  });
+
+  it('keeps each horizon as its own series', async () => {
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [
+        entityForecastRow({ product: 'vps', horizon: 1, yhat: 12 }),
+        entityForecastRow({ product: 'vps', horizon: 7, yhat: 30 }),
+      ],
+      fetchRecurringCauseGroups: async () => [],
+    });
+
+    expect(dashboard.entityForecast).toHaveLength(2);
+    expect(dashboard.entityForecast.map(row => row.horizon).sort()).toEqual([1, 7]);
+  });
+});
+
+describe('recurring causes panel', () => {
+  it('carries the groups and what distinguishes each one', async () => {
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [
+        recurringCauseGroupRow({ group_id: 0 }),
+        recurringCauseGroupRow({ group_id: 1, entity_count: 4 }),
+      ],
+    });
+
+    expect(dashboard.recurringCauseGroups).toHaveLength(2);
+    expect(dashboard.recurringCauseGroups[0]?.distinguishing_features).toContain('breach_rate');
+  });
+
+  it('carries the silhouette so the screen can say no pattern was found', async () => {
+    const dashboard = await buildDashboard({
+      fetchKpiAchievement: async () => [],
+      fetchKpiProjection: async () => [],
+      fetchVolumeForecast: async () => [],
+      fetchCategoryTrends: async () => [],
+      fetchGroupLoad: async () => [],
+      fetchNoisyEntities: async () => [],
+      fetchEntityForecast: async () => [],
+      fetchRecurringCauseGroups: async () => [recurringCauseGroupRow({ silhouette: 0.08 })],
+    });
+
+    expect(dashboard.recurringCauseGroups[0]?.silhouette).toBeLessThan(0.2);
   });
 });
