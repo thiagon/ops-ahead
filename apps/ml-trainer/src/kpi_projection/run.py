@@ -15,11 +15,19 @@ from volume.train import train_lightgbm
 
 LOGGER = logging.getLogger(__name__)
 
-# The 2 independent PPR bands this analysis projects against — kpi_group as
-# defined by tenant_kpi_targets (P1+P2 combined, P3 alone). Each band's volume
-# path is the sum of its priority_group parts' own independent D+1 forecasts —
-# volume_features has no combined "p1_p2" series to forecast directly.
-KPI_GROUP_VOLUME_PARTS = {"p1_p2": ("p1", "p2"), "p3": ("p3",)}
+
+def _volume_parts(severities: tuple[int, ...]) -> tuple[str, ...]:
+    """The volume series a band is the sum of. `volume_features` has no
+    combined series to forecast directly, so a band is projected by summing
+    its severities' own independent D+1 forecasts."""
+    return tuple(volume_features.SEVERITY_PRIORITY_GROUPS[s] for s in sorted(severities))
+
+
+def _configured_bands(targets: pd.DataFrame, tenant_id: str) -> list[tuple[int, ...]]:
+    """The bands this tenant configured, from tenant_kpi_targets. No band
+    means nothing to project: there is no default band to fall back to."""
+    rows = targets.loc[targets["tenant_id"] == tenant_id]
+    return sorted({tuple(band) for band in rows["severities"]})
 
 
 def _next_month_start(month_start: pd.Timestamp) -> pd.Timestamp:
@@ -28,19 +36,19 @@ def _next_month_start(month_start: pd.Timestamp) -> pd.Timestamp:
     return month_start.replace(month=month_start.month + 1)
 
 
-def _month_to_date_state(achievement: pd.DataFrame, tenant_id: str, kpi_group: str, month_start: pd.Timestamp) -> tuple[int, int]:
-    """This kpi_group's current-month row from gold_alert_kpi_achievement.
+def _month_to_date_state(achievement: pd.DataFrame, tenant_id: str, severities: tuple[int, ...], month_start: pd.Timestamp) -> tuple[int, int]:
+    """This band's current-month row from gold_alert_kpi_achievement.
     Zeros if the month hasn't accumulated a row in the mart yet (breached_ytd
     then starts from the prior month's cumulative, i.e. 0 at year start)."""
     rows = achievement.loc[
         (achievement["tenant_id"] == tenant_id)
-        & (achievement["kpi_group"] == kpi_group)
+        & (achievement["severities"] == severities)
         & (pd.to_datetime(achievement["month"]) == month_start)
     ]
     if rows.empty:
         prior = achievement.loc[
             (achievement["tenant_id"] == tenant_id)
-            & (achievement["kpi_group"] == kpi_group)
+            & (achievement["severities"] == severities)
             & (pd.to_datetime(achievement["month"]) < month_start)
         ]
         breached_ytd_before = int(prior["breached_ytd"].iloc[-1]) if not prior.empty else 0
@@ -49,12 +57,12 @@ def _month_to_date_state(achievement: pd.DataFrame, tenant_id: str, kpi_group: s
     return int(row["breached_in_month"]), int(row["breached_ytd"]) - int(row["breached_in_month"])
 
 
-def _probability_of_meeting_target(totals: np.ndarray, targets: pd.DataFrame, tenant_id: str, kpi_group: str) -> monte_carlo.ProjectionSummary:
+def _probability_of_meeting_target(totals: np.ndarray, targets: pd.DataFrame, tenant_id: str, severities: tuple[int, ...]) -> monte_carlo.ProjectionSummary:
     """`p_within_target` is the fraction of simulations that close the year
     at or under the `max_breaches` of the `achievement_pct == 100` band
     (tenant_kpi_targets) — "at least met the target", not a looser band.
-    `None` when this tenant/kpi_group has no target row."""
-    group_targets = targets.loc[(targets["tenant_id"] == tenant_id) & (targets["kpi_group"] == kpi_group)]
+    `None` when this tenant/band has no target row."""
+    group_targets = targets.loc[(targets["tenant_id"] == tenant_id) & (targets["severities"] == severities)]
     target_row = group_targets.loc[group_targets["achievement_pct"] == 100]
     ci80_lower, ci80_upper = np.percentile(totals, [10, 90])
     p_within_target = float(np.mean(totals <= target_row["max_breaches"].iloc[0])) if not target_row.empty else None
@@ -95,7 +103,7 @@ def _fit_lgb_and_residual_std(
 
 
 def _eligibility(kpi_state: pd.DataFrame, month_start: pd.Timestamp, severities: tuple[int, ...]) -> tuple[float, int]:
-    """(`in_kpi / total`, `in_kpi`) for this kpi_group's severities, from
+    """(`in_kpi / total`, `in_kpi`) for this band's severities, from
     kpi_monthly_state — the same eligibility signal `silver_alert` computes,
     just not carried into gold_alert_kpi_achievement (which only tracks
     breach counts against the annual band). Rate 1.0 / count 0 (no exclusion
@@ -114,11 +122,11 @@ def run_kpi_projection(
     kpi_state: pd.DataFrame,
     achievement: pd.DataFrame,
     targets: pd.DataFrame,
-    tenant_id: str = "locaweb",
+    tenant_id: str,
 ) -> dict:
-    """Monte Carlo monthly KPI projection — the 2 independent PPR bands
-    tenant_kpi_targets defines (P1+P2 combined, P3 alone), projected against
-    the annual cumulative band from gold_alert_kpi_achievement, not a monthly
+    """Monte Carlo monthly KPI projection — one independent projection per
+    band the tenant configured in tenant_kpi_targets, projected against the
+    annual cumulative band from gold_alert_kpi_achievement, not a monthly
     ceiling. Runs as an on-demand analysis registered in MLflow like any
     other experiment, not an endpoint (`docs/sprints/sprint-3-mvp.md` §3:
     "a lógica Python pode ser validada como script antes de virar
@@ -135,7 +143,7 @@ def run_kpi_projection(
     rng = np.random.default_rng(settings.kpi_projection_seed)
     n_sims = settings.kpi_projection_n_simulations
 
-    projections: dict[str, monte_carlo.ProjectionSummary] = {}
+    projections: dict[tuple[int, ...], monte_carlo.ProjectionSummary] = {}
     rows_to_write: list[dict] = []
 
     with mlflow.start_run() as run:
@@ -144,8 +152,11 @@ def run_kpi_projection(
         mlflow.log_param("seed", settings.kpi_projection_seed)
         mlflow.log_param("days_remaining", len(remaining_days))
 
-        for kpi_group, parts in KPI_GROUP_VOLUME_PARTS.items():
+        for severities in _configured_bands(targets, tenant_id):
+            # MLflow param names reject commas, so the band reads p1p2 here.
+            band = "".join(f"p{s}" for s in severities)
             volume_paths_by_part = []
+            parts = _volume_parts(severities)
             for part in parts:
                 part_df = long_df.loc[long_df["priority_group"] == part].sort_values("date")
                 model, residual_std = _fit_lgb_and_residual_std(daily, part, settings.kpi_projection_holdout_days)
@@ -162,21 +173,20 @@ def run_kpi_projection(
 
             volume_paths = sum(volume_paths_by_part)
 
-            severities = (1, 2) if kpi_group == "p1_p2" else (3,)
             eligibility_rate, eligible_so_far = _eligibility(kpi_state, month_start, severities)
-            breached_so_far, breached_ytd_before = _month_to_date_state(achievement, tenant_id, kpi_group, month_start)
+            breached_so_far, breached_ytd_before = _month_to_date_state(achievement, tenant_id, severities, month_start)
             breach_rate_samples = monte_carlo.sample_breach_rate_posterior(breached_so_far, eligible_so_far, n_sims, rng)
             breach_paths = monte_carlo.simulate_breach_counts(volume_paths, eligibility_rate, breach_rate_samples, rng)
 
             breach_totals = breached_ytd_before + breached_so_far + breach_paths.sum(axis=1)
-            summary = _probability_of_meeting_target(breach_totals, targets, tenant_id, kpi_group)
-            projections[kpi_group] = summary
+            summary = _probability_of_meeting_target(breach_totals, targets, tenant_id, severities)
+            projections[severities] = summary
 
             rows_to_write.append(
                 {
                     "tenant_id": tenant_id,
                     "as_of_date": as_of_date.date(),
-                    "kpi_group": kpi_group,
+                    "severities": list(severities),
                     "median_breaches_ytd": summary.median,
                     "ci80_lower": summary.ci80_lower,
                     "ci80_upper": summary.ci80_upper,
@@ -184,12 +194,12 @@ def run_kpi_projection(
                 }
             )
 
-            mlflow.log_param(f"{kpi_group}_eligibility_rate", eligibility_rate)
-            mlflow.log_metric(f"{kpi_group}_median", summary.median)
-            mlflow.log_metric(f"{kpi_group}_ci80_lower", summary.ci80_lower)
-            mlflow.log_metric(f"{kpi_group}_ci80_upper", summary.ci80_upper)
+            mlflow.log_param(f"band_{band}_eligibility_rate", eligibility_rate)
+            mlflow.log_metric(f"band_{band}_median", summary.median)
+            mlflow.log_metric(f"band_{band}_ci80_lower", summary.ci80_lower)
+            mlflow.log_metric(f"band_{band}_ci80_upper", summary.ci80_upper)
             if summary.p_within_target is not None:
-                mlflow.log_metric(f"{kpi_group}_p_within_target", summary.p_within_target)
+                mlflow.log_metric(f"band_{band}_p_within_target", summary.p_within_target)
 
         run_id = run.info.run_id
 

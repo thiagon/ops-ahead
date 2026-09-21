@@ -15,6 +15,8 @@ GOLD_ALERT_DAILY_FEATURES_COLUMNS = [
     "p1_count",
     "p2_count",
     "p3_count",
+    "p4_count",
+    "p5_count",
     "avg_opened_hour",
 ]
 

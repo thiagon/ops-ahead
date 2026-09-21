@@ -23,6 +23,8 @@ def _synthetic_daily(days: int = 240) -> pd.DataFrame:
                 "p1_count": max(total // 12, 0),
                 "p2_count": max(total // 6, 0),
                 "p3_count": max(total // 3, 0),
+                "p4_count": max(total // 8, 0),
+                "p5_count": max(total // 15, 0),
                 "avg_opened_hour": 12.0 + rng.integers(-1, 2),
             }
         )

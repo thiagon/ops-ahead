@@ -6,12 +6,20 @@ import pandas as pd
 
 BR_HOLIDAYS = holidays.Brazil()
 
+# Every severity has its own series, not only the KPI-measured 1-3: a tenant
+# configures which severities form a KPI band, so the projection has to be able
+# to sum a series for any of them.
 PRIORITY_GROUPS = {
     "total": "total_incidents",
     "p1": "p1_count",
     "p2": "p2_count",
     "p3": "p3_count",
+    "p4": "p4_count",
+    "p5": "p5_count",
 }
+
+# A KPI band lists severities; the volume series are named after them.
+SEVERITY_PRIORITY_GROUPS = {1: "p1", 2: "p2", 3: "p3", 4: "p4", 5: "p5"}
 
 
 def to_long_format(daily: pd.DataFrame) -> pd.DataFrame:
@@ -27,6 +35,8 @@ def to_long_format(daily: pd.DataFrame) -> pd.DataFrame:
         p1_count=("p1_count", "sum"),
         p2_count=("p2_count", "sum"),
         p3_count=("p3_count", "sum"),
+        p4_count=("p4_count", "sum"),
+        p5_count=("p5_count", "sum"),
         avg_opened_hour=("avg_opened_hour", "mean"),
     )
 
