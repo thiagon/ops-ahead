@@ -27,7 +27,10 @@ function challengeFor(verifier: string): string {
 
 async function authRoutes(app: FastifyInstance): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>();
-  const secure = app.env.HTTPS_ENABLED;
+  const cookieOpts = {
+    secure: app.env.HTTPS_ENABLED,
+    domain: app.env.SESSION_COOKIE_DOMAIN,
+  };
   const cookies = app.env.SESSION_COOKIE_KEY
     ? new SealedJson(app.env.SESSION_COOKIE_KEY)
     : undefined;
@@ -63,7 +66,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply
         .header(
           'set-cookie',
-          `${FLOW_COOKIE}=${encodeURIComponent(JSON.stringify({ verifier, state, next }))}; HttpOnly; ${cookieAttributes(secure, FLOW_MAX_AGE_SECONDS)}`,
+          `${FLOW_COOKIE}=${encodeURIComponent(JSON.stringify({ verifier, state, next }))}; HttpOnly; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: FLOW_MAX_AGE_SECONDS })}`,
         )
         .redirect(url, 302);
     },
@@ -108,11 +111,11 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
 
       return reply
         .header('set-cookie', [
-          `${FLOW_COOKIE}=; HttpOnly; ${cookieAttributes(secure, 0)}`,
-          `${SESSION_COOKIE}=${sealed}; HttpOnly; ${cookieAttributes(secure)}`,
+          `${FLOW_COOKIE}=; HttpOnly; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: 0 })}`,
+          `${SESSION_COOKIE}=${sealed}; HttpOnly; ${cookieAttributes(cookieOpts)}`,
           // Readable by the front on purpose: it has to echo the value back
           // in the header, which is what a cross-site caller cannot do.
-          `${CSRF_COOKIE}=${csrf}; ${cookieAttributes(secure)}`,
+          `${CSRF_COOKIE}=${csrf}; ${cookieAttributes(cookieOpts)}`,
         ])
         .redirect(`${app.env.FRONTEND_ORIGIN.replace(/\/$/, '')}${flow.next ?? '/'}`, 302);
     },
@@ -134,8 +137,8 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       return reply
         .header('set-cookie', [
-          `${SESSION_COOKIE}=; HttpOnly; ${cookieAttributes(secure, 0)}`,
-          `${CSRF_COOKIE}=; ${cookieAttributes(secure, 0)}`,
+          `${SESSION_COOKIE}=; HttpOnly; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: 0 })}`,
+          `${CSRF_COOKIE}=; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: 0 })}`,
         ])
         .status(204)
         .send(null);

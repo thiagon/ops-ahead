@@ -208,7 +208,10 @@ async function authPlugin(fastify: FastifyInstance) {
       refreshToken: tokens.refreshToken ?? session.refreshToken,
       csrf: session.csrf,
     };
-    const attrs = cookieAttributes(fastify.env.HTTPS_ENABLED);
+    const attrs = cookieAttributes({
+      secure: fastify.env.HTTPS_ENABLED,
+      domain: fastify.env.SESSION_COOKIE_DOMAIN,
+    });
     reply.header('set-cookie', `${SESSION_COOKIE}=${cookies.seal(next)}; HttpOnly; ${attrs}`);
     return await asUser(tokens.accessToken, request);
   }

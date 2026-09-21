@@ -24,14 +24,8 @@ spec:
       ports:
         - protocol: UDP
           port: 53
-        # Internal ingress — AUTHENTIK_ISSUER is the public host, so
-        # introspection goes through Traefik rather than the pod IP.
-        - protocol: TCP
-          port: 80
-        - protocol: TCP
-          port: 443
-    # infra: Authentik (9000 on the pod, 80 on the Service) — the gateway
-    # introspects every person token here.
+    # infra: Authentik Service (80 → 9000 on the pod) — discovery, token
+    # exchange and introspection. The public issuer host is only for the browser.
     - to:
         - namespaceSelector:
             matchLabels:

@@ -27,6 +27,8 @@ export interface OidcConfig {
   clientSecret: string;
   redirectUri: string;
   introspectionCacheTtlMs: number;
+  /** In-cluster origin of the issuer host. Empty: fetch the issuer as written. */
+  internalOrigin?: string;
 }
 
 interface CacheEntry {
@@ -119,7 +121,7 @@ export class OidcService {
       client_secret: this.#config.clientSecret,
       code_verifier: codeVerifier,
     });
-    const response = await fetch(token_endpoint, {
+    const response = await fetch(this.#serverUrl(token_endpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body,
@@ -151,7 +153,7 @@ export class OidcService {
     }
 
     const { introspection_endpoint } = await this.metadata();
-    const response = await fetch(introspection_endpoint, {
+    const response = await fetch(this.#serverUrl(introspection_endpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -184,7 +186,7 @@ export class OidcService {
   async revoke(token: string): Promise<void> {
     const { issuer } = await this.metadata();
     const url = new URL('application/o/revoke/', this.#trailingSlash(issuer));
-    await fetch(url, {
+    await fetch(this.#serverUrl(url.toString()), {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -205,7 +207,7 @@ export class OidcService {
     refreshToken: string,
   ): Promise<{ accessToken: string; refreshToken?: string } | undefined> {
     const { token_endpoint } = await this.metadata();
-    const response = await fetch(token_endpoint, {
+    const response = await fetch(this.#serverUrl(token_endpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -225,12 +227,53 @@ export class OidcService {
   }
 
   async #discover(): Promise<ProviderMetadata> {
-    const url = new URL('.well-known/openid-configuration', this.#trailingSlash(this.#config.issuer));
-    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    const url = new URL(
+      '.well-known/openid-configuration',
+      this.#trailingSlash(this.#config.issuer),
+    );
+    const response = await fetch(this.#serverUrl(url.toString()), {
+      headers: { accept: 'application/json' },
+    });
     if (!response.ok) {
       throw createError.BadGateway(`OIDC discovery failed with ${response.status}`);
     }
-    return (await response.json()) as ProviderMetadata;
+    const metadata = (await response.json()) as ProviderMetadata;
+    return {
+      ...metadata,
+      issuer: this.#browserUrl(metadata.issuer),
+      authorization_endpoint: this.#browserUrl(metadata.authorization_endpoint),
+      token_endpoint: this.#browserUrl(metadata.token_endpoint),
+      introspection_endpoint: this.#browserUrl(metadata.introspection_endpoint),
+      end_session_endpoint: metadata.end_session_endpoint
+        ? this.#browserUrl(metadata.end_session_endpoint)
+        : undefined,
+      jwks_uri: this.#browserUrl(metadata.jwks_uri),
+    };
+  }
+
+  /**
+   * Server-side fetches use the in-cluster origin when one is set; the
+   * browser still follows the public host from discovery.
+   */
+  #serverUrl(url: string): string {
+    const origin = this.#config.internalOrigin;
+    if (!origin) return url;
+    return this.#rewrite(url, new URL(this.#config.issuer).host, new URL(origin));
+  }
+
+  #browserUrl(url: string): string {
+    const origin = this.#config.internalOrigin;
+    if (!origin) return url;
+    return this.#rewrite(url, new URL(origin).host, new URL(this.#config.issuer));
+  }
+
+  #rewrite(url: string, fromHost: string, to: URL): string {
+    if (!url) return url;
+    const parsed = new URL(url);
+    if (parsed.host !== fromHost) return url;
+    parsed.protocol = to.protocol;
+    parsed.host = to.host;
+    return parsed.toString();
   }
 
   /** Bounded so a burst of distinct tokens cannot grow the map forever. */
@@ -244,7 +287,10 @@ export class OidcService {
 
   #toGroups(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
-    return value.filter((entry): entry is string => typeof entry === 'string');
+    // Authentik's own groups (`authentik Admins`, …) are not tenants.
+    return value.filter(
+      (entry): entry is string => typeof entry === 'string' && !entry.startsWith('authentik '),
+    );
   }
 
   #trailingSlash(url: string): string {

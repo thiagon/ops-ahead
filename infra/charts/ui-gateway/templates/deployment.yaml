@@ -28,12 +28,6 @@ spec:
     spec:
       serviceAccountName: ui-gateway
       automountServiceAccountToken: false
-      {{- with .Values.gateway.env.authentikHostAlias }}
-      hostAliases:
-        - ip: {{ .ip | quote }}
-          hostnames:
-            - {{ .host | quote }}
-      {{- end }}
       # The 'gateway' Service would otherwise inject legacy GATEWAY_* env vars
       # into its own pods; the app reads its config from the env schema only.
       enableServiceLinks: false
@@ -93,6 +87,8 @@ spec:
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
             - name: AUTHENTIK_ISSUER
               value: {{ .Values.gateway.env.authentikIssuer | quote }}
+            - name: AUTHENTIK_INTERNAL_ORIGIN
+              value: {{ .Values.gateway.env.authentikInternalOrigin | default "" | quote }}
             - name: AUTHENTIK_CLIENT_ID
               value: {{ .Values.gateway.env.authentikClientId | quote }}
             - name: AUTHENTIK_MCP_CLIENT_ID
@@ -103,6 +99,8 @@ spec:
               value: {{ .Values.gateway.env.frontendOrigin | quote }}
             - name: PUBLIC_URL
               value: {{ .Values.gateway.env.publicUrl | quote }}
+            - name: SESSION_COOKIE_DOMAIN
+              value: {{ .Values.gateway.env.sessionCookieDomain | default "" | quote }}
             - name: SESSION_COOKIE_KEY
               valueFrom:
                 secretKeyRef:

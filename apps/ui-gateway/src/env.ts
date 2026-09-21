@@ -56,11 +56,23 @@ export const envSchema = z
 
     /** Issuer URL of the Authentik realm — OIDC discovery hangs off it. */
     AUTHENTIK_ISSUER: z.string().default(''),
+    /**
+     * In-cluster origin of that issuer. Server-side fetches (discovery, token,
+     * introspect) go here so the public hostname does not have to resolve
+     * inside the pod. Empty: fetch the issuer as written. The browser still
+     * follows the public authorization endpoint.
+     */
+    AUTHENTIK_INTERNAL_ORIGIN: z.string().default(''),
     /** Confidential client the browser flow uses. */
     AUTHENTIK_CLIENT_ID: z.string().default(''),
     AUTHENTIK_CLIENT_SECRET: z.string().default(''),
     /** Public client the MCP clients register against; it never gets a secret. */
     AUTHENTIK_MCP_CLIENT_ID: z.string().default(''),
+    /**
+     * Parent domain of the UI and gateway hosts, so `oa_session` is sent to
+     * both. Empty: host-only (the cookie stays on the gateway).
+     */
+    SESSION_COOKIE_DOMAIN: z.string().default(''),
     /**
      * How long an introspection answer is reused. Short: it is what makes a
      * revoked token stop working, so the window is the delay on a revocation.

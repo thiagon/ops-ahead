@@ -374,9 +374,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ sub: 'test-user', tenants: TEST_TENANTS });
-    expect(res.headers['set-cookie']).toEqual(
-      expect.arrayContaining([expect.stringContaining('oa_session=')]),
-    );
+    expect([res.headers['set-cookie']].flat().join(';')).toContain('oa_session=');
   });
 
   it('keeps /docs behind a session', async () => {

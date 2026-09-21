@@ -53,7 +53,11 @@ data:
           scope_name: groups
           description: "The tenants this person operates"
           expression: |
-            return [group.name for group in request.user.ak_groups.all()]
+            return [
+              group.name
+              for group in request.user.ak_groups.all()
+              if not group.name.startswith("authentik ")
+            ]
 
       - id: gateway-web-provider
         model: authentik_providers_oauth2.oauth2provider

@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
+import { SecretCipher } from '../lib/cipher.ts';
 import { AnalysesService } from './analyses/service.ts';
 import { ApiKeysService } from './api-keys/service.ts';
 import { EventsService } from './events/service.ts';
 import { OidcService } from './oidc/service.ts';
 import { RulesService } from './rules/service.ts';
-import { SecretCipher } from '../lib/cipher.ts';
 import { SourcesService } from './sources/service.ts';
 import { TenantsService } from './tenants/service.ts';
 
@@ -55,6 +55,7 @@ async function servicesPlugin(fastify: FastifyInstance) {
       clientSecret: fastify.env.AUTHENTIK_CLIENT_SECRET,
       redirectUri: `${fastify.env.PUBLIC_URL.replace(/\/$/, '')}/auth/callback`,
       introspectionCacheTtlMs: fastify.env.INTROSPECTION_CACHE_TTL_MS,
+      internalOrigin: fastify.env.AUTHENTIK_INTERNAL_ORIGIN || undefined,
     }),
     apiKeys: new ApiKeysService(fastify.prisma),
     tenants: new TenantsService(fastify.prisma),

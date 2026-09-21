@@ -103,6 +103,10 @@ authentik:
           secretKeyRef:
             name: authentik-secret
             key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      # Public hostname so OIDC documents keep browser URLs when the gateway
+      # talks to the in-cluster Service rather than the ingress.
+      - name: AUTHENTIK_HOST
+        value: http://auth.ops-ahead.localtest.me
 
 # Where the gateway sends the browser back after the login. Kept here rather
 # than inside the blueprint so the two stay one edit apart.
