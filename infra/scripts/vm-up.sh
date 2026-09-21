@@ -18,6 +18,11 @@ command -v helm    > /dev/null 2>&1 || error "helm not found"
 command -v yq      > /dev/null 2>&1 || error "yq not found"
 command -v git     > /dev/null 2>&1 || error "git not found"
 
+# helm has no k3s-aware fallback: without this it targets localhost:8080.
+if [ -z "${KUBECONFIG:-}" ] && [ -f /etc/rancher/k3s/k3s.yaml ]; then
+  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+fi
+
 kubectl get nodes > /dev/null 2>&1 || error "cannot reach the cluster — check KUBECONFIG"
 
 step "Node prerequisites"
