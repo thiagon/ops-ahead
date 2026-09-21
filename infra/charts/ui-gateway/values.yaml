@@ -32,7 +32,16 @@ gateway:
     httpsEnabled: "false"
     corsOrigins:
       - http://ui.ops-ahead.localtest.me
-    authentikIssuer: http://authentik.ops-ahead.localtest.me/application/o/gateway-web/
+    authentikIssuer: http://auth.ops-ahead.localtest.me/application/o/gateway-web/
+    # The issuer host has to be one name: the gateway reads the discovery
+    # document from it, and hands the `authorization_endpoint` it finds there
+    # to the browser. `localtest.me` resolves to 127.0.0.1, which inside the
+    # pod is the pod itself — so the name is pinned to Traefik, which serves
+    # the same ingress the browser reaches. hostAliases takes an address, not
+    # a Service name, and this is the Traefik ClusterIP in dev.
+    authentikHostAlias:
+      ip: 10.43.30.165
+      host: auth.ops-ahead.localtest.me
     authentikClientId: gateway-web
     authentikMcpClientId: gateway-mcp
     introspectionCacheTtlMs: "5000"

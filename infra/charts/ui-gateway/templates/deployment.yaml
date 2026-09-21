@@ -28,6 +28,12 @@ spec:
     spec:
       serviceAccountName: ui-gateway
       automountServiceAccountToken: false
+      {{- with .Values.gateway.env.authentikHostAlias }}
+      hostAliases:
+        - ip: {{ .ip | quote }}
+          hostnames:
+            - {{ .host | quote }}
+      {{- end }}
       # The 'gateway' Service would otherwise inject legacy GATEWAY_* env vars
       # into its own pods; the app reads its config from the env schema only.
       enableServiceLinks: false

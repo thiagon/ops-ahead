@@ -14,6 +14,47 @@ data:
     metadata:
       name: ops-ahead gateway
     entries:
+      # Discovery order across blueprints is not guaranteed, and a `!Find` that
+      # misses resolves to null without failing the apply — the provider would
+      # come up with no authorization flow and no scopes, reported as success.
+      # Applying each referenced blueprint first is what makes the `!Find`s
+      # below deterministic.
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: Default - Provider authorization flow (implicit consent)
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: Default - Provider authorization flow (explicit consent)
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: Default - Provider invalidation flow
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: System - OAuth2 Provider - Scopes
+      # Owns the akadmin user the locaweb group below takes as its member.
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: authentik Bootstrap
+
+      # What makes a group a tenant: the claim carries the group names
+      # verbatim, and the gateway compares the :tenant of the URL against them.
+      # Defined before the providers that !KeyOf it — an entry resolves only
+      # against what earlier entries in the same blueprint already created.
+      - id: tenant-groups-mapping
+        model: authentik_providers_oauth2.scopemapping
+        identifiers:
+          name: "ops-ahead groups"
+        attrs:
+          scope_name: groups
+          description: "The tenants this person operates"
+          expression: |
+            return [group.name for group in request.user.ak_groups.all()]
+
       - id: gateway-web-provider
         model: authentik_providers_oauth2.oauth2provider
         identifiers:
@@ -22,15 +63,20 @@ data:
           client_type: confidential
           client_id: gateway-web
           client_secret: !Env AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+          # Required since 2026.5. The BFF spends a refresh token to keep a
+          # session alive without sending the person back through the login.
+          grant_types:
+            - authorization_code
+            - refresh_token
           redirect_uris:
             - matching_mode: strict
               url: {{ .Values.gateway.redirectUri | quote }}
           # The gateway asks the provider whether a token is still live on
           # every request, so it reads what this scope carries.
           property_mappings:
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
             - !KeyOf tenant-groups-mapping
           authorization_flow:
             !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
@@ -51,13 +97,16 @@ data:
         attrs:
           client_type: public
           client_id: gateway-mcp
+          grant_types:
+            - authorization_code
+            - refresh_token
           redirect_uris:
             - matching_mode: regex
               url: ".*"
           property_mappings:
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
             - !KeyOf tenant-groups-mapping
           authorization_flow:
             !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
@@ -70,18 +119,6 @@ data:
         attrs:
           name: ops-ahead gateway (MCP)
           provider: !KeyOf gateway-mcp-provider
-
-      # What makes a group a tenant: the claim carries the group names
-      # verbatim, and the gateway compares the :tenant of the URL against them.
-      - id: tenant-groups-mapping
-        model: authentik_providers_oauth2.scopemapping
-        identifiers:
-          scope_name: groups
-        attrs:
-          name: "ops-ahead groups"
-          description: "The tenants this person operates"
-          expression: |
-            return [group.name for group in request.user.ak_groups.all()]
 
       # Dev tenant: the group *is* the tenant, same name, no prefix. The
       # bootstrap admin is put in it so the first login already operates
