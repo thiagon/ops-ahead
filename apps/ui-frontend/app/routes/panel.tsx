@@ -14,7 +14,7 @@ import { withTenant } from '~/features/config/repo.server.ts';
 import { managerPath, occurrenceDetailPath, queuePath, useTenantSlug } from '~/paths';
 import { loadQueue, type QueueRow } from '~/queue.server.ts';
 import { formatRatio } from '~/risk.ts';
-import type { Route } from './+types/painel';
+import type { Route } from './+types/panel';
 import type { loader as detailLoader } from './occurrence-detail';
 
 export function meta() {
