@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # Below this many days a category×product is folded into its tenant's
     # residual series instead of getting a model of its own.
     entity_min_history_days: int = 60
+    # Behaviour grouping is unsupervised: the window is how much history
+    # describes an entity, and k is searched over a range rather than fixed.
+    recurring_causes_window_days: int = 90
+    recurring_causes_min_incidents: int = 5
+    recurring_causes_k_min: int = 2
+    recurring_causes_k_max: int = 8
+    recurring_causes_seed: int = 42
     kafka_group_id: str = "ml-trainer"
     gateway_url: str = "http://gateway.ui.svc.cluster.local"
     # Bounds how long consume_forever() blocks per poll before checking for

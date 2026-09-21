@@ -9,7 +9,8 @@
     { "$ref": "#/definitions/entityForecast" },
     { "$ref": "#/definitions/breachRisk" },
     { "$ref": "#/definitions/kpiProjection" },
-    { "$ref": "#/definitions/externalEventDetection" }
+    { "$ref": "#/definitions/externalEventDetection" },
+    { "$ref": "#/definitions/recurringCauses" }
   ],
   "definitions": {
     "volumeForecast": {
@@ -77,6 +78,18 @@
         "analysis": { "const": "external_event_detection" },
         "tenant_id": { "$ref": "#/definitions/tenantId" },
         "contamination": { "type": "number", "minimum": 0, "maximum": 0.5, "description": "Expected share of days flagged anomalous. ml-trainer's own configured default applies when omitted." }
+      }
+    },
+    "recurringCauses": {
+      "type": "object",
+      "required": ["run_id", "update_key", "analysis", "tenant_id"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "update_key": { "$ref": "#/definitions/updateKey" },
+        "analysis": { "const": "recurring_causes" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" },
+        "window_days": { "type": "integer", "minimum": 1, "description": "How much history describes an entity's behaviour. Unsupervised, so no split boundaries. ml-trainer's own configured default applies when omitted." }
       }
     },
     "tenantId": {

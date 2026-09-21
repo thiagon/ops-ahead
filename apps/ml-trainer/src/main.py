@@ -90,6 +90,19 @@ def _train_kpi_projection(settings: Settings) -> str:
     return run_ids[0]
 
 
+def _train_recurring_causes(settings: Settings) -> str:
+    from recurring_causes.data import (
+        dataset_version,
+        fetch_gold_alert_category_entity_breakdown,
+    )
+    from recurring_causes.train import train_and_log
+
+    breakdown = fetch_gold_alert_category_entity_breakdown(
+        settings, settings.recurring_causes_window_days
+    )
+    return train_and_log(settings, breakdown, dataset_version=dataset_version(breakdown))
+
+
 def _run_drift(settings: Settings) -> str:
     import metrics
     from breach import features as breach_features
@@ -137,12 +150,14 @@ TRAINERS = {
     "breach": _train_breach,
     "external_event": _train_external_event,
     "kpi_projection": _train_kpi_projection,
+    "recurring_causes": _train_recurring_causes,
     "drift": _run_drift,
 }
 
 # The supervised forecasts need a hold-out window to evaluate against;
-# kpi_projection always forecasts from "now" forward and external_event trains
-# unsupervised on all available history — neither takes split boundaries.
+# kpi_projection always forecasts from "now" forward, and external_event and
+# recurring_causes train unsupervised on all available history — none of them
+# take split boundaries.
 SPLIT_REQUIRED_DOMAINS = {"volume", "entity_forecast", "breach"}
 
 
@@ -171,7 +186,10 @@ def main() -> None:
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m main train <volume|entity_forecast|breach|external_event|kpi_projection|drift> | consume")
+        LOGGER.error(
+            "Usage: python -m main train "
+            "<volume|entity_forecast|breach|external_event|kpi_projection|recurring_causes|drift> | consume"
+        )
         sys.exit(2)
 
     domain = sys.argv[2]
