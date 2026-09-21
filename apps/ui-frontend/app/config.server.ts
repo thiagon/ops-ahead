@@ -8,13 +8,12 @@ const configSchema = z.object({
   CLICKHOUSE_URL: z.url({ protocol: /^https?$/ }).default('http://default:@localhost:8123/default'),
   // Where a customer's origin system reaches the gateway from outside the
   // cluster — an ingress host, so it differs per environment and the
-  // integration screen has nothing to show until it is set.
+  // integration screen has nothing to show until it is set. Screen reads call
+  // this host from the browser.
   PUBLIC_GATEWAY_URL: z.url({ protocol: /^https?$/ }).default('https://gateway.ops-ahead.local'),
-  // The same gateway reached from inside the cluster. The public host is what
-  // the browser is sent to for the login; this is what the loaders call.
-  GATEWAY_URL: z
-    .url({ protocol: /^https?$/ })
-    .default('http://gateway.ui.svc.cluster.local'),
+  // The same gateway reached from inside the cluster. Actions and the
+  // ClickHouse JSON routes still hop through here, forwarding the cookie.
+  GATEWAY_URL: z.url({ protocol: /^https?$/ }).default('http://gateway.ui.svc.cluster.local'),
   ML_MODEL_SERVING_URL: z
     .url({ protocol: /^https?$/ })
     .default('http://ml-model-serving.ml.svc.cluster.local:3000'),

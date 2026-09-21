@@ -13,10 +13,12 @@ carries it live → data-ingest applies it and mirrors it into MinIO. Nothing
 here reaches MinIO or ClickHouse directly — verification is a separate step
 that reads the ClickHouse tables data-ingest wrote to.
 
-    python -m seed_config --gateway-url http://localhost:8080 --secret ops-ahead-dev
+    GATEWAY_TOKEN=... python scripts/seed_config.py \\
+      --gateway-url http://gateway.204-168-208-210.sslip.io
 """
 
 import argparse
+import os
 
 import httpx
 
@@ -94,8 +96,11 @@ TARGETS = {
 }
 
 
-def seed(gateway_url: str, secret: str | None) -> None:
-    with httpx.Client(base_url=gateway_url, timeout=10) as client:
+def seed(gateway_url: str, secret: str | None, token: str) -> None:
+    # The gateway introspects this bearer as gateway-web. A token minted for
+    # gateway-mcp comes back inactive and every route answers 401.
+    headers = {"Authorization": f"Bearer {token}"}
+    with httpx.Client(base_url=gateway_url, headers=headers, timeout=10) as client:
         # Registering is what makes the address answer at all; the rules below
         # are what lets data-ingest translate what arrives on it.
         body = {"intake": MAPPING["intake"]}
@@ -121,10 +126,20 @@ def seed(gateway_url: str, secret: str | None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gateway-url", default="http://localhost:8080")
+    parser.add_argument(
+        "--gateway-url",
+        default="http://gateway.204-168-208-210.sslip.io",
+    )
     parser.add_argument("--secret", help="Leave it out to have the gateway mint one")
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("GATEWAY_TOKEN"),
+        help="Access token issued to the gateway-web client",
+    )
     args = parser.parse_args()
-    seed(args.gateway_url, args.secret)
+    if not args.token:
+        parser.error("pass --token or set GATEWAY_TOKEN (a gateway-web access token)")
+    seed(args.gateway_url, args.secret, args.token)
 
 
 if __name__ == "__main__":

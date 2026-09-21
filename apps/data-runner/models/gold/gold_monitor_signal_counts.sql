@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id, window_minutes, window_start)',
+        order_by='(tenant_id, entity_id, window_minutes, window_start)',
         partition_by='toYYYYMM(window_start)'
     )
 }}
@@ -14,6 +14,7 @@
 -- own literal call (same pattern as the alert chain's entity-window counts).
 {% for minutes in [15, 60, 360] %}
 select
+    tenant_id,
     entity_id,
     {{ minutes }}                                                    as window_minutes,
     toStartOfInterval(received_at, interval {{ minutes }} minute)    as window_start,
@@ -22,6 +23,6 @@ select
     countIf(condition = 'cleared')                                   as cleared_count,
     uniqExact(external_id)                                           as distinct_conditions
 from {{ source('ingest', 'bronze_monitor') }}
-group by entity_id, window_start
+group by tenant_id, entity_id, window_start
 {% if not loop.last %}union all{% endif %}
 {% endfor %}

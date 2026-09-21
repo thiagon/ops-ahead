@@ -1,0 +1,2209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Pitch SPRINT 4 — Ops Ahead · Solução Final</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<style>
+		:root {
+			--bg-main: #0B0F19;
+			--bg-tile: #161F33;
+			--bg-tile-2: #1E2A47;
+			--accent-red: #F9203E;
+			--accent-red-soft: rgba(249, 32, 62, 0.12);
+			--text-light: #F8FAFC;
+			--text-muted: #94A3B8;
+			--text-dim: #64748B;
+			--border-color: #2A3B5C;
+			--green: #10B981;
+			--amber: #F59E0B;
+			--blue: #3B82F6;
+			--purple: #8B5CF6;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+			-webkit-print-color-adjust: exact !important;
+			print-color-adjust: exact !important;
+		}
+
+		body {
+			background-color: #e2e8f0;
+			display: grid;
+			gap: 40px;
+			place-items: center;
+			padding: 40px 0;
+			min-height: 100vh;
+			font-family: 'Inter', sans-serif;
+		}
+
+		.slide-container {
+			background-color: var(--bg-main);
+			width: 1280px;
+			height: 720px;
+			padding: 50px 60px;
+			position: relative;
+			color: var(--text-light);
+			border-radius: 8px;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+		}
+
+		.slide-container::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 6px;
+			background: linear-gradient(90deg, var(--accent-red) 0%, var(--accent-red) 30%, transparent 30%);
+			z-index: 10;
+		}
+
+		h1,
+		h2,
+		h3,
+		h4 {
+			font-family: 'Poppins', sans-serif;
+			font-weight: 700;
+			color: var(--text-light);
+		}
+
+		p,
+		li,
+		td,
+		th,
+		span {
+			font-family: 'Inter', sans-serif;
+			color: var(--text-muted);
+		}
+
+		code,
+		.mono {
+			font-family: 'JetBrains Mono', monospace;
+		}
+
+		.slide-title {
+			font-size: 32px;
+			margin-bottom: 24px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			color: var(--text-light);
+			display: flex;
+			align-items: center;
+			width: 100%;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 14px;
+		}
+
+		.slide-title .red-slash {
+			color: var(--accent-red);
+			margin-right: 14px;
+			font-weight: 900;
+		}
+
+		.content-area {
+			display: flex;
+			flex-direction: column;
+			flex-grow: 1;
+			width: 100%;
+			justify-content: center;
+		}
+
+		.brand-footer {
+			position: absolute;
+			bottom: 22px;
+			right: 40px;
+			font-family: 'Poppins', sans-serif;
+			font-weight: 700;
+			font-size: 16px;
+			color: var(--text-light);
+		}
+
+		.brand-footer span {
+			color: var(--accent-red);
+			font-weight: 900;
+			margin-right: 5px;
+		}
+
+		/* ---------- CAPA ---------- */
+		.title-layout {
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+		}
+
+		.title-layout h1 {
+			font-size: 96px;
+			margin-bottom: 16px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+		}
+
+		.title-layout .subtitle {
+			font-size: 28px;
+			color: var(--text-light);
+			font-weight: 600;
+		}
+
+		.tagline {
+			font-size: 22px;
+			color: var(--accent-red);
+			font-style: italic;
+			letter-spacing: 1px;
+			margin-top: 18px;
+		}
+
+		/* ---------- EQUIPE ---------- */
+		.team-grid {
+			display: flex;
+			justify-content: space-between;
+			gap: 18px;
+			width: 100%;
+		}
+
+		.team-member {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			background: var(--bg-tile);
+			padding: 22px 14px;
+			border-radius: 12px;
+			border-top: 4px solid var(--accent-red);
+		}
+
+		.team-member .photo {
+			width: 100px;
+			height: 100px;
+			border-radius: 50%;
+			object-fit: cover;
+			border: 3px solid var(--border-color);
+			margin-bottom: 14px;
+			background: var(--bg-main);
+		}
+
+		.team-member h3 {
+			font-size: 16px;
+			text-align: center;
+			margin-bottom: 4px;
+			line-height: 1.3;
+		}
+
+		.team-member p {
+			font-size: 13px;
+			color: var(--accent-red);
+			font-weight: 600;
+		}
+
+		/* ---------- CENÁRIO LOCAWEB ---------- */
+		.highlight-numbers-layout {
+			display: flex;
+			align-items: stretch;
+			gap: 36px;
+			width: 100%;
+		}
+
+		.highlight-numbers-layout>div:first-child {
+			flex: 0 0 35%;
+			text-align: center;
+			background-color: var(--bg-tile);
+			padding: 36px 28px;
+			border-radius: 16px;
+			border-bottom: 4px solid var(--accent-red);
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
+
+		.highlight-numbers-layout .number {
+			font-size: 120px;
+			font-weight: 900;
+			color: var(--accent-red);
+			line-height: 1;
+			font-family: 'Poppins', sans-serif;
+		}
+
+		.highlight-numbers-layout .number-label {
+			font-size: 16px;
+			font-weight: 600;
+			color: var(--text-light);
+			margin-top: 16px;
+			text-transform: uppercase;
+		}
+
+		.data-tiles {
+			flex: 1;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 12px;
+		}
+
+		.data-tile {
+			background: var(--bg-tile);
+			border-radius: 10px;
+			border-left: 3px solid var(--accent-red);
+			padding: 18px 20px;
+		}
+
+		.data-tile .data-num {
+			font-family: 'Poppins', sans-serif;
+			font-size: 36px;
+			font-weight: 900;
+			color: var(--accent-red);
+			line-height: 1;
+		}
+
+		.data-tile .data-label {
+			color: var(--text-light);
+			font-weight: 600;
+			font-size: 14px;
+			margin-top: 8px;
+		}
+
+		.data-tile .data-desc {
+			color: var(--text-muted);
+			font-size: 12px;
+			margin-top: 4px;
+			line-height: 1.4;
+		}
+
+		/* ---------- PROBLEMA ---------- */
+		.two-column {
+			display: flex;
+			width: 100%;
+			gap: 50px;
+			align-items: stretch;
+		}
+
+		.two-column>div {
+			flex: 1;
+		}
+
+		.feature-block {
+			margin-bottom: 26px;
+		}
+
+		.feature-block:last-child {
+			margin-bottom: 0;
+		}
+
+		.feature-block h3 {
+			font-size: 20px;
+			color: var(--text-light);
+			margin-bottom: 8px;
+			display: flex;
+			align-items: center;
+		}
+
+		.feature-block h3 i {
+			color: var(--accent-red);
+			margin-right: 14px;
+			font-size: 22px;
+		}
+
+		.feature-block p {
+			font-size: 15px;
+			color: var(--text-muted);
+			line-height: 1.5;
+		}
+
+		/* ---------- PÚBLICO-ALVO ---------- */
+		.persona-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 18px;
+			width: 100%;
+		}
+
+		.persona-card {
+			background: var(--bg-tile);
+			border-radius: 14px;
+			border-top: 4px solid var(--accent-red);
+			padding: 22px 24px;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.persona-card .persona-icon {
+			width: 56px;
+			height: 56px;
+			border-radius: 50%;
+			background: rgba(249, 32, 62, 0.12);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--accent-red);
+			font-size: 24px;
+			margin-bottom: 14px;
+		}
+
+		.persona-card .persona-tier {
+			font-family: 'Poppins', sans-serif;
+			font-size: 11px;
+			letter-spacing: 2px;
+			color: var(--accent-red);
+			text-transform: uppercase;
+			font-weight: 700;
+			margin-bottom: 6px;
+		}
+
+		.persona-card h3 {
+			font-size: 18px;
+			color: var(--text-light);
+			margin-bottom: 10px;
+			line-height: 1.25;
+		}
+
+		.persona-card p {
+			font-size: 13px;
+			color: var(--text-muted);
+			line-height: 1.55;
+		}
+
+		.persona-card.new {
+			border-top-color: var(--green);
+		}
+
+		.persona-card.new .persona-tier {
+			color: var(--green);
+		}
+
+		.persona-card.new .persona-icon {
+			background: rgba(16, 185, 129, 0.12);
+			color: var(--green);
+		}
+
+		.persona-card .new-badge {
+			margin-left: 8px;
+			background: var(--green);
+			color: var(--bg-main);
+			font-size: 9px;
+			font-weight: 700;
+			padding: 2px 6px;
+			border-radius: 4px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			font-family: 'Poppins', sans-serif;
+		}
+
+		/* ---------- PROPOSTA DE SOLUÇÃO ---------- */
+		.tiled-content {
+			display: flex;
+			gap: 16px;
+			width: 100%;
+			align-items: stretch;
+		}
+
+		.tile {
+			flex: 1;
+			background-color: var(--bg-tile);
+			border-radius: 12px;
+			padding: 22px;
+			border-top: 4px solid var(--accent-red);
+			display: flex;
+			flex-direction: column;
+		}
+
+		.tile .icon {
+			font-size: 30px;
+			color: var(--accent-red);
+			margin-bottom: 12px;
+		}
+
+		.tile h3 {
+			color: var(--text-light);
+			font-size: 16px;
+			margin-bottom: 8px;
+		}
+
+		.tile p {
+			color: var(--text-muted);
+			font-size: 12.5px;
+			line-height: 1.5;
+		}
+
+		.tile .tech-row {
+			margin-top: 12px;
+			padding-top: 10px;
+			border-top: 1px solid var(--border-color);
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 10.5px;
+			color: var(--accent-red);
+			letter-spacing: 0.5px;
+			line-height: 1.5;
+		}
+
+		/* ---------- ARQUITETURA VISÃO GERAL ---------- */
+		.arch-layout {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 26px;
+			height: 100%;
+		}
+
+		.arch-stack {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.arch-layer {
+			background: var(--bg-tile);
+			border-radius: 10px;
+			padding: 12px 16px;
+			border-left: 4px solid var(--accent-red);
+			position: relative;
+		}
+
+		.arch-layer .layer-tag {
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 10px;
+			color: var(--accent-red);
+			letter-spacing: 1.5px;
+			margin-bottom: 4px;
+			text-transform: uppercase;
+		}
+
+		.arch-layer h4 {
+			font-size: 14px;
+			color: var(--text-light);
+			margin-bottom: 4px;
+		}
+
+		.arch-layer p {
+			font-size: 11px;
+			color: var(--text-muted);
+			font-family: 'JetBrains Mono', monospace;
+			line-height: 1.4;
+		}
+
+		.arch-arrow {
+			text-align: center;
+			color: var(--accent-red);
+			font-size: 14px;
+			margin: -2px 0;
+		}
+
+		.arch-sources {
+			text-align: center;
+			margin-top: 10px;
+			padding: 8px;
+			background: rgba(0, 0, 0, 0.3);
+			border-radius: 6px;
+			font-size: 11px;
+			color: var(--text-muted);
+		}
+
+		.arch-sources strong {
+			color: var(--text-light);
+		}
+
+		.principles-list {
+			display: flex;
+			flex-direction: column;
+			gap: 7px;
+		}
+
+		.principle-item {
+			background: var(--bg-tile);
+			border-radius: 6px;
+			padding: 8px 12px;
+			display: flex;
+			gap: 10px;
+			align-items: flex-start;
+			border-left: 2px solid var(--accent-red);
+		}
+
+		.principle-item .num {
+			font-family: 'Poppins', sans-serif;
+			font-weight: 900;
+			color: var(--accent-red);
+			font-size: 16px;
+			flex: 0 0 22px;
+			line-height: 1.4;
+		}
+
+		.principle-item .body {
+			font-size: 11.5px;
+			line-height: 1.4;
+			color: var(--text-muted);
+		}
+
+		.principle-item .body strong {
+			color: var(--text-light);
+		}
+
+		.principle-item .body code {
+			font-size: 10px;
+			color: var(--accent-red);
+		}
+
+		.principles-title {
+			font-size: 14px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			color: var(--text-light);
+			margin-bottom: 10px;
+			font-family: 'Poppins', sans-serif;
+		}
+
+		.principles-title .accent {
+			color: var(--accent-red);
+		}
+
+		/* ---------- TABELAS PADRÃO ---------- */
+		.locaweb-table {
+			width: 100%;
+			border-collapse: collapse;
+			background-color: var(--bg-tile);
+			border: 1px solid var(--border-color);
+			border-radius: 8px;
+			overflow: hidden;
+		}
+
+		.locaweb-table th {
+			background: rgba(0, 0, 0, 0.35);
+			color: var(--accent-red);
+			padding: 11px 14px;
+			text-align: left;
+			font-size: 11px;
+			text-transform: uppercase;
+			letter-spacing: 1.5px;
+			border-bottom: 2px solid var(--border-color);
+			font-family: 'Poppins', sans-serif;
+		}
+
+		.locaweb-table td {
+			padding: 10px 14px;
+			border-bottom: 1px solid var(--border-color);
+			font-size: 12px;
+			color: var(--text-muted);
+			line-height: 1.45;
+			vertical-align: top;
+		}
+
+		.locaweb-table tr:last-child td {
+			border-bottom: none;
+		}
+
+		.locaweb-table td strong,
+		.locaweb-table td b {
+			color: var(--text-light);
+		}
+
+		.locaweb-table td code {
+			color: var(--accent-red);
+			font-size: 11px;
+		}
+
+		.callout {
+			margin-top: 14px;
+			padding: 12px 18px;
+			background: var(--bg-tile-2);
+			border-radius: 8px;
+			border-left: 3px solid var(--amber);
+		}
+
+		.callout h4 {
+			color: var(--amber);
+			font-size: 12px;
+			margin-bottom: 6px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+		}
+
+		.callout ul {
+			list-style: none;
+			padding-left: 0;
+		}
+
+		.callout li {
+			font-size: 11.5px;
+			color: var(--text-muted);
+			line-height: 1.55;
+			margin-bottom: 3px;
+		}
+
+		.callout li::before {
+			content: '▸ ';
+			color: var(--amber);
+			font-weight: 700;
+		}
+
+		.callout li strong,
+		.callout li b {
+			color: var(--text-light);
+		}
+
+		.callout.callout-green {
+			border-left-color: var(--green);
+		}
+
+		.callout.callout-green h4 {
+			color: var(--green);
+		}
+
+		.callout.callout-green li::before {
+			color: var(--green);
+		}
+
+		.callout.callout-green li code {
+			color: var(--green);
+		}
+
+
+		/* ---------- MODELOS CARDS ---------- */
+		.models-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr 1fr;
+			gap: 14px;
+			margin-bottom: 14px;
+		}
+
+		.model-card {
+			background: var(--bg-tile);
+			border-radius: 12px;
+			padding: 18px;
+			border-top: 3px solid var(--accent-red);
+			display: flex;
+			flex-direction: column;
+		}
+
+		.model-card .model-icon {
+			width: 36px;
+			height: 36px;
+			border-radius: 8px;
+			background: var(--accent-red-soft);
+			color: var(--accent-red);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 16px;
+			margin-bottom: 10px;
+		}
+
+		.model-card h4 {
+			font-size: 14px;
+			color: var(--text-light);
+			margin-bottom: 4px;
+		}
+
+		.model-card .algo {
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 10px;
+			color: var(--accent-red);
+			margin-bottom: 10px;
+			letter-spacing: 0.5px;
+		}
+
+		.model-card .why {
+			font-size: 11px;
+			color: var(--text-muted);
+			line-height: 1.5;
+			margin-bottom: 10px;
+			flex-grow: 1;
+		}
+
+		.model-card .metric {
+			padding-top: 8px;
+			border-top: 1px solid var(--border-color);
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+		}
+
+		.model-card .metric span {
+			color: var(--text-dim);
+			margin-right: 6px;
+		}
+
+		.model-card .metric strong {
+			color: var(--text-light);
+			font-weight: 600;
+		}
+
+		.ops-stack {
+			background: var(--bg-tile-2);
+			border-radius: 8px;
+			padding: 12px 18px;
+			border-left: 3px solid var(--green);
+		}
+
+		.ops-stack h4 {
+			color: var(--green);
+			font-size: 11px;
+			margin-bottom: 6px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+		}
+
+		.ops-stack ul {
+			list-style: none;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 4px 18px;
+		}
+
+		.ops-stack li {
+			font-size: 11px;
+			color: var(--text-muted);
+			line-height: 1.5;
+		}
+
+		.ops-stack li strong {
+			color: var(--text-light);
+		}
+
+		.ops-stack li code {
+			color: var(--accent-red);
+			font-size: 10px;
+		}
+
+		/* ---------- AGENTE ---------- */
+		.tool-pills {
+			margin-top: 14px;
+			padding: 12px 18px;
+			background: var(--bg-tile-2);
+			border-radius: 8px;
+			border-left: 3px solid var(--accent-red);
+		}
+
+		.tool-pills h4 {
+			font-size: 11px;
+			color: var(--accent-red);
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			margin-bottom: 8px;
+		}
+
+		.tool-pills .pills {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+		}
+
+		.tool-pills code {
+			font-size: 11px;
+			color: var(--text-light);
+			background: var(--bg-main);
+			padding: 4px 10px;
+			border-radius: 999px;
+			border: 1px solid var(--border-color);
+		}
+
+		.tool-pills code.new {
+			border-color: var(--accent-red);
+			color: var(--accent-red);
+		}
+
+		/* ---------- INTERFACES ---------- */
+		.principle-banner {
+			background: var(--bg-tile-2);
+			border-left: 3px solid var(--accent-red);
+			border-radius: 0 8px 8px 0;
+			padding: 12px 18px;
+			margin-top: 14px;
+		}
+
+		.principle-banner p {
+			font-size: 13px;
+			color: var(--text-light);
+			line-height: 1.5;
+		}
+
+		.principle-banner strong {
+			color: var(--accent-red);
+		}
+
+		.iface-cols {
+			display: grid;
+			grid-template-columns: 1fr 1fr 1fr;
+			gap: 14px;
+			margin-bottom: 14px;
+		}
+
+		.iface-col {
+			background: var(--bg-tile);
+			border-radius: 10px;
+			padding: 14px 16px;
+			border-top: 3px solid var(--accent-red);
+		}
+
+		.iface-col .icon {
+			width: 32px;
+			height: 32px;
+			border-radius: 8px;
+			background: var(--accent-red-soft);
+			color: var(--accent-red);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 14px;
+			margin-bottom: 8px;
+		}
+
+		.iface-col .label {
+			font-size: 10px;
+			text-transform: uppercase;
+			color: var(--text-dim);
+			letter-spacing: 1.5px;
+			margin-bottom: 4px;
+		}
+
+		.iface-col h4 {
+			font-size: 13px;
+			color: var(--text-light);
+			margin-bottom: 6px;
+		}
+
+		.iface-col p {
+			font-size: 11px;
+			color: var(--text-muted);
+			line-height: 1.5;
+		}
+
+		/* ---------- INFRA STRIP ---------- */
+		.infra-strip {
+			background: var(--bg-tile-2);
+			border-radius: 8px;
+			padding: 12px 18px;
+			display: grid;
+			grid-template-columns: 1fr 1fr 1fr;
+			gap: 10px 22px;
+		}
+
+		.infra-strip .infra-item {
+			font-size: 11px;
+			color: var(--text-muted);
+			line-height: 1.5;
+		}
+
+		.infra-strip .infra-item strong {
+			color: var(--text-light);
+			font-family: 'Poppins', sans-serif;
+		}
+
+		.infra-strip .infra-item i {
+			color: var(--accent-red);
+			margin-right: 6px;
+			width: 14px;
+		}
+
+		/* ---------- TIMELINE ---------- */
+		.timeline {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+
+		.timeline-row {
+			display: grid;
+			grid-template-columns: 70px 1fr 240px;
+			gap: 14px;
+			align-items: center;
+			padding: 9px 14px;
+			background: var(--bg-tile);
+			border-radius: 6px;
+			border-left: 3px solid var(--accent-red);
+		}
+
+		.timeline-row .t {
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 13px;
+			font-weight: 700;
+			color: var(--accent-red);
+		}
+
+		.timeline-row .ev {
+			font-size: 12px;
+			color: var(--text-light);
+			line-height: 1.4;
+		}
+
+		.timeline-row .comp {
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 11px;
+			color: var(--text-muted);
+			text-align: right;
+		}
+
+		.sli-banner {
+			margin-top: 12px;
+			padding: 10px 18px;
+			background: linear-gradient(90deg, var(--accent-red-soft), transparent);
+			border-radius: 8px;
+			border: 1px solid rgba(249, 32, 62, 0.4);
+			text-align: center;
+		}
+
+		.sli-banner strong {
+			color: var(--accent-red);
+			font-family: 'Poppins', sans-serif;
+			font-weight: 700;
+		}
+
+		/* ---------- WIREFRAMES ---------- */
+		.wf-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 16px;
+			width: 100%;
+		}
+
+		.wf-card {
+			background: var(--bg-tile);
+			border-radius: 12px;
+			padding: 16px 18px;
+			border-top: 3px solid var(--accent-red);
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+		}
+
+		.wf-card h4 {
+			font-size: 14px;
+			color: var(--text-light);
+			line-height: 1.3;
+		}
+
+		.wf-card .wf-body {
+			display: flex;
+			gap: 12px;
+			flex: 1;
+			align-items: stretch;
+		}
+
+		.wf-card .wf-thumb {
+			flex: 0 0 52%;
+			border-radius: 8px;
+			overflow: hidden;
+			background: var(--bg-main);
+			align-self: stretch;
+			min-height: 0;
+		}
+
+		.wf-card .wf-thumb img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+
+		.wf-card p {
+			font-size: 11px;
+			color: var(--text-muted);
+			line-height: 1.5;
+			flex: 1;
+			margin: 0;
+		}
+
+		.wf-card p strong {
+			color: var(--text-light);
+		}
+
+		/* ---------- SCRUMBAN ---------- */
+		.agile-layout {
+			display: grid;
+			grid-template-columns: 35% 1fr;
+			gap: 30px;
+			align-items: stretch;
+		}
+
+		.scrum-box {
+			background: var(--bg-tile);
+			border-radius: 12px;
+			padding: 22px;
+			border-top: 3px solid var(--accent-red);
+		}
+
+		.scrum-box h3 {
+			font-size: 14px;
+			color: var(--text-light);
+			margin-bottom: 12px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.scrum-box h3 i {
+			color: var(--accent-red);
+			font-size: 16px;
+		}
+
+		.scrum-box .row {
+			display: flex;
+			justify-content: space-between;
+			padding: 6px 0;
+			border-bottom: 1px dashed var(--border-color);
+			font-size: 12px;
+		}
+
+		.scrum-box .row:last-child {
+			border-bottom: none;
+		}
+
+		.scrum-box .row .key {
+			color: var(--text-light);
+			font-weight: 500;
+		}
+
+		.scrum-box .row .val {
+			color: var(--accent-red);
+			font-family: 'JetBrains Mono', monospace;
+			font-size: 11px;
+		}
+
+		.board-placeholder {
+			border-radius: 12px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.board-placeholder img {
+			width: 100%;
+			height: auto;
+			display: block;
+			border-radius: 12px;
+		}
+
+		.board-placeholder .msg {
+			z-index: 2;
+			text-align: center;
+			padding: 20px;
+		}
+
+		/* ---------- FECHAMENTO ---------- */
+		.closing-headline {
+			font-family: 'Poppins', sans-serif;
+			font-size: 38px;
+			font-weight: 900;
+			color: var(--text-light);
+			line-height: 1.15;
+			margin-bottom: 18px;
+		}
+
+		.closing-headline .accent {
+			color: var(--accent-red);
+		}
+
+		.closing-lead {
+			font-size: 15px;
+			color: var(--text-muted);
+			line-height: 1.6;
+			margin-bottom: 22px;
+			max-width: 850px;
+		}
+
+		.closing-lead strong {
+			color: var(--text-light);
+		}
+
+		.thanks-line {
+			margin-top: 18px;
+			text-align: center;
+			font-size: 13px;
+			color: var(--text-dim);
+			font-style: italic;
+			letter-spacing: 1px;
+		}
+
+		.thanks-line strong {
+			color: var(--accent-red);
+			font-style: normal;
+			font-family: 'Poppins', sans-serif;
+		}
+	</style>
+</head>
+
+<body>
+
+	<!-- SLIDE 1: CAPA -->
+	<div class="slide-container" id="slide1">
+		<div class="title-layout">
+			<p style="font-size:22px; color: var(--text-muted); letter-spacing: 4px; margin-bottom: 28px;">FIAP + locaweb</p>
+			<h1 style="color: var(--accent-red);">// OPS AHEAD</h1>
+			<p class="subtitle">Operação à frente, visão antecipada.</p>
+			<p class="tagline">"Veja o incidente antes que ele aconteça"</p>
+			<p
+				style="font-size: 18px; color: var(--text-muted); letter-spacing: 4px; text-transform: uppercase; margin-top: 50px;">
+				CHALLENGE LOCAWEB 2026</p>
+		</div>
+	</div>
+
+	<!-- SLIDE 2: EQUIPE -->
+	<div class="slide-container" id="slide2">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> EQUIPE OPS AHEAD
+		</h2>
+		<div class="content-area">
+			<p
+				style="font-size: 16px; color: var(--text-muted); margin-bottom: 30px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 500;">
+				SPRINT 4: SOLUÇÃO FINAL</p>
+			<div class="team-grid">
+				<div class="team-member"><img class="photo" src="assets/team/gustavo.png" alt="Gustavo Rodrigues Neves">
+					<h3>Gustavo<br>Rodrigues Neves</h3>
+					<p>RM561572</p>
+				</div>
+				<div class="team-member"><img class="photo" src="assets/team/joao.png" alt="João Gabriel Rodrigues Porto">
+					<h3>João Gabriel<br>Rodrigues Porto</h3>
+					<p>RM565092</p>
+				</div>
+				<div class="team-member"><img class="photo" src="assets/team/raphael.png" alt="Raphael Carlos da Silva Moraes">
+					<h3>Raphael Carlos<br>da Silva Moraes</h3>
+					<p>RM564098</p>
+				</div>
+				<div class="team-member"><img class="photo" src="assets/team/samuel.png" alt="Samuel Calebe Gusman">
+					<h3>Samuel Calebe<br>Gusman</h3>
+					<p>RM562124</p>
+				</div>
+				<div class="team-member"><img class="photo" src="assets/team/thiago.png" alt="Thiago Nunes Pereira">
+					<h3>Thiago Nunes<br>Pereira</h3>
+					<p>RM565900</p>
+				</div>
+			</div>
+		</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+	<!-- SLIDE 3: O CENÁRIO LOCAWEB -->
+	<div class="slide-container" id="slide3">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> O CENÁRIO LOCAWEB
+		</h2>
+		<div class="content-area">
+			<div class="highlight-numbers-layout">
+				<div>
+					<div class="number">1/3</div>
+					<div class="number-label">DO TRÁFEGO DA<br>INTERNET BRASILEIRA</div>
+					<p style="font-size: 13px; color: var(--text-muted); margin-top: 18px; line-height: 1.5;">
+						3,4 milhões de caixas de e-mail · 500 mil sites hospedados · BOPE 24×7</p>
+				</div>
+				<div class="data-tiles">
+					<div class="data-tile">
+						<div class="data-num">65,6%</div>
+						<div class="data-label">"Sem Intervenção"</div>
+						<div class="data-desc">Auto-healing resolve, mas o sinal preditivo é descartado</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">75,7%</div>
+						<div class="data-label">Concentrados no Time 14</div>
+						<div class="data-desc">Gargalo operacional claro</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">248</div>
+						<div class="data-label">Breaches de OLA / ano</div>
+						<div class="data-desc">Apenas 1% do volume KPI, mas pressionam o bônus</div>
+					</div>
+					<div class="data-tile">
+						<div class="data-num">18%</div>
+						<div class="data-label">Incidentes &lt; 60 segundos</div>
+						<div class="data-desc">Ruído competindo com sinal real</div>
+					</div>
+				</div>
+			</div>
+			<p style="font-size: 13px; color: var(--text-muted); margin-top: 20px; text-align: center;">
+				Análise de <strong style="color: var(--text-light);">mais de 122 mil incidentes</strong> do ITSM. P1/P2 ≤ 4h ·
+				margem ≈
+				36 breaches P2/ano para 100% da meta.</p>
+		</div>
+	</div>
+
+	<!-- SLIDE 4: O PROBLEMA -->
+	<div class="slide-container" id="slide4">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> O PROBLEMA OPERACIONAL
+		</h2>
+		<div class="content-area">
+			<p style="font-size: 17px; color: var(--text-muted); margin-bottom: 22px;">Hoje a operação é <strong
+					style="color: var(--accent-red);">reativa</strong>: a equipe só age depois que o incidente já ocorreu.</p>
+			<div class="two-column">
+				<div style="display: flex; flex-direction: column; justify-content: space-between;">
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-clock-rotate-left"></i> Picos não antecipados</h3>
+						<p>Volume varia ~30% entre dias úteis e fins de semana, mas sazonalidade não alimenta nenhuma previsão de
+							escala.</p>
+					</div>
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-bolt"></i> Sinais preditivos desperdiçados</h3>
+						<p>80 mil "Sem Intervenção" anuais são descartadas do KPI, mas suas rajadas em um IC são o principal
+							indicador de P2 iminente. Ninguém monitora.</p>
+					</div>
+				</div>
+				<div style="display: flex; flex-direction: column; justify-content: space-between;">
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-eye-slash"></i> Risco de OLA invisível</h3>
+						<p>Os 248 breaches/ano pressionam diretamente o bônus, mas a equipe só descobre a violação depois que o
+							prazo estourou.</p>
+					</div>
+					<div class="feature-block">
+						<h3><i class="fa-solid fa-database"></i> Concentração sem resposta</h3>
+						<p>Time 14 absorve 75,7% dos incidentes; 3 servidores concentram ~11% do volume. Sem mecanismo para
+							redistribuir antes da sobrecarga.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 5: PÚBLICO-ALVO -->
+	<div class="slide-container" id="slide5">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> PÚBLICO-ALVO
+		</h2>
+		<div class="content-area">
+			<div class="persona-grid">
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-headset"></i></div>
+					<div class="persona-tier">Público primário</div>
+					<h3>Equipe BOPE</h3>
+					<p>Sabe dos picos antes deles acontecerem e recebe os chamados em risco já priorizados na fila, com menos
+						pressão
+						no plantão 24×7.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-server"></i></div>
+					<div class="persona-tier">Público técnico</div>
+					<h3>Time SRE / Plataforma</h3>
+					<p>Mantém pipeline e agente em pé no dia-a-dia. Cuida de deploy, retreino dos modelos e do custo do LLM em
+						produção.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-chart-line"></i></div>
+					<div class="persona-tier">Público secundário</div>
+					<h3>Gestores Operacionais e Diretoria</h3>
+					<p>Decide escala da próxima semana com base em projeção, não em achismo. Acompanha as metas de OLA antes do
+						mês fechar.</p>
+				</div>
+				<div class="persona-card">
+					<div class="persona-icon"><i class="fa-solid fa-globe"></i></div>
+					<div class="persona-tier">Público indireto</div>
+					<h3>Clientes Locaweb</h3>
+					<p>Menos tempo fora do ar e mais estabilidade na infra que sustenta a operação deles.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 6: PROPOSTA DE SOLUÇÃO -->
+	<div class="slide-container" id="slide6">
+		<h2 class="slide-title" style="font-size: 24px; margin-bottom: 10px; padding-bottom: 8px;">
+			<span class="red-slash">//</span> PROPOSTA DE SOLUÇÃO
+		</h2>
+		<div class="content-area" style="justify-content: flex-start; gap: 8px;">
+
+			<!-- LINHA 1: FONTES + 4 CAMADAS -->
+			<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+
+				<!-- FONTES -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="color: var(--text-dim); font-size: 9px;">FONTES</div>
+					<div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+						<div style="background: var(--bg-tile); border-radius: 8px; padding: 10px 12px;">
+							<h4 style="font-size: 12px; margin-bottom: 3px;">ServiceNow</h4>
+							<p style="font-size: 10px; line-height: 1.4;">Webhook HMAC + backfill · 122k incidentes/ano
+								rotulados</p>
+						</div>
+						<div style="background: var(--bg-tile); border-radius: 8px; padding: 10px 12px;">
+							<h4 style="font-size: 12px; margin-bottom: 3px;">Prometheus / Infra</h4>
+							<p style="font-size: 10px; line-height: 1.4;">Métricas por IC: latência, erro, saturação</p>
+						</div>
+					</div>
+					<div
+						style="font-size: 9px; color: var(--text-dim); border-top: 1px dashed var(--border-color); padding-top: 5px; display: flex; align-items: baseline; gap: 5px;">
+						<span
+							style="width: 15px; height: 15px; border-radius: 50%; background: var(--accent-red); color: var(--bg-main); font-weight: 700; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">1</span>
+						Contrato de entrada versionado — nada entra sem schema.
+					</div>
+				</div>
+
+				<!-- CAMADA 1 -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="font-size: 9px;">CAMADA 1 // DADOS</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">Kafka <span class="mono"
+								style="color: var(--accent-red); font-size: 9px;">Strimzi</span></h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">events.alert · events.monitor · deadlines.milestone ·
+							actions.log</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">data-ingest &amp; data-runner</h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">dbt staging → silver → gold, com Great Expectations
+							barrando dado ruim</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">Feature Store</h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">Sazonalidade, carga por grupo, sequência de P4, tempo
+							até o OLA — mesmas features no treino e na inferência</p>
+					</div>
+					<div
+						style="font-size: 9px; color: var(--text-dim); border-top: 1px dashed var(--border-color); padding-top: 5px; display: flex; align-items: baseline; gap: 5px;">
+						<span
+							style="width: 15px; height: 15px; border-radius: 50%; background: var(--accent-red); color: var(--bg-main); font-weight: 700; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
+						Publica marts e features prontas para consumo.
+					</div>
+				</div>
+
+				<!-- CAMADA 2 -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="font-size: 9px;">CAMADA 2 // INTELIGÊNCIA</div>
+					<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 7px 9px;">
+							<h4 style="font-size: 10px; margin-bottom: 2px;">Volume D+1/D+7</h4>
+							<p style="font-size: 9px; line-height: 1.3;">LightGBM + Prophet</p>
+						</div>
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 7px 9px;">
+							<h4 style="font-size: 10px; margin-bottom: 2px;">Risco de breach</h4>
+							<p style="font-size: 9px; line-height: 1.3;">LightGBM + isotonic</p>
+						</div>
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 7px 9px;">
+							<h4 style="font-size: 10px; margin-bottom: 2px;">Rajada por IC</h4>
+							<p style="font-size: 9px; line-height: 1.3;">z-score robusto + CUSUM</p>
+						</div>
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 7px 9px;">
+							<h4 style="font-size: 10px; margin-bottom: 2px;">Evento externo</h4>
+							<p style="font-size: 9px; line-height: 1.3;">Isolation Forest</p>
+						</div>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">Projeção de KPI</h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">Monte Carlo · probabilidade de fechar o mês na meta</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">ml-model-serving <span class="mono"
+								style="color: var(--accent-red); font-size: 9px;">BentoML</span></h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">/predict/volume e /predict/breach sempre com SHAP na
+							resposta · MLflow registry</p>
+					</div>
+					<div
+						style="font-size: 9px; color: var(--text-dim); border-top: 1px dashed var(--border-color); padding-top: 5px; display: flex; align-items: baseline; gap: 5px;">
+						<span
+							style="width: 15px; height: 15px; border-radius: 50%; background: var(--accent-red); color: var(--bg-main); font-weight: 700; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
+						Score calibrado + SHAP, validado em walk-forward.
+					</div>
+				</div>
+
+				<!-- CAMADA 3 -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="font-size: 9px;">CAMADA 3 // COPILOTO IA</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">FastAPI + LangGraph</h4>
+						<p style="font-size: 9.5px; line-height: 1.35; margin-bottom: 6px;">coletar → raciocinar → validar →
+							agir</p>
+						<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+							<code
+								style="font-size: 8.5px; color: var(--text-light); background: var(--bg-main); padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border-color);">find_similar_resolved</code>
+							<code
+								style="font-size: 8.5px; color: var(--text-light); background: var(--bg-main); padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border-color);">get_breach_score</code>
+							<code
+								style="font-size: 8.5px; color: var(--text-light); background: var(--bg-main); padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border-color);">+7 tools</code>
+						</div>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">RAG — pgvector</h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">Runbooks e incidentes já resolvidos, na mesma query SQL
+							· MLflow AI Gateway → Claude</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--accent-red); border-radius: 0 8px 8px 0; padding: 8px 10px; flex: 1;">
+						<h4 style="font-size: 11px; margin-bottom: 2px;">Guardrails</h4>
+						<p style="font-size: 9.5px; line-height: 1.35;">Pydantic + JSON Schema · inválido → retry → fallback
+							determinístico. Langfuse traça custo por alerta.</p>
+					</div>
+					<div
+						style="font-size: 9px; color: var(--text-dim); border-top: 1px dashed var(--border-color); padding-top: 5px; display: flex; align-items: baseline; gap: 5px;">
+						<span
+							style="width: 15px; height: 15px; border-radius: 50%; background: var(--accent-red); color: var(--bg-main); font-weight: 700; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">4</span>
+						Recomendação auditável: risco, causa provável, ação.
+					</div>
+				</div>
+			</div>
+
+			<!-- LINHA 2: ARMAZENAMENTO + CAMADA 4 -->
+			<div style="display: grid; grid-template-columns: 1fr 3fr; gap: 10px;">
+
+				<!-- ARMAZENAMENTO -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="color: var(--text-light); font-size: 9px;">ARMAZENAMENTO</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--amber); border-radius: 0 8px 8px 0; padding: 6px 10px;">
+						<h4 style="font-size: 10px; margin-bottom: 1px; color: var(--amber);">BRONZE</h4>
+						<p style="font-size: 9px; line-height: 1.3;">Evento cru imutável · MinIO + Iceberg</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--text-muted); border-radius: 0 8px 8px 0; padding: 6px 10px;">
+						<h4 style="font-size: 10px; margin-bottom: 1px; color: var(--text-light);">PRATA</h4>
+						<p style="font-size: 9px; line-height: 1.3;">Incidentes conformados e deduplicados</p>
+					</div>
+					<div
+						style="background: var(--bg-tile); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 6px 10px;">
+						<h4 style="font-size: 10px; margin-bottom: 1px; color: var(--green);">OURO</h4>
+						<p style="font-size: 9px; line-height: 1.3;">Marts de KPI, features e rótulos · ClickHouse</p>
+					</div>
+					<p
+						style="font-size: 8.5px; color: var(--text-dim); line-height: 1.35; border-top: 1px dashed var(--border-color); padding-top: 5px;">
+						Iceberg dá time travel: todo retreino reproduz o dataset exato da data do treino.</p>
+				</div>
+
+				<!-- CAMADA 4 -->
+				<div style="display: flex; flex-direction: column; gap: 5px;">
+					<div class="layer-tag" style="color: var(--green); font-size: 9px;">CAMADA 4 // DECISÃO</div>
+					<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 8px 10px;">
+							<h4 style="font-size: 11px; margin-bottom: 2px;"><i class="fa-brands fa-slack"
+									style="color: var(--green); margin-right: 4px;"></i>Slack / ServiceNow</h4>
+							<p style="font-size: 9.5px; line-height: 1.35;">Ack &amp; Aplicar · Ignorar · Escalar, sem sair do
+								canal</p>
+						</div>
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 8px 10px;">
+							<h4 style="font-size: 11px; margin-bottom: 2px;"><i class="fa-solid fa-display"
+									style="color: var(--green); margin-right: 4px;"></i>Painel N1/N2</h4>
+							<p style="font-size: 9.5px; line-height: 1.35;">Fila priorizada e drill-down SHAP · React Router 7
+							</p>
+						</div>
+						<div
+							style="background: var(--bg-tile); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 8px 10px;">
+							<h4 style="font-size: 11px; margin-bottom: 2px;"><i class="fa-solid fa-chart-line"
+									style="color: var(--green); margin-right: 4px;"></i>Painel Gestor / Grafana</h4>
+							<p style="font-size: 9.5px; line-height: 1.35;">Projeção dos 4 KPIs do PPR e carga por equipe</p>
+						</div>
+					</div>
+					<div
+						style="background: rgba(16, 185, 129, 0.12); border: 1px solid var(--green); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; flex: 1;">
+						<span
+							style="width: 17px; height: 17px; border-radius: 50%; background: var(--green); color: var(--bg-main); font-weight: 700; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">5</span>
+						<p style="font-size: 10px; color: var(--text-light); line-height: 1.4;"><strong>Loop de feedback:</strong>
+							a ação do operador (Ack &amp; Aplicar, Ignorar, Escalar) volta como evento em <code
+								style="color: var(--green); font-size: 9.5px;">actions.log</code>, alimenta a memória da
+							operação e recalibra as previsões da semana seguinte.</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- FAIXA MONITORAMENTO E GOVERNANÇA -->
+			<div style="background: var(--bg-tile-2); border-radius: 8px; padding: 8px 16px;">
+				<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px 14px;">
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px;">
+							Qualidade de dados</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">dbt tests + Great
+							Expectations no contrato de cada mart</div>
+					</div>
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px;">
+							Drift de modelo</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">PSI de features e queda de
+							AUC disparam retreino</div>
+					</div>
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px;">
+							Observabilidade</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">Prometheus, Grafana, Loki e
+							Tempo desde o dia 1</div>
+					</div>
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--accent-red); text-transform: uppercase; letter-spacing: 0.5px;">
+							Custo e trace de LLM</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">Langfuse por alerta · budget
+							no MLflow AI Gateway</div>
+					</div>
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--accent-red); text-transform: uppercase; letter-spacing: 0.5px;">
+							Segurança</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">External Secrets,
+							NetworkPolicy e RBAC por namespace</div>
+					</div>
+					<div>
+						<div
+							style="font-size: 9.5px; font-weight: 700; color: var(--accent-red); text-transform: uppercase; letter-spacing: 0.5px;">
+							Entrega contínua</div>
+						<div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">ArgoCD GitOps · tudo em K8s
+							1.28+, cloud-agnostic</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 7: ARQUITETURA - VISÃO GERAL -->
+	<div class="slide-container" id="slide7">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> ARQUITETURA EM 4 CAMADAS + 7 PRINCÍPIOS
+		</h2>
+		<div class="content-area">
+			<div class="arch-layout">
+				<div class="arch-stack">
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 4 // DECISÃO</div>
+						<h4>Onde o operador age</h4>
+						<p>TS+Fastify · React Router 7 · Grafana</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 3 // COPILOTO IA</div>
+						<h4>Quem reformata o sinal em ação</h4>
+						<p>Python+LangGraph · RAG · guardrails</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 2 // INTELIGÊNCIA</div>
+						<h4>Onde os modelos pontuam</h4>
+						<p>model-serving · burst-detector</p>
+					</div>
+					<div class="arch-arrow"><i class="fa-solid fa-arrow-up"></i></div>
+					<div class="arch-layer">
+						<div class="layer-tag">CAMADA 1 // DADOS</div>
+						<h4>Onde tudo é capturado</h4>
+						<p>Kafka · MinIO · ClickHouse</p>
+					</div>
+					<div class="arch-sources">
+						<i class="fa-solid fa-arrow-up" style="color: var(--accent-red); margin-right: 6px;"></i>
+						Fontes: <strong>ServiceNow</strong> · <strong>Prometheus</strong>
+					</div>
+				</div>
+
+				<div>
+					<div class="principles-title"><span class="accent">7</span> princípios que guiaram cada escolha</div>
+					<div class="principles-list">
+						<div class="principle-item"><span class="num">1</span>
+							<div class="body"><strong>Contratos antes de componentes.</strong> Trocar Prophet por NeuralProphet ou
+								Claude por GPT não quebra nada além daquele componente.</div>
+						</div>
+						<div class="principle-item"><span class="num">2</span>
+							<div class="body"><strong>K8s-nativo.</strong> Toda a stack se descreve com 4 primitivas:
+								<code>Deployment</code>, <code>StatefulSet</code>, <code>CronJob</code>, <code>Job</code>.
+							</div>
+						</div>
+						<div class="principle-item"><span class="num">3</span>
+							<div class="body"><strong>Estado fora dos serviços.</strong> Deployments stateless escalam via HPA; estado
+								em Postgres/MinIO/ClickHouse/Kafka/Redis.</div>
+						</div>
+						<div class="principle-item"><span class="num">4</span>
+							<div class="body"><strong>Volume de produção.</strong> ClickHouse + Kafka + Argo desde o desenho, prontos
+								para
+								centenas de milhares de eventos/dia, 24×7.</div>
+						</div>
+						<div class="principle-item"><span class="num">5</span>
+							<div class="body"><strong>Observabilidade dia 1.</strong> Prometheus, Grafana, Loki, Tempo, Langfuse para
+								LLM.</div>
+						</div>
+						<div class="principle-item"><span class="num">6</span>
+							<div class="body"><strong>Cloud-agnostic.</strong> Roda em qualquer K8s 1.28+.</div>
+						</div>
+						<div class="principle-item"><span class="num">7</span>
+							<div class="body"><strong>Stack poliglota.</strong> Camada externa em TS e o core de ML em Python.</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 8: CAMADA 1 - DADOS -->
+	<div class="slide-container" id="slide8">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 1 — DADOS
+		</h2>
+		<div class="content-area">
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 22%;">Componente</th>
+						<th style="width: 24%;">Tecnologia</th>
+						<th style="width: 18%;">Primitiva K8s</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Barramento de eventos</strong></td>
+						<td>Apache Kafka</td>
+						<td><code>StatefulSet</code></td>
+						<td>Stream near-real-time para Camadas 2 e 3</td>
+					</tr>
+					<tr>
+						<td><strong>Lake</strong></td>
+						<td>MinIO + Apache Iceberg</td>
+						<td><code>StatefulSet</code></td>
+						<td>Parquet particionado + time travel auditável</td>
+					</tr>
+					<tr>
+						<td><strong>Warehouse analítico</strong></td>
+						<td>ClickHouse</td>
+						<td><code>StatefulSet</code></td>
+						<td>Analítica em escala: bilhões de linhas em segundos</td>
+					</tr>
+					<tr>
+						<td><strong>Transformação</strong></td>
+						<td>dbt-core</td>
+						<td><code>Job</code></td>
+						<td>staging → intermediate → marts, SQL versionado</td>
+					</tr>
+					<tr>
+						<td><strong>Orquestração</strong></td>
+						<td>Python + Kafka</td>
+						<td><code>Deployment</code> + KEDA</td>
+						<td><code>ui-orchestrator</code> publica o gatilho em <code>trigger.data</code>, e
+							<code>data-runner</code> encadeia dbt → Great Expectations no próprio handler da mensagem</td>
+					</tr>
+					<tr>
+						<td><strong>Qualidade</strong></td>
+						<td>Great Expectations</td>
+						<td>chamada in-process</td>
+						<td>Bloqueia o mart antes de contaminar o warehouse</td>
+					</tr>
+				</tbody>
+			</table>
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;">
+				<div class="callout" style="margin-top: 0;">
+					<h4><i class="fa-solid fa-circle-question" style="margin-right: 4px;"></i> Por que não Postgres / Airflow /
+						fila
+						simples?</h4>
+					<ul>
+						<li><strong>ClickHouse &gt; Postgres/DuckDB:</strong> o regime operacional já parte de centenas de milhares
+							de
+							eventos por dia.</li>
+						<li><strong>Sem Argo/Airflow/Prefect:</strong> não existe motor de pipeline separado — cada
+							<code>deployment</code> encadeia seus próprios passos e escala via KEDA.</li>
+						<li><strong>Kafka &gt; fila simples:</strong> o fluxo é streaming por natureza e exige replay e
+							desacoplamento
+							entre camadas.</li>
+					</ul>
+				</div>
+				<div class="callout callout-green" style="margin-top: 0;">
+					<h4><i class="fa-solid fa-database" style="margin-right: 4px;"></i> Marts essenciais (dbt sobre ClickHouse)
+					</h4>
+					<ul>
+						<li><code>incidents_by_ic</code> · agregados por IC e janela</li>
+						<li><code>p4_sequences_by_ci</code> · precursor de P2</li>
+						<li><code>first_touch_duration</code> · tempo no primeiro grupo</li>
+						<li><code>priority_changes_log</code> · histórico de recategorização</li>
+						<li><code>daily_anomaly_features</code> · base do detector externo</li>
+						<li><code>kpi_monthly_state</code> · estado do mês para projeção</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 9: CAMADA 2 - INTELIGÊNCIA -->
+	<div class="slide-container" id="slide9">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 2 — INTELIGÊNCIA
+		</h2>
+		<div class="content-area">
+			<div class="models-grid" style="gap: 12px;">
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-chart-line"></i></div>
+					<h4>Volume D+1 / D+7</h4>
+					<div class="algo">LightGBM + Prophet baseline</div>
+					<p class="why">LightGBM captura features heterogêneas. Prophet roda em paralelo como <strong
+							style="color: var(--text-light);">sanity-check de sazonalidade</strong>.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>MAPE · IC 80% · MAE</strong></div>
+				</div>
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+					<h4>Risco de breach</h4>
+					<div class="algo">LightGBM binário + isotonic + SHAP</div>
+					<p class="why">Boosting captura interações não-lineares. Isotonic corrige a distorção do 1% de positivos.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>AUC-PR · Brier · recall@top-k/h</strong></div>
+				</div>
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-bolt"></i></div>
+					<h4>Detecção de rajada</h4>
+					<div class="algo">z-score robusto + CUSUM por IC</div>
+					<p class="why">Sem treino, atualiza online. Limiar adaptativo por IC evita falso positivo em ICs barulhentos.
+					</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Precision · lead-time · FP/IC</strong></div>
+				</div>
+			</div>
+
+			<div class="models-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-percent"></i></div>
+					<h4>Projeção mensal dos 4 KPIs do PPR</h4>
+					<div class="algo">Monte Carlo (volume previsto × taxa de breach)</div>
+					<p class="why">O gestor não pergunta "vai estourar este chamado". Pergunta "vou fechar o mês na meta".
+						Simulamos os dias restantes e devolvemos a probabilidade de fechar dentro de cada KPI (volume P2/P3 e OLA
+						P2/P3).</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Cobertura IC 80% · erro fim do mês</strong></div>
+				</div>
+				<div class="model-card" style="padding: 14px;">
+					<div class="model-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+					<h4>Detector de evento externo</h4>
+					<div class="algo">Isolation Forest sobre features diárias</div>
+					<p class="why">AWS fora, CrowdStrike e registro.br entram no dataset como pico inexplicável. O detector marca
+						o dia, exclui do treino dos outros modelos e avisa o operador para olhar fora da Locaweb antes de agir.</p>
+					<div class="metric"><span>MÉTRICAS</span><strong>Recall em outliers · FP em dias normais</strong></div>
+				</div>
+			</div>
+
+			<div class="ops-stack">
+				<h4><i class="fa-solid fa-layer-group" style="margin-right: 4px;"></i> Features de domínio que entram nos
+					modelos</h4>
+				<ul>
+					<li><strong>Sequência de P4 no mesmo IC.</strong> Threshold escalando (70% → 85% → 92%) é precursor de P2.
+					</li>
+					<li><strong>Tempo no primeiro grupo vs. OLA.</strong> N1 pode cozinhar até 25% do OLA. Acima disso já era pra
+						ter escalado.</li>
+					<li><strong>Histórico de recategorização.</strong> P3 que vira P2 mantém a prioridade anterior como contexto.
+					</li>
+					<li><strong>Flag de abertura manual.</strong> Suporte abriu porque o monitoramento falhou. Aponta gap na
+						observabilidade.</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 10: CAMADA 3 - AGENTE LLM -->
+	<div class="slide-container" id="slide10">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 3 — COPILOTO IA
+		</h2>
+		<div class="content-area">
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 24%;">Componente</th>
+						<th style="width: 30%;">Tecnologia</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Serviço</strong></td>
+						<td>FastAPI + LangGraph</td>
+						<td>API HTTP que orquestra o copiloto como grafo de estados</td>
+					</tr>
+					<tr>
+						<td><strong>Gateway LLM</strong></td>
+						<td>MLflow AI Gateway</td>
+						<td>Proxy LLM-agnóstico embutido no MLflow (<code>ns: ml</code>), que também serve tracking e
+							registry</td>
+					</tr>
+					<tr>
+						<td><strong>Modelo default</strong></td>
+						<td>Claude Sonnet 4.6</td>
+						<td>Default em produção, com fallback para GPT-4.1 se o provider cair</td>
+					</tr>
+					<tr>
+						<td><strong>RAG</strong></td>
+						<td>pgvector + sentence-transformers PT-BR</td>
+						<td>Embeddings + filtros estruturados na mesma query SQL</td>
+					</tr>
+					<tr>
+						<td><strong>Validação</strong></td>
+						<td>Pydantic + JSON Schema</td>
+						<td>Saída inválida → retry → fallback <code>agent_failed=true</code></td>
+					</tr>
+					<tr>
+						<td><strong>Auditoria</strong></td>
+						<td>Tabela <code>agent_calls</code> + Langfuse</td>
+						<td>Cada chamada do copiloto fica gravada e rastreável</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div class="tool-pills">
+				<h4><i class="fa-solid fa-toolbox" style="margin-right: 4px;"></i> 9 ferramentas disponíveis ao copiloto</h4>
+				<div class="pills">
+					<code>get_recent_incidents</code>
+					<code>get_group_load</code>
+					<code>find_similar_resolved</code>
+					<code>get_ola_window</code>
+					<code>detect_backbone_pattern</code>
+					<code>get_breach_score</code>
+					<code>detect_p4_escalation</code>
+					<code>detect_external_event</code>
+					<code>get_kpi_projection</code>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 11: CAMADA 4 - INTERFACES -->
+	<div class="slide-container" id="slide11">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> CAMADA 4 — INTERFACES
+		</h2>
+		<div class="content-area">
+			<div class="iface-cols">
+				<div class="iface-col">
+					<div class="icon"><i class="fa-brands fa-slack"></i></div>
+					<div class="label">Onde o operador age</div>
+					<h4>Slack / ServiceNow</h4>
+					<p>Block Kit interativo com Ack & Aplicar, Ignorar, Escalar. Fan-out feito pelo Motor de Integração.</p>
+				</div>
+				<div class="iface-col">
+					<div class="icon"><i class="fa-solid fa-display"></i></div>
+					<div class="label">Onde consulta o panorama</div>
+					<h4>Painel Interativo</h4>
+					<p>Fila priorizada, drill-down SHAP, chat com copiloto. Cada decisão fica auditável de ponta a ponta.</p>
+				</div>
+				<div class="iface-col">
+					<div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+					<div class="label">Onde o gestor vê tendência</div>
+					<h4>Grafana</h4>
+					<p>Apenas leitura. Mostra D+1/D+7, breaches contra a meta e carga por equipe. O time já usa Grafana no dia a
+						dia, então não precisa aprender ferramenta nova.</p>
+				</div>
+			</div>
+
+			<table class="locaweb-table">
+				<thead>
+					<tr>
+						<th style="width: 22%;">Componente</th>
+						<th style="width: 26%;">Tecnologia</th>
+						<th>Papel</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Motor de Integração</strong></td>
+						<td>TS + Fastify</td>
+						<td>Recebe e dispara webhooks do ITSM, manda alertas pro Slack/ServiceNow e expõe a API REST pública</td>
+					</tr>
+					<tr>
+						<td><strong>Painel Interativo</strong></td>
+						<td>React Router 7</td>
+						<td>Painel para o N1 e N2 com fila priorizada e drill-down dos chamados em risco</td>
+					</tr>
+					<tr>
+						<td><strong>Painel tático</strong></td>
+						<td>Grafana</td>
+						<td>Projeção D+1/D+7, breaches vs. meta, carga por equipe</td>
+					</tr>
+					<tr>
+						<td><strong>Autenticação</strong></td>
+						<td>Keycloak</td>
+						<td>SSO AD/LDAP</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div class="principle-banner">
+				<p><strong>Princípio:</strong> o operador não vai largar Slack e ServiceNow para abrir nosso painel. O
+					trabalho dele continua acontecendo
+					nos canais que ele já usa. Nosso painel serve como visão consolidada e auditoria, não como
+					centro de operação.
+				</p>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 12: INFRA K8S (CARDS) -->
+	<div class="slide-container" id="slide12">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> INFRAESTRUTURA — TUDO K8S, 4 PRIMITIVAS
+		</h2>
+		<div class="content-area">
+			<div class="models-grid" style="margin-bottom: 24px; gap: 20px;">
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-network-wired"></i></div>
+					<h4>Aplicações & APIs</h4>
+					<div class="algo">Deployment + Service + Ingress</div>
+					<p class="why">Serviços de longa duração que escalam sozinhos conforme o tráfego sobe ou cai.</p>
+					<div class="metric"><span>EXEMPLOS</span><strong>gateway, ui, model-serving, copiloto</strong></div>
+				</div>
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-database"></i></div>
+					<h4>Estado Persistente</h4>
+					<div class="algo">StatefulSet + PVC</div>
+					<p class="why">Volumes persistentes que crescem conforme a operação cresce. É a base que sustenta os dados.
+					</p>
+					<div class="metric"><span>EXEMPLOS</span><strong>Postgres, MinIO, ClickHouse, Kafka</strong></div>
+				</div>
+				<div class="model-card">
+					<div class="model-icon"><i class="fa-solid fa-clock"></i></div>
+					<h4>Tarefas & Processamento</h4>
+					<div class="algo">CronJob + Job</div>
+					<p class="why">Pipelines assíncronos para retreino contínuo dos modelos, ingestões diárias e consolidação
+						analítica.</p>
+					<div class="metric"><span>EXEMPLOS</span><strong>dbt run, ingestão, retreino, backup</strong></div>
+				</div>
+			</div>
+
+			<div class="infra-strip" style="width: 100%;">
+				<div class="infra-item"><i class="fa-solid fa-code-branch"></i><strong>GitOps:</strong> ArgoCD</div>
+				<div class="infra-item"><i class="fa-solid fa-network-wired"></i><strong>Service mesh:</strong> Linkerd</div>
+				<div class="infra-item"><i class="fa-solid fa-eye"></i><strong>Observabilidade:</strong> Prometheus, Loki e
+					Tempo</div>
+				<div class="infra-item"><i class="fa-solid fa-key"></i><strong>Secrets:</strong> External Secrets + Vault</div>
+				<div class="infra-item"><i class="fa-solid fa-cloud-arrow-up"></i><strong>Backup:</strong> Velero</div>
+				<div class="infra-item"><i class="fa-solid fa-shield"></i><strong>Segregação:</strong> Namespace +
+					NetworkPolicy</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 13: FLUXO E2E -->
+	<div class="slide-container" id="slide13">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> FLUXO END-TO-END DE UM ALERTA
+		</h2>
+		<div class="content-area">
+			<div class="timeline">
+				<div class="timeline-row">
+					<div class="t">T+0s</div>
+					<div class="ev">Webhook do ITSM Locaweb chega</div>
+					<div class="comp">gateway → Kafka</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+5s</div>
+					<div class="ev">Stream processa, qualidade valida e materializa</div>
+					<div class="comp">Argo · GE · MinIO/Iceberg · ClickHouse</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+10s</div>
+					<div class="ev">Detector de rajada avalia janela móvel do IC</div>
+					<div class="comp">burst-detector + Redis</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+46s</div>
+					<div class="ev">Modelo de breach pontua → score 0,78 + SHAP top-5</div>
+					<div class="comp">model-serving</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+47s</div>
+					<div class="ev">Copiloto é invocado, chama tools relevantes</div>
+					<div class="comp">copiloto · find_similar_resolved + 2 tools</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+50s</div>
+					<div class="ev">Copiloto emite JSON validado</div>
+					<div class="comp">Postgres + Kafka</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+51s</div>
+					<div class="ev">Operador é notificado em Slack/ServiceNow</div>
+					<div class="comp">gateway fan-out + ui live</div>
+				</div>
+				<div class="timeline-row">
+					<div class="t">T+?</div>
+					<div class="ev">Operador age e o clique alimenta a avaliação</div>
+					<div class="comp">gateway → Kafka</div>
+				</div>
+			</div>
+
+			<div
+				style="margin-top: 12px; padding: 10px 16px; background: var(--bg-tile-2); border-radius: 8px; border-left: 3px solid var(--amber); font-size: 11.5px; line-height: 1.55; color: var(--text-muted);">
+				<strong
+					style="color: var(--amber); text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Ramificações do
+					fluxo:</strong>
+				<strong style="color: var(--text-light);">recategorização</strong> — model-serving compara prioridade no Redis e
+				dispara re-inferência ·
+				<strong style="color: var(--text-light);">evento externo</strong> — copiloto troca "ESCALAR" por "INVESTIGAR
+				causa externa" ·
+				<strong style="color: var(--text-light);">P4 escalonando</strong> — sinal de precursor entra como linha extra no
+				alerta.
+			</div>
+
+			<div class="sli-banner">
+				<strong>SLI alvo:</strong> &lt; 60s entre incidente aberto e recomendação na tela. <span
+					style="color: var(--text-muted);">Monitorado em Grafana.</span>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 14: PROTÓTIPOS -->
+	<div class="slide-container" id="slide14">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> PROTÓTIPOS DA SOLUÇÃO
+		</h2>
+		<div class="content-area">
+			<div class="wf-grid">
+				<div class="wf-card">
+					<h4><i class="fa-brands fa-slack" style="color: var(--accent-red); margin-right: 6px;"></i> Recomendação no
+						Slack/ServiceNow</h4>
+					<div class="wf-body">
+						<p>Operador age <strong>onde já vive</strong>. Block Kit com <strong>Ack &amp; Aplicar</strong>,
+							<strong>Ignorar</strong>, <strong>Escalar</strong>. Mesmo conteúdo cai no ServiceNow. Quando o detector
+							flagra
+							<strong>evento externo</strong>, o card muda os botões para investigar antes da ação padrão.
+						</p>
+						<div class="wf-thumb"><img src="assets/mock-slack.png" alt="Mock Slack/ServiceNow"></div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-display" style="color: var(--accent-red); margin-right: 6px;"></i> Painel UI</h4>
+					<div class="wf-body">
+						<p>Fila ordenada por urgência <strong>reavaliada pelo copiloto</strong>, não pelo score puro. Cada item é o
+							TL;DR — caso entendido em <strong>5 segundos</strong>. Drill-down a um clique.</p>
+						<div class="wf-thumb"><img src="assets/mock-painel.png" alt="Mock Painel UI"></div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-chart-line" style="color: var(--accent-red); margin-right: 6px;"></i> Grafana</h4>
+					<div class="wf-body">
+						<p>Os <strong>4 KPIs do PPR</strong> projetados separadamente (volume P2/P3 e OLA P2/P3) e a probabilidade
+							conjunta de fechar o mês. Apoia decisão de escala e sustenta pedido de capacidade. Só leitura.
+							<strong>Adoção zero-fricção</strong> — Locaweb já usa.
+						</p>
+						<div class="wf-thumb"><img src="assets/mock-grafana.png" alt="Mock Grafana"></div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-magnifying-glass" style="color: var(--accent-red); margin-right: 6px;"></i> "Por que
+						o copiloto disse isso?"</h4>
+					<div class="wf-body">
+						<p>Auditabilidade total. SHAP top-5, tools chamadas com argumentos e resultados, sequência de P4 no IC,
+							projeção
+							de KPI consultada. N2 sênior contesta ou confirma e o feedback alimenta a <strong>avaliação
+								contínua</strong>.</p>
+						<div class="wf-thumb"><img src="assets/mock-explain.png" alt="Mock Drill-down"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 14B: EVIDÊNCIAS DO MVP -->
+	<div class="slide-container" id="slide14b">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> EVIDÊNCIAS DO MVP PRELIMINAR
+		</h2>
+		<div class="content-area">
+			<div class="wf-grid">
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-database" style="color: var(--accent-red); margin-right: 6px;"></i> Pipeline de
+						dados — dbt sobre ClickHouse</h4>
+					<div class="wf-body">
+						<p>Camadas <strong>silver → gold</strong> versionadas como SQL: consolidação de eventos por
+							<code>tenant_id</code>/<code>source</code>/<code>external_id</code> no silver e marts prontos para
+							treino (<code>breach_training_examples</code>, <code>kpi_monthly_state</code>, sequências de P4 por
+							IC) no gold — a Camada 1 da arquitetura rodando de verdade.
+						</p>
+						<div class="wf-thumb"><img src="assets/evidencia-dataset.png" alt="Modelos dbt silver e gold no VS Code">
+						</div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-flask" style="color: var(--accent-red); margin-right: 6px;"></i> Treino e registro
+						— MLflow</h4>
+					<div class="wf-body">
+						<p>Run de treino do modelo de <strong>projeção mensal de KPI</strong> rastreado no MLflow: métricas
+							(medianas e intervalo de confiança 80% por prioridade), parâmetros e duração gravados a cada
+							execução — auditabilidade do modelo desde o primeiro treino.</p>
+						<div class="wf-thumb"><img src="assets/evidencia-mlflow.png" alt="Run de treino no MLflow"></div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-code-branch" style="color: var(--accent-red); margin-right: 6px;"></i> Entrega
+						contínua — ArgoCD GitOps</h4>
+					<div class="wf-body">
+						<p>Aplicações de <strong>data</strong> (ClickHouse, Kafka, ingest, deadline-tracker) sincronizadas e
+							saudáveis via GitOps: todo deploy nasce de um push no Git, nunca de um <code>kubectl apply</code>
+							manual.</p>
+						<div class="wf-thumb"><img src="assets/evidencia-argo.png" alt="Applications no ArgoCD"></div>
+					</div>
+				</div>
+				<div class="wf-card">
+					<h4><i class="fa-solid fa-display" style="color: var(--accent-red); margin-right: 6px;"></i> Painel N1/N2
+						em uso</h4>
+					<div class="wf-body">
+						<p>Fila de incidentes ativos priorizada por score de breach, com <strong>drill-down SHAP top-5</strong> e
+							linha do tempo do caso — o operador vê o motivo da recomendação e age com <strong>Ack &amp;
+								Aplicar</strong> sem sair da tela.</p>
+						<div class="wf-thumb"><img src="assets/evidencia-painel.png" alt="Painel N1/N2 com drill-down SHAP"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 15: SCRUMBAN -->
+	<div class="slide-container" id="slide15">
+		<h2 class="slide-title">
+			<span class="red-slash">//</span> GESTÃO ÁGIL — SCRUMBAN
+		</h2>
+		<div class="content-area">
+			<div class="agile-layout">
+				<!-- Coluna Texto -->
+				<div style="display: flex; flex-direction: column; gap: 20px;">
+					<div class="scrum-box" style="margin-top: 0; padding: 22px;">
+						<h3><i class="fa-solid fa-rotate"></i> Por que Scrumban?</h3>
+						<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">Unimos as
+							entregas fixas do <strong>Scrum</strong> com o fluxo contínuo do <strong>Kanban</strong>. Sem Dailies ou
+							Story Points, com foco em vazão e WIP limits.</p>
+						<div class="row"><span class="key">Síncronas</span><span class="val">Seg (Planning) e Sex (Review)</span>
+						</div>
+						<div class="row"><span class="key">Ferramenta</span><span class="val">GitHub Projects</span></div>
+					</div>
+
+					<div class="scrum-box" style="padding: 22px;">
+						<h3><i class="fa-solid fa-users"></i> Time Horizontal</h3>
+						<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">Sem PO fixo,
+							todos revisam PRs. O papel de <strong>Scrum Master é rotativo</strong> a cada Sprint para contato oficial
+							e desbloqueios.</p>
+						<div class="row"><span class="key">Sprint 1</span><span class="val" style="color: var(--text-dim);">João
+								Porto</span></div>
+						<div class="row"><span class="key">Sprint 2</span><span class="val" style="color: var(--text-dim);">Samuel
+								Gusman</span></div>
+						<div class="row"><span class="key">Sprint 3</span><span class="val"
+								style="color: var(--text-dim);">Raphael Moraes</span></div>
+						<div class="row"><span class="key">Sprint 4</span><span class="val">Gustavo Neves</span></div>
+					</div>
+				</div>
+
+				<!-- Coluna Imagem (Board) -->
+				<div style="display: flex; flex-direction: column;">
+					<div class="board-placeholder">
+						<img src="assets/project4.png" alt="GitHub Projects Board">
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- SLIDE 16: FECHAMENTO -->
+	<div class="slide-container" id="slide16">
+		<div class="content-area" style="justify-content: center; align-items: center; text-align: center; height: 100%;">
+			<div class="closing-headline" style="font-size: 64px; text-align: center; margin-bottom: 24px;">Da ideia ao <span
+					class="accent">projeto executável.</span></div>
+			<p class="closing-lead" style="font-size: 20px; text-align: center; max-width: 900px; margin: 0 auto 50px;">O BOPE
+				deixa de apagar incêndio para ver o incidente antes dele acontecer.</p>
+
+			<p class="thanks-line" style="font-size: 18px;"><strong>Obrigado!</strong> Equipe Super Datados · FIAP
+				Enterprise Challenge 2026 · Locaweb</p>
+		</div>
+		<div class="brand-footer"><span>FIAP +</span> locaweb</div>
+	</div>
+
+</body>
+
+</html>

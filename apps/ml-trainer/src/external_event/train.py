@@ -20,11 +20,16 @@ def fit_isolation_forest(frame: pd.DataFrame, contamination: float, random_state
     return model
 
 
-def train_and_log(settings: Settings, daily: pd.DataFrame, dataset_version: str | None = None) -> str:
+def train_and_log(
+    settings: Settings,
+    alert: pd.DataFrame,
+    monitor: pd.DataFrame | None = None,
+    dataset_version: str | None = None,
+) -> str:
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
-    frame = to_daily_frame(daily)
+    frame = to_daily_frame(alert, monitor)
     model = fit_isolation_forest(frame, settings.external_event_contamination)
 
     bundled_model = ExternalEventModel(model)

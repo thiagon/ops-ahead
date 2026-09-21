@@ -187,6 +187,7 @@ class BatchWriter:
 
         alert_rows: list[tuple] = []
         monitor_rows: list[tuple] = []
+        translated: list[tuple[bytes, str]] = []
         for envelope in batch:
             try:
                 bronze = translate(envelope, self._dictionaries, self._bindings)
@@ -201,12 +202,13 @@ class BatchWriter:
                 )
                 continue
 
+            payload = bronze.model_dump_json().encode()
             if isinstance(bronze, BronzeAlertEvent):
                 alert_rows.append(_alert_row(bronze))
-                await self._publisher.publish(bronze.model_dump_json().encode(), topic=self._settings.kafka_topic_alert)
+                translated.append((payload, self._settings.kafka_topic_alert))
             else:
                 monitor_rows.append(_monitor_row(bronze))
-                await self._publisher.publish(bronze.model_dump_json().encode(), topic=self._settings.kafka_topic_monitor)
+                translated.append((payload, self._settings.kafka_topic_monitor))
 
         if alert_rows:
             self._ch.execute(_CLICKHOUSE_INSERT_ALERT, alert_rows)
@@ -214,6 +216,14 @@ class BatchWriter:
         if monitor_rows:
             self._ch.execute(_CLICKHOUSE_INSERT_MONITOR, monitor_rows)
             logger.info("clickhouse: inserted %d bronze_monitor rows", len(monitor_rows))
+
+        # Last, because it is the only effect here a retry cannot repeat
+        # harmlessly: the lake write is keyed by content and bronze collapses
+        # a repeated event_id, so replaying the batch leaves no trace of the
+        # first attempt — a republished event would reach every downstream
+        # consumer twice.
+        for payload, topic in translated:
+            await self._publisher.publish(payload, topic=topic)
 
     async def write_milestones(self, batch: list[MilestoneEvent]) -> None:
         rows = [_milestone_row(evt) for evt in batch]

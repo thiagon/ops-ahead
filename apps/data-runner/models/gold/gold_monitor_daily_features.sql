@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(date, source)',
+        order_by='(tenant_id, date, source)',
         partition_by='toYYYYMM(date)'
     )
 }}
@@ -12,6 +12,7 @@
 -- purpose as the alert chain's daily_anomaly_features, sourced from the
 -- monitor chain instead.
 select
+    tenant_id,
     toDate(received_at)                                             as date,
     source,
     count()                                                         as total_signals,
@@ -22,4 +23,4 @@ select
     countIf(severity = 1) / count()                                 as p1_share,
     countIf(severity <= 2) / count()                                as critical_share
 from {{ source('ingest', 'bronze_monitor') }}
-group by date, source
+group by tenant_id, date, source

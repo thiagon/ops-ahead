@@ -1,13 +1,6 @@
 import { useState } from 'react';
-import {
-  data,
-  Form,
-  Link,
-  redirect,
-  useFetcher,
-  useNavigation,
-  useSearchParams,
-} from 'react-router';
+import { Form, Link, redirect, useFetcher, useNavigation, useSearchParams } from 'react-router';
+import { readJson } from '~/client-fetch.ts';
 import { Badge } from '~/components/Badge';
 import {
   Field,
@@ -26,15 +19,16 @@ import {
   SendIcon,
   TrashIcon,
 } from '~/components/icons';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
+import { gatewayUrl } from '~/features/auth/gateway.client.ts';
 import { nextDraftId } from '~/features/config/editor-ui.ts';
+import { configRepo } from '~/features/config/repo.client.ts';
 import {
-  ConflictError,
   getIntegration,
-  NotFoundError,
   removeMapping,
   rotateSecret,
   setOriginStatus,
@@ -42,8 +36,8 @@ import {
   upsertMapping,
   withTenant,
 } from '~/features/config/repo.server.ts';
+import { ConflictError, NotFoundError } from '~/features/config/repo.ts';
 import { parseIntegrationTab, samplePayload } from '~/features/config/sample-payload.ts';
-import { takeSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
   INTAKE_LABEL,
   isBound,
@@ -89,49 +83,55 @@ function buildRows(domainValues: readonly string[], entries: MappingEntry[]): Do
   return [...byDomainValue].map(([domainValue, origins]) => ({ domainValue, origins }));
 }
 
-export async function loader({ params, request }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => {
-    const integration = await getIntegration(params.source).catch(error => {
-      if (error instanceof NotFoundError) {
-        throw new Response('Integração não encontrada', { status: 404 });
-      }
-      throw error;
-    });
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  const source = params.source;
+  if (!tenant || !source) throw new Response('Integração não encontrada', { status: 404 });
 
-    const config = getConfig();
-    const bound = new Map(integration.bindings.map(binding => [binding.field, binding]));
-    const fields = integration.fields.map(contract => {
-      const binding = bound.get(contract.field);
-      const path = binding?.path ?? null;
-      const labels = binding?.labels ?? null;
-      if (!contract.translated) return { ...contract, path, labels, values: null };
-      return {
-        ...contract,
-        path,
-        labels,
-        values: {
-          freeForm: contract.domainValues.length === 0,
-          rows: buildRows(contract.domainValues, integration.mappings[contract.field] ?? []),
-        },
-      };
-    });
+  const flashUrl = `/data/${encodeURIComponent(tenant)}/integrations/${encodeURIComponent(source)}/flash`;
+  const [integration, flash] = await Promise.all([
+    configRepo(tenant)
+      .getIntegration(source)
+      .catch(error => {
+        if (error instanceof NotFoundError) {
+          throw new Response(error.message, { status: 404 });
+        }
+        throw error;
+      }),
+    readJson<{ flashedSecret: string | null }>(flashUrl).catch(() => ({ flashedSecret: null })),
+  ]);
+  const flashedSecret = flash.flashedSecret;
 
-    const { secret, clearHeader } = await takeSecretFlash(request, params.source);
-    const headers = clearHeader ? { 'Set-Cookie': clearHeader } : undefined;
-
-    return data(
-      {
-        origin: integration,
-        url: webhookUrl(config.PUBLIC_GATEWAY_URL, params.tenant, integration.source),
-        fields,
-        sampleBody: JSON.stringify(samplePayload(fields), null, 2),
-        dictionaryVersion: integration.dictionaryVersion,
-        dictionaryStatus: integration.dictionaryStatus,
-        flashedSecret: secret,
+  const bound = new Map(integration.bindings.map(binding => [binding.field, binding]));
+  const fields = integration.fields.map(contract => {
+    const binding = bound.get(contract.field);
+    const path = binding?.path ?? null;
+    const labels = binding?.labels ?? null;
+    if (!contract.translated) return { ...contract, path, labels, values: null };
+    return {
+      ...contract,
+      path,
+      labels,
+      values: {
+        freeForm: contract.domainValues.length === 0,
+        rows: buildRows(contract.domainValues, integration.mappings[contract.field] ?? []),
       },
-      { headers },
-    );
+    };
   });
+
+  return {
+    origin: integration,
+    url: webhookUrl(gatewayUrl(), tenant, integration.source),
+    fields,
+    sampleBody: JSON.stringify(samplePayload(fields), null, 2),
+    dictionaryVersion: integration.dictionaryVersion,
+    dictionaryStatus: integration.dictionaryStatus,
+    flashedSecret,
+  };
+}
+
+export function HydrateFallback() {
+  return <LoadingScreen title="Integração" />;
 }
 
 type ActionResult = {

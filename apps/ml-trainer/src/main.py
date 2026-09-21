@@ -47,11 +47,16 @@ def _train_breach(settings: Settings) -> str:
 
 
 def _train_external_event(settings: Settings) -> str:
-    from external_event.data import dataset_version, fetch_gold_monitor_daily_features
+    from external_event.data import (
+        dataset_version,
+        fetch_gold_alert_daily_features,
+        fetch_gold_monitor_daily_features,
+    )
     from external_event.train import train_and_log
 
-    daily = fetch_gold_monitor_daily_features(settings)
-    return train_and_log(settings, daily, dataset_version=dataset_version(daily))
+    alert = fetch_gold_alert_daily_features(settings)
+    monitor = fetch_gold_monitor_daily_features(settings)
+    return train_and_log(settings, alert, monitor, dataset_version=dataset_version(alert, monitor))
 
 
 def _train_kpi_projection(settings: Settings) -> str:
@@ -112,16 +117,21 @@ def _run_drift(settings: Settings) -> str:
         fetch_severity_escalations,
         fetch_signal_counts,
     )
-    from drift.run import run_drift_monitoring
+    from drift.run import require_tenant, run_drift_monitoring
     from volume import features as volume_features
     from volume.data import fetch_gold_alert_daily_features
 
+    # Narrowed to the tenant whose Production models drift is measured against
+    # — the same filter each trainer applies before fitting.
+    tenant_id = require_tenant(settings)
     daily = fetch_gold_alert_daily_features(settings)
+    daily = daily[daily["tenant_id"] == tenant_id]
     # Horizon doesn't change FEATURE_COLUMNS' own distribution meaningfully —
     # 1 is an arbitrary, stable choice, not a per-horizon drift concern.
     volume_frame = volume_features.build_feature_frame(daily, horizon=1)
 
     examples = fetch_breach_training_examples(settings)
+    examples = examples[examples["tenant_id"] == tenant_id]
     signal_counts = fetch_signal_counts(settings)
     auto_resolution_rate = fetch_auto_resolution_rate(settings)
     severity_escalations = fetch_severity_escalations(settings)
@@ -137,9 +147,13 @@ def _run_drift(settings: Settings) -> str:
 
     for domain, domain_results in outcome["results"].items():
         for feature, result in domain_results.items():
-            metrics.feature_drift_psi.labels(domain=domain, feature=feature).set(result.psi)
+            metrics.feature_drift_psi.labels(tenant=tenant_id, domain=domain, feature=feature).set(
+                result.psi
+            )
             if result.ks_pvalue is not None:
-                metrics.feature_drift_ks_pvalue.labels(domain=domain, feature=feature).set(result.ks_pvalue)
+                metrics.feature_drift_ks_pvalue.labels(
+                    tenant=tenant_id, domain=domain, feature=feature
+                ).set(result.ks_pvalue)
 
     return outcome["run_id"]
 

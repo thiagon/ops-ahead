@@ -30,7 +30,27 @@ def run_build() -> None:
     subprocess.run(["dbt", "run", "--profiles-dir", "/dbt"], check=True)
 
 
+# Bronze collapses a repeated event_id through ReplacingMergeTree, which only
+# applies when parts merge — asynchronously, on ClickHouse's own schedule.
+BRONZE_TABLES = ("bronze_alert", "bronze_monitor")
+
+
+def merge_bronze() -> None:
+    """Forces those merges so everything downstream — the models and the
+    suites alike — reads the one row per event the layer promises, instead of
+    whatever the background scheduler happened to have finished."""
+    from clickhouse_driver import Client
+
+    from settings import Settings
+
+    client = Client.from_url(Settings().clickhouse_native_url)
+    for table in BRONZE_TABLES:
+        client.execute(f"OPTIMIZE TABLE {table} FINAL")
+        LOGGER.info("clickhouse: merged %s", table)
+
+
 def run_transform() -> None:
+    merge_bronze()
     run_build()
 
     from redis_snapshot import publish_snapshot
@@ -40,10 +60,19 @@ def run_transform() -> None:
 
 
 def run_quality(argv: list[str]) -> None:
+    """A reproved suite reports itself by exiting, which is what the CLI and
+    the PreSync Job need. In-process callers need an exception instead:
+    SystemExit derives from BaseException, so it passes straight through an
+    `except Exception` handler and ends the process holding the message.
+    """
     from runner import main as runner_main
 
     sys.argv = ["runner", *argv]
-    runner_main()
+    try:
+        runner_main()
+    except SystemExit as exc:
+        if exc.code:
+            raise RuntimeError(f"quality suite failed (exit code {exc.code})") from exc
 
 
 # Shared by the CLI (`run <build|transform|quality>`, main.py), the

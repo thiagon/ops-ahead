@@ -30,6 +30,10 @@ export function deadlinesPath(tenant: string): string {
   return `/${encodeURIComponent(tenant)}/deadlines`;
 }
 
+export function analysesPath(tenant: string): string {
+  return `/${encodeURIComponent(tenant)}/analyses`;
+}
+
 export function occurrencePath(tenant: string, source: string, externalId: string): string {
   return `/${encodeURIComponent(tenant)}/occurrences/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}`;
 }

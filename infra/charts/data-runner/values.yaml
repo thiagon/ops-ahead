@@ -42,6 +42,7 @@ run:
       - entity_forecast
       - kpi_projection
       - external_event_detection
+      - recurring_causes
     clickhouseHost: clickhouse.data.svc.cluster.local
     clickhouseUser: ops_ahead
     clickhouseDatabase: default
@@ -55,12 +56,12 @@ run:
     # it. Overridden per-pipeline the same way pipelines/data-itsm-daily's
     # `source: itsm` used to configure the old WorkflowTemplate.
     source: itsm
-    # Marts register_snapshot.py counts and fingerprints for full_pipeline —
-    # same list pipelines/data-itsm-daily/values.yaml carried for the old
-    # WorkflowTemplate's inline script.
+    # Marts register_snapshot.py counts and fingerprints for full_pipeline.
+    # Every name here has to be a mart apps/data-runner/models/marts declares:
+    # the step counts each one by name, so an absent table fails the run.
     snapshotMarts:
       - incidents_by_ic
-      - p4_sequences_by_ci
+      - no_intervention_sequences_by_ci
       - first_touch_duration
       - priority_changes_log
       - kpi_monthly_state

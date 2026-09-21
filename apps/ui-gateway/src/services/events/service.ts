@@ -49,4 +49,17 @@ export class EventsService {
       source: envelope.source,
     };
   }
+
+  async ingestBatch(
+    origin: EventOrigin,
+    bodies: Record<string, unknown>[],
+  ): Promise<WebhookAccepted[]> {
+    const envelopes = bodies.map(body => buildEnvelope(origin, body));
+    await this.#publish.sendBatch(envelopes);
+    return envelopes.map(envelope => ({
+      event_id: envelope.event_id,
+      tenant_id: envelope.tenant_id,
+      source: envelope.source,
+    }));
+  }
 }

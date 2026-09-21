@@ -1,5 +1,17 @@
 # Payloads — `ui-orchestrator` e o caminho sob demanda
 
+> **Nomes como estavam quando este documento foi escrito.** Depois desta track o serviço
+> virou `ui-gateway`, `POST /trigger` virou `POST /analyses`, `GET /runs/{run_id}` virou
+> `GET /analyses/{id}`, e o tópico `trigger.status` deixou de existir — o consumidor agora
+> reporta status por `PATCH /analyses/{id}` com o header `X-Run-Key`. Toda análise, a
+> `full_pipeline` inclusive, entra por `POST /analyses`; o CronJob diário é só mais um
+> caller, autenticado pela chave do scheduler. Os payloads abaixo também são anteriores ao
+> `tenant_id`, hoje obrigatório em toda análise sobre modelos.
+>
+> **A união aceita hoje é `apps/ui-gateway/src/services/analyses/schema.ts`**, com o JSON
+> Schema em `contracts/` como schema de record. Este documento é a narrativa da decisão,
+> não a lista.
+
 Contrato completo de todas as mensagens que atravessam o sistema, do `POST /trigger` até
 o `GET /runs/{run_id}`. Complementa `spec.md` (arquitetura) e
 `domain/ubiquitous-language.md` (o que `analysis` significa) — este documento é a leitura
@@ -77,6 +89,15 @@ Linguagem de negócio, discriminado por `analysis`. Idêntico ao contrato origin
 {
   "analysis": "external_event_detection",
   "contamination": 0.05
+}
+```
+
+```json
+// analysis: drift_monitoring — sem datas de split e sem parâmetros: a janela de
+// referência é a do modelo em produção daquele tenant, lida do registry. Não treina
+// nada, só mede PSI/KS entre aquela janela e a atual
+{
+  "analysis": "drift_monitoring"
 }
 ```
 

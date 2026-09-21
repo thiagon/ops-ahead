@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id, window_hours, window_start)',
+        order_by='(tenant_id, entity_id, window_hours, window_start)',
         partition_by='toYYYYMM(window_start)'
     )
 }}
@@ -13,6 +13,7 @@
 -- size gets its own literal call.
 {% for hours in [1, 6, 24] %}
 select
+    tenant_id,
     entity_id,
     {{ hours }}                                               as window_hours,
     toStartOfInterval(opened_at, interval {{ hours }} hour)   as window_start,
@@ -26,6 +27,6 @@ select
     avg(duration_seconds)                                     as avg_duration_seconds
 from {{ ref('silver_alert') }}
 where entity_id is not null and entity_id != ''
-group by entity_id, window_start
+group by tenant_id, entity_id, window_start
 {% if not loop.last %}union all{% endif %}
 {% endfor %}

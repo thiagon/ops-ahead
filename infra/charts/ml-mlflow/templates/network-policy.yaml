@@ -29,6 +29,15 @@ spec:
         - port: 9092
         - port: 9093
         - port: 8123
+    # ui: ml-trainer reporta o status de cada run em PATCH /analyses/{id}.
+    # Sem isto o treino roda e termina, mas o gateway nunca fica sabendo — a
+    # execucao fica presa em `pending` para quem consulta.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ui
+      ports:
+        - port: 3000
     # Mesmo namespace: Postgres (5432), Redis (6379)
     - to:
         - podSelector: {}

@@ -6,22 +6,30 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from 'react-router';
 import type { Route } from './+types/root';
 import logo from './assets/logo.png';
+import { getConfig } from './config.server.ts';
 import { useHydrateSession } from './session';
 import './app.css';
+
+export function loader() {
+  return { gatewayUrl: getConfig().PUBLIC_GATEWAY_URL };
+}
 
 export function links() {
   return [{ rel: 'icon', href: logo, type: 'image/png' }];
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const data = useRouteLoaderData('root') as { gatewayUrl?: string } | undefined;
   return (
     <html lang="pt-BR">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="gateway-url" content={data?.gatewayUrl ?? ''} />
         <Meta />
         <Links />
       </head>
@@ -48,14 +56,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     message = error.status === 404 ? '404' : 'Erro';
     details =
       error.status === 404 ? 'A página solicitada não existe.' : error.statusText || details;
-  } else if (import.meta.env.DEV && error instanceof Error) {
-    // Registry / Prisma messages name tables and files — they stay in the
-    // server log. The screen only says something failed.
-    const fromRegistry = /PrismaClient|Invalid `|Error converting field/i.test(error.message);
-    if (!fromRegistry) {
-      details = error.message;
-      stack = error.stack;
-    }
+  } else if (error instanceof Error) {
+    details = error.message;
+    stack = error.stack;
   }
 
   return (

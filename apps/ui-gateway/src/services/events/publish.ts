@@ -31,4 +31,14 @@ export class EventsPublish {
       value: JSON.stringify(envelope),
     });
   }
+
+  async sendBatch(envelopes: EventEnvelope[]): Promise<void> {
+    await this.#publish.publishBatch(
+      envelopes.map(envelope => ({
+        topic: this.topicFor(envelope.intake),
+        key: envelope.event_id,
+        value: JSON.stringify(envelope),
+      })),
+    );
+  }
 }

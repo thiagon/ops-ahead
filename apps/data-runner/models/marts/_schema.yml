@@ -3,6 +3,8 @@ version: 2
 models:
   - name: incidents_by_ic
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: window_hours
@@ -19,6 +21,8 @@ models:
 
   - name: group_load_by_window
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: owner
         tests: [not_null]
       - name: snapshot_at
@@ -28,6 +32,8 @@ models:
 
   - name: no_intervention_sequences_by_ci
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: sequence_length

@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id, date)',
+        order_by='(tenant_id, entity_id, date)',
         partition_by='toYYYYMM(date)'
     )
 }}
@@ -14,14 +14,15 @@
 with ordered as (
 
     select
+        tenant_id,
         entity_id,
         received_at,
         severity,
         lagInFrame(severity) over (
-            partition by entity_id order by received_at
+            partition by tenant_id, entity_id order by received_at
         ) as prev_severity,
         row_number() over (
-            partition by entity_id order by received_at
+            partition by tenant_id, entity_id order by received_at
         ) as rn
     from {{ source('ingest', 'bronze_monitor') }}
     where severity is not null
@@ -29,8 +30,9 @@ with ordered as (
 )
 
 select
+    tenant_id,
     entity_id,
     toDate(received_at)                                        as date,
     countIf(rn > 1 and severity < prev_severity)                as escalation_count
 from ordered
-group by entity_id, date
+group by tenant_id, entity_id, date

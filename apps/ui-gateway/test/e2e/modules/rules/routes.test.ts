@@ -9,7 +9,9 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {
@@ -88,7 +90,9 @@ describe('PUT /rules/deadlines/:tenant', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {
@@ -145,7 +149,9 @@ describe('PUT /rules/targets/:tenant', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {
@@ -188,7 +194,9 @@ describe('GET and history', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {
@@ -240,7 +248,9 @@ describe('GET /rules/schema', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {
@@ -257,7 +267,9 @@ describe('GET /rules/schema', () => {
     expect(res.statusCode).toBe(200);
 
     const body = res.json() as {
-      mapping: { oneOf: { properties: { intake: { const: string }; bindings: { required: string[] } } }[] };
+      mapping: {
+        oneOf: { properties: { intake: { const: string }; bindings: { required: string[] } } }[];
+      };
       deadlines: { properties: { deadlines: unknown } };
       targets: { properties: { targets: unknown } };
     };

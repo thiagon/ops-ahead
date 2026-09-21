@@ -82,13 +82,15 @@ function installFakeGateway() {
 
         if (method === 'PUT' && extra === 'status') {
           const row = sources.find(item => item.tenant_id === tenant && item.source === source);
-          if (!row) return Response.json({ error: 'NotFound', message: 'missing' }, { status: 404 });
+          if (!row)
+            return Response.json({ error: 'NotFound', message: 'missing' }, { status: 404 });
           row.status = body.status;
           return Response.json(row);
         }
         if (method === 'POST' && extra === 'secret') {
           const row = sources.find(item => item.tenant_id === tenant && item.source === source);
-          if (!row) return Response.json({ error: 'NotFound', message: 'missing' }, { status: 404 });
+          if (!row)
+            return Response.json({ error: 'NotFound', message: 'missing' }, { status: 404 });
           const secret = 'rotated-secret-value-000000000000';
           secrets.set(`${tenant}:${source}`, secret);
           return Response.json({ source: row, secret });
@@ -121,7 +123,10 @@ function installFakeGateway() {
         const key = `${tenant}:${source}`;
         if (mappingMatch[3]) {
           return Response.json(
-            mappingHistory.filter(item => item.intake && key).slice().reverse(),
+            mappingHistory
+              .filter(item => item.intake && key)
+              .slice()
+              .reverse(),
           );
         }
         if (method === 'GET') {
@@ -226,12 +231,8 @@ describe('mappings', () => {
     await anOrigin();
     await asTenant(() => updateBindings('service_now', REQUIRED_ALERT_BINDINGS));
 
-    await asTenant(() =>
-      upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }),
-    );
-    await asTenant(() =>
-      upsertMapping('service_now', { field: 'status', from: '2', to: 'open' }),
-    );
+    await asTenant(() => upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }));
+    await asTenant(() => upsertMapping('service_now', { field: 'status', from: '2', to: 'open' }));
     await asTenant(() =>
       upsertMapping('service_now', { field: 'status', from: '2', to: 'in_progress' }),
     );
@@ -244,9 +245,7 @@ describe('mappings', () => {
   it('removes one mapped value', async () => {
     await anOrigin();
     await asTenant(() => updateBindings('service_now', REQUIRED_ALERT_BINDINGS));
-    await asTenant(() =>
-      upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }),
-    );
+    await asTenant(() => upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }));
 
     const after = await asTenant(() => removeMapping('service_now', 'status', '1'));
 
@@ -290,9 +289,7 @@ describe('bindings', () => {
 
   it('marks the dictionary published — that is what Publicar commits', async () => {
     await anOrigin();
-    expect((await asTenant(() => getIntegration('service_now'))).dictionaryStatus).toBe(
-      'inactive',
-    );
+    expect((await asTenant(() => getIntegration('service_now'))).dictionaryStatus).toBe('inactive');
 
     await asTenant(() => updateBindings('service_now', REQUIRED_ALERT_BINDINGS));
 
@@ -337,9 +334,7 @@ describe('listIntegrations', () => {
   it('returns origin rows without the dictionary, so the list stays cheap', async () => {
     await anOrigin();
     await asTenant(() => updateBindings('service_now', REQUIRED_ALERT_BINDINGS));
-    await asTenant(() =>
-      upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }),
-    );
+    await asTenant(() => upsertMapping('service_now', { field: 'status', from: '1', to: 'open' }));
 
     const [integration] = await asTenant(() => listIntegrations());
 

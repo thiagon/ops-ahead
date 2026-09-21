@@ -6,6 +6,7 @@ import mlflow
 import pandas as pd
 
 from drift.monitor import PSI_SIGNIFICANT_THRESHOLD, DriftResult, compute_drift
+from model_names import registered_model_name
 from settings import Settings
 from trigger import EXPERIMENT_NAMES
 
@@ -61,6 +62,15 @@ def _log_domain_drift(domain: str, results: dict[str, DriftResult]) -> None:
             mlflow.log_metric(f"{domain}_{feature}_ks_pvalue", result.ks_pvalue)
 
 
+def require_tenant(settings: Settings) -> str:
+    """Drift is scoped to one tenant because the model it compares against is:
+    the registry holds one Production version per tenant (model_names.py), so
+    there is no tenant-wide model whose training window this could mean."""
+    if settings.tenant_id is None:
+        raise ValueError("drift monitoring needs a tenant_id — one Production model per tenant.")
+    return settings.tenant_id
+
+
 def run_drift_monitoring(
     settings: Settings,
     domains: dict[str, tuple[pd.DataFrame, str, list[str]]],
@@ -70,14 +80,18 @@ def run_drift_monitoring(
     `(feature_frame, date_column, feature_columns)` — main.py assembles this
     from each domain's own data/features modules so this function stays free
     of ClickHouse I/O and is unit-testable with synthetic frames."""
+    tenant_id = require_tenant(settings)
+
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     mlflow.set_experiment(settings.mlflow_experiment_name)
     client = mlflow.MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
 
     all_results: dict[str, dict[str, DriftResult]] = {}
     with mlflow.start_run() as run:
+        mlflow.log_param("tenant_id", tenant_id)
         for domain, (frame, date_column, feature_columns) in domains.items():
-            train_end = _production_train_end(client, EXPERIMENT_NAMES[domain])
+            model_name = registered_model_name(EXPERIMENT_NAMES[domain], tenant_id)
+            train_end = _production_train_end(client, model_name)
             reference, current = _split_reference_current(frame, date_column, train_end)
 
             results = compute_drift(reference, current, feature_columns)

@@ -19,7 +19,11 @@ describe('AnalysesService.start', () => {
 
   beforeEach(() => {
     publish = vi.fn(async (_message: OutboundMessage) => undefined);
-    analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    analyses = new AnalysesService(
+      memoryPrisma(),
+      { publish, publishBatch: async () => undefined },
+      topics,
+    );
   });
 
   it('mints an id, stores pending, and publishes `analysis` intact keyed as run_id', async () => {
@@ -107,6 +111,27 @@ describe('AnalysesService.start', () => {
     expect(listed.map(row => row.id)).toEqual([scheduled.id]);
   });
 
+  it("includes the tenant-less data analyses in a tenant's listing", async () => {
+    const training = await analyses.start(
+      { analysis: 'kpi_projection', tenant_id: 'locaweb' },
+      USER,
+    );
+    const pipeline = await analyses.start({ analysis: 'full_pipeline' }, USER);
+
+    const listed = await analyses.list({ tenantId: 'locaweb', limit: 50 });
+
+    expect(listed.map(row => row.id).sort()).toEqual([training.id, pipeline.id].sort());
+  });
+
+  it("keeps another tenant's training out of a tenant's listing", async () => {
+    await analyses.start({ analysis: 'kpi_projection', tenant_id: 'outro' }, USER);
+    const mine = await analyses.start({ analysis: 'kpi_projection', tenant_id: 'locaweb' }, USER);
+
+    const listed = await analyses.list({ tenantId: 'locaweb', limit: 50 });
+
+    expect(listed.map(row => row.id)).toEqual([mine.id]);
+  });
+
   it('mints a fresh id per call', async () => {
     const first = await analyses.start({ analysis: 'data_quality_check' }, USER);
     const second = await analyses.start({ analysis: 'data_quality_check' }, USER);
@@ -135,6 +160,7 @@ describe('AnalysesService.start', () => {
     ['breach_risk', 'trigger.ml'],
     ['kpi_projection', 'trigger.ml'],
     ['external_event_detection', 'trigger.ml'],
+    ['drift_monitoring', 'trigger.ml'],
     ['data_refresh', 'trigger.data'],
     ['data_quality_check', 'trigger.data'],
   ] as const)('routes %s to %s', async (analysis, topic) => {
@@ -160,7 +186,7 @@ describe('AnalysesService status', () => {
   it('rejects an unknown id — pending is only a stored row, never a guess', async () => {
     const analyses = new AnalysesService(
       memoryPrisma(),
-      { publish: async () => undefined },
+      { publish: async () => undefined, publishBatch: async () => undefined },
       topics,
     );
 
@@ -169,7 +195,11 @@ describe('AnalysesService status', () => {
 
   it('reflects whatever update last stored for that id when the kafka key is presented', async () => {
     const publish = vi.fn(async (_message: OutboundMessage) => undefined);
-    const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    const analyses = new AnalysesService(
+      memoryPrisma(),
+      { publish, publishBatch: async () => undefined },
+      topics,
+    );
     const started = await analyses.start({ analysis: 'data_refresh' }, USER);
     const status = {
       status: 'running' as const,
@@ -189,7 +219,7 @@ describe('AnalysesService status', () => {
   it('rejects an update with the wrong key', async () => {
     const analyses = new AnalysesService(
       memoryPrisma(),
-      { publish: async () => undefined },
+      { publish: async () => undefined, publishBatch: async () => undefined },
       topics,
     );
     const started = await analyses.start({ analysis: 'data_refresh' }, USER);
@@ -201,7 +231,11 @@ describe('AnalysesService status', () => {
 
   it('rejects moving status backwards — succeeded cannot become running', async () => {
     const publish = vi.fn(async (_message: OutboundMessage) => undefined);
-    const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    const analyses = new AnalysesService(
+      memoryPrisma(),
+      { publish, publishBatch: async () => undefined },
+      topics,
+    );
     const started = await analyses.start({ analysis: 'data_refresh' }, USER);
     const key = runKeyFrom(publish);
 
@@ -215,7 +249,11 @@ describe('AnalysesService status', () => {
 
   it('rejects swapping a terminal status for the other', async () => {
     const publish = vi.fn(async (_message: OutboundMessage) => undefined);
-    const analyses = new AnalysesService(memoryPrisma(), { publish }, topics);
+    const analyses = new AnalysesService(
+      memoryPrisma(),
+      { publish, publishBatch: async () => undefined },
+      topics,
+    );
     const started = await analyses.start({ analysis: 'data_refresh' }, USER);
     const key = runKeyFrom(publish);
 
@@ -229,7 +267,7 @@ describe('AnalysesService status', () => {
   it('hides a tenant-scoped run from a caller who does not act for that tenant', async () => {
     const analyses = new AnalysesService(
       memoryPrisma(),
-      { publish: async () => undefined },
+      { publish: async () => undefined, publishBatch: async () => undefined },
       topics,
     );
     const started = await analyses.start(

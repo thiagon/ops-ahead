@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gatewayFetch } from '../app/features/auth/gateway.server.ts';
-import { loginPath, readIdentity, requireTenantAccess } from '../app/features/auth/session.server.ts';
+import {
+  loginPath,
+  readIdentity,
+  requireTenantAccess,
+} from '../app/features/auth/session.server.ts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -8,7 +12,9 @@ afterEach(() => {
 
 describe('gatewayFetch', () => {
   it('forwards the cookie and echoes the CSRF token on a mutating call', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await gatewayFetch(
@@ -25,7 +31,9 @@ describe('gatewayFetch', () => {
   });
 
   it('does not send CSRF on GET', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await gatewayFetch(
@@ -48,9 +56,7 @@ describe('readIdentity', () => {
   it('reads sub and tenants from the gateway', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        Response.json({ sub: 'person', tenants: ['locaweb'] }),
-      ),
+      vi.fn(async () => Response.json({ sub: 'person', tenants: ['locaweb'] })),
     );
 
     await expect(

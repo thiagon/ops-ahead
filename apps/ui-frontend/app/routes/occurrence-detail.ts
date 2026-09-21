@@ -5,16 +5,20 @@ import {
   fetchSimilarIncidents,
 } from '~/clickhouse.server.ts';
 import { buildTimeline } from '~/components/Timeline';
-import { withTenant } from '~/features/config/repo.server.ts';
+import { dataResponse } from '~/data-response.server.ts';
 import type { Route } from './+types/occurrence-detail';
 
 /**
- * The drill-down's per-row data — timeline and similar incidents are only
- * worth fetching for the selected recommendation, not every row in the queue.
+ * The drill-down's per-row data. The panel fetches this URL from the browser
+ * so a failure shows up in the network panel with its body.
  */
 export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => {
+  return dataResponse(request, params.tenant, async () => {
     const { source, externalId } = params;
+    if (!source || !externalId) {
+      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
+    }
+
     const alert = await fetchOpenAlert(source, externalId);
     if (!alert) {
       throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });

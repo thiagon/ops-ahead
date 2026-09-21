@@ -17,6 +17,7 @@ def register_incidents_by_ic(context: AbstractDataContext) -> ValidationDefiniti
     batch_def = _table_asset(context, "incidents_by_ic")
     suite = context.suites.add(gx.ExpectationSuite(name="mart_incidents_by_ic"))
 
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="tenant_id"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="entity_id"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="window_start"))
     suite.add_expectation(

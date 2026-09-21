@@ -3,6 +3,8 @@ version: 2
 models:
   - name: gold_monitor_signal_counts
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: window_minutes
@@ -17,6 +19,8 @@ models:
 
   - name: gold_monitor_auto_resolution_rate
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: auto_resolution_rate
@@ -24,6 +28,8 @@ models:
 
   - name: gold_monitor_signal_intervals
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: median_interval_seconds
@@ -31,6 +37,8 @@ models:
 
   - name: gold_monitor_severity_escalations
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: entity_id
         tests: [not_null]
       - name: date
@@ -40,6 +48,8 @@ models:
 
   - name: gold_monitor_daily_features
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: date
         tests: [not_null]
       - name: source

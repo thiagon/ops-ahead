@@ -8,6 +8,7 @@ const ANALYSIS_DOMAIN: Record<AnalysisRequest['analysis'], 'ml' | 'data'> = {
   recurring_causes: 'ml',
   kpi_projection: 'ml',
   external_event_detection: 'ml',
+  drift_monitoring: 'ml',
   data_refresh: 'data',
   data_quality_check: 'data',
   full_pipeline: 'data',

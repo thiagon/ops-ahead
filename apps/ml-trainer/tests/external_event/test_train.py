@@ -6,7 +6,7 @@ from external_event.train import train_and_log
 from settings import Settings
 
 
-def _synthetic_daily(days: int = 60) -> pd.DataFrame:
+def _synthetic_alert(days: int = 60) -> pd.DataFrame:
     dates = pd.date_range("2025-01-01", periods=days, freq="D")
     rng = np.random.default_rng(3)
     rows = []
@@ -17,12 +17,30 @@ def _synthetic_daily(days: int = 60) -> pd.DataFrame:
             {
                 "date": date,
                 "source": "itsm",
-                "total_signals": total,
-                "firing_count": int(total * 0.6),
-                "cleared_count": int(total * 0.4),
+                "total_incidents": total,
+                "unique_entities": 5,
+                "incidents_per_entity": total / 5,
+                "critical_share": 0.3,
+                "manual_open_share": 0.2,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _synthetic_monitor(days: int = 60) -> pd.DataFrame:
+    dates = pd.date_range("2025-01-01", periods=days, freq="D")
+    rows = []
+    for date in dates:
+        rows.append(
+            {
+                "date": date,
+                "source": "zabbix",
+                "total_signals": 30,
+                "unique_entities": 6,
+                "firing_count": 18,
+                "cleared_count": 12,
                 "p1_share": 0.1,
                 "critical_share": 0.3,
-                "unique_entities": 5,
             }
         )
     return pd.DataFrame(rows)
@@ -40,9 +58,15 @@ def synthetic_settings(tmp_path) -> Settings:
     )
 
 
-def test_train_and_log_completes_and_logs_a_run(synthetic_settings):
-    daily = _synthetic_daily()
+def test_train_and_log_completes_without_any_monitor_origin(synthetic_settings):
+    """The shape most tenants have: incidents only, no origin observing
+    conditions. The detector has to train on that alone."""
+    run_id = train_and_log(synthetic_settings, _synthetic_alert())
 
-    run_id = train_and_log(synthetic_settings, daily)
+    assert run_id
+
+
+def test_train_and_log_completes_with_both_intakes(synthetic_settings):
+    run_id = train_and_log(synthetic_settings, _synthetic_alert(), _synthetic_monitor())
 
     assert run_id

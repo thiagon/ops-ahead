@@ -133,6 +133,18 @@ export const recurringCausesRequestSchema = z
   .strict()
   .meta({ id: 'RecurringCausesRequest' });
 
+/**
+ * Tenant-scoped like the trainings it watches: drift is measured against that
+ * tenant's own Production model, and the registry holds one per tenant.
+ */
+export const driftMonitoringRequestSchema = z
+  .object({
+    analysis: z.literal('drift_monitoring'),
+    ...tenantScoped,
+  })
+  .strict()
+  .meta({ id: 'DriftMonitoringRequest' });
+
 export const entityForecastRequestSchema = z
   .object({
     analysis: z.literal('entity_forecast'),
@@ -172,6 +184,7 @@ export const analysisRequestSchema = z
     kpiProjectionRequestSchema,
     externalEventDetectionRequestSchema,
     recurringCausesRequestSchema,
+    driftMonitoringRequestSchema,
     dataRefreshRequestSchema,
     dataQualityCheckRequestSchema,
     fullPipelineRequestSchema,

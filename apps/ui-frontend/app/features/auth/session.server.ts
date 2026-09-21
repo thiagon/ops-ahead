@@ -40,10 +40,7 @@ export async function requireIdentity(request: Request): Promise<Identity> {
  * Selection is the URL's; authorization is the claim's, so a slug someone
  * types by hand is a 403 rather than a different client's screen.
  */
-export async function requireTenantAccess(
-  request: Request,
-  tenant: string,
-): Promise<Identity> {
+export async function requireTenantAccess(request: Request, tenant: string): Promise<Identity> {
   const identity = await requireIdentity(request);
   if (!identity.tenants.includes(tenant)) {
     throw new Response('Esse cliente não está entre os seus.', { status: 403 });

@@ -318,6 +318,16 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ui
+    # data-runner closes the daily chain here: the snapshot it fingerprints is
+    # logged to MLflow (5000) and the cache-aside copy the inference path reads
+    # is published to Redis (6379).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - port: 5000
+        - port: 6379
 ---
 # ── ui ─────────────────────────────────────────────────────────────────────
 apiVersion: networking.k8s.io/v1

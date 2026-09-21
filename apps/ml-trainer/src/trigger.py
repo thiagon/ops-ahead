@@ -51,6 +51,11 @@ def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None
 
     Cron-style events without a key are skipped — they never went through
     POST /analyses, so the gateway has no row to update.
+
+    Best-effort: a failure is logged, never raised. The offset stands for the
+    training the message asked for, and raising here would leave it
+    uncommitted and replay that training on every restart, with no
+    dead-letter topic to land the message in.
     """
     run_id = payload["run_id"]
     if not run_key:
@@ -69,10 +74,8 @@ def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None
             response.read()
     except urllib.error.HTTPError as exc:
         LOGGER.error("PATCH /analyses/%s failed: %s %s", run_id, exc.code, exc.read().decode())
-        raise
     except urllib.error.URLError as exc:
         LOGGER.error("PATCH /analyses/%s unreachable: %s", run_id, exc.reason)
-        raise
 
 
 def process_message(
@@ -117,6 +120,9 @@ def process_message(
     message_settings.kpi_projection_seed = event.get("seed", message_settings.kpi_projection_seed)
     message_settings.external_event_contamination = event.get(
         "contamination", message_settings.external_event_contamination
+    )
+    message_settings.recurring_causes_window_days = event.get(
+        "window_days", message_settings.recurring_causes_window_days
     )
     configure_experiment(message_settings, domain)
 

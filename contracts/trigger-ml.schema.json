@@ -10,7 +10,8 @@
     { "$ref": "#/definitions/breachRisk" },
     { "$ref": "#/definitions/kpiProjection" },
     { "$ref": "#/definitions/externalEventDetection" },
-    { "$ref": "#/definitions/recurringCauses" }
+    { "$ref": "#/definitions/recurringCauses" },
+    { "$ref": "#/definitions/driftMonitoring" }
   ],
   "definitions": {
     "volumeForecast": {
@@ -90,6 +91,17 @@
         "analysis": { "const": "recurring_causes" },
         "tenant_id": { "$ref": "#/definitions/tenantId" },
         "window_days": { "type": "integer", "minimum": 1, "description": "How much history describes an entity's behaviour. Unsupervised, so no split boundaries. ml-trainer's own configured default applies when omitted." }
+      }
+    },
+    "driftMonitoring": {
+      "type": "object",
+      "required": ["run_id", "run_key", "analysis", "tenant_id"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/definitions/runId" },
+        "run_key": { "$ref": "#/definitions/runKey" },
+        "analysis": { "const": "drift_monitoring" },
+        "tenant_id": { "$ref": "#/definitions/tenantId" }
       }
     },
     "tenantId": {

@@ -13,18 +13,24 @@ _KEY_PREFIX = "monitor:signal_count"
 _WINDOW_MINUTES = 15
 
 
-def read_signal_counts(client: Client, window_minutes: int = _WINDOW_MINUTES) -> dict[str, int]:
+def read_signal_counts(
+    client: Client, window_minutes: int = _WINDOW_MINUTES
+) -> dict[tuple[str, str], int]:
     """Latest 15-minute signal count per entity — the correlation feature
     the breach-risk inference path reads (domain spec: "as duas cadeias se
     encontram por entity"). One row per entity even though
-    gold_monitor_signal_counts carries many historical windows."""
+    gold_monitor_signal_counts carries many historical windows.
+
+    Keyed by (tenant, entity): entity_id is only unique inside a tenant, so
+    without the tenant two clients naming a resource alike would each read the
+    other's noise."""
     rows = client.execute(
-        "SELECT entity_id, argMax(signal_count, window_start) "
+        "SELECT tenant_id, entity_id, argMax(signal_count, window_start) "
         "FROM gold_monitor_signal_counts WHERE window_minutes = %(window_minutes)s "
-        "GROUP BY entity_id",
+        "GROUP BY tenant_id, entity_id",
         {"window_minutes": window_minutes},
     )
-    return {entity_id: count for entity_id, count in rows}
+    return {(tenant_id, entity_id): count for tenant_id, entity_id, count in rows}
 
 
 def publish_snapshot(
@@ -43,8 +49,8 @@ def publish_snapshot(
 
     counts = read_signal_counts(client)
     ttl_seconds = _WINDOW_MINUTES * 60
-    for entity_id, count in counts.items():
-        redis_client.set(f"{_KEY_PREFIX}:{entity_id}", count, ex=ttl_seconds)
+    for (tenant_id, entity_id), count in counts.items():
+        redis_client.set(f"{_KEY_PREFIX}:{tenant_id}:{entity_id}", count, ex=ttl_seconds)
 
     LOGGER.info("published monitor signal-count snapshot for %d entities", len(counts))
     return len(counts)

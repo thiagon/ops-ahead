@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+import urllib.error
 from datetime import date
 
 import pytest
@@ -169,6 +171,26 @@ class TestReportStatus:
         assert seen["method"] == "PATCH"
         assert seen["headers"]["X-run-key"] == "the-key"
         assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            urllib.error.URLError("connection refused"),
+            urllib.error.HTTPError(
+                "http://gateway/analyses/run-1", 409, "Conflict", {}, io.BytesIO(b"{}")
+            ),
+        ],
+        ids=["unreachable", "rejected"],
+    )
+    def test_a_failed_patch_never_reaches_the_consumer_loop(self, monkeypatch, error):
+        from trigger import report_status
+
+        def _urlopen(request, timeout=10):
+            raise error
+
+        monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+
+        report_status("http://gateway", {"run_id": "run-1", "status": "running"}, "the-key")
 
 
 class TestChainTrainings:

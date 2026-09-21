@@ -35,7 +35,7 @@ describe('analysisRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it.each(['kpi_projection', 'external_event_detection'] as const)(
+  it.each(['kpi_projection', 'external_event_detection', 'drift_monitoring'] as const)(
     'accepts %s without split dates, but never without a tenant',
     analysis => {
       expect(analysisRequestSchema.safeParse({ analysis }).success).toBe(false);

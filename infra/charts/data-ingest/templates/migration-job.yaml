@@ -42,7 +42,9 @@ spec:
           args:
             - "-path=/migrations"
             - "-database=$(DATABASE_URL)"
-            - "up"
+            {{- range .Values.migration.command }}
+            - {{ . | quote }}
+            {{- end }}
           env:
             - name: DATABASE_URL
               valueFrom:

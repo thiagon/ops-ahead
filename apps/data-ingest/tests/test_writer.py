@@ -84,3 +84,53 @@ def test_publisher_protocol_carries_bytes():
     from writer import Publisher
 
     assert inspect.signature(Publisher.publish).parameters["message"].annotation is bytes
+
+
+class _Recorder:
+    """Collects the order of the writer's external effects."""
+
+    def __init__(self) -> None:
+        self.order: list[str] = []
+
+    async def publish(self, message: bytes, topic: str) -> None:
+        self.order.append(f"publish:{topic}")
+
+    def execute(self, statement: str, rows: list | None = None) -> None:
+        self.order.append("insert")
+
+
+def test_publishing_happens_after_the_bronze_inserts(monkeypatch):
+    """A retried batch replays the lake write and the bronze inserts without
+    trace — both are keyed. A republish is not, so it goes last: nothing
+    downstream sees an event the bronze row for it never landed."""
+    import asyncio
+
+    from models import BronzeAlertEvent
+    from settings import Settings
+    import writer as writer_module
+
+    recorder = _Recorder()
+    bronze = BronzeAlertEvent.model_validate(
+        {
+            "event_id": str(uuid4()),
+            "tenant_id": "locaweb",
+            "source": "itsm",
+            "version": "v1",
+            "dictionary_version": "v1",
+            "received_at": "2024-01-15T10:00:00+00:00",
+            "external_id": "INC0001",
+            "opened_at": "2024-01-15T09:55:00+00:00",
+            "severity": 3,
+            "status": "closed",
+            "title": "disk full",
+        }
+    )
+
+    w = writer_module.BatchWriter(Settings(), recorder, dictionaries=None, bindings=None)
+    monkeypatch.setattr(w, "_write_lake", lambda batch: recorder.order.append("lake"))
+    monkeypatch.setattr(writer_module, "translate", lambda envelope, d, b: bronze)
+    w._ch = recorder
+
+    asyncio.run(w.write([_make("itsm", "alert", "2024-01-15T10:00:00+00:00")]))
+
+    assert recorder.order == ["lake", "insert", "publish:events.alert"]

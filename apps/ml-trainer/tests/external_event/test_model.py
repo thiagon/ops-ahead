@@ -5,25 +5,37 @@ from external_event.train import fit_isolation_forest
 
 
 def _daily_frame_with_one_spike(n_normal: int = 40) -> pd.DataFrame:
+    """Alert-shaped days with one obvious outlier. No monitor origin, so those
+    columns sit at zero — the shape most tenants actually have."""
     rows = [
         {
-            "total_signals": 20 + (i % 3),
-            "p1_share": 0.1,
-            "critical_share": 0.3,
-            "unique_entities": 5,
-            "signals_per_entity": (20 + (i % 3)) / 5,
-            "cleared_share": 0.6,
+            "alert_total_incidents": 20 + (i % 3),
+            "alert_incidents_per_entity": (20 + (i % 3)) / 5,
+            "alert_unique_entities": 5,
+            "alert_critical_share": 0.3,
+            "alert_manual_open_share": 0.2,
+            "monitor_total_signals": 0.0,
+            "monitor_signals_per_entity": 0.0,
+            "monitor_unique_entities": 0.0,
+            "monitor_p1_share": 0.0,
+            "monitor_critical_share": 0.0,
+            "monitor_cleared_share": 0.0,
         }
         for i in range(n_normal)
     ]
     rows.append(
         {
-            "total_signals": 500,  # obvious spike
-            "p1_share": 0.9,
-            "critical_share": 0.95,
-            "unique_entities": 40,
-            "signals_per_entity": 500 / 40,
-            "cleared_share": 0.05,
+            "alert_total_incidents": 500,  # obvious spike
+            "alert_incidents_per_entity": 500 / 40,
+            "alert_unique_entities": 40,
+            "alert_critical_share": 0.95,
+            "alert_manual_open_share": 0.9,
+            "monitor_total_signals": 0.0,
+            "monitor_signals_per_entity": 0.0,
+            "monitor_unique_entities": 0.0,
+            "monitor_p1_share": 0.0,
+            "monitor_critical_share": 0.0,
+            "monitor_cleared_share": 0.0,
         }
     )
     return pd.DataFrame(rows)

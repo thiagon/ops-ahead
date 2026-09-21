@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { isRouteErrorResponse, useRevalidator } from 'react-router';
 import { AlertTriangleIcon, RefreshIcon } from '~/components/icons';
 import { PageHeader } from '~/components/PageHeader';
@@ -31,6 +32,16 @@ export function classify(error: unknown): { kind: Kind; status?: number } {
   return { kind: 'unexpected' };
 }
 
+function errorDetail(error: unknown): string | undefined {
+  if (isRouteErrorResponse(error)) {
+    if (typeof error.data === 'string' && error.data.length > 0) return error.data;
+    return error.statusText || undefined;
+  }
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  if (typeof error === 'string' && error.length > 0) return error;
+  return undefined;
+}
+
 export function RouteError({
   error,
   title,
@@ -44,6 +55,11 @@ export function RouteError({
   const revalidator = useRevalidator();
   const { kind, status } = classify(error);
   const retrying = revalidator.state === 'loading';
+  const detail = errorDetail(error);
+
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
 
   const copy = {
     unavailable: {
@@ -72,6 +88,12 @@ export function RouteError({
           </div>
 
           <p className="max-w-prose text-sm text-text-muted">{copy.body}</p>
+
+          {detail && (
+            <pre className="max-w-full overflow-x-auto whitespace-pre-wrap rounded-lg bg-bg-elevated px-3 py-2 font-mono text-text-dim text-xs">
+              {detail}
+            </pre>
+          )}
 
           {kind !== 'notFound' && (
             <button

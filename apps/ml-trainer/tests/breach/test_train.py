@@ -56,11 +56,26 @@ def _synthetic_examples(n: int = 300, tenant_id: str = "locaweb") -> pd.DataFram
     )
 
 
-def _synthetic_monitor_context() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _synthetic_monitor_context(
+    *tenants: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """The monitor marts carry the tenant: the same entity_id exists under
+    each one, which is what the per-tenant narrowing has to separate."""
+    tenants = tenants or ("locaweb",)
     entities = [f"ic{i}" for i in range(5)]
-    signal_counts = pd.DataFrame(columns=["entity_id", "window_minutes", "window_start", "signal_count"])
-    auto_resolution_rate = pd.DataFrame({"entity_id": entities, "auto_resolution_rate": [0.5] * len(entities)})
-    severity_escalations = pd.DataFrame(columns=["entity_id", "date", "escalation_count"])
+    signal_counts = pd.DataFrame(
+        columns=["tenant_id", "entity_id", "window_minutes", "window_start", "signal_count"]
+    )
+    auto_resolution_rate = pd.DataFrame(
+        {
+            "tenant_id": [t for t in tenants for _ in entities],
+            "entity_id": entities * len(tenants),
+            "auto_resolution_rate": [0.5] * (len(entities) * len(tenants)),
+        }
+    )
+    severity_escalations = pd.DataFrame(
+        columns=["tenant_id", "entity_id", "date", "escalation_count"]
+    )
     return signal_counts, auto_resolution_rate, severity_escalations
 
 
@@ -97,7 +112,8 @@ def test_each_tenant_gets_its_own_model(synthetic_settings, monkeypatch):
 
     def _fake_train_tenant(settings, examples, *args, **kwargs):
         tenant_id = args[3] if len(args) > 3 else kwargs["tenant_id"]
-        seen[tenant_id] = set(examples["tenant_id"])
+        # args[1] is auto_resolution_rate — narrowed the same way as examples.
+        seen[tenant_id] = set(examples["tenant_id"]) | set(args[1]["tenant_id"])
         return f"run-{tenant_id}"
 
     monkeypatch.setattr("breach.train.train_tenant", _fake_train_tenant)
@@ -105,7 +121,9 @@ def test_each_tenant_gets_its_own_model(synthetic_settings, monkeypatch):
     examples = pd.concat(
         [_synthetic_examples(), _synthetic_examples(tenant_id="acme")], ignore_index=True
     )
-    signal_counts, auto_resolution_rate, severity_escalations = _synthetic_monitor_context()
+    signal_counts, auto_resolution_rate, severity_escalations = _synthetic_monitor_context(
+        "locaweb", "acme"
+    )
 
     train_and_log(
         synthetic_settings, examples, signal_counts, auto_resolution_rate, severity_escalations

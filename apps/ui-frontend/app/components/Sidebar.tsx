@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import {
+  analysesPath,
   deadlinesPath,
   integrationsPath,
   managerPath,
@@ -20,6 +21,7 @@ import {
   ListIcon,
   MenuIcon,
   PlugIcon,
+  PulseIcon,
   TrendingUpIcon,
 } from './icons';
 import { Logo } from './Logo';
@@ -62,6 +64,12 @@ function navGroups(tenant: string): Array<{ title: string; items: NavEntry[] }> 
           label: 'Painel do gestor',
           hint: 'Meta anual, projeção e tendências',
           icon: ClockIcon,
+        },
+        {
+          to: analysesPath(tenant),
+          label: 'Análises',
+          hint: 'Disparar e acompanhar qualquer execução',
+          icon: PulseIcon,
         },
       ],
     },

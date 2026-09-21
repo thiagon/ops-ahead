@@ -9,8 +9,8 @@ from faststream.kafka import KafkaBroker
 from faststream.kafka.annotations import KafkaMessage
 
 import metrics
+from batching import RewindFetchedBatch, batch_subscriber_kwargs
 from bindings import BindingRegistry
-from buffer import BatchBuffer
 from config_store import ConfigStore
 from config_stream import (
     apply_deadline_rows,
@@ -61,7 +61,10 @@ def _persist_tenant_rule(save: Callable[[str, dict[str, Any]], None], raw: bytes
 
 
 def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
-    broker = KafkaBroker(settings.kafka_bootstrap_servers)
+    broker = KafkaBroker(
+        settings.kafka_bootstrap_servers,
+        middlewares=(RewindFetchedBatch,),
+    )
     app = FastStream(broker)
     dictionaries = DictionaryRegistry()
     bindings = BindingRegistry()
@@ -94,17 +97,6 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
         metrics.batch_latency.observe(time.perf_counter() - t0)
         metrics.batch_size.observe(len(batch))
 
-    buffer = BatchBuffer(
-        flush=_flush,
-        max_size=settings.batch_max_size,
-        max_seconds=settings.batch_max_seconds,
-    )
-    milestone_buffer = BatchBuffer(
-        flush=writer.write_milestones,
-        max_size=settings.batch_max_size,
-        max_seconds=settings.batch_max_seconds,
-    )
-
     # Same consumer group on both raw topics: this is the ingestion+translation
     # stage as a whole, not two independent processes
     # (docs/insights/fluxo-do-incidente.md — translation lives inside
@@ -132,37 +124,32 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
             writer.replace_kpi_targets(rows)
         _persist_tenant_rule(config_store.save_targets, msg.body)
 
-    @broker.subscriber(settings.kafka_topic_raw_alert, group_id=settings.kafka_group_id)
-    async def handle_alert(msg: EventEnvelope) -> None:
-        metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
-        await buffer.add(msg)
+    fetched = batch_subscriber_kwargs(settings)
 
-    @broker.subscriber(settings.kafka_topic_raw_monitor, group_id=settings.kafka_group_id)
-    async def handle_monitor(msg: EventEnvelope) -> None:
-        metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
-        await buffer.add(msg)
+    @broker.subscriber(settings.kafka_topic_raw_alert, **fetched)
+    async def handle_alert(msgs: list[EventEnvelope], message: KafkaMessage) -> None:
+        for msg in msgs:
+            metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
+        await _flush(msgs)
+        await message.ack()
+
+    @broker.subscriber(settings.kafka_topic_raw_monitor, **fetched)
+    async def handle_monitor(msgs: list[EventEnvelope], message: KafkaMessage) -> None:
+        for msg in msgs:
+            metrics.events_consumed.labels(source=msg.source, intake=msg.intake).inc()
+        await _flush(msgs)
+        await message.ack()
 
     # Already canonical (apps/data-deadline-tracker) — no raw topic, no lake,
     # no translation, straight to bronze_deadline_milestone.
-    @broker.subscriber(settings.kafka_topic_milestone, group_id=settings.kafka_group_id)
-    async def handle_milestone(msg: MilestoneEvent) -> None:
-        metrics.milestones_consumed.labels(kind=msg.kind).inc()
-        await milestone_buffer.add(msg)
-
-    @app.on_startup
-    async def start_ticker() -> None:
-        async def _tick() -> None:
-            while True:
-                await asyncio.sleep(1)
-                await buffer.tick()
-                await milestone_buffer.tick()
-
-        asyncio.create_task(_tick())
-
-    @app.on_shutdown
-    async def drain_buffer() -> None:
-        await buffer.drain()
-        await milestone_buffer.drain()
+    @broker.subscriber(settings.kafka_topic_milestone, **fetched)
+    async def handle_milestone(
+        msgs: list[MilestoneEvent], message: KafkaMessage
+    ) -> None:
+        for msg in msgs:
+            metrics.milestones_consumed.labels(kind=msg.kind).inc()
+        await writer.write_milestones(msgs)
+        await message.ack()
 
     return app, broker
 

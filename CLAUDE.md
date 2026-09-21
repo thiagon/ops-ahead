@@ -76,17 +76,27 @@ or `trigger.data` (Kafka, `ns: data`) — never touches Kubernetes. `ml-trainer`
 topic's lag: **no application process ever creates a Kubernetes resource** — only the
 KEDA operator (`infra/charts/infra-keda`, installed once, `ns: infra`) does, which is
 platform infra, not code this team writes. Each message handler PATCHes `running` then a terminal status (`succeeded`/`failed`)
-to `ui-gateway` (`PATCH /analyses/{id}` with `X-Update-Key` from the trigger
+to `ui-gateway` (`PATCH /analyses/{id}` with `X-Run-Key` from the trigger
 message). Postgres on the `config-postgres` instance is the source of truth for
-`GET /analyses/{id}`. `full_pipeline` from the daily CronJob has no `update_key`
-and does not PATCH — it never went through `POST /analyses`.
+`GET /analyses/{id}`.
+
+**Every `analysis` is startable by every caller.** There is no value reserved to a
+schedule, a screen or a script: the union in `apps/ui-gateway/src/services/analyses/schema.ts`
+is the whole surface, and any client presenting a valid credential can ask for any member
+of it. What a run came from is recorded — `trigger` is `manual`, `scheduled` or `chained`,
+derived from the credential and never from the body — but it never restricts what can be
+asked. A UI, an MCP client or a CronJob that offers a subset of that union is a bug in
+that client, not a rule: the whole point of the gateway is that nobody needs a shell to
+run something. The vocabulary itself lives in `domain/ubiquitous-language.md#analysis`.
 
 The **daily data chain** (`dbt run → great_expectations → register-snapshot`) is the same
 mechanism, not a parallel one: a native `CronJob` (`ns: data`, part of `data-runner`'s own
-chart) publishes `{"run_id": "daily-<date>", "analysis": "full_pipeline"}` to
-`trigger.data` on schedule — `full_pipeline` is vocabulary the `CronJob` uses internally,
-never accepted from `POST /analyses`. Full contract of every payload/topic:
-`conductor/tracks/exec-trigger_20260807/payloads.md`; JSON Schema in `contracts/trigger-*.schema.json`.
+chart) `POST`s `{"analysis": "full_pipeline"}` to `/analyses` with the scheduler API key,
+like any other client — the gateway mints the `id`, the `run_key` and the row, so the daily
+run is as queryable as one somebody asked for. The accepted union is
+`apps/ui-gateway/src/services/analyses/schema.ts`, with the JSON Schema of record in
+`contracts/trigger-*.schema.json`; `conductor/tracks/exec-trigger_20260807/payloads.md`
+narrates how it got that shape, under the names it had then.
 
 ## uv Workspaces
 

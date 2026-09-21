@@ -5,25 +5,28 @@ import pytest
 
 from drift.monitor import PSI_SIGNIFICANT_THRESHOLD
 from drift.run import run_drift_monitoring
+from model_names import registered_model_name
 from settings import Settings
 from trigger import EXPERIMENT_NAMES
 
+TENANT = "locaweb"
 
-def _promote_fake_production(tracking_uri: str, registered_model_name: str, train_end: str) -> None:
+
+def _promote_fake_production(tracking_uri: str, model_name: str, train_end: str) -> None:
     """Registers a Production model version carrying only the `train_end`
     param drift needs — no real artifact, matching how `_production_train_end`
     only ever reads `run.data.params`, never loads the model itself."""
     mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(f"{registered_model_name}-fixture")
+    mlflow.set_experiment(f"{model_name}-fixture")
     client = mlflow.MlflowClient(tracking_uri=tracking_uri)
 
     with mlflow.start_run() as run:
         mlflow.log_param("train_end", train_end)
         run_id = run.info.run_id
 
-    client.create_registered_model(registered_model_name)
-    version = client.create_model_version(name=registered_model_name, source=f"runs:/{run_id}/model", run_id=run_id)
-    client.transition_model_version_stage(name=registered_model_name, version=version.version, stage="Production")
+    client.create_registered_model(model_name)
+    version = client.create_model_version(name=model_name, source=f"runs:/{run_id}/model", run_id=run_id)
+    client.transition_model_version_stage(name=model_name, version=version.version, stage="Production")
 
 
 @pytest.fixture
@@ -31,6 +34,7 @@ def synthetic_settings(tmp_path) -> Settings:
     return Settings(
         mlflow_tracking_uri=f"sqlite:///{tmp_path}/mlflow.db",
         mlflow_experiment_name="drift-monitoring-test",
+        tenant_id=TENANT,
     )
 
 
@@ -40,7 +44,11 @@ def _feature_frame(dates: pd.DatetimeIndex, stable: np.ndarray, shifted: np.ndar
 
 def test_run_drift_monitoring_reports_shift_after_train_end(synthetic_settings):
     train_end = "2026-01-31"
-    _promote_fake_production(synthetic_settings.mlflow_tracking_uri, EXPERIMENT_NAMES["volume"], train_end)
+    _promote_fake_production(
+        synthetic_settings.mlflow_tracking_uri,
+        registered_model_name(EXPERIMENT_NAMES["volume"], TENANT),
+        train_end,
+    )
 
     rng = np.random.default_rng(7)
     reference_dates = pd.date_range("2025-02-01", periods=365, freq="D")
@@ -63,7 +71,11 @@ def test_run_drift_monitoring_reports_shift_after_train_end(synthetic_settings):
 
 def test_run_drift_monitoring_raises_when_no_data_accrued_since_promotion(synthetic_settings):
     train_end = "2026-06-30"  # after every row in the frame below
-    _promote_fake_production(synthetic_settings.mlflow_tracking_uri, EXPERIMENT_NAMES["breach"], train_end)
+    _promote_fake_production(
+        synthetic_settings.mlflow_tracking_uri,
+        registered_model_name(EXPERIMENT_NAMES["breach"], TENANT),
+        train_end,
+    )
 
     dates = pd.date_range("2026-01-01", "2026-01-10", freq="D")
     frame = pd.DataFrame({"opened_at": dates, "severity": range(len(dates))})
@@ -78,4 +90,13 @@ def test_run_drift_monitoring_raises_when_no_production_version_exists(synthetic
     frame = pd.DataFrame({"date": dates, "avg_opened_hour": range(len(dates))})
 
     with pytest.raises(ValueError, match="no Production version"):
+        run_drift_monitoring(synthetic_settings, {"volume": (frame, "date", ["avg_opened_hour"])})
+
+
+def test_run_drift_monitoring_raises_without_a_tenant(synthetic_settings):
+    synthetic_settings.tenant_id = None
+    dates = pd.date_range("2026-01-01", "2026-01-10", freq="D")
+    frame = pd.DataFrame({"date": dates, "avg_opened_hour": range(len(dates))})
+
+    with pytest.raises(ValueError, match="needs a tenant_id"):
         run_drift_monitoring(synthetic_settings, {"volume": (frame, "date", ["avg_opened_hour"])})

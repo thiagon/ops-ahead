@@ -181,14 +181,32 @@ O que se pede quando se dispara uma execução sob demanda — a pergunta de neg
 mecanismo por trás dela. É o único campo discriminador do payload que entra pelo ponto de
 entrada único (`ui-gateway`, ver [Context Map](./context-map.md)).
 
-Valores hoje:
+Valores hoje — a lista fechada está em `contracts/trigger-ml.schema.json` e
+`contracts/trigger-data.schema.json`, que são o schema de record:
+
+Sobre modelos, uma execução por tenant (há um modelo por tenant, então toda execução
+carrega `tenant_id`):
 
 - **`volume_forecast`** — treinar o modelo de previsão de volume de incidentes.
+- **`entity_forecast`** — treinar a previsão de volume por categoria e produto.
 - **`breach_risk`** — treinar o modelo de risco de breach de OLA.
 - **`kpi_projection`** — projetar o fechamento mensal dos 4 KPIs do PPR (Monte Carlo).
 - **`external_event_detection`** — treinar o detector de evento externo (Isolation Forest).
+- **`recurring_causes`** — agrupar entidades por comportamento repetido no histórico.
+- **`drift_monitoring`** — medir o afastamento entre a janela de treino do modelo em
+  produção daquele tenant e a janela atual. Não treina nada.
+
+Sobre o dado, tenant-wide (reconstroem todos os marts de uma vez, então nunca carregam
+`tenant_id`):
+
 - **`data_refresh`** — rematerializar os marts a partir do dado recebido.
 - **`data_quality_check`** — rodar a suite de qualidade sobre os marts.
+- **`full_pipeline`** — a cadeia inteira: rematerializar, validar e, com a validação
+  aprovada, encadear os treinos. É o que o CronJob diário pede, e qualquer caller pode
+  pedir o mesmo — não existe valor de `analysis` reservado ao relógio.
+
+Toda execução, qualquer que seja o valor, entra por `POST /analyses` e é respondida por
+`GET /analyses/{id}`: não existe execução que essa consulta não saiba explicar.
 
 `analysis` nunca é um nome de `Job`, tópico ou imagem — é vocabulário de quem pede a
 execução, não de quem a executa. A tradução para o mecanismo interno (qual tópico

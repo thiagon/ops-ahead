@@ -20,7 +20,9 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 2
-      activeDeadlineSeconds: 120
+      # Must outlast curl's own retry window below, or the deadline kills
+      # the attempt the retries exist to make.
+      activeDeadlineSeconds: 1200
       template:
         metadata:
           labels:
@@ -43,7 +45,13 @@ spec:
               args:
                 - |
                   set -eu
+                  # --retry-connrefused is the point: a refused connection is
+                  # what a gateway rollout looks like from here, and plain
+                  # --retry treats it as final. This fires once a day, so an
+                  # attempt that gives up costs a whole run of the chain.
                   curl -sS --fail-with-body -X POST "$GATEWAY_URL/analyses" \
+                    --retry 6 --retry-delay 10 --retry-connrefused \
+                    --retry-max-time 300 --max-time 30 \
                     -H 'Content-Type: application/json' \
                     -H "Authorization: Bearer $SCHEDULER_API_KEY" \
                     -d '{"analysis":"full_pipeline"}'

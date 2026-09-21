@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id)'
+        order_by='(tenant_id, entity_id)'
     )
 }}
 
@@ -16,13 +16,14 @@ with ordered as (
     -- partition's first row — row_number is what filters that row out below,
     -- same reasoning as priority_changes_log.sql.
     select
+        tenant_id,
         entity_id,
         received_at,
         lagInFrame(received_at) over (
-            partition by entity_id order by received_at
+            partition by tenant_id, entity_id order by received_at
         ) as prev_received_at,
         row_number() over (
-            partition by entity_id order by received_at
+            partition by tenant_id, entity_id order by received_at
         ) as rn
     from {{ source('ingest', 'bronze_monitor') }}
 
@@ -31,6 +32,7 @@ with ordered as (
 intervals as (
 
     select
+        tenant_id,
         entity_id,
         dateDiff('second', prev_received_at, received_at) as interval_seconds
     from ordered
@@ -39,9 +41,10 @@ intervals as (
 )
 
 select
+    tenant_id,
     entity_id,
     count()                                as interval_count,
     quantile(0.5)(interval_seconds)        as median_interval_seconds,
     stddevPop(interval_seconds)            as interval_stddev_seconds
 from intervals
-group by entity_id
+group by tenant_id, entity_id

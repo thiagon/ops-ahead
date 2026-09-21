@@ -42,11 +42,14 @@ BREACH_TRAINING_EXAMPLES_COLUMNS = [
     "final_duration_seconds",
 ]
 
-SIGNAL_COUNTS_COLUMNS = ["entity_id", "window_minutes", "window_start", "signal_count"]
+# The monitor marts are per (tenant, entity): the same entity_id can exist
+# under two tenants, so the tenant travels with the rows and the caller
+# narrows to one before building features.
+SIGNAL_COUNTS_COLUMNS = ["tenant_id", "entity_id", "window_minutes", "window_start", "signal_count"]
 
-AUTO_RESOLUTION_RATE_COLUMNS = ["entity_id", "auto_resolution_rate"]
+AUTO_RESOLUTION_RATE_COLUMNS = ["tenant_id", "entity_id", "auto_resolution_rate"]
 
-SEVERITY_ESCALATIONS_COLUMNS = ["entity_id", "date", "escalation_count"]
+SEVERITY_ESCALATIONS_COLUMNS = ["tenant_id", "entity_id", "date", "escalation_count"]
 
 
 def fetch_breach_training_examples(settings: Settings) -> pd.DataFrame:
@@ -61,7 +64,7 @@ def fetch_signal_counts(settings: Settings) -> pd.DataFrame:
     columns = ", ".join(SIGNAL_COUNTS_COLUMNS)
     rows = client.execute(
         f"select {columns} from gold_monitor_signal_counts where window_minutes in (15, 60) "
-        "order by entity_id, window_minutes, window_start"
+        "order by tenant_id, entity_id, window_minutes, window_start"
     )
     return pd.DataFrame(rows, columns=SIGNAL_COUNTS_COLUMNS)
 
@@ -69,14 +72,14 @@ def fetch_signal_counts(settings: Settings) -> pd.DataFrame:
 def fetch_auto_resolution_rate(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
     columns = ", ".join(AUTO_RESOLUTION_RATE_COLUMNS)
-    rows = client.execute(f"select {columns} from gold_monitor_auto_resolution_rate order by entity_id")
+    rows = client.execute(f"select {columns} from gold_monitor_auto_resolution_rate order by tenant_id, entity_id")
     return pd.DataFrame(rows, columns=AUTO_RESOLUTION_RATE_COLUMNS)
 
 
 def fetch_severity_escalations(settings: Settings) -> pd.DataFrame:
     client = Client.from_url(settings.clickhouse_url)
     columns = ", ".join(SEVERITY_ESCALATIONS_COLUMNS)
-    rows = client.execute(f"select {columns} from gold_monitor_severity_escalations order by entity_id, date")
+    rows = client.execute(f"select {columns} from gold_monitor_severity_escalations order by tenant_id, entity_id, date")
     return pd.DataFrame(rows, columns=SEVERITY_ESCALATIONS_COLUMNS)
 
 

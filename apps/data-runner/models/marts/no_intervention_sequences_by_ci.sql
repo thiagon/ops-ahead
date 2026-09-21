@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id, sequence_start)',
+        order_by='(tenant_id, entity_id, sequence_start)',
         partition_by='toYYYYMM(sequence_start)'
     )
 }}
@@ -15,28 +15,31 @@
 -- resolution_code, not severity, which is an unrelated passthrough.
 with all_events as (
     select
+        tenant_id,
         entity_id,
         external_id,
         opened_at,
         resolution_code,
-        row_number() over (partition by entity_id order by opened_at) as rn_all
+        row_number() over (partition by tenant_id, entity_id order by opened_at) as rn_all
     from {{ ref('silver_alert') }}
     where entity_id is not null and entity_id != ''
 ),
 
 no_intervention as (
     select
+        tenant_id,
         entity_id,
         external_id,
         opened_at,
         rn_all,
-        row_number() over (partition by entity_id order by opened_at) as rn_ni
+        row_number() over (partition by tenant_id, entity_id order by opened_at) as rn_ni
     from all_events
     where resolution_code = 'no_intervention'
 ),
 
 sequenced as (
     select
+        tenant_id,
         entity_id,
         external_id,
         opened_at,
@@ -46,6 +49,7 @@ sequenced as (
 )
 
 select
+    tenant_id,
     entity_id,
     sequence_group,
     min(opened_at)      as sequence_start,
@@ -54,4 +58,4 @@ select
     min(external_id)    as first_incident,
     max(external_id)    as last_incident
 from sequenced
-group by entity_id, sequence_group
+group by tenant_id, entity_id, sequence_group

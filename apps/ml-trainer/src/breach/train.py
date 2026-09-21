@@ -195,9 +195,12 @@ def train_and_log(
                 trained[tenant_id] = train_tenant(
                     settings,
                     examples[examples["tenant_id"] == tenant_id],
-                    signal_counts,
-                    auto_resolution_rate,
-                    severity_escalations,
+                    # The monitor marts join on entity_id, which is only unique
+                    # inside a tenant — narrowed here so one tenant's noise
+                    # never lands on another's incident.
+                    signal_counts[signal_counts["tenant_id"] == tenant_id],
+                    auto_resolution_rate[auto_resolution_rate["tenant_id"] == tenant_id],
+                    severity_escalations[severity_escalations["tenant_id"] == tenant_id],
                     tenant_id,
                     dataset_version,
                     n_trials,

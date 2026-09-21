@@ -16,6 +16,7 @@ def test_incidents_by_ic_passes_on_clean_snapshot(sqlite_engine, gx_context):
         "incidents_by_ic",
         [
             {
+                "tenant_id": "locaweb",
                 "entity_id": "host-0",
                 "window_start": datetime(2026, 1, 1),
                 "window_hours": 24,
@@ -35,6 +36,7 @@ def test_incidents_by_ic_fails_on_invalid_window_hours(sqlite_engine, gx_context
         "incidents_by_ic",
         [
             {
+                "tenant_id": "locaweb",
                 "entity_id": "host-0",
                 "window_start": datetime(2026, 1, 1),
                 "window_hours": 3,

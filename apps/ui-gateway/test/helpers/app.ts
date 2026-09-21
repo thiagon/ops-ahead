@@ -68,7 +68,10 @@ export const TEST_SECRET_KEY = Buffer.alloc(32, 7).toString('base64');
  */
 export function stubKafka(app: FastifyInstance): void {
   if (app.hasDecorator('kafka')) return;
-  app.decorate('kafka', { publish: async () => undefined });
+  app.decorate('kafka', {
+    publish: async () => undefined,
+    publishBatch: async () => undefined,
+  });
 }
 
 /**
@@ -317,7 +320,11 @@ export function memoryPrisma(): PrismaClient {
         where,
         take,
       }: {
-        where?: { trigger?: AnalysisRow['trigger']; analysis?: string; tenantId?: string };
+        where?: {
+          trigger?: AnalysisRow['trigger'];
+          analysis?: string;
+          OR?: { tenantId: string | null }[];
+        };
         take?: number;
       }) {
         const matches = [...rows.values()]
@@ -325,7 +332,7 @@ export function memoryPrisma(): PrismaClient {
             row =>
               (!where?.trigger || row.trigger === where.trigger) &&
               (!where?.analysis || row.analysis === where.analysis) &&
-              (!where?.tenantId || row.tenantId === where.tenantId),
+              (!where?.OR || where.OR.some(clause => row.tenantId === clause.tenantId)),
           )
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         return take ? matches.slice(0, take) : matches;

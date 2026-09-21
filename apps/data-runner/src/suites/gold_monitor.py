@@ -12,6 +12,7 @@ def register_gold_monitor_signal_counts(context: AbstractDataContext) -> Validat
     batch_def = _table_asset(context, "gold_monitor_signal_counts")
     suite = context.suites.add(gx.ExpectationSuite(name="gold_monitor_signal_counts"))
 
+    suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="tenant_id"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="entity_id"))
     suite.add_expectation(gxe.ExpectColumnValuesToNotBeNull(column="window_start"))
     suite.add_expectation(

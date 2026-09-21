@@ -67,7 +67,7 @@ describe('EventsService.ingest', () => {
 
   beforeEach(() => {
     publish = vi.fn(async (_message: OutboundMessage) => undefined);
-    events = new EventsService({ publish }, topics);
+    events = new EventsService({ publish, publishBatch: async () => undefined }, topics);
   });
 
   it('publishes the raw envelope keyed by its event id and answers with that identity', async () => {

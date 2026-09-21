@@ -81,7 +81,11 @@ export class AnalysisStore {
       where: {
         ...(filter.trigger ? { trigger: filter.trigger } : {}),
         ...(filter.analysis ? { analysis: filter.analysis } : {}),
-        ...(filter.tenantId ? { tenantId: filter.tenantId } : {}),
+        // A data analysis rebuilds every mart at once and so carries no
+        // tenant. A tenant's listing includes those rows because they are the
+        // same runs GET /analyses/{id} already answers for to any caller —
+        // filtering on tenantId alone would hide a run the caller started.
+        ...(filter.tenantId ? { OR: [{ tenantId: filter.tenantId }, { tenantId: null }] } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: filter.limit,

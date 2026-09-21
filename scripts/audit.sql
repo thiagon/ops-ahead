@@ -26,12 +26,12 @@ FROM first_touch_duration
 GROUP BY severity
 ORDER BY severity;
 
--- P4 sequences summary
+-- No-intervention sequences summary
 SELECT
     entity_id,
     count()          AS total_sequences,
     max(sequence_length) AS longest_sequence
-FROM p4_sequences_by_ci
+FROM no_intervention_sequences_by_ci
 GROUP BY entity_id
 ORDER BY longest_sequence DESC
 LIMIT 10;

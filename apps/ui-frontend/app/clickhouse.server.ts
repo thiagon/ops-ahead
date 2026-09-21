@@ -298,9 +298,10 @@ export async function fetchGroupLoad(): Promise<GroupLoadRow[]> {
   return await query<GroupLoadRow>(
     `select owner, toString(snapshot_at) as snapshot_at, incidents_open
      from group_load_by_window
+     where tenant_id = {tenant_id:String}
      order by owner
      limit 1 by owner`,
-    {},
+    { tenant_id: (await currentTenant()).slug },
   );
 }
 
@@ -312,11 +313,11 @@ export async function fetchNoisyEntities(limit = 10): Promise<NoisyEntityRow[]> 
   return await query<NoisyEntityRow>(
     `select entity_id, window_minutes, signal_count
      from gold_monitor_signal_counts
-     where window_minutes = 60
+     where tenant_id = {tenant_id:String} and window_minutes = 60
      order by window_start desc, signal_count desc
      limit 1 by entity_id
      limit {limit:UInt32}`,
-    { limit },
+    { tenant_id: (await currentTenant()).slug, limit },
   );
 }
 
@@ -408,17 +409,22 @@ export async function fetchBreachContext(): Promise<Record<string, BreachContext
      owner_load as (
          select owner, argMax(incidents_open, snapshot_at) as incidents_open
          from group_load_by_window
+         where tenant_id = {tenant_id:String}
          group by owner
      ),
+     -- Both monitor marts join back by entity_id, which is only unique inside
+     -- a tenant: without the filter another client's noise would attach to
+     -- this one's occurrences.
      signals as (
          select entity_id, window_minutes, argMax(signal_count, window_start) as signal_count
          from gold_monitor_signal_counts
-         where window_minutes in (15, 60)
+         where tenant_id = {tenant_id:String} and window_minutes in (15, 60)
          group by entity_id, window_minutes
      ),
      escalations as (
          select entity_id, sum(escalation_count) as escalation_count
          from gold_monitor_severity_escalations
+         where tenant_id = {tenant_id:String}
          group by entity_id
      ),
      -- Owner + severity history over closed occurrences only: an open one has

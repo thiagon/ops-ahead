@@ -31,8 +31,8 @@ gateway:
     hmacEnabled: "true"
     httpsEnabled: "false"
     corsOrigins:
-      - http://ui.ops-ahead.localtest.me
-    authentikIssuer: http://auth.ops-ahead.localtest.me/application/o/gateway-web/
+      - http://ui.204-168-208-210.sslip.io
+    authentikIssuer: http://auth.204-168-208-210.sslip.io/application/o/gateway-web/
     # Server-side OIDC (discovery, token, introspect) talks to the Service
     # directly. The public issuer host is what the browser is sent to, and
     # what `localtest.me` would resolve to inside the pod (itself).
@@ -40,13 +40,13 @@ gateway:
     authentikClientId: gateway-web
     authentikMcpClientId: gateway-mcp
     introspectionCacheTtlMs: "5000"
-    frontendOrigin: http://ui.ops-ahead.localtest.me
-    publicUrl: http://gateway.ops-ahead.localtest.me
+    frontendOrigin: http://ui.204-168-208-210.sslip.io
+    publicUrl: http://gateway.204-168-208-210.sslip.io
     # Parent of ui.* and gateway.* so the session cookie reaches both hosts.
-    sessionCookieDomain: ops-ahead.localtest.me
+    sessionCookieDomain: 204-168-208-210.sslip.io
   secretName: ui-gateway-secret
   ingress:
-    host: gateway.ops-ahead.localtest.me
+    host: gateway.204-168-208-210.sslip.io
   # config-postgres instance; a different database on it.
   analysesDatabase:
     host: config-postgres.ui.svc.cluster.local:5432

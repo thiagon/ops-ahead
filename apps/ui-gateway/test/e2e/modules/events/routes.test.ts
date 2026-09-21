@@ -25,7 +25,9 @@ describe('POST /webhook/:tenant/:source', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
   });
 
   afterAll(async () => {

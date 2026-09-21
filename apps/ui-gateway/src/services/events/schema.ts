@@ -79,3 +79,20 @@ export const versionParam = z.string().min(1).default('latest').meta({
 });
 
 export const webhookParamsSchema = addressParamsSchema.extend({ version: versionParam });
+
+/** One Produce request. Above this the caller splits the replay. */
+export const WEBHOOK_BATCH_MAX = 500;
+
+export const webhookBatchBodySchema = z
+  .array(webhookBodySchema)
+  .min(1)
+  .max(WEBHOOK_BATCH_MAX)
+  .meta({
+    id: 'WebhookBatchBody',
+    description: 'Opaque origin events, each preserved verbatim',
+  });
+
+export const webhookBatchAcceptedSchema = z.array(webhookAcceptedSchema).meta({
+  id: 'WebhookBatchAccepted',
+  description: 'The bus owns every event in the batch',
+});

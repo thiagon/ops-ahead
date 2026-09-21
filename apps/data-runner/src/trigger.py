@@ -121,6 +121,11 @@ def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None
 
     A missing key means the message did not come from POST /analyses, which no
     producer does anymore; the branch stays as a defence, not a path.
+
+    Best-effort: a failure is logged, never raised. The offset stands for the
+    run the message asked for, and raising here would leave it uncommitted and
+    replay the whole chain on every restart, with no dead-letter topic to land
+    the message in.
     """
     run_id = payload["run_id"]
     if not run_key:
@@ -139,10 +144,8 @@ def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None
             response.read()
     except urllib.error.HTTPError as exc:
         LOGGER.error("PATCH /analyses/%s failed: %s %s", run_id, exc.code, exc.read().decode())
-        raise
     except urllib.error.URLError as exc:
         LOGGER.error("PATCH /analyses/%s unreachable: %s", run_id, exc.reason)
-        raise
 
 
 def run_full_pipeline(

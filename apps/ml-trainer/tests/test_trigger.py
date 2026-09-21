@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+import urllib.error
 
 import pytest
 
@@ -218,6 +220,48 @@ class TestProcessMessage:
             "detail": {"error": "empty validation partition after temporal_split"},
         }
 
+    def test_carries_window_days_into_the_recurring_causes_settings(
+        self, settings, published, publish_status
+    ):
+        calls: list[Settings] = []
+
+        def _train_recurring_causes(s: Settings) -> str:
+            calls.append(s)
+            return "mlflow-run-rc"
+
+        process_message(
+            settings,
+            {"recurring_causes": _train_recurring_causes},
+            {
+                "run_id": "run-6",
+                "analysis": "recurring_causes",
+                "tenant_id": "locaweb",
+                "window_days": 120,
+            },
+            publish_status,
+        )
+
+        assert len(calls) == 1
+        assert calls[0].recurring_causes_window_days == 120
+
+    def test_keeps_the_configured_window_when_the_event_omits_it(
+        self, settings, published, publish_status
+    ):
+        calls: list[Settings] = []
+
+        def _train_recurring_causes(s: Settings) -> str:
+            calls.append(s)
+            return "mlflow-run-rc"
+
+        process_message(
+            settings,
+            {"recurring_causes": _train_recurring_causes},
+            {"run_id": "run-7", "analysis": "recurring_causes", "tenant_id": "locaweb"},
+            publish_status,
+        )
+
+        assert calls[0].recurring_causes_window_days == settings.recurring_causes_window_days
+
     def test_drops_a_malformed_event_without_publishing_or_crashing(self, settings, published, publish_status):
         process_message(settings, {"volume": lambda s: "x", "breach": lambda s: "x"}, {"run_id": "run-4"}, publish_status)
 
@@ -274,3 +318,23 @@ class TestReportStatus:
         assert seen["method"] == "PATCH"
         assert seen["headers"]["X-run-key"] == "the-key"
         assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            urllib.error.URLError("connection refused"),
+            urllib.error.HTTPError(
+                "http://gateway/analyses/run-1", 409, "Conflict", {}, io.BytesIO(b"{}")
+            ),
+        ],
+        ids=["unreachable", "rejected"],
+    )
+    def test_a_failed_patch_never_reaches_the_consumer_loop(self, monkeypatch, error):
+        from trigger import report_status
+
+        def _urlopen(request, timeout=10):
+            raise error
+
+        monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+
+        report_status("http://gateway", {"run_id": "run-1", "status": "running"}, "the-key")

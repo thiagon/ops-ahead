@@ -16,6 +16,7 @@ def test_gold_monitor_signal_counts_passes_on_clean_snapshot(sqlite_engine, gx_c
         "gold_monitor_signal_counts",
         [
             {
+                "tenant_id": "locaweb",
                 "entity_id": "host-0",
                 "window_start": datetime(2026, 1, 1),
                 "window_minutes": 15,
@@ -35,6 +36,7 @@ def test_gold_monitor_signal_counts_fails_on_invalid_window_minutes(sqlite_engin
         "gold_monitor_signal_counts",
         [
             {
+                "tenant_id": "locaweb",
                 "entity_id": "host-0",
                 "window_start": datetime(2026, 1, 1),
                 "window_minutes": 5,

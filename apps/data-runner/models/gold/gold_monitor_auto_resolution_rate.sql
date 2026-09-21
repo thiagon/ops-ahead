@@ -2,7 +2,7 @@
     config(
         materialized='table',
         engine='MergeTree()',
-        order_by='(entity_id)'
+        order_by='(tenant_id, entity_id)'
     )
 }}
 
@@ -10,9 +10,10 @@
 -- no owner/acknowledgment — "auto" here means the condition transitioned to
 -- cleared, not that a human intervened, which does not exist in this chain).
 select
+    tenant_id,
     entity_id,
     count()                                                            as condition_count,
     countIf(condition = 'cleared')                                     as cleared_count,
     countIf(condition = 'cleared') / count()                           as auto_resolution_rate
 from {{ ref('silver_monitor') }}
-group by entity_id
+group by tenant_id, entity_id

@@ -7,14 +7,15 @@ import type {
   KpiProjectionRow,
   RecurringCauseGroupRow,
 } from '~/clickhouse.server.ts';
+import { readJson } from '~/client-fetch.ts';
 import { Badge } from '~/components/Badge';
 import { ForecastChart } from '~/components/ForecastChart';
 import { type Kpi, KpiCard } from '~/components/KpiCard';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
-import { loadDashboard } from '~/dashboard.server.ts';
-import { withTenant } from '~/features/config/repo.server.ts';
+import type { DashboardData } from '~/dashboard.server.ts';
 import { queuePath, useTenantSlug } from '~/paths';
 import type { Route } from './+types/manager';
 
@@ -22,8 +23,14 @@ export function meta() {
   return [{ title: 'Painel do gestor · Ops Ahead' }];
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, () => loadDashboard());
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+  return readJson<DashboardData>(`/data/${encodeURIComponent(tenant)}/manager`);
+}
+
+export function HydrateFallback() {
+  return <LoadingScreen title="Painel do gestor" />;
 }
 
 /** The band is stored as the severities themselves; this is the only place
