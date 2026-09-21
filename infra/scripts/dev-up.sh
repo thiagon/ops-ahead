@@ -22,7 +22,6 @@ command -v yq      > /dev/null 2>&1 || error "yq not found — run: make setup"
 
 cd "$ROOT_DIR"
 
-VAULT_INIT_FILE="$ROOT_DIR/.data/vault-init.json"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 # Pin the Kubernetes version so clusters are reproducible across machines.
@@ -82,6 +81,12 @@ else
     --wait
 fi
 
+# k3d sets `unless-stopped` on its containers, so a host reboot brings the whole
+# cluster back up on its own. Reset it on every run: `docker update` only reaches
+# containers that exist now, and `k3d cluster create` mints new ones.
+docker ps -aq --filter "label=k3d.cluster=ops-ahead" \
+  | xargs -r docker update --restart=no >/dev/null
+
 # Wait for the node to answer (matters right after a `k3d cluster start`).
 for i in $(seq 1 40); do
   kubectl get nodes 2>/dev/null | grep -q " Ready" && break
@@ -91,8 +96,9 @@ kubectl get nodes
 
 # Fast path: a previously bootstrapped cluster only needs to be resumed. All
 # workloads persist in etcd across stop/start, so skip the heavy bootstrap —
-# just make sure Vault is unsealed and push the working dir. ArgoCD self-heals
-# the rest. (Run `make destroy` to force a clean bootstrap.)
+# unseal Vault, rewrite KV from the charts' ExternalSecrets (dev-sync), and
+# push the working dir. ArgoCD self-heals the rest. (Run `make destroy` to
+# force a clean bootstrap.)
 if [ "$CLUSTER_EXISTS" = "1" ] && [ -f "$VAULT_INIT_FILE" ] \
    && kubectl get application ops-ahead-root -n infra > /dev/null 2>&1; then
   step "Resuming existing cluster (fast path)"
@@ -334,57 +340,14 @@ step "Bootstrap Vault"
 kubectl wait pod -l app.kubernetes.io/name=vault -n infra \
   --for=condition=Ready --timeout=120s > /dev/null
 
-VAULT_POD=$(kubectl get pod -n infra -l app.kubernetes.io/name=vault \
-  -o jsonpath='{.items[0].metadata.name}')
-
-# Discover paths and properties from each chart's ExternalSecret and build the
-# `vault kv put` commands. Convention: each `remoteRef.property` matches a var
-# with the same name in .env. Adding an app = external-secret.yaml + .env vars.
-declare -A VAULT_PAIRS
-while IFS=$'\t' read -r path prop; do
-  [ -z "$path" ] && continue
-  val="${!prop:-}"
-  [ -z "$val" ] && error "$prop not set in .env (declared in secret/$path)"
-  VAULT_PAIRS[$path]+=" ${prop}=\"${val}\""
-done < <(yq eval-all --no-doc '.spec.data[] | [.remoteRef.key, .remoteRef.property] | @tsv' \
-  infra/charts/*/templates/external-secret.yaml 2>/dev/null | sort -u)
-
-VAULT_KV_CMDS=""
-for path in "${!VAULT_PAIRS[@]}"; do
-  VAULT_KV_CMDS+="vault kv put secret/${path}${VAULT_PAIRS[$path]}"$'\n'
-  info "secret/${path} →$(echo "${VAULT_PAIRS[$path]}" | sed 's/="[^"]*"//g')"
-done
-
-# Heredoc keeps VAULT_TOKEN out of argv (visible in ps/audit).
-kubectl exec -i -n infra "$VAULT_POD" -- sh << VAULT_SCRIPT
-export VAULT_TOKEN='${VAULT_TOKEN}'
-vault secrets enable -path=secret kv-v2 2>/dev/null || true
-vault auth enable kubernetes 2>/dev/null || true
-vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc" > /dev/null
-
-${VAULT_KV_CMDS}
-vault policy write eso-policy - << 'POLICY'
-path "secret/data/*" { capabilities = ["read"] }
-POLICY
-
-vault write auth/kubernetes/role/eso-role \
-  bound_service_account_names=external-secrets \
-  bound_service_account_namespaces=infra \
-  policies=eso-policy \
-  ttl=1h > /dev/null
-
-vault audit enable file file_path=/vault/logs/audit.log 2>/dev/null || true
-VAULT_SCRIPT
+seed_vault
 info "Vault: secrets and ESO role configured"
 
 step "Waiting for ESO to sync secrets"
 kubectl wait pod -l app.kubernetes.io/instance=infra-eso -n infra \
   --for=condition=Ready --timeout=180s > /dev/null 2>&1 || warn "ESO pod did not become Ready within 3min"
 
-kubectl wait externalsecret --all --all-namespaces \
-  --for=condition=Ready --timeout=120s > /dev/null 2>&1 \
-  && info "ESO: all ExternalSecrets ready" \
-  || warn "ESO: some ExternalSecret not Ready — check ClusterSecretStore"
+refresh_external_secrets
 
 step "Labels"
 # Apply monitoring label to declared namespaces — source: namespaces.yaml.
