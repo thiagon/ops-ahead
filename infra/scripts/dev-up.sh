@@ -14,11 +14,13 @@ set -a; source "$ENV_FILE"; set +a
 : "${ARGOCD_ADMIN_PASSWORD:?'ARGOCD_ADMIN_PASSWORD must be set in .env'}"
 : "${ARGOCD_ADMIN_PASSWORD_HASH:?'ARGOCD_ADMIN_PASSWORD_HASH must be set in .env'}"
 
-docker info > /dev/null 2>&1        || error "Docker is not running"
 command -v kubectl > /dev/null 2>&1 || error "kubectl not found — run: make setup"
 command -v helm    > /dev/null 2>&1 || error "helm not found — run: make setup"
-command -v k3d     > /dev/null 2>&1 || error "k3d not found — run: make setup"
 command -v yq      > /dev/null 2>&1 || error "yq not found — run: make setup"
+if [ -z "${VM_MODE:-}" ]; then
+  docker info > /dev/null 2>&1      || error "Docker is not running"
+  command -v k3d > /dev/null 2>&1   || error "k3d not found — run: make setup"
+fi
 
 cd "$ROOT_DIR"
 
@@ -59,33 +61,40 @@ unseal_vault() {
   done
 }
 
-step "k3d cluster"
+step "Cluster"
 CLUSTER_EXISTS=0
-if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
-  CLUSTER_EXISTS=1
-  info "Cluster exists — ensuring it is started..."
-  k3d cluster start ops-ahead
+if [ -n "${VM_MODE:-}" ]; then
+  # k3s owns the node; a bootstrapped root-app is what marks it as existing.
+  kubectl get application ops-ahead-root -n infra > /dev/null 2>&1 && CLUSTER_EXISTS=1
+  info "k3s node (VM mode)"
 else
-  info "Creating cluster 'ops-ahead'..."
-  # A new cluster must not reattach another cluster's PVCs. Stop/start (make
-  # down) keeps .data; only create wipes leftovers from a previous delete.
-  wipe_data_dir
-  mkdir -p "$ROOT_DIR/.data"
-  k3d cluster create ops-ahead \
-    --image "$K3S_IMAGE" \
-    --port "80:80@loadbalancer" \
-    --port "443:443@loadbalancer" \
-    --registry-config "$SCRIPT_DIR/registries.yaml" \
-    --host-alias "127.0.0.1:gitea.ops-ahead.localtest.me" \
-    --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
-    --wait
-fi
+  CLUSTER_EXISTS=0
+  if k3d cluster list 2>/dev/null | grep -q "^ops-ahead"; then
+    CLUSTER_EXISTS=1
+    info "Cluster exists — ensuring it is started..."
+    k3d cluster start ops-ahead
+  else
+    info "Creating cluster 'ops-ahead'..."
+    # A new cluster must not reattach another cluster's PVCs. Stop/start (make
+    # down) keeps .data; only create wipes leftovers from a previous delete.
+    wipe_data_dir
+    mkdir -p "$ROOT_DIR/.data"
+    k3d cluster create ops-ahead \
+      --image "$K3S_IMAGE" \
+      --port "80:80@loadbalancer" \
+      --port "443:443@loadbalancer" \
+      --registry-config "$SCRIPT_DIR/registries.yaml" \
+      --host-alias "127.0.0.1:gitea.ops-ahead.localtest.me" \
+      --volume "$ROOT_DIR/.data:/var/lib/rancher/k3s/storage@server:0" \
+      --wait
+  fi
 
-# k3d sets `unless-stopped` on its containers, so a host reboot brings the whole
-# cluster back up on its own. Reset it on every run: `docker update` only reaches
-# containers that exist now, and `k3d cluster create` mints new ones.
-docker ps -aq --filter "label=k3d.cluster=ops-ahead" \
-  | xargs -r docker update --restart=no >/dev/null
+  # k3d sets `unless-stopped` on its containers, so a host reboot brings the whole
+  # cluster back up on its own. Reset it on every run: `docker update` only reaches
+  # containers that exist now, and `k3d cluster create` mints new ones.
+  docker ps -aq --filter "label=k3d.cluster=ops-ahead" \
+    | xargs -r docker update --restart=no >/dev/null
+fi
 
 # Wait for the node to answer (matters right after a `k3d cluster start`).
 for i in $(seq 1 40); do
