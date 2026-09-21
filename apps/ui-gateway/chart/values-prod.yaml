@@ -1,0 +1,30 @@
+# Production (VM) — env + ingress for https://gateway.ops-ahead.xyz
+gateway:
+  env:
+    appEnv: production
+    logLevel: info
+    serviceName: gateway
+    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
+    kafkaTopicRawAlert: events.raw.alert
+    kafkaTopicRawMonitor: events.raw.monitor
+    kafkaTopicRulesMapping: rules.mapping
+    kafkaTopicRulesDeadline: rules.deadline
+    kafkaTopicRulesTarget: rules.target
+    kafkaTopicMl: trigger.ml
+    kafkaTopicData: trigger.data
+    hmacEnabled: "true"
+    httpsEnabled: "true"
+    corsOrigins:
+      - https://ui.ops-ahead.xyz
+    authentikIssuer: https://auth.ops-ahead.xyz/application/o/gateway-web/
+    authentikInternalOrigin: http://infra-authentik-server.infra.svc.cluster.local
+    authentikClientId: gateway-web
+    authentikMcpClientId: gateway-mcp
+    introspectionCacheTtlMs: "5000"
+    frontendOrigin: https://ui.ops-ahead.xyz
+    publicUrl: https://gateway.ops-ahead.xyz
+    sessionCookieDomain: ops-ahead.xyz
+  ingress:
+    host: gateway.ops-ahead.xyz
+    entrypoint: websecure
+    tls: true

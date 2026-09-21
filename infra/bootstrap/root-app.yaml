@@ -41,6 +41,9 @@ spec:
       jqPathExpressions:
         - .spec.source.repoURL          # single-source apps
         - .spec.sources[].repoURL       # multi-source apps (e.g. data-ingest)
+        # reconcile_child_apps injects values-local.yaml on k3d; keep that live.
+        - .spec.source.helm.valueFiles
+        - .spec.sources[].helm.valueFiles
     - group: argoproj.io
       kind: ApplicationSet
       jsonPointers:

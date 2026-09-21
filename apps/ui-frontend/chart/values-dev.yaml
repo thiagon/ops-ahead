@@ -1,3 +1,4 @@
+# CI image tag + replica knobs only. Env lives in values-prod / values-local.
 ui-frontend:
   image:
     tag: "latest"

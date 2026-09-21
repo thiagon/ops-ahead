@@ -1,6 +1,7 @@
-# Traefik Ingress resources — dev overlay
-# All services accessible via *.204-168-208-210.sslip.io (add to /etc/hosts → 127.0.0.1)
-# Single entry point: port 80 on the k3d loadbalancer
+# Traefik Ingress — internal tools only on *.ops-ahead.localtest.me (:80).
+# Public surface is ui / gateway / auth on *.ops-ahead.xyz (app charts + Cloudflare).
+# Reach these hosts from a laptop via: make tunnel  (SSH LocalForward 80/443).
+# Gitea keeps a websecure twin for docker push (insecure-registries prefer HTTPS).
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -13,7 +14,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: vault.204-168-208-210.sslip.io
+    - host: vault.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -35,7 +36,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: argocd.204-168-208-210.sslip.io
+    - host: argocd.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -46,7 +47,6 @@ spec:
                 port:
                   number: 80
 ---
-# Gitea local — só dev. Permite ArgoCD apontar pra Git local em vez do GitHub.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -69,9 +69,7 @@ spec:
                 port:
                   number: 3000
 ---
-# Camadas do ml-trainer (prophet, shap, optuna, scikit-learn) levam minutos para
-# subir e o Gitea só responde o header quando terminou de recebê-las. Sem isso o
-# Traefik desiste no meio do `docker push` e o registry devolve 504.
+# Camadas do ml-trainer levam minutos; sem isto o Traefik corta o docker push (504).
 apiVersion: traefik.io/v1alpha1
 kind: ServersTransport
 metadata:
@@ -86,10 +84,7 @@ spec:
     idleConnTimeout: 10m
 
 ---
-# Router HTTPS separado só pro `docker push`: registries em insecure-registries
-# fazem o docker preferir HTTPS, e sem router no 443 o Traefik responde 404. Fica
-# num Ingress próprio porque `router.tls` vale pro router inteiro — se fosse no
-# mesmo do `web`, forçaria TLS no 80 e quebraria o HTTP (browser + git push).
+# Router HTTPS separado só pro docker push — ver comentário histórico no chart Gitea.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -127,7 +122,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: grafana.204-168-208-210.sslip.io
+    - host: grafana.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -149,7 +144,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: prometheus.204-168-208-210.sslip.io
+    - host: prometheus.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -171,7 +166,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: mlflow.204-168-208-210.sslip.io
+    - host: mlflow.ops-ahead.localtest.me
       http:
         paths:
           - path: /
@@ -193,7 +188,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: minio.204-168-208-210.sslip.io
+    - host: minio.ops-ahead.localtest.me
       http:
         paths:
           - path: /

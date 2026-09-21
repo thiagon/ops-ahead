@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ops-ahead-gateway": {
+      "type": "http",
+      "url": "https://gateway.ops-ahead.xyz/mcp/locaweb",
+      "oauth": {
+        "clientId": "gateway-mcp"
+      }
+    }
+  }
+}

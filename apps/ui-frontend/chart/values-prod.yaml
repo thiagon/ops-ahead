@@ -1,0 +1,14 @@
+# Production (VM) — env + ingress for https://ui.ops-ahead.xyz
+frontend:
+  env:
+    clickhouseHost: clickhouse.data.svc.cluster.local
+    clickhouseUser: ops_ahead
+    clickhouseDatabase: default
+    publicGatewayUrl: https://gateway.ops-ahead.xyz
+    gatewayUrl: http://gateway.ui.svc.cluster.local
+    mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
+    mlModelServingTimeoutMs: "1500"
+  ingress:
+    host: ui.ops-ahead.xyz
+    entrypoint: websecure
+    tls: true

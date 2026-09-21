@@ -1,5 +1,5 @@
-# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
-# same for every app.
+# Chart defaults — image repo, resources, wiring. App env + public hosts live in
+# apps/ui-gateway/chart/ (values-prod / values-local / values-dev).
 ui-gateway:
   image:
     repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-gateway
@@ -16,38 +16,7 @@ gateway:
     limits:
       cpu: 500m
       memory: 512Mi
-  env:
-    appEnv: dev
-    logLevel: info
-    serviceName: gateway
-    kafkaBootstrapServers: ops-ahead-kafka-bootstrap.data.svc.cluster.local:9092
-    kafkaTopicRawAlert: events.raw.alert
-    kafkaTopicRawMonitor: events.raw.monitor
-    kafkaTopicRulesMapping: rules.mapping
-    kafkaTopicRulesDeadline: rules.deadline
-    kafkaTopicRulesTarget: rules.target
-    kafkaTopicMl: trigger.ml
-    kafkaTopicData: trigger.data
-    hmacEnabled: "true"
-    httpsEnabled: "false"
-    corsOrigins:
-      - http://ui.204-168-208-210.sslip.io
-    authentikIssuer: http://auth.204-168-208-210.sslip.io/application/o/gateway-web/
-    # Server-side OIDC (discovery, token, introspect) talks to the Service
-    # directly. The public issuer host is what the browser is sent to, and
-    # what `localtest.me` would resolve to inside the pod (itself).
-    authentikInternalOrigin: http://infra-authentik-server.infra.svc.cluster.local
-    authentikClientId: gateway-web
-    authentikMcpClientId: gateway-mcp
-    introspectionCacheTtlMs: "5000"
-    frontendOrigin: http://ui.204-168-208-210.sslip.io
-    publicUrl: http://gateway.204-168-208-210.sslip.io
-    # Parent of ui.* and gateway.* so the session cookie reaches both hosts.
-    sessionCookieDomain: 204-168-208-210.sslip.io
   secretName: ui-gateway-secret
-  ingress:
-    host: gateway.204-168-208-210.sslip.io
-  # config-postgres instance; a different database on it.
   analysesDatabase:
     host: config-postgres.ui.svc.cluster.local:5432
     name: gateway
@@ -55,13 +24,9 @@ gateway:
 
 networkPolicy:
   enabled: true
-  # Kafka's plain internal listener.
   kafkaPort: 9092
-  # ClickHouse HTTP interface — ui-frontend's gold/silver loaders.
   clickhousePort: 8123
-  # Authentik server — introspection and the token endpoint.
   authentikPort: 9000
-  # ml-model-serving — the breach score ui-frontend's operator queue reads.
   mlModelServingPort: 3000
 
 monitoring:

@@ -10,9 +10,9 @@ metadata:
 spec:
   revisionHistoryLimit: 3
   project: ops-ahead
-  # Multi-source: base chart from infra/charts; the app's colocated per-env
-  # overlay (apps/ui-gateway/chart/values-dev.yaml) carries env config *and*
-  # the CI-pinned image tag, so each environment runs its own image.
+  # Multi-source: base chart from infra/charts; app overlays in apps/ui-gateway/chart/
+  # — values-prod.yaml (ops-ahead.xyz), values-dev.yaml (CI image tag). On k3d,
+  # reconcile appends values-local.yaml (localtest.me).
   sources:
     - repoURL: https://github.com/thiagon/ops-ahead
       targetRevision: main
@@ -23,6 +23,7 @@ spec:
       helm:
         valueFiles:
           - values.yaml
+          - $values/apps/ui-gateway/chart/values-prod.yaml
           - $values/apps/ui-gateway/chart/values-dev.yaml
   destination:
     server: https://kubernetes.default.svc

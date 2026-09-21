@@ -1,0 +1,8 @@
+# Local k3d — overrides public URLs from values-prod.yaml.
+frontend:
+  env:
+    publicGatewayUrl: http://gateway.ops-ahead.localtest.me
+  ingress:
+    host: ui.ops-ahead.localtest.me
+    entrypoint: web
+    tls: false
