@@ -235,3 +235,38 @@ describe('GET and history', () => {
     });
   });
 });
+
+describe('GET /rules/schema', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('answers 401 without a session', async () => {
+    const res = await app.inject({ method: 'GET', url: '/rules/schema' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns the mapping, deadline and target JSON Schemas from the same Zod contracts', async () => {
+    const res = await app.inject({ method: 'GET', url: '/rules/schema', headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json() as {
+      mapping: { oneOf: { properties: { intake: { const: string }; bindings: { required: string[] } } }[] };
+      deadlines: { properties: { deadlines: unknown } };
+      targets: { properties: { targets: unknown } };
+    };
+
+    const alert = body.mapping.oneOf.find(variant => variant.properties.intake.const === 'alert');
+    expect(alert?.properties.bindings.required).toEqual(
+      expect.arrayContaining(['external_id', 'opened_at', 'severity', 'status', 'title']),
+    );
+    expect(body.deadlines.properties.deadlines).toBeDefined();
+    expect(body.targets.properties.targets).toBeDefined();
+  });
+});

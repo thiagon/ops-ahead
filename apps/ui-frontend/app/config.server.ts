@@ -15,12 +15,6 @@ const configSchema = z.object({
   GATEWAY_URL: z
     .url({ protocol: /^https?$/ })
     .default('http://gateway.ui.svc.cluster.local'),
-  // The configuration registry this app owns — nothing else reads or writes
-  // it (apps/ui-frontend/prisma/schema.prisma). Tenant is a row there, not an env.
-  CONFIG_DATABASE_URL: z
-    .string()
-    .min(1)
-    .default('postgres://config:config@config-postgres.ui.svc.cluster.local:5432/config'),
   ML_MODEL_SERVING_URL: z
     .url({ protocol: /^https?$/ })
     .default('http://ml-model-serving.ml.svc.cluster.local:3000'),

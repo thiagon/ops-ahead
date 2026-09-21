@@ -4,35 +4,31 @@ Dashboard front end (`ns: ui`). React Router in framework mode: the loaders run 
 own server and query the ClickHouse gold layer directly — the browser never receives a database
 credential.
 
-The Ajustes screens (integrations, deadlines, KPI targets) own their registry in Postgres via
-Prisma (`prisma/`). Nothing else reads or writes that database.
+The Ajustes screens (integrations, deadlines, KPI targets) read and write the gateway
+(`GATEWAY_URL`), the same registry REST and MCP share. ClickHouse remains the source for
+operational screens (panel, queue, manager).
 
 ## Development
 
 ```bash
-# Registry Postgres — matches apps/ui-frontend/.env
-docker run --rm -d --name ui-frontend-config-pg \
-  -e POSTGRES_USER=config -e POSTGRES_PASSWORD=config -e POSTGRES_DB=config \
-  -p 55432:5432 postgres:16-alpine
-
 npm install
-npm run db:migrate
-npm run db:seed   # optional: locaweb/service_now as Monitor
 npm run dev
 ```
+
+The gateway must be reachable (`GATEWAY_URL`). This app does not seed configuration.
 
 ## Configuration
 
 | Env | Meaning |
 |-----|---------|
 | `CLICKHOUSE_URL` | Whole connection in one URL, on the HTTP interface (`8123`) |
-| `CONFIG_DATABASE_URL` | Postgres URL for the configuration registry this app owns |
+| `GATEWAY_URL` | Gateway from this process (cluster service, or the ingress host locally) |
 | `PUBLIC_GATEWAY_URL` | External webhook base shown on the integration screen |
 | `SERVICE_NAME` / `SERVICE_VERSION` | Reported by `/health` |
 
 ## Routes
 
-- `/` — enter tenant slug
+- `/` — pick a tenant from the signed-in identity
 - `/:tenant` — N1/N2 panel
 - `/:tenant/manager` — tactical view
 - `/:tenant/queue` — prioritized queue

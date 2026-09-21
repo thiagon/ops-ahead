@@ -1,59 +1,27 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { PrismaClient } from '@prisma/client';
-import { getConfig } from '~/config.server.ts';
+import { redirect } from 'react-router';
+import { gatewayFetch } from '~/features/auth/gateway.server.ts';
+import { loginPath } from '~/features/auth/session.server.ts';
+import { parseRulesContract, type RulesContract } from './contract-schema.ts';
 import {
   type ConfigDomain,
+  type ContractField,
   type Deadline,
   type FieldBinding,
   type Intake,
   isIntegrationReady,
   type KpiTarget,
   kpiGroupKey,
+  type LabelEntry,
   type MappingEntry,
   type MappingField,
   type Status,
 } from './types.ts';
 
 /**
- * The configuration registry, read and written straight from the loaders — the
- * same way clickhouse.server.ts serves every other screen. This database
- * belongs to the frontend: nothing else reads or writes it.
+ * The configuration registry, read and written through the gateway — the same
+ * functions REST and MCP call. This app does not keep a copy.
  */
-
-let cached: PrismaClient | undefined;
-
-/**
- * `@prisma/client` resolves to the Node build and CONFIG_DATABASE_URL carries
- * the credentials, so both stay in the server bundle — what the `.server.ts`
- * suffix guarantees.
- */
-function db(): PrismaClient {
-  cached ??= new PrismaClient({
-    datasources: { db: { url: getConfig().CONFIG_DATABASE_URL } },
-  });
-  return cached;
-}
-
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    void cached?.$disconnect();
-    cached = undefined;
-  });
-}
-
-/** An integration as the screens read it — the origin plus what it maps. */
-export interface Integration {
-  source: string;
-  intake: Intake;
-  envelopeVersion: string;
-  secretCreatedAt: string | null;
-  lifecycle: Status;
-  enabled: boolean;
-  dictionaryVersion: string | null;
-  dictionaryStatus: Status | null;
-  bindings: FieldBinding[];
-  mappings: Partial<Record<MappingField, MappingEntry[]>>;
-}
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -76,171 +44,80 @@ export class MisconfiguredError extends Error {
   }
 }
 
-/** The tenant in scope — numeric id for FKs, slug for URLs and ClickHouse. */
+/** The tenant in scope — the URL slug, which is also the Authentik group. */
 export type ActiveTenant = {
-  id: number;
   slug: string;
   name: string;
 };
 
-const tenantStore = new AsyncLocalStorage<ActiveTenant>();
+type TenantScope = {
+  tenant: ActiveTenant;
+  request: Request;
+  contract?: Promise<RulesContract>;
+};
 
-let cachedTenant: ActiveTenant | undefined;
-
-/** Clears the in-process cache — tests reseeding the fallback tenant need it. */
-export function clearTenantCache(): void {
-  cachedTenant = undefined;
-}
-
-export async function getTenantBySlug(slug: string): Promise<ActiveTenant | null> {
-  const row = await db().tenant.findUnique({ where: { slug } });
-  if (!row) return null;
-  return { id: row.id, slug: row.slug, name: row.name };
-}
+const tenantStore = new AsyncLocalStorage<TenantScope>();
 
 /**
- * Binds this async chain to a tenant looked up by URL slug. Nested loaders
- * run in parallel, so every loader/action that reads tenant-scoped data
- * must call this itself — a parent loader cannot leak the store downward.
+ * Binds this async chain to the tenant in the URL. Nested loaders run in
+ * parallel, so every loader/action that reads tenant-scoped data must call
+ * this itself — a parent loader cannot leak the store downward.
+ *
+ * Existence is the claim's: the caller already passed `requireTenantAccess`.
+ * The request is stored so config reads can spend the same cookie the
+ * browser sent (features/auth/gateway.server.ts).
  */
-export async function withTenant<T>(slug: string, fn: () => Promise<T>): Promise<T> {
-  const tenant = await getTenantBySlug(slug);
-  if (!tenant) {
-    throw new Response('Cliente não encontrado', { status: 404 });
-  }
-  return tenantStore.run(tenant, fn);
+export async function withTenant<T>(
+  request: Request,
+  slug: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return tenantStore.run({ tenant: { slug, name: slug }, request }, fn);
 }
 
 /**
- * The tenant bound by `withTenant`. Tests that are not behind a URL fall
- * back to the one `status = active` row, the same bootstrap the seed marks.
+ * The tenant bound by `withTenant`. ClickHouse queries use the slug as
+ * `tenant_id`; there is no numeric id on this side of the gateway.
  */
 export async function currentTenant(): Promise<ActiveTenant> {
   const fromStore = tenantStore.getStore();
-  if (fromStore) return fromStore;
+  if (fromStore) return fromStore.tenant;
+  throw new MisconfiguredError(
+    'Nenhum tenant no contexto — as telas passam pelo withTenant.',
+  );
+}
 
-  if (cachedTenant) return cachedTenant;
-
-  const row = await db().tenant.findFirst({ where: { status: 'active' } });
-  if (!row) {
+function scope(): TenantScope {
+  const stored = tenantStore.getStore();
+  if (!stored) {
     throw new MisconfiguredError(
-      'Nenhum tenant ativo no cadastro — rode o seed ou marque um como active.',
+      'Nenhum tenant no contexto — as telas passam pelo withTenant.',
     );
   }
-
-  cachedTenant = { id: row.id, slug: row.slug, name: row.name };
-  return cachedTenant;
+  return stored;
 }
 
-async function activeTenantId(): Promise<number> {
-  return (await currentTenant()).id;
+function tenantId(): string {
+  return scope().tenant.slug;
 }
 
-/** Until the screens have login, the history is real and its authorship is not. */
-const AUTHOR = 'anonymous';
-
-type OriginWithRelations = {
-  id: number;
+/** An integration as the screens read it — the source plus what it maps. */
+export interface Integration {
   source: string;
   intake: Intake;
-  envelopeVersion: string;
-  secretCreatedAt: Date | null;
-  status: Status;
-  dictionary: { version: string; status: Status } | null;
-  bindings: { field: string; path: string | null }[];
-  mappings: { id: number; mappingField: string; fromValue: string; toValue: string }[];
-};
-
-function compose(origin: OriginWithRelations): Integration {
-  return {
-    source: origin.source,
-    intake: origin.intake,
-    envelopeVersion: origin.envelopeVersion,
-    secretCreatedAt: origin.secretCreatedAt?.toISOString() ?? null,
-    lifecycle: origin.status,
-    enabled: origin.status === 'active',
-    dictionaryVersion: origin.dictionary?.version ?? null,
-    dictionaryStatus: origin.dictionary?.status ?? null,
-    bindings: origin.bindings.map(({ field, path }) => ({ field, path })),
-    mappings: origin.mappings.reduce<Integration['mappings']>((acc, mapping) => {
-      const field = mapping.mappingField as MappingField;
-      const entries = acc[field] ?? [];
-      entries.push({ id: mapping.id, from: mapping.fromValue, to: mapping.toValue });
-      acc[field] = entries;
-      return acc;
-    }, {}),
-  };
+  lifecycle: Status;
+  enabled: boolean;
+  dictionaryVersion: string | null;
+  dictionaryStatus: Status | null;
+  bindings: FieldBinding[];
+  mappings: Partial<Record<MappingField, MappingEntry[]>>;
+  fields: ContractField[];
 }
 
-/** Every read of an origin brings what it maps, so one integration is one read. */
-function withRelations() {
-  return {
-    dictionary: true,
-    bindings: { where: { status: 'active' as const }, orderBy: { field: 'asc' as const } },
-    mappings: {
-      where: { status: 'active' as const },
-      orderBy: [{ mappingField: 'asc' as const }, { fromValue: 'asc' as const }],
-    },
-  };
-}
-
-async function originRow(source: string) {
-  const origin = await db().origin.findUnique({
-    where: { tenantId_source: { tenantId: await activeTenantId(), source } },
-    include: withRelations(),
-  });
-  if (!origin) throw new NotFoundError(`Integração ${source} não existe.`);
-  return origin;
-}
-
-/** List row — origin only. Completeness lives in `lifecycle`, not in the dictionary. */
 export interface IntegrationListItem {
   source: string;
   intake: Intake;
   lifecycle: Status;
-}
-
-export async function listIntegrations(): Promise<IntegrationListItem[]> {
-  const origins = await db().origin.findMany({
-    where: { tenantId: await activeTenantId(), status: { not: 'archived' } },
-    select: { source: true, intake: true, status: true },
-    orderBy: { source: 'asc' },
-  });
-  return origins.map(row => ({
-    source: row.source,
-    intake: row.intake,
-    lifecycle: row.status,
-  }));
-}
-
-export async function getIntegration(source: string): Promise<Integration> {
-  return compose(await originRow(source));
-}
-
-export async function listDeadlines(): Promise<Deadline[]> {
-  const rows = await db().deadline.findMany({
-    where: { tenantId: await activeTenantId(), status: 'active' },
-    orderBy: { severity: 'asc' },
-  });
-  return rows.map(row => ({ severity: row.severity, deadlineSeconds: row.deadlineSeconds }));
-}
-
-export async function listKpiTargets(): Promise<KpiTarget[]> {
-  const rows = await db().kpiTarget.findMany({
-    where: { tenantId: await activeTenantId(), status: 'active' },
-    orderBy: { achievementPct: 'desc' },
-  });
-  return rows
-    .map(row => ({
-      severities: row.severities,
-      maxBreaches: row.maxBreaches,
-      achievementPct: Number(row.achievementPct),
-    }))
-    .sort((a, b) => {
-      const byGroup = kpiGroupKey(a.severities).localeCompare(kpiGroupKey(b.severities));
-      if (byGroup !== 0) return byGroup;
-      return b.achievementPct - a.achievementPct;
-    });
 }
 
 export interface Revision {
@@ -248,324 +125,489 @@ export interface Revision {
   domain: ConfigDomain;
   summary: string;
   at: string;
-  /** Whether there is a prior state to restore — a creation replaced nothing. */
   revertible: boolean;
-  /** The state as it stood before the change. The screen loads this; Publicar writes it. */
   payload: unknown;
 }
 
+type SourceStatus = 'active' | 'disabled';
+
+type SourceSummary = {
+  tenant_id: string;
+  source: string;
+  intake: Intake;
+  status: SourceStatus;
+};
+
+type LabelBinding = string | { key: string; path: string }[];
+
+type MappingDocument = {
+  intake: Intake;
+  version: string;
+  bindings: Record<string, string | LabelBinding | undefined>;
+  mappings: Partial<Record<MappingField, Record<string, string>>>;
+};
+
+type ErrorBody = {
+  error?: string;
+  message?: string;
+  details?: { path: string; message: string }[];
+};
+
+function lifecycleOf(status: SourceStatus): Status {
+  return status === 'active' ? 'active' : 'inactive';
+}
+
+function toGatewayStatus(status: Status): SourceStatus {
+  return status === 'active' ? 'active' : 'disabled';
+}
+
+async function api(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (init.body != null && !headers.has('content-type')) {
+    headers.set('content-type', 'application/json');
+  }
+  const response = await gatewayFetch(scope().request, path, { ...init, headers });
+  if (response.status === 401) {
+    throw redirect(loginPath(scope().request));
+  }
+  return response;
+}
+
+async function readBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function errorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const record = body as ErrorBody;
+  if (typeof record.message === 'string' && record.message.length > 0) return record.message;
+  return fallback;
+}
+
+async function expectOk(response: Response, fallback: string): Promise<unknown> {
+  const body = await readBody(response);
+  if (response.ok) return body;
+  if (response.status === 404) throw new NotFoundError(errorMessage(body, fallback));
+  throw new ConflictError(errorMessage(body, fallback));
+}
+
+async function getOptional<T>(path: string): Promise<T | null> {
+  const response = await api(path);
+  if (response.status === 404) return null;
+  return (await expectOk(response, 'Falha ao ler a configuração.')) as T;
+}
+
+async function listSources(): Promise<SourceSummary[]> {
+  const body = await expectOk(
+    await api(`/sources/${encodeURIComponent(tenantId())}`),
+    'Falha ao listar as origens.',
+  );
+  return Array.isArray(body) ? (body as SourceSummary[]) : [];
+}
+
+async function findSource(source: string): Promise<SourceSummary> {
+  const found = (await listSources()).find(row => row.source === source);
+  if (!found) throw new NotFoundError(`Integração ${source} não existe.`);
+  return found;
+}
+
+async function loadContract(): Promise<RulesContract> {
+  const stored = scope();
+  stored.contract ??= (async () => {
+    const body = await expectOk(await api('/rules/schema'), 'Falha ao ler o schema das regras.');
+    return parseRulesContract(body);
+  })();
+  return stored.contract;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isLabelEntry(value: unknown): value is LabelEntry {
+  const row = asRecord(value);
+  return typeof row?.key === 'string' && typeof row.path === 'string';
+}
+
+function bindingsFrom(
+  fields: readonly ContractField[],
+  document: MappingDocument | null,
+): FieldBinding[] {
+  const raw = document?.bindings ?? {};
+  return fields.map(field => {
+    const value = raw[field.field];
+    if (field.kind === 'labels' && Array.isArray(value)) {
+      return { field: field.field, path: null, labels: value.filter(isLabelEntry) };
+    }
+    if (typeof value === 'string') return { field: field.field, path: value, labels: null };
+    return { field: field.field, path: null, labels: null };
+  });
+}
+
+function mappingsFrom(document: MappingDocument | null): Integration['mappings'] {
+  const raw = document?.mappings ?? {};
+  const result: Integration['mappings'] = {};
+  for (const [field, pairs] of Object.entries(raw)) {
+    if (!pairs) continue;
+    result[field as MappingField] = Object.entries(pairs).map(([from, to]) => ({ from, to }));
+  }
+  return result;
+}
+
+async function compose(
+  source: SourceSummary,
+  mapping: MappingDocument | null,
+): Promise<Integration> {
+  const fields = (await loadContract()).fields[source.intake];
+  return {
+    source: source.source,
+    intake: source.intake,
+    lifecycle: lifecycleOf(source.status),
+    enabled: source.status === 'active',
+    dictionaryVersion: mapping?.version ?? null,
+    dictionaryStatus: mapping ? 'active' : 'inactive',
+    bindings: bindingsFrom(fields, mapping),
+    mappings: mappingsFrom(mapping),
+    fields,
+  };
+}
+
+function mappingPath(source: string): string {
+  return `/rules/mappings/${encodeURIComponent(tenantId())}/${encodeURIComponent(source)}`;
+}
+
+async function loadMapping(source: string): Promise<MappingDocument | null> {
+  return await getOptional<MappingDocument>(mappingPath(source));
+}
+
+function toGatewayBindings(
+  bindings: readonly FieldBinding[],
+): Record<string, string | LabelBinding> {
+  const out: Record<string, string | LabelBinding> = {};
+  for (const binding of bindings) {
+    if (binding.labels && binding.labels.length > 0) {
+      out[binding.field] = [...binding.labels];
+      continue;
+    }
+    if (binding.path) out[binding.field] = binding.path;
+  }
+  return out;
+}
+
+function deadlineItems(value: unknown): Deadline[] {
+  const record = asRecord(value);
+  const nested = asRecord(record?.document);
+  const list = Array.isArray(value)
+    ? value
+    : asArray(record?.deadlines).length > 0
+      ? asArray(record?.deadlines)
+      : asArray(nested?.deadlines);
+  const rows: Deadline[] = [];
+  for (const item of list) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const severity = Number(row.severity);
+    const seconds = Number(row.seconds ?? row.deadlineSeconds);
+    if (!Number.isInteger(severity) || !Number.isFinite(seconds)) continue;
+    rows.push({ severity, deadlineSeconds: seconds });
+  }
+  return rows.sort((a, b) => a.severity - b.severity);
+}
+
+function targetItems(value: unknown): KpiTarget[] {
+  const record = asRecord(value);
+  const nested = asRecord(record?.document);
+  const list = Array.isArray(value)
+    ? value
+    : asArray(record?.targets).length > 0
+      ? asArray(record?.targets)
+      : asArray(nested?.targets);
+  const rows: KpiTarget[] = [];
+  for (const item of list) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const severities = asArray(row.severities)
+      .map(Number)
+      .filter(severity => Number.isInteger(severity) && severity > 0);
+    const maxBreaches = Number(row.max_breaches ?? row.maxBreaches);
+    const achievementPct = Number(row.achievement_pct ?? row.achievementPct);
+    if (
+      severities.length === 0 ||
+      !Number.isFinite(maxBreaches) ||
+      !Number.isFinite(achievementPct)
+    ) {
+      continue;
+    }
+    rows.push({ severities, maxBreaches, achievementPct });
+  }
+  return rows.sort((a, b) => {
+    const byGroup = kpiGroupKey(a.severities).localeCompare(kpiGroupKey(b.severities));
+    if (byGroup !== 0) return byGroup;
+    return b.achievementPct - a.achievementPct;
+  });
+}
+
+function historyStamp(value: unknown): { id: number; at: string } | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const id = Number(record.id);
+  const at =
+    typeof record.created_at === 'string'
+      ? record.created_at
+      : typeof record.createdAt === 'string'
+        ? record.createdAt
+        : '';
+  if (!Number.isInteger(id) || at.length === 0) return null;
+  return { id, at };
+}
+
+async function putMapping(source: string, document: MappingDocument): Promise<void> {
+  await expectOk(
+    await api(mappingPath(source), { method: 'PUT', body: JSON.stringify(document) }),
+    'A configuração não passou na validação.',
+  );
+}
+
+export async function listIntegrations(): Promise<IntegrationListItem[]> {
+  return (await listSources())
+    .map(row => ({
+      source: row.source,
+      intake: row.intake,
+      lifecycle: lifecycleOf(row.status),
+    }))
+    .sort((a, b) => a.source.localeCompare(b.source));
+}
+
+export async function getIntegration(source: string): Promise<Integration> {
+  const origin = await findSource(source);
+  return await compose(origin, await loadMapping(source));
+}
+
+export async function listDeadlines(): Promise<Deadline[]> {
+  return deadlineItems(await getOptional(`/rules/deadlines/${encodeURIComponent(tenantId())}`));
+}
+
+export async function listKpiTargets(): Promise<KpiTarget[]> {
+  return targetItems(await getOptional(`/rules/targets/${encodeURIComponent(tenantId())}`));
+}
+
 export async function listRevisions(domains?: readonly ConfigDomain[]): Promise<Revision[]> {
-  const rows = await db().revision.findMany({
-    where: {
-      tenantId: await activeTenantId(),
-      ...(domains?.length ? { domain: { in: [...domains] } } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
-  return rows.map(row => ({
-    id: row.id,
-    domain: row.domain as ConfigDomain,
-    summary: row.summary,
-    at: row.createdAt.toISOString(),
-    revertible: row.payload !== null && row.domain !== 'dictionary',
-    payload: row.payload,
-  }));
-}
+  const wanted = new Set(domains ?? ['deadline', 'kpi_target']);
+  const tenant = encodeURIComponent(tenantId());
+  const rows: Revision[] = [];
 
-// ─── writes ──────────────────────────────────────────────────────────────────
+  if (wanted.has('deadline')) {
+    for (const item of asArray(await getOptional(`/rules/deadlines/${tenant}/history`))) {
+      const stamp = historyStamp(item);
+      if (!stamp) continue;
+      rows.push({
+        id: stamp.id,
+        domain: 'deadline',
+        summary: 'Prazos publicados',
+        at: stamp.at,
+        revertible: true,
+        payload: deadlineItems(item),
+      });
+    }
+  }
 
-/**
- * Append-only. `previous` is the state as it stood *before* the change —
- * restoring it is what a rollback does, so recording the new state would
- * revert to itself. A change with no prior state records none, and the screen
- * says so rather than offering a revert that does nothing.
- */
-async function recordRevision(
-  domain: ConfigDomain,
-  configKey: string,
-  summary: string,
-  previous: unknown,
-): Promise<void> {
-  await db().revision.create({
-    data: {
-      tenantId: await activeTenantId(),
-      domain,
-      configKey,
-      summary,
-      author: AUTHOR,
-      payload: (previous ?? undefined) as never,
-    },
-  });
-}
+  if (wanted.has('kpi_target')) {
+    for (const item of asArray(await getOptional(`/rules/targets/${tenant}/history`))) {
+      const stamp = historyStamp(item);
+      if (!stamp) continue;
+      rows.push({
+        id: stamp.id,
+        domain: 'kpi_target',
+        summary: 'Metas publicadas',
+        at: stamp.at,
+        revertible: true,
+        payload: targetItems(item),
+      });
+    }
+  }
 
-/**
- * The origin's signing key. Shown once and never stored — what carries it to
- * the gateway is outside these screens for now, so rotating here changes the
- * date on record, not what the gateway accepts.
- */
-export function generateSecret(): string {
-  return Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  return rows.sort((a, b) => b.at.localeCompare(a.at));
 }
 
 export async function createIntegration(input: {
   source: string;
   intake: Intake;
-  envelopeVersion: string;
 }): Promise<{ integration: Integration; secret: string }> {
-  const tenantId = await activeTenantId();
-  const existing = await db().origin.findUnique({
-    where: { tenantId_source: { tenantId, source: input.source } },
-  });
+  const existing = (await listSources()).find(row => row.source === input.source);
   if (existing) throw new ConflictError(`Já existe uma integração chamada ${input.source}.`);
 
-  await db().origin.create({
-    data: {
-      tenantId,
-      source: input.source,
-      intake: input.intake,
-      envelopeVersion: input.envelopeVersion,
-      status: 'inactive',
-      secretCreatedAt: new Date(),
-      dictionary: { create: { version: 'v1', status: 'inactive' } },
-    },
-  });
+  const created = (await expectOk(
+    await api(`/sources/${encodeURIComponent(tenantId())}/${encodeURIComponent(input.source)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ intake: input.intake }),
+    }),
+    'Não foi possível criar a integração.',
+  )) as { source: SourceSummary; secret: string };
 
-  await recordRevision('origin', input.source, `Integração ${input.source} criada`, null);
+  await expectOk(
+    await api(
+      `/sources/${encodeURIComponent(tenantId())}/${encodeURIComponent(input.source)}/status`,
+      { method: 'PUT', body: JSON.stringify({ status: 'disabled' }) },
+    ),
+    'Não foi possível criar a integração.',
+  );
 
-  return { integration: await getIntegration(input.source), secret: generateSecret() };
+  return { integration: await getIntegration(created.source.source), secret: created.secret };
 }
 
 export async function rotateSecret(source: string): Promise<string> {
-  const origin = await originRow(source);
-
-  await db().origin.update({
-    where: { id: origin.id },
-    data: { secretCreatedAt: new Date() },
-  });
-  await recordRevision('origin', source, `Chave de ${source} rotacionada`, null);
-
-  return generateSecret();
+  const body = (await expectOk(
+    await api(
+      `/sources/${encodeURIComponent(tenantId())}/${encodeURIComponent(source)}/secret`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+    `Integração ${source} não existe.`,
+  )) as { secret: string };
+  return body.secret;
 }
 
-/** Inactive stays in the list; archived leaves it. Rows are never deleted. */
 export async function setOriginStatus(source: string, status: Status): Promise<Integration> {
-  const origin = await originRow(source);
-  if (origin.status === status) return compose(origin);
-  if (status === 'active' && !isIntegrationReady(compose(origin))) {
+  const current = await getIntegration(source);
+  const next = toGatewayStatus(status);
+  if (lifecycleOf(next) === current.lifecycle) return current;
+  if (next === 'active' && !isIntegrationReady(current)) {
     throw new ConflictError(
       'A integração só ativa quando todos os campos obrigatórios e os valores do vocabulário estão configurados.',
     );
   }
 
-  await db().origin.update({
-    where: { id: origin.id },
-    data: { status },
-  });
-  const summary =
-    status === 'active'
-      ? `Integração ${source} ativada`
-      : status === 'inactive'
-        ? `Integração ${source} inativada`
-        : `Integração ${source} arquivada`;
-  await recordRevision('origin', source, summary, { status: origin.status });
+  await expectOk(
+    await api(`/sources/${encodeURIComponent(tenantId())}/${encodeURIComponent(source)}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: next }),
+    }),
+    `Integração ${source} não existe.`,
+  );
   return await getIntegration(source);
-}
-
-async function demoteIfIncomplete(source: string): Promise<Integration> {
-  const origin = await originRow(source);
-  const integration = compose(origin);
-  if (origin.status !== 'active' || isIntegrationReady(integration)) {
-    return integration;
-  }
-  await db().origin.update({
-    where: { id: origin.id },
-    data: { status: 'inactive' },
-  });
-  await recordRevision('origin', source, `Integração ${source} inativada`, {
-    status: origin.status,
-  });
-  return compose({ ...origin, status: 'inactive' });
 }
 
 export async function updateBindings(
   source: string,
   bindings: readonly FieldBinding[],
 ): Promise<Integration> {
-  const previous = await getIntegration(source);
-  const origin = await originRow(source);
-
-  await db().$transaction(async tx => {
-    const fields = bindings.map(binding => binding.field);
-    await tx.fieldBinding.updateMany({
-      where: { originId: origin.id, field: { notIn: fields } },
-      data: { status: 'inactive' },
-    });
-    for (const binding of bindings) {
-      await tx.fieldBinding.upsert({
-        where: { originId_field: { originId: origin.id, field: binding.field } },
-        update: { path: binding.path, status: 'active' },
-        create: {
-          originId: origin.id,
-          field: binding.field,
-          path: binding.path,
-          status: 'active',
-        },
-      });
-    }
-    // The screen's "Publicar" is this write — draft stays until the customer
-    // commits the field paths (and whatever mappings they already added).
-    await tx.dictionaryVersion.upsert({
-      where: { originId: origin.id },
-      update: { status: 'active' },
-      create: { originId: origin.id, version: 'v1', status: 'active' },
-    });
+  const origin = await findSource(source);
+  const current = await loadMapping(source);
+  await putMapping(source, {
+    intake: origin.intake,
+    version: current?.version ?? 'v1',
+    bindings: toGatewayBindings(bindings),
+    mappings: current?.mappings ?? {},
   });
-
-  await recordRevision('origin', source, `Campos de ${source} atualizados`, previous.bindings);
-  return await demoteIfIncomplete(source);
+  return await getIntegration(source);
 }
 
 export async function upsertMapping(
   source: string,
   input: { field: MappingField; from: string; to: string },
 ): Promise<Integration> {
-  const origin = await originRow(source);
-
-  await db().mapping.upsert({
-    where: {
-      originId_mappingField_fromValue: {
-        originId: origin.id,
-        mappingField: input.field,
-        fromValue: input.from,
-      },
-    },
-    update: { toValue: input.to, status: 'active' },
-    create: {
-      originId: origin.id,
-      mappingField: input.field,
-      fromValue: input.from,
-      toValue: input.to,
-      status: 'active',
-    },
+  const origin = await findSource(source);
+  const current = await loadMapping(source);
+  if (!current) {
+    throw new ConflictError('Publique os campos da origem antes de mapear valores.');
+  }
+  const fieldMap = { ...(current.mappings[input.field] ?? {}) };
+  fieldMap[input.from] = input.to;
+  await putMapping(source, {
+    intake: origin.intake,
+    version: current.version,
+    bindings: current.bindings,
+    mappings: { ...current.mappings, [input.field]: fieldMap },
   });
-
-  await recordRevision('dictionary', source, `${input.from} → ${input.to} em ${input.field}`, null);
-  return await demoteIfIncomplete(source);
+  return await getIntegration(source);
 }
 
-export async function removeMapping(source: string, mappingId: number): Promise<Integration> {
-  const origin = await originRow(source);
-  const entry = await db().mapping.findFirst({
-    where: { id: mappingId, originId: origin.id, status: 'active' },
+export async function removeMapping(
+  source: string,
+  field: MappingField,
+  from: string,
+): Promise<Integration> {
+  const origin = await findSource(source);
+  const current = await loadMapping(source);
+  const fieldMap = { ...(current?.mappings[field] ?? {}) };
+  if (!current || !(from in fieldMap)) {
+    throw new NotFoundError('Este valor já não está mapeado.');
+  }
+  delete fieldMap[from];
+  const mappings = { ...current.mappings };
+  if (Object.keys(fieldMap).length === 0) {
+    delete mappings[field];
+  } else {
+    mappings[field] = fieldMap;
+  }
+  await putMapping(source, {
+    intake: origin.intake,
+    version: current.version,
+    bindings: current.bindings,
+    mappings,
   });
-  if (!entry) throw new NotFoundError('Este valor já não está mapeado.');
-
-  await db().mapping.update({
-    where: { id: mappingId },
-    data: { status: 'inactive' },
-  });
-  await recordRevision(
-    'dictionary',
-    source,
-    `${entry.fromValue} removido de ${entry.mappingField}`,
-    { field: entry.mappingField, from: entry.fromValue, to: entry.toValue },
-  );
   return await getIntegration(source);
 }
 
 export async function replaceDeadlines(items: readonly Deadline[]): Promise<Deadline[]> {
-  const previous = await listDeadlines();
-  const tenantId = await activeTenantId();
-
-  await db().$transaction(async tx => {
-    const severities = items.map(item => item.severity);
-    await tx.deadline.updateMany({
-      where: { tenantId, severity: { notIn: severities } },
-      data: { status: 'inactive' },
-    });
-    for (const item of items) {
-      await tx.deadline.upsert({
-        where: { tenantId_severity: { tenantId, severity: item.severity } },
-        update: { deadlineSeconds: item.deadlineSeconds, status: 'active' },
-        create: {
-          tenantId,
-          severity: item.severity,
-          deadlineSeconds: item.deadlineSeconds,
-          status: 'active',
-        },
-      });
-    }
-  });
-
-  await recordRevision('deadline', (await currentTenant()).slug, 'Prazos atualizados', previous);
+  if (items.length === 0) {
+    throw new ConflictError('Publique pelo menos um prazo.');
+  }
+  await expectOk(
+    await api(`/rules/deadlines/${encodeURIComponent(tenantId())}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        deadlines: items.map(item => ({ severity: item.severity, seconds: item.deadlineSeconds })),
+      }),
+    }),
+    'Não foi possível publicar os prazos.',
+  );
   return await listDeadlines();
 }
 
 export async function replaceKpiTargets(items: readonly KpiTarget[]): Promise<KpiTarget[]> {
-  const previous = await listKpiTargets();
-  const tenantId = await activeTenantId();
-
-  await db().$transaction(async tx => {
-    const incoming = new Set(
-      items.map(item => `${kpiGroupKey(item.severities)}:${item.achievementPct}`),
-    );
-    const existing = await tx.kpiTarget.findMany({ where: { tenantId } });
-    for (const row of existing) {
-      if (!incoming.has(`${kpiGroupKey(row.severities)}:${Number(row.achievementPct)}`)) {
-        await tx.kpiTarget.update({
-          where: { id: row.id },
-          data: { status: 'inactive' },
-        });
-      }
-    }
-    for (const item of items) {
-      const severities = [...item.severities].sort((a, b) => a - b);
-      await tx.kpiTarget.upsert({
-        where: {
-          tenantId_severities_achievementPct: {
-            tenantId,
-            severities,
-            achievementPct: item.achievementPct,
-          },
-        },
-        update: { maxBreaches: item.maxBreaches, status: 'active' },
-        create: {
-          tenantId,
-          severities,
-          maxBreaches: item.maxBreaches,
-          achievementPct: item.achievementPct,
-          status: 'active',
-        },
-      });
-    }
-  });
-
-  await recordRevision('kpi_target', (await currentTenant()).slug, 'Metas atualizadas', previous);
+  if (items.length === 0) {
+    throw new ConflictError('Publique pelo menos uma meta.');
+  }
+  await expectOk(
+    await api(`/rules/targets/${encodeURIComponent(tenantId())}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        targets: items.map(item => ({
+          severities: item.severities,
+          max_breaches: item.maxBreaches,
+          achievement_pct: item.achievementPct,
+        })),
+      }),
+    }),
+    'Não foi possível publicar as metas.',
+  );
   return await listKpiTargets();
 }
 
-/** Restores the state a revision recorded, itself recorded as a new revision. */
+/** Restores a published document by writing it again — the gateway keeps history. */
 export async function rollback(revisionId: number): Promise<void> {
-  const revision = await db().revision.findFirst({
-    where: { id: revisionId, tenantId: await activeTenantId() },
-  });
+  const revision = (await listRevisions()).find(row => row.id === revisionId);
   if (!revision) throw new NotFoundError('Esta alteração não está mais no histórico.');
-  if (revision.payload === null) {
-    throw new ConflictError('Esta alteração não tem um estado anterior para restaurar.');
-  }
 
-  switch (revision.domain as ConfigDomain) {
+  switch (revision.domain) {
     case 'deadline':
-      await replaceDeadlines(revision.payload as unknown as Deadline[]);
+      await replaceDeadlines(revision.payload as Deadline[]);
       return;
     case 'kpi_target':
-      await replaceKpiTargets(revision.payload as unknown as KpiTarget[]);
-      return;
-    case 'origin':
-      await updateBindings(revision.configKey, revision.payload as unknown as FieldBinding[]);
+      await replaceKpiTargets(revision.payload as KpiTarget[]);
       return;
     default:
-      throw new ConflictError('Ainda não é possível reverter uma alteração de dicionário.');
+      throw new ConflictError('Ainda não é possível reverter esta alteração pela tela.');
   }
 }

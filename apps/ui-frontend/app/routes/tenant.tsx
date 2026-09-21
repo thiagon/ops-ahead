@@ -9,16 +9,15 @@ import { useSession } from '~/session';
 import type { Route } from './+types/tenant';
 
 /**
- * Resolves the tenant from the URL slug and wraps the chrome every tenant
- * screen shares. Child loaders still call `withTenant` themselves: nested
- * loaders run in parallel, so they cannot inherit this request's store.
+ * Binds the tenant from the URL and wraps the chrome every tenant screen
+ * shares. Child loaders still call `withTenant` themselves: nested loaders
+ * run in parallel, so they cannot inherit this request's store.
  *
- * Access is checked before the slug is resolved: an unauthorized caller must
- * not learn whether a client exists.
+ * Access is the claim's — an unauthorized caller never reaches the slug.
  */
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireTenantAccess(request, params.tenant);
-  return withTenant(params.tenant, async () => ({
+  return withTenant(request, params.tenant, async () => ({
     tenant: await currentTenant(),
     openCount: await fetchOpenAlertCount().catch(() => null),
   }));

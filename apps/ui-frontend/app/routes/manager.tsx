@@ -22,8 +22,8 @@ export function meta() {
   return [{ title: 'Painel do gestor · Ops Ahead' }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, () => loadDashboard());
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, () => loadDashboard());
 }
 
 /** The band is stored as the severities themselves; this is the only place

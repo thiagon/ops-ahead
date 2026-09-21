@@ -30,9 +30,9 @@ import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
+import { nextDraftId } from '~/features/config/editor-ui.ts';
 import {
   ConflictError,
-  currentTenant,
   getIntegration,
   NotFoundError,
   removeMapping,
@@ -45,12 +45,10 @@ import {
 import { parseIntegrationTab, samplePayload } from '~/features/config/sample-payload.ts';
 import { takeSecretFlash } from '~/features/config/secret-flash.server.ts';
 import {
-  CONTRACT_FIELDS,
-  DOMAIN_VALUES,
-  FIELD_HINT,
   INTAKE_LABEL,
+  isBound,
   type MappingEntry,
-  type MappingField,
+  parseBindingsForm,
   SEVERITY_VALUE_LABEL,
   type Status,
   webhookUrl,
@@ -78,15 +76,13 @@ export type DomainRow = {
   origins: MappingEntry[];
 };
 
-function buildRows(field: MappingField, entries: MappingEntry[]): DomainRow[] {
+function buildRows(domainValues: readonly string[], entries: MappingEntry[]): DomainRow[] {
   const byDomainValue = new Map<string, MappingEntry[]>();
 
-  for (const value of DOMAIN_VALUES[field]) byDomainValue.set(value, []);
+  for (const value of domainValues) byDomainValue.set(value, []);
   for (const entry of entries) {
     const bucket = byDomainValue.get(entry.to);
     if (bucket) bucket.push(entry);
-    // resolution_code has a free-form target, so its values are whatever the
-    // dictionary already carries rather than a fixed list.
     else byDomainValue.set(entry.to, [entry]);
   }
 
@@ -94,7 +90,7 @@ function buildRows(field: MappingField, entries: MappingEntry[]): DomainRow[] {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const integration = await getIntegration(params.source).catch(error => {
       if (error instanceof NotFoundError) {
         throw new Response('Integração não encontrada', { status: 404 });
@@ -103,20 +99,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     });
 
     const config = getConfig();
-    const tenant = await currentTenant();
-    // The contract decides which fields exist and which of them translate; the
-    // integration only says where each one is read.
-    const bound = new Map(integration.bindings.map(binding => [binding.field, binding.path]));
-    const fields = CONTRACT_FIELDS[integration.intake].map(contract => {
-      const path = bound.get(contract.field) ?? null;
-      if (!contract.translated) return { ...contract, path, values: null };
-      const field = contract.field as MappingField;
+    const bound = new Map(integration.bindings.map(binding => [binding.field, binding]));
+    const fields = integration.fields.map(contract => {
+      const binding = bound.get(contract.field);
+      const path = binding?.path ?? null;
+      const labels = binding?.labels ?? null;
+      if (!contract.translated) return { ...contract, path, labels, values: null };
       return {
         ...contract,
         path,
+        labels,
         values: {
-          freeForm: DOMAIN_VALUES[field].length === 0,
-          rows: buildRows(field, integration.mappings[field] ?? []),
+          freeForm: contract.domainValues.length === 0,
+          rows: buildRows(contract.domainValues, integration.mappings[contract.field] ?? []),
         },
       };
     });
@@ -127,12 +122,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     return data(
       {
         origin: integration,
-        url: webhookUrl(
-          config.PUBLIC_GATEWAY_URL,
-          integration.envelopeVersion,
-          tenant.slug,
-          integration.source,
-        ),
+        url: webhookUrl(config.PUBLIC_GATEWAY_URL, params.tenant, integration.source),
         fields,
         sampleBody: JSON.stringify(samplePayload(fields), null, 2),
         dictionaryVersion: integration.dictionaryVersion,
@@ -160,7 +150,7 @@ function ok(partial: Partial<ActionResult> = {}): ActionResult {
  * submitted with a fetcher and answer with the value alone.
  */
 export async function action({ params, request }: Route.ActionArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const intent = form.get('intent');
 
@@ -181,7 +171,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
       if (intent === 'add-mapping') {
         await upsertMapping(params.source, {
-          field: form.get('field') as MappingField,
+          field: String(form.get('field') ?? ''),
           from: String(form.get('from') ?? '').trim(),
           to: String(form.get('to') ?? ''),
         });
@@ -189,7 +179,11 @@ export async function action({ params, request }: Route.ActionArgs) {
       }
 
       if (intent === 'remove-mapping') {
-        await removeMapping(params.source, Number(form.get('mappingId')));
+        await removeMapping(
+          params.source,
+          String(form.get('field') ?? ''),
+          String(form.get('from') ?? ''),
+        );
         return ok();
       }
 
@@ -199,14 +193,8 @@ export async function action({ params, request }: Route.ActionArgs) {
         if (problem) return ok({ error: problem });
 
         const config = getConfig();
-        const tenant = await currentTenant();
         const integration = await getIntegration(params.source);
-        const url = webhookUrl(
-          config.PUBLIC_GATEWAY_URL,
-          integration.envelopeVersion,
-          tenant.slug,
-          integration.source,
-        );
+        const url = webhookUrl(config.PUBLIC_GATEWAY_URL, params.tenant, integration.source);
 
         try {
           return ok({
@@ -217,11 +205,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         }
       }
 
-      const bindings = form.getAll('field').map((field, index) => ({
-        field: String(field),
-        path: String(form.getAll('path')[index] ?? '').trim() || null,
-      }));
-      await updateBindings(params.source, bindings);
+      await updateBindings(params.source, parseBindingsForm(form));
       return ok();
     } catch (error) {
       if (error instanceof ConflictError || error instanceof NotFoundError) {
@@ -272,7 +256,7 @@ function CopyField({ label, value, hint }: { label: string; value: string; hint?
   );
 }
 
-function OriginChip({ entry }: { entry: MappingEntry }) {
+function OriginChip({ field, entry }: { field: string; entry: MappingEntry }) {
   const fetcher = useFetcher();
   if (fetcher.state !== 'idle') return null;
 
@@ -281,7 +265,8 @@ function OriginChip({ entry }: { entry: MappingEntry }) {
       {entry.from}
       <fetcher.Form method="post">
         <input type="hidden" name="intent" value="remove-mapping" />
-        <input type="hidden" name="mappingId" value={entry.id} />
+        <input type="hidden" name="field" value={field} />
+        <input type="hidden" name="from" value={entry.from} />
         <button
           type="submit"
           aria-label={`Remover ${entry.from}`}
@@ -311,7 +296,7 @@ function ValueRow({ field, row }: { field: string; row: DomainRow }) {
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         {row.origins.map(entry => (
-          <OriginChip key={entry.id} entry={entry} />
+          <OriginChip key={entry.from} field={field} entry={entry} />
         ))}
         {adding ? (
           <fetcher.Form
@@ -380,6 +365,112 @@ function FreeFormRow({ field }: { field: string }) {
   );
 }
 
+function LabelsEditor({
+  field,
+  required,
+  path,
+  labels,
+}: {
+  field: string;
+  required: boolean;
+  path: string | null;
+  labels: readonly { key: string; path: string }[] | null;
+}) {
+  const [mode, setMode] = useState<'path' | 'entries'>(
+    labels && labels.length > 0 ? 'entries' : 'path',
+  );
+  const [entries, setEntries] = useState(() =>
+    labels && labels.length > 0
+      ? labels.map(entry => ({ id: nextDraftId(), key: entry.key, path: entry.path }))
+      : [{ id: nextDraftId(), key: '', path: '' }],
+  );
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 text-text-dim">←</span>
+        <input type="hidden" form="bindings" name="field" value={field} />
+        {mode === 'path' ? (
+          <input
+            form="bindings"
+            name="path"
+            defaultValue={path ?? ''}
+            placeholder={required ? 'obrigatório' : 'mapa que a origem já envia'}
+            aria-label={`Caminho no payload para ${field}`}
+            className={`${inputClass} border-transparent bg-bg-tile font-mono text-xs`}
+          />
+        ) : (
+          <input type="hidden" form="bindings" name="path" value="" />
+        )}
+        <button
+          type="button"
+          onClick={() => setMode(current => (current === 'path' ? 'entries' : 'path'))}
+          className="shrink-0 rounded-lg px-2 py-1 text-text-dim text-xs transition-colors hover:bg-white/[0.04] hover:text-text-light"
+        >
+          {mode === 'path' ? 'Vários campos' : 'Um caminho'}
+        </button>
+      </div>
+      {mode === 'entries' && (
+        <div className="flex flex-col gap-2">
+          {entries.map(entry => (
+            <div key={entry.id} className="flex items-center gap-2">
+              <input
+                form="bindings"
+                name="label_key"
+                value={entry.key}
+                onChange={event =>
+                  setEntries(rows =>
+                    rows.map(row =>
+                      row.id === entry.id ? { ...row, key: event.target.value } : row,
+                    ),
+                  )
+                }
+                placeholder="chave"
+                aria-label={`Chave do rótulo ${entry.key || entry.id}`}
+                className={`${inputClass} border-transparent bg-bg-tile font-mono text-xs sm:max-w-[140px]`}
+              />
+              <span className="text-text-dim">←</span>
+              <input
+                form="bindings"
+                name="label_path"
+                value={entry.path}
+                onChange={event =>
+                  setEntries(rows =>
+                    rows.map(row =>
+                      row.id === entry.id ? { ...row, path: event.target.value } : row,
+                    ),
+                  )
+                }
+                placeholder="caminho no payload"
+                aria-label={`Caminho do rótulo ${entry.key || entry.id}`}
+                className={`${inputClass} border-transparent bg-bg-tile font-mono text-xs`}
+              />
+              {entries.length > 1 && (
+                <button
+                  type="button"
+                  aria-label={`Remover rótulo ${entry.key || entry.id}`}
+                  onClick={() => setEntries(rows => rows.filter(row => row.id !== entry.id))}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-dim transition-colors hover:bg-accent-red/10 hover:text-accent-red"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setEntries(rows => [...rows, { id: nextDraftId(), key: '', path: '' }])}
+            className="flex min-h-8 w-fit items-center gap-1.5 rounded-lg border border-border-base border-dashed px-2.5 py-1.5 text-sm text-text-dim transition-colors hover:border-signal-blue/50 hover:text-text-light"
+          >
+            <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+            Adicionar rótulo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FieldRowItem({ row }: { row: FieldRow }) {
   const [open, setOpen] = useState(false);
   const values = row.values;
@@ -399,18 +490,27 @@ function FieldRowItem({ row }: { row: FieldRow }) {
           <span className="text-text-dim text-xs">{row.hint}</span>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-text-dim">←</span>
-          <input type="hidden" form="bindings" name="field" value={row.field} />
-          <input
-            form="bindings"
-            name="path"
-            defaultValue={row.path ?? ''}
-            placeholder={row.required ? 'obrigatório' : 'deixe vazio se não existir'}
-            aria-label={`Caminho no payload para ${row.field}`}
-            className={`${inputClass} border-transparent bg-bg-tile font-mono text-xs`}
+        {row.kind === 'labels' ? (
+          <LabelsEditor
+            field={row.field}
+            required={row.required}
+            path={row.path}
+            labels={row.labels}
           />
-        </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="shrink-0 text-text-dim">←</span>
+            <input type="hidden" form="bindings" name="field" value={row.field} />
+            <input
+              form="bindings"
+              name="path"
+              defaultValue={row.path ?? ''}
+              placeholder={row.required ? 'obrigatório' : 'deixe vazio se não existir'}
+              aria-label={`Caminho no payload para ${row.field}`}
+              className={`${inputClass} border-transparent bg-bg-tile font-mono text-xs`}
+            />
+          </div>
+        )}
 
         {values && (
           <button
@@ -437,7 +537,7 @@ function FieldRowItem({ row }: { row: FieldRow }) {
 
       {values && open && (
         <div className="border-border-base border-t px-3 pb-3">
-          <p className="py-2.5 text-text-dim text-xs">{FIELD_HINT[row.field as MappingField]}</p>
+          {row.mappingHint && <p className="py-2.5 text-text-dim text-xs">{row.mappingHint}</p>}
           <div className="flex flex-col divide-y divide-border-base/60">
             {values.rows.map(entry => (
               <ValueRow key={entry.domainValue} field={row.field} row={entry} />
@@ -775,7 +875,7 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
   const [searchParams] = useSearchParams();
   const tab = parseIntegrationTab(searchParams.get('tab'));
   const secret = actionData?.secret ?? flashedSecret;
-  const missing = fields.filter(row => row.required && !row.path).length;
+  const missing = fields.filter(row => row.required && !isBound(row)).length;
   const uncovered = fields.reduce((total, row) => {
     if (!row.values || row.values.freeForm) return total;
     return total + row.values.rows.filter(entry => entry.origins.length === 0).length;

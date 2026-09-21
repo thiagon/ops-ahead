@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { FastifyInstance } from 'fastify';
+import { rulesJsonSchema } from '../../services/rules/schema.ts';
 import {
   analysisParamsSchema,
   analysisRequestSchema,
@@ -128,6 +129,16 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
       inputSchema: targetSetSchema,
     },
     async args => jsonResult(await rules.setTargets(tenant, args)),
+  );
+
+  server.registerTool(
+    'get_rules_schema',
+    {
+      title: 'Rules JSON Schema',
+      description:
+        'JSON Schema for mapping, deadline and target documents — the same contracts REST and MCP validate.',
+    },
+    async () => jsonResult(rulesJsonSchema()),
   );
 
   server.registerTool(

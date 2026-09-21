@@ -191,6 +191,7 @@ describe('MCP over http', () => {
         'get_mapping',
         'get_deadlines',
         'get_targets',
+        'get_rules_schema',
         'history_mapping',
         'history_deadlines',
         'history_targets',

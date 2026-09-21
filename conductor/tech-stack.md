@@ -52,7 +52,7 @@
 - **ClickHouse** (Altinity operator) — bronze/silver/gold incident data, read
   directly by `ui-frontend`'s loaders. No PostgreSQL for incident data.
 - **PostgreSQL** (`config-postgres` in `ns: ui`) — two databases on one instance:
-  the frontend config registry, and `gateway` (on-demand analysis status).
+  the gateway (sources, mappings, deadlines, targets, analyses), and `authentik`.
 
 ## Infrastructure
 

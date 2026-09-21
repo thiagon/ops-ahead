@@ -24,11 +24,6 @@ frontend:
     gatewayUrl: http://gateway.ui.svc.cluster.local
     mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
     mlModelServingTimeoutMs: "1500"
-  # ui-postgres' ExternalSecret, projected into ns:ui by the chart that
-  # provisions the database.
-  configDatabase:
-    host: config-postgres.ui.svc.cluster.local:5432
-    secretName: postgres-config-secret
   secretName: ui-frontend-secret
   ingress:
     host: ui.ops-ahead.localtest.me

@@ -28,8 +28,8 @@ export function meta() {
   return [{ title: 'Prazos · Ops Ahead' }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => {
     const [deadlines, revisions] = await Promise.all([
       listDeadlines(),
       listRevisions(['deadline']),
@@ -39,7 +39,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const deadlines = parseDeadlines(form);
     if (typeof deadlines === 'string') return { error: deadlines };

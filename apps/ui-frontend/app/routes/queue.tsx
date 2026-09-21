@@ -14,8 +14,8 @@ export function meta() {
   return [{ title: 'Fila de ocorrências · Ops Ahead' }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => ({ rows: await loadQueue() }));
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => ({ rows: await loadQueue() }));
 }
 
 function ConsumedBar({ row }: { row: QueueRow }) {

@@ -47,7 +47,7 @@ gateway:
   secretName: ui-gateway-secret
   ingress:
     host: gateway.ops-ahead.localtest.me
-  # Same instance as ui-frontend (config-postgres); a different database on it.
+  # config-postgres instance; a different database on it.
   analysesDatabase:
     host: config-postgres.ui.svc.cluster.local:5432
     name: gateway

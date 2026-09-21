@@ -10,6 +10,8 @@ import {
   originParamsSchema,
   rulesAcceptedSchema,
   rulesErrorSchema,
+  rulesJsonSchema,
+  rulesJsonSchemaResponse,
   targetHistorySchema,
   targetSetSchema,
   tenantParamsSchema,
@@ -18,6 +20,18 @@ import {
 export function registerRulesRoutes(app: FastifyInstance): void {
   const rules = app.services.rules;
   const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.get(
+    '/rules/schema',
+    app.auth.user({
+      tags: ['rules'],
+      summary: 'JSON Schema for mapping, deadline and target documents',
+      description:
+        'The same contracts REST and MCP validate. The UI uses this so the field list, required flags and value dictionaries are not copied.',
+      response: { 200: rulesJsonSchemaResponse },
+    }),
+    () => rulesJsonSchema(),
+  );
 
   typed.put(
     '/rules/mappings/:tenant/:source',
