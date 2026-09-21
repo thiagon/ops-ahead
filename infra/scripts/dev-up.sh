@@ -96,6 +96,12 @@ else
     | xargs -r docker update --restart=no >/dev/null
 fi
 
+# k3d sets `unless-stopped` on its containers, so a host reboot brings the whole
+# cluster back up on its own. Reset it on every run: `docker update` only reaches
+# containers that exist now, and `k3d cluster create` mints new ones.
+docker ps -aq --filter "label=k3d.cluster=ops-ahead" \
+  | xargs -r docker update --restart=no >/dev/null
+
 # Wait for the node to answer (matters right after a `k3d cluster start`).
 for i in $(seq 1 40); do
   kubectl get nodes 2>/dev/null | grep -q " Ready" && break

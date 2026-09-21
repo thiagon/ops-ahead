@@ -2,7 +2,7 @@
 # same for every app.
 ui-gateway:
   image:
-    repository: gitea.204-168-208-210.sslip.io/ops-ahead/ui-gateway
+    repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-gateway
     tag: latest
     pullPolicy: IfNotPresent
 
