@@ -12,31 +12,31 @@
   "definitions": {
     "dataRefresh": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis"],
+      "required": ["run_id", "run_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "update_key": { "$ref": "#/definitions/updateKey" },
+        "run_key": { "$ref": "#/definitions/runKey" },
         "analysis": { "const": "data_refresh" }
       }
     },
     "dataQualityCheck": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis"],
+      "required": ["run_id", "run_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "update_key": { "$ref": "#/definitions/updateKey" },
+        "run_key": { "$ref": "#/definitions/runKey" },
         "analysis": { "const": "data_quality_check" }
       }
     },
     "fullPipeline": {
       "type": "object",
-      "required": ["run_id", "update_key", "analysis"],
+      "required": ["run_id", "run_key", "analysis"],
       "additionalProperties": false,
       "properties": {
         "run_id": { "$ref": "#/definitions/runId" },
-        "update_key": { "$ref": "#/definitions/updateKey" },
+        "run_key": { "$ref": "#/definitions/runKey" },
         "analysis": { "const": "full_pipeline" }
       }
     },
@@ -44,9 +44,9 @@
       "type": "string",
       "description": "UUID minted by ui-gateway and returned as `id` on POST /analyses, for every analysis including the scheduled full_pipeline."
     },
-    "updateKey": {
+    "runKey": {
       "type": "string",
-      "description": "Credential for PATCH /analyses/{id}. Travels only on this message — never in the HTTP 202 — so only the consumer can update status."
+      "description": "Credential identifying this run: PATCH /analyses/{id}, and POST /analyses for the runs chained off it when the run is a full_pipeline. Travels only on this message — never in the HTTP 202 — so only the consumer that received it can update status or chain."
     }
   }
 }

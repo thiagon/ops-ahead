@@ -10,12 +10,11 @@ const configSchema = z.object({
   // cluster — an ingress host, so it differs per environment and the
   // integration screen has nothing to show until it is set.
   PUBLIC_GATEWAY_URL: z.url({ protocol: /^https?$/ }).default('https://gateway.ops-ahead.local'),
-  // The configuration registry this app owns — nothing else reads or writes
-  // it (apps/ui-frontend/prisma/schema.prisma). Tenant is a row there, not an env.
-  CONFIG_DATABASE_URL: z
-    .string()
-    .min(1)
-    .default('postgres://config:config@config-postgres.ui.svc.cluster.local:5432/config'),
+  // The same gateway reached from inside the cluster. The public host is what
+  // the browser is sent to for the login; this is what the loaders call.
+  GATEWAY_URL: z
+    .url({ protocol: /^https?$/ })
+    .default('http://gateway.ui.svc.cluster.local'),
   ML_MODEL_SERVING_URL: z
     .url({ protocol: /^https?$/ })
     .default('http://ml-model-serving.ml.svc.cluster.local:3000'),

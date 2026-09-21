@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { EventPublisher } from '../../lib/kafka.ts';
 import { RulesPublish, type RulesTopics } from './publish.ts';
 import type { DeadlineSet, Mapping, TargetSet } from './schema.ts';
 import { RuleStore, type Stored } from './store.ts';

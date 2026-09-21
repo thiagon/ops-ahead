@@ -79,4 +79,23 @@ describe('samplePayload', () => {
       status: 'Encerrado',
     });
   });
+
+  it('writes each labels entry at its own origin path', () => {
+    const fields: SampleField[] = [
+      {
+        field: 'labels',
+        type: 'object',
+        path: null,
+        labels: [
+          { key: 'product', path: 'fields.product' },
+          { key: 'category', path: 'fields.category' },
+        ],
+        values: null,
+      },
+    ];
+
+    expect(samplePayload(fields, now)).toEqual({
+      fields: { product: 'product', category: 'category' },
+    });
+  });
 });

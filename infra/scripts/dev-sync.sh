@@ -15,6 +15,12 @@ cd "$ROOT_DIR"
 
 kubectl get ns infra > /dev/null 2>&1 || error "Cluster not found — run: make up"
 
+# Charts may have grown new ExternalSecret keys since the last full bootstrap.
+# Rewrite Vault from the templates + .env so make sync (and the make-up fast
+# path) pick them up without `make destroy`.
+step "Vault secrets"
+seed_vault
+
 GITEA_PUSH_URL="http://${GITEA_ADMIN_USERNAME}:${GITEA_ADMIN_PASSWORD}@gitea.ops-ahead.localtest.me/${GITEA_ADMIN_USERNAME}/ops-ahead.git"
 
 # Wait for the Gitea HTTP endpoint (pod-Ready is not enough — the ingress
@@ -98,5 +104,8 @@ for app in $(kubectl get applications -n infra -o name 2>/dev/null); do
   kubectl annotate "$app" -n infra \
     argocd.argoproj.io/refresh=hard --overwrite > /dev/null 2>&1 || true
 done
+
+info "Refreshing ExternalSecrets from Vault..."
+refresh_external_secrets
 
 info "Synced — track at http://argocd.ops-ahead.localtest.me"

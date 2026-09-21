@@ -1,18 +1,59 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import type { PrismaClient } from '../../src/generated/prisma/client.ts';
-import { SecretCipher } from '../../src/services/sources/cipher.ts';
+import { SealedJson, SecretCipher } from '../../src/lib/cipher.ts';
 
 type Extend = (app: FastifyInstance) => void;
 
 export async function createTestApp(extend?: Extend): Promise<FastifyInstance> {
   process.env.SOURCE_SECRET_KEY ??= TEST_SECRET_KEY;
+  process.env.SESSION_COOKIE_KEY ??= TEST_SECRET_KEY;
   const app = buildApp({ logger: false });
   extend?.(app);
   stubKafka(app);
   stubPrisma(app);
   await app.ready();
+  stubIntrospection(app);
   return app;
+}
+
+/** The tenants the seeded caller acts for — the groups its token would carry. */
+export const TEST_TENANTS = ['locaweb', 'outro-tenant'];
+
+/**
+ * Every REST route now asks the identity provider who is calling, and no test
+ * reaches one. The stub answers for TEST_BEARER alone, so a test that sends
+ * nothing still exercises the 401 path.
+ */
+export const TEST_BEARER = 'test-access-token';
+
+export function stubIntrospection(app: FastifyInstance): void {
+  if (!app.hasDecorator('services')) return;
+  app.services.oidc.introspect = async (token: string) =>
+    token === TEST_BEARER ? { sub: 'test-user', groups: TEST_TENANTS } : undefined;
+  app.services.oidc.revoke = async () => undefined;
+  app.services.oidc.refresh = async () => undefined;
+  Object.defineProperty(app.services.oidc, 'configured', { get: () => true });
+}
+
+/** What an authenticated caller sends; the MCP client sends the same. */
+export const authHeaders = { authorization: `Bearer ${TEST_BEARER}` };
+
+/** Cookie + CSRF as the browser would send them after /auth/callback. */
+export function sessionHeaders(
+  app: FastifyInstance,
+  accessToken = TEST_BEARER,
+): { cookie: string; 'x-csrf-token': string } {
+  const csrf = 'test-csrf-token';
+  const sealed = new SealedJson(app.env.SESSION_COOKIE_KEY).seal({
+    accessToken,
+    refreshToken: 'test-refresh',
+    csrf,
+  });
+  return {
+    cookie: `oa_session=${sealed}; oa_csrf=${csrf}`,
+    'x-csrf-token': csrf,
+  };
 }
 
 /** The secret the seeded sources sign with — what a test signs its bodies with. */
@@ -78,10 +119,11 @@ function seededSources(): Map<string, SourceRow> {
 type AnalysisRow = {
   id: string;
   analysis: string;
+  tenantId: string | null;
   trigger: 'manual' | 'scheduled' | 'chained';
   parentId: string | null;
   status: 'pending' | 'running' | 'succeeded' | 'failed';
-  updateKeyHash: string;
+  runKeyHash: string;
   startedAt: Date | null;
   finishedAt: Date | null;
   detail: unknown;
@@ -148,7 +190,31 @@ export function memoryPrisma(): PrismaClient {
   const deadlines = copies<DeadlineRow>();
   const targets = copies<TargetRow>();
 
+  const apiKeys = new Map<string, { kind: 'scheduler'; hash: string; revokedAt: Date | null }>();
+
   const client = {
+    apiKey: {
+      async create({ data }: { data: { kind: 'scheduler'; prefix: string; hash: string } }) {
+        apiKeys.set(data.hash, { kind: data.kind, hash: data.hash, revokedAt: null });
+        return { id: data.hash, ...data, createdAt: new Date(), revokedAt: null };
+      },
+      async findUnique({ where }: { where: { hash: string } }) {
+        return apiKeys.get(where.hash) ?? null;
+      },
+      async upsert({
+        where,
+        create,
+      }: {
+        where: { hash: string };
+        create: { kind: 'scheduler'; prefix: string; hash: string };
+        update: object;
+      }) {
+        if (!apiKeys.has(where.hash)) {
+          apiKeys.set(where.hash, { kind: create.kind, hash: create.hash, revokedAt: null });
+        }
+        return apiKeys.get(where.hash);
+      },
+    },
     tenant: {
       async upsert({
         where,
@@ -208,7 +274,7 @@ export function memoryPrisma(): PrismaClient {
         create: Partial<AnalysisRow> & {
           id: string;
           status: AnalysisRow['status'];
-          updateKeyHash: string;
+          runKeyHash: string;
         };
         update: Partial<AnalysisRow>;
       }) {
@@ -217,10 +283,11 @@ export function memoryPrisma(): PrismaClient {
           rows.set(where.id, {
             id: create.id,
             analysis: create.analysis ?? 'unknown',
+            tenantId: create.tenantId ?? null,
             trigger: create.trigger ?? 'manual',
             parentId: create.parentId ?? null,
             status: create.status,
-            updateKeyHash: create.updateKeyHash,
+            runKeyHash: create.runKeyHash,
             startedAt: create.startedAt ?? null,
             finishedAt: create.finishedAt ?? null,
             detail: create.detail ?? null,
@@ -237,21 +304,28 @@ export function memoryPrisma(): PrismaClient {
         rows.set(where.id, { ...current, ...data });
         return rows.get(where.id);
       },
-      async findUnique({ where }: { where: { id: string } }) {
-        return rows.get(where.id) ?? null;
+      async findUnique({ where }: { where: { id?: string; runKeyHash?: string } }) {
+        if (where.runKeyHash !== undefined) {
+          for (const row of rows.values()) {
+            if (row.runKeyHash === where.runKeyHash) return row;
+          }
+          return null;
+        }
+        return (where.id !== undefined ? rows.get(where.id) : undefined) ?? null;
       },
       async findMany({
         where,
         take,
       }: {
-        where?: { trigger?: AnalysisRow['trigger']; analysis?: string };
+        where?: { trigger?: AnalysisRow['trigger']; analysis?: string; tenantId?: string };
         take?: number;
       }) {
         const matches = [...rows.values()]
           .filter(
             row =>
               (!where?.trigger || row.trigger === where.trigger) &&
-              (!where?.analysis || row.analysis === where.analysis),
+              (!where?.analysis || row.analysis === where.analysis) &&
+              (!where?.tenantId || row.tenantId === where.tenantId),
           )
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         return take ? matches.slice(0, take) : matches;

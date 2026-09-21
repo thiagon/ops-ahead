@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
+import { SecretCipher } from '../lib/cipher.ts';
 import { AnalysesService } from './analyses/service.ts';
+import { ApiKeysService } from './api-keys/service.ts';
 import { EventsService } from './events/service.ts';
+import { OidcService } from './oidc/service.ts';
 import { RulesService } from './rules/service.ts';
-import { SecretCipher } from './sources/cipher.ts';
 import { SourcesService } from './sources/service.ts';
+import { TenantsService } from './tenants/service.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -13,6 +16,9 @@ declare module 'fastify' {
       events: EventsService;
       sources: SourcesService;
       rules: RulesService;
+      oidc: OidcService;
+      apiKeys: ApiKeysService;
+      tenants: TenantsService;
     };
   }
 }
@@ -43,7 +49,21 @@ async function servicesPlugin(fastify: FastifyInstance) {
       },
       fastify.prisma,
     ),
+    oidc: new OidcService({
+      issuer: fastify.env.AUTHENTIK_ISSUER,
+      clientId: fastify.env.AUTHENTIK_CLIENT_ID,
+      clientSecret: fastify.env.AUTHENTIK_CLIENT_SECRET,
+      redirectUri: `${fastify.env.PUBLIC_URL.replace(/\/$/, '')}/auth/callback`,
+      introspectionCacheTtlMs: fastify.env.INTROSPECTION_CACHE_TTL_MS,
+      internalOrigin: fastify.env.AUTHENTIK_INTERNAL_ORIGIN || undefined,
+    }),
+    apiKeys: new ApiKeysService(fastify.prisma),
+    tenants: new TenantsService(fastify.prisma),
   });
+
+  if (fastify.env.SCHEDULER_API_KEY) {
+    await fastify.services.apiKeys.register(fastify.env.SCHEDULER_API_KEY);
+  }
 }
 
 export default fp(servicesPlugin, {

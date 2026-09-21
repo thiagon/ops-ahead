@@ -29,11 +29,38 @@ function methodNotAllowed(reply: FastifyReply) {
  *
  * The tenant is a path parameter, the same way every REST route that is
  * scoped to one carries it — never a tool argument.
+ *
+ * Authorization is the Bearer token's, never the cookie's: an MCP client is
+ * not a browser, and the 401 carries the RFC 9728 pointer it reads to find
+ * the authorization server.
  */
 function registerMcpRoutes(app: FastifyInstance): void {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
+  function unauthorized(reply: FastifyReply) {
+    const metadata = `${app.env.PUBLIC_URL.replace(/\/$/, '')}/.well-known/oauth-protected-resource`;
+    return reply
+      .status(401)
+      .header('www-authenticate', `Bearer realm="gateway", resource_metadata="${metadata}"`)
+      .send({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Unauthorized.' },
+        id: null,
+      });
+  }
+
   typed.post('/mcp/:tenant', mcpParams, async (request, reply) => {
+    const auth = request.auth;
+    if (auth.kind !== 'user') return unauthorized(reply);
+    if (!auth.tenants.includes(request.params.tenant)) {
+      return reply.status(403).send({
+        jsonrpc: '2.0',
+        error: { code: -32003, message: 'Forbidden.' },
+        id: null,
+      });
+    }
+    await app.services.tenants.ensure(request.params.tenant);
+
     reply.hijack();
 
     const server = buildMcpServer(app, request.params.tenant);
@@ -52,4 +79,7 @@ function registerMcpRoutes(app: FastifyInstance): void {
   typed.delete('/mcp/:tenant', mcpParams, async (_request, reply) => methodNotAllowed(reply));
 }
 
-export default fp(registerMcpRoutes, { name: 'mcp-route', dependencies: ['env', 'services'] });
+export default fp(registerMcpRoutes, {
+  name: 'mcp-route',
+  dependencies: ['env', 'services', 'auth'],
+});

@@ -1,0 +1,114 @@
+# Authentik owns people, groups and token revocation; the gateway owns none of
+# those (docs/spec-gateway-auth-v2.md). A group here *is* a tenant — same name,
+# no prefix — so adding a client is creating a group, not editing a chart.
+#
+# Everything the upstream chart reads sits under `authentik:`, its own name as
+# a dependency; its internal `authentik:` block is the nesting that follows.
+
+authentik:
+  # Non-sensitive configuration only: the chart turns every key here into an
+  # AUTHENTIK_* env var through a Secret of its own. Setting
+  # `existingSecret.secretName` would suppress that Secret entirely — the
+  # upstream chart renders it only when no existing secret is named — and the
+  # values below would silently never reach the pod. Credentials come from
+  # `global.env` instead, so both sources coexist.
+  authentik:
+    # A blueprint entry that gets skipped says so only at debug — raise this
+    # when an apply reports success but creates nothing.
+    log_level: info
+
+    postgresql:
+      host: config-postgres.ui.svc.cluster.local
+      name: authentik
+      user: admin
+      port: 5432
+
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      # Flat list of hostnames, not the host/paths pairs other charts take:
+      # this one quotes each entry straight into `spec.rules[].host`, so a map
+      # here reaches the API server serialized as the hostname. `paths` and
+      # `pathType` are siblings of this key, left at the chart's defaults.
+      hosts:
+        - auth.ops-ahead.localtest.me
+
+  worker:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  # The chart's bundled Postgres and Redis stay off: config-postgres already
+  # holds the authentik database (ui-postgres.extraDatabases), and the cache
+  # lives in that same Postgres so the IdP adds one dependency rather than two.
+  postgresql:
+    enabled: false
+  redis:
+    enabled: false
+
+  # The two OAuth applications the gateway talks to, applied by the worker at
+  # startup. Declarative so a rebuilt cluster comes up with them already there.
+  blueprints:
+    configMaps:
+      - authentik-blueprints
+
+  # Applies to server and worker alike. Container `env` wins over the `envFrom`
+  # the chart's own Secret arrives through, so these are the authoritative copy.
+  global:
+    env:
+      # Cache in this instance's Postgres rather than a second datastore. Redis
+      # of ml-redis is not reused (docs/spec-gateway-auth-v2.md).
+      - name: AUTHENTIK_CACHE__CACHE_BACKEND
+        value: django.core.cache.backends.db.DatabaseCache
+      - name: AUTHENTIK_CACHE__LOCATION
+        value: authentik_cache
+      # Seeded from the single Vault path for this app, via the ExternalSecret.
+      - name: AUTHENTIK_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_SECRET_KEY
+      - name: AUTHENTIK_POSTGRESQL__PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_POSTGRESQL__PASSWORD
+      - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_BOOTSTRAP_PASSWORD
+      - name: AUTHENTIK_BOOTSTRAP_EMAIL
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_BOOTSTRAP_EMAIL
+      # Read verbatim by the blueprint's `!Env`, applied by the worker.
+      - name: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      # Public hostname so OIDC documents keep browser URLs when the gateway
+      # talks to the in-cluster Service rather than the ingress.
+      - name: AUTHENTIK_HOST
+        value: http://auth.ops-ahead.localtest.me
+
+# Where the gateway sends the browser back after the login. Kept here rather
+# than inside the blueprint so the two stay one edit apart.
+gateway:
+  redirectUri: http://gateway.ops-ahead.localtest.me/auth/callback

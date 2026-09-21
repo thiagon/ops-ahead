@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { EventPublisher } from '../../lib/kafka.ts';
 import { EventsPublish, type EventsTopics } from './publish.ts';
 import { type EventEnvelope, eventEnvelopeSchema, type WebhookAccepted } from './schema.ts';
 

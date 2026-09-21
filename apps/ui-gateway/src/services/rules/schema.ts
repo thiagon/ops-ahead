@@ -122,17 +122,29 @@ const mappingVersion = z.string().min(1).meta({
 
 const alertMappings = z
   .object({
-    status: statusMapping.optional(),
-    severity: severityMapping.optional(),
-    reported_by: reportedByMapping.optional(),
-    resolution_code: resolutionCodeMapping.optional(),
+    status: statusMapping.optional().meta({
+      description: 'Lifecycle of the incident. An unmapped value becomes unknown.',
+    }),
+    severity: severityMapping.optional().meta({
+      description: "The origin's scale translated to ours.",
+    }),
+    reported_by: reportedByMapping.optional().meta({
+      description: 'How the incident was opened.',
+    }),
+    resolution_code: resolutionCodeMapping.optional().meta({
+      description: 'Why it closed. An unmapped value passes through untranslated.',
+    }),
   })
   .strict();
 
 const monitorMappings = z
   .object({
-    condition: conditionMapping.optional(),
-    severity: severityMapping.optional(),
+    condition: conditionMapping.optional().meta({
+      description: 'Whether the condition is firing or cleared.',
+    }),
+    severity: severityMapping.optional().meta({
+      description: "The origin's scale translated to ours.",
+    }),
   })
   .strict();
 
@@ -280,3 +292,26 @@ export const rulesErrorSchema = z
       .meta({ description: 'Which fields broke the contract' }),
   })
   .meta({ id: 'RulesErrorResponse' });
+
+/**
+ * The same Zod documents REST and MCP already validate, as JSON Schema.
+ * The UI reads this instead of keeping a second copy of the contract.
+ */
+export function rulesJsonSchema() {
+  return {
+    mapping: z.toJSONSchema(mappingSchema),
+    deadlines: z.toJSONSchema(deadlineSetSchema),
+    targets: z.toJSONSchema(targetSetSchema),
+  };
+}
+
+export const rulesJsonSchemaResponse = z
+  .object({
+    mapping: z.unknown(),
+    deadlines: z.unknown(),
+    targets: z.unknown(),
+  })
+  .meta({
+    id: 'RulesJsonSchema',
+    description: 'JSON Schema for origin mappings, deadline sets and KPI target sets',
+  });

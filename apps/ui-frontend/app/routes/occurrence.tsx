@@ -26,8 +26,8 @@ export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.externalId} · Ops Ahead` }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => {
     const { source, externalId } = params;
     const alert = await fetchOpenAlert(source, externalId);
     if (!alert) {

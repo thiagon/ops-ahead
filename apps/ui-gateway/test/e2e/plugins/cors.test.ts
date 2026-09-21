@@ -28,6 +28,7 @@ describe('cors over http', () => {
     const other = await fetch(`${server.baseUrl}/health`, { headers: { origin: OTHER } });
 
     expect(allowed.headers.get('access-control-allow-origin')).toBe(ALLOWED);
+    expect(allowed.headers.get('access-control-allow-credentials')).toBe('true');
     expect(other.headers.get('access-control-allow-origin')).toBeNull();
   });
 });

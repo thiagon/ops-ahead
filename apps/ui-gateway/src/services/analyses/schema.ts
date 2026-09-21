@@ -48,6 +48,10 @@ export const analysisParamsSchema = z.object({
   id: z.string().min(1),
 });
 
+export const tenantParamsSchema = z.object({
+  tenant: z.string().min(1),
+});
+
 export const analysisListQuerySchema = z.object({
   trigger: analysisTriggerSchema.optional(),
   analysis: z.string().min(1).optional(),
@@ -56,7 +60,7 @@ export const analysisListQuerySchema = z.object({
 });
 
 export const analysisUpdateHeadersSchema = z.object({
-  'x-update-key': z.string().min(1).meta({
+  'x-run-key': z.string().min(1).meta({
     description: 'Credential from the Kafka message for this run — never returned on HTTP 202',
   }),
 });
@@ -70,16 +74,6 @@ export const analysisUpdateHeadersSchema = z.object({
 const splitDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
 
 /**
- * Optional on every analysis: a caller that says nothing is a person asking
- * for it, which is what `manual` means. The CronJob and data-runner's chaining
- * declare theirs so a run's origin is queryable instead of inferred.
- */
-const provenance = {
-  trigger: analysisTriggerSchema.default('manual'),
-  parent_id: z.string().min(1).optional(),
-};
-
-/**
  * Required on every training: there is one model per tenant, so a run without
  * one has no owner — neither "whose model is this" nor "retrain just this
  * client" would be answerable. The data analyses stay tenant-wide, since a
@@ -91,7 +85,6 @@ export const volumeForecastRequestSchema = z
   .object({
     analysis: z.literal('volume_forecast'),
     ...tenantScoped,
-    ...provenance,
     train_end: splitDate,
     validation_end: splitDate,
     holdout_end: splitDate,
@@ -103,7 +96,6 @@ export const breachRiskRequestSchema = z
   .object({
     analysis: z.literal('breach_risk'),
     ...tenantScoped,
-    ...provenance,
     train_end: splitDate,
     validation_end: splitDate,
     holdout_end: splitDate,
@@ -115,7 +107,6 @@ export const kpiProjectionRequestSchema = z
   .object({
     analysis: z.literal('kpi_projection'),
     ...tenantScoped,
-    ...provenance,
     n_simulations: z.number().int().positive().optional(),
     seed: z.number().int().optional(),
   })
@@ -126,7 +117,6 @@ export const externalEventDetectionRequestSchema = z
   .object({
     analysis: z.literal('external_event_detection'),
     ...tenantScoped,
-    ...provenance,
     contamination: z.number().min(0).max(0.5).optional(),
   })
   .strict()
@@ -136,7 +126,6 @@ export const recurringCausesRequestSchema = z
   .object({
     analysis: z.literal('recurring_causes'),
     ...tenantScoped,
-    ...provenance,
     // How much history describes an entity's behaviour. Unsupervised, so
     // there is no hold-out to declare — only the window to group over.
     window_days: z.number().int().positive().optional(),
@@ -148,7 +137,6 @@ export const entityForecastRequestSchema = z
   .object({
     analysis: z.literal('entity_forecast'),
     ...tenantScoped,
-    ...provenance,
     train_end: splitDate,
     validation_end: splitDate,
     holdout_end: splitDate,
@@ -157,12 +145,12 @@ export const entityForecastRequestSchema = z
   .meta({ id: 'EntityForecastRequest' });
 
 export const dataRefreshRequestSchema = z
-  .object({ analysis: z.literal('data_refresh'), ...provenance })
+  .object({ analysis: z.literal('data_refresh') })
   .strict()
   .meta({ id: 'DataRefreshRequest' });
 
 export const dataQualityCheckRequestSchema = z
-  .object({ analysis: z.literal('data_quality_check'), ...provenance })
+  .object({ analysis: z.literal('data_quality_check') })
   .strict()
   .meta({ id: 'DataQualityCheckRequest' });
 
@@ -172,7 +160,7 @@ export const dataQualityCheckRequestSchema = z
  * like any other client — there is no second, invisible way in.
  */
 export const fullPipelineRequestSchema = z
-  .object({ analysis: z.literal('full_pipeline'), ...provenance })
+  .object({ analysis: z.literal('full_pipeline') })
   .strict()
   .meta({ id: 'FullPipelineRequest' });
 

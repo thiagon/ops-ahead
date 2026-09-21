@@ -32,10 +32,22 @@ gateway:
     httpsEnabled: "false"
     corsOrigins:
       - http://ui.ops-ahead.localtest.me
+    authentikIssuer: http://auth.ops-ahead.localtest.me/application/o/gateway-web/
+    # Server-side OIDC (discovery, token, introspect) talks to the Service
+    # directly. The public issuer host is what the browser is sent to, and
+    # what `localtest.me` would resolve to inside the pod (itself).
+    authentikInternalOrigin: http://infra-authentik-server.infra.svc.cluster.local
+    authentikClientId: gateway-web
+    authentikMcpClientId: gateway-mcp
+    introspectionCacheTtlMs: "5000"
+    frontendOrigin: http://ui.ops-ahead.localtest.me
+    publicUrl: http://gateway.ops-ahead.localtest.me
+    # Parent of ui.* and gateway.* so the session cookie reaches both hosts.
+    sessionCookieDomain: ops-ahead.localtest.me
   secretName: ui-gateway-secret
   ingress:
     host: gateway.ops-ahead.localtest.me
-  # Same instance as ui-frontend (config-postgres); a different database on it.
+  # config-postgres instance; a different database on it.
   analysesDatabase:
     host: config-postgres.ui.svc.cluster.local:5432
     name: gateway
@@ -47,6 +59,8 @@ networkPolicy:
   kafkaPort: 9092
   # ClickHouse HTTP interface — ui-frontend's gold/silver loaders.
   clickhousePort: 8123
+  # Authentik server — introspection and the token endpoint.
+  authentikPort: 9000
   # ml-model-serving — the breach score ui-frontend's operator queue reads.
   mlModelServingPort: 3000
 

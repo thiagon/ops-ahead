@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestApp } from '../../../helpers/app.ts';
+import { authHeaders, createTestApp } from '../../../helpers/app.ts';
 import { alertMapping } from '../../../helpers/mapping.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
@@ -25,6 +25,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
       payload: alertMapping,
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
@@ -48,6 +49,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
         },
         mappings: {},
       },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
@@ -61,6 +63,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
       payload: { ...alertMapping, bindings: rest },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -74,6 +77,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
       method: 'PUT',
       url: '/rules/mappings/locaweb/itsm',
       payload: alertMapping,
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(502);
@@ -100,6 +104,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
       payload: { deadlines: [{ severity: 1, seconds: 14400 }] },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
@@ -111,6 +116,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
       payload: { deadlines: [] },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -127,6 +133,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
           { severity: 1, seconds: 7200 },
         ],
       },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -156,6 +163,7 @@ describe('PUT /rules/targets/:tenant', () => {
       payload: {
         targets: [{ severities: [1, 2], max_breaches: 5, achievement_pct: 95 }],
       },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
@@ -169,6 +177,7 @@ describe('PUT /rules/targets/:tenant', () => {
       payload: {
         targets: [{ kpi_group: 'p1_p2', max_breaches: 5, achievement_pct: 95 }],
       },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -188,9 +197,18 @@ describe('GET and history', () => {
 
   it('reads the current deadlines after a PUT', async () => {
     const body = { deadlines: [{ severity: 1, seconds: 14400 }] };
-    await app.inject({ method: 'PUT', url: '/rules/deadlines/locaweb', payload: body });
+    await app.inject({
+      method: 'PUT',
+      url: '/rules/deadlines/locaweb',
+      payload: body,
+      headers: authHeaders,
+    });
 
-    const res = await app.inject({ method: 'GET', url: '/rules/deadlines/locaweb' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/rules/deadlines/locaweb',
+      headers: authHeaders,
+    });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual(body);
@@ -201,14 +219,54 @@ describe('GET and history', () => {
       method: 'PUT',
       url: '/rules/deadlines/locaweb',
       payload: { deadlines: [{ severity: 1, seconds: 7200 }] },
+      headers: authHeaders,
     });
 
-    const res = await app.inject({ method: 'GET', url: '/rules/deadlines/locaweb/history' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/rules/deadlines/locaweb/history',
+      headers: authHeaders,
+    });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()[0]).toMatchObject({
       deadlines: [{ severity: 1, seconds: 7200 }],
       id: expect.any(Number),
     });
+  });
+});
+
+describe('GET /rules/schema', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('answers 401 without a session', async () => {
+    const res = await app.inject({ method: 'GET', url: '/rules/schema' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns the mapping, deadline and target JSON Schemas from the same Zod contracts', async () => {
+    const res = await app.inject({ method: 'GET', url: '/rules/schema', headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json() as {
+      mapping: { oneOf: { properties: { intake: { const: string }; bindings: { required: string[] } } }[] };
+      deadlines: { properties: { deadlines: unknown } };
+      targets: { properties: { targets: unknown } };
+    };
+
+    const alert = body.mapping.oneOf.find(variant => variant.properties.intake.const === 'alert');
+    expect(alert?.properties.bindings.required).toEqual(
+      expect.arrayContaining(['external_id', 'opened_at', 'severity', 'status', 'title']),
+    );
+    expect(body.deadlines.properties.deadlines).toBeDefined();
+    expect(body.targets.properties.targets).toBeDefined();
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SecretCipher } from '../../../../src/services/sources/cipher.ts';
+import { SecretCipher } from '../../../../src/lib/cipher.ts';
 import { SourcesService } from '../../../../src/services/sources/service.ts';
 import { memoryPrisma, TEST_SECRET, TEST_SECRET_KEY } from '../../../helpers/app.ts';
 

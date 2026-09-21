@@ -7,6 +7,7 @@ import {
   createJsonSchemaTransform,
   createJsonSchemaTransformObject,
 } from 'fastify-type-provider-zod';
+import createError from 'http-errors';
 
 /** z.codec is the HTTP Date bridge; OpenAPI only has the wire type (ISO-8601). */
 const zodToJsonConfig = {
@@ -43,6 +44,7 @@ async function swaggerPlugin(fastify: FastifyInstance) {
         title: fastify.env.SERVICE_NAME,
         version: fastify.env.SERVICE_VERSION,
       },
+      components: { securitySchemes: fastify.auth.schemes },
     },
     transform: createJsonSchemaTransform({ zodToJsonConfig }),
     transformObject: createJsonSchemaTransformObject({ zodToJsonConfig }),
@@ -56,7 +58,13 @@ async function swaggerPlugin(fastify: FastifyInstance) {
     openApiDocumentEndpoints: { json: '/json', yaml: '/yaml' },
     configuration: { nonce: docsNonce },
     hooks: {
-      onRequest(_request, reply, done) {
+      onRequest(request, reply, done) {
+        // /docs is behind a session: a probe and a webhook have no cookie,
+        // and the reference is not a public surface.
+        if (request.auth?.kind !== 'user') {
+          done(createError.Unauthorized('this endpoint needs a logged-in caller'));
+          return;
+        }
         const header = cspHeader(reply);
         if (header.includes('script-src')) {
           reply.header(
@@ -70,4 +78,4 @@ async function swaggerPlugin(fastify: FastifyInstance) {
   });
 }
 
-export default fp(swaggerPlugin, { name: 'swagger', dependencies: ['env'] });
+export default fp(swaggerPlugin, { name: 'swagger', dependencies: ['env', 'auth'] });

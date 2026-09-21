@@ -1,9 +1,9 @@
 # Configuração da ingestão — tela e persistência
 
 **Criado:** 2026-09-17
-**Atualizado:** 2026-09-18
-**Estado:** telas e registry Prisma no `ui-frontend`; propagação aos consumidores (Kafka) é passo posterior
-**Escopo:** `apps/ui-frontend` (telas + Postgres), `infra/charts/ui-postgres`, `infra/charts/ui-frontend`
+**Atualizado:** 2026-09-21
+**Estado:** telas no `ui-frontend`; registry no `ui-gateway` (REST e MCP)
+**Escopo:** `apps/ui-frontend` (telas), `apps/ui-gateway` (cadastro), `infra/charts/ui-frontend`
 
 ---
 
@@ -24,20 +24,19 @@ de engenharia, não de configuração.
 
 ## 2. O que muda
 
-O cliente cadastra a integração pela tela. O registry fica no Postgres deste app.
+O cliente cadastra a integração pela tela. O registry fica no Postgres do gateway.
 
 ```
-ui-frontend ──► Postgres (ns: ui, config-postgres)
-   telas          cadastro, histórico, rollback
+ui-frontend ──► ui-gateway ──► Postgres (ns: ui, config-postgres / gateway)
+   telas         REST + MCP      origens, mapeamentos, prazos, metas
 ```
 
-**Postgres é o cadastro.** Guarda quem alterou, quando, e a versão anterior —
-é o que sustenta o histórico e o rollback. Só o `ui-frontend` fala com ele
-(`prisma/schema.prisma`, `app/features/config/repo.server.ts`).
+**O gateway é o cadastro.** REST e MCP chamam as mesmas funções. O histórico são os
+últimos dez documentos publicados; republicar um é um PUT do corpo. Só o `ui-gateway`
+fala com o banco (`prisma/schema.prisma`).
 
-Publicar o estado corrente para o pipeline (tópicos `config.*`, Vault HMAC,
-consumidores em gateway/ingest) é um passo posterior — as telas já persistem;
-a propagação ainda não.
+O `ui-frontend` não tem banco próprio de configuração: os loaders gastam o cookie da
+sessão em `GATEWAY_URL` (`app/features/auth/gateway.server.ts`).
 
 ### Sem configuração, não roda (quando a propagação existir)
 
@@ -45,7 +44,7 @@ Um serviço que sobe e não encontra a configuração de que depende não fica p
 — o readiness probe falha. Não há arquivo-semente embutido na imagem: falha
 visível em vez de degradação silenciosa.
 
-O seed inicial nasce no Postgres (`npm run db:seed` / `prisma/seed.ts`).
+Não há seed neste app: a configuração nasce no gateway, pela tela ou pelo MCP.
 
 ---
 
@@ -106,19 +105,22 @@ Em `apps/ui-frontend/`:
 
 ```
 app/features/config/
-  types.ts                 vocabulário do domínio, CONTRACT_FIELDS, DOMAIN_VALUES
-  repo.server.ts           leitura/escrita Prisma (loaders e actions)
+  types.ts                 vocabulário de apresentação (prioridade, intake)
+  contract-schema.ts       parser de GET /rules/schema
+  repo.server.ts           cliente HTTP do gateway (loaders e actions)
   secret-flash.server.ts   cookie de uma vez após criar integração
-prisma/
-  schema.prisma            registry (config_*)
-  seed.ts                  estado inicial locaweb/service_now (Monitor)
+app/features/auth/
+  gateway.server.ts        encaminha o cookie da sessão
 app/routes/
   integrations.tsx · integration-detail.tsx · targets.tsx · deadlines.tsx
 ```
 
-Os loaders e `action()` chamam só `repo.server.ts`. Não há API HTTP intermediária.
+Os loaders e `action()` chamam `repo.server.ts`, que fala com o gateway. O
+vocabulário do dicionário (campos, obrigatórios, enums) vem de `GET /rules/schema`.
+Não há Prisma neste app.
 
-Migrations: PreSync Job no chart `ui-frontend` (`prisma migrate deploy`).
+A URL de envio é `/webhook/:tenant/:source` (o `version` opcional seleciona o
+dicionário; omitido, o gateway usa o vigente).
 
 ---
 

@@ -3,17 +3,21 @@ import { Link, Outlet } from 'react-router';
 import { fetchOpenAlertCount } from '~/clickhouse.server.ts';
 import { RouteError } from '~/components/RouteError';
 import { Sidebar } from '~/components/Sidebar';
+import { requireTenantAccess } from '~/features/auth/session.server.ts';
 import { currentTenant, withTenant } from '~/features/config/repo.server.ts';
 import { useSession } from '~/session';
 import type { Route } from './+types/tenant';
 
 /**
- * Resolves the tenant from the URL slug and wraps the chrome every tenant
- * screen shares. Child loaders still call `withTenant` themselves: nested
- * loaders run in parallel, so they cannot inherit this request's store.
+ * Binds the tenant from the URL and wraps the chrome every tenant screen
+ * shares. Child loaders still call `withTenant` themselves: nested loaders
+ * run in parallel, so they cannot inherit this request's store.
+ *
+ * Access is the claim's — an unauthorized caller never reaches the slug.
  */
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => ({
+export async function loader({ params, request }: Route.LoaderArgs) {
+  await requireTenantAccess(request, params.tenant);
+  return withTenant(request, params.tenant, async () => ({
     tenant: await currentTenant(),
     openCount: await fetchOpenAlertCount().catch(() => null),
   }));

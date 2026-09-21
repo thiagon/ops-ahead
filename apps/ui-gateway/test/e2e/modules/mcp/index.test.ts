@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { authHeaders } from '../../../helpers/app.ts';
 import { alertMapping } from '../../../helpers/mapping.ts';
 import { startTestServer, type TestServer } from '../../../helpers/server.ts';
 
@@ -14,7 +15,11 @@ async function rpc(
 ) {
   const res = await fetch(`${baseUrl}/mcp/${tenant}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      ...authHeaders,
+    },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
   const body = await res.text();
@@ -186,6 +191,7 @@ describe('MCP over http', () => {
         'get_mapping',
         'get_deadlines',
         'get_targets',
+        'get_rules_schema',
         'history_mapping',
         'history_deadlines',
         'history_targets',

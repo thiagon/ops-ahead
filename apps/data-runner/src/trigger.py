@@ -42,20 +42,20 @@ def _split_boundaries(settings: Settings, today: date) -> dict[str, str]:
     }
 
 
-def start_analysis(
-    gateway_url: str, body: dict[str, Any], *, trigger: str, parent_id: str | None = None
-) -> str:
+def start_analysis(gateway_url: str, body: dict[str, Any], *, run_key: str) -> str:
     """POST /analyses as any other client would. The gateway mints the id, the
-    update_key and the row, so a chained training is as queryable as one
-    somebody asked for."""
-    payload = {**body, "trigger": trigger}
-    if parent_id:
-        payload["parent_id"] = parent_id
+    run_key and the row, so a chained training is as queryable as one somebody
+    asked for.
+
+    The parent's run_key is the credential: presenting it is what makes this a
+    chained run off that full_pipeline, so neither trigger nor parent_id is
+    sent — the gateway derives both from the header.
+    """
     request = urllib.request.Request(
         f"{gateway_url.rstrip('/')}/analyses",
-        data=json.dumps(payload).encode(),
+        data=json.dumps(body).encode(),
         method="POST",
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "X-Run-Key": run_key},
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read())["id"]
@@ -78,6 +78,7 @@ def discover_tenants(settings: Settings) -> list[str]:
 def chain_trainings(
     settings: Settings,
     parent_run_id: str,
+    parent_run_key: str,
     start: StartAnalysisFn = start_analysis,
     today: date | None = None,
     tenants: list[str] | None = None,
@@ -106,9 +107,7 @@ def chain_trainings(
             if analysis in SPLIT_REQUIRED_ANALYSES:
                 body.update(splits)
             try:
-                started[key] = start(
-                    settings.gateway_url, body, trigger="chained", parent_id=parent_run_id
-                )
+                started[key] = start(settings.gateway_url, body, run_key=parent_run_key)
             except Exception as exc:
                 # One training failing to start must not cost the others, and
                 # none of it undoes the transformation that already ran.
@@ -117,15 +116,15 @@ def chain_trainings(
     return {"chained": started, "chain_failed": failed}
 
 
-def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | None) -> None:
-    """PATCH /analyses/{id} with the update_key from the trigger.data message.
+def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None) -> None:
+    """PATCH /analyses/{id} with the run_key from the trigger.data message.
 
     A missing key means the message did not come from POST /analyses, which no
     producer does anymore; the branch stays as a defence, not a path.
     """
     run_id = payload["run_id"]
-    if not update_key:
-        LOGGER.info("no update_key on event; skipping PATCH /analyses/%s", run_id)
+    if not run_key:
+        LOGGER.info("no run_key on event; skipping PATCH /analyses/%s", run_id)
         return
 
     body = {key: value for key, value in payload.items() if key != "run_id"}
@@ -133,7 +132,7 @@ def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | N
         f"{gateway_url.rstrip('/')}/analyses/{run_id}",
         data=json.dumps(body).encode(),
         method="PATCH",
-        headers={"Content-Type": "application/json", "X-Update-Key": update_key},
+        headers={"Content-Type": "application/json", "X-Run-Key": run_key},
     )
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
@@ -149,6 +148,7 @@ def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | N
 def run_full_pipeline(
     settings: Settings,
     dag_run_id: str,
+    run_key: str,
     steps: dict[str, Callable] = _STEPS,
     register_snapshot: RegisterSnapshotFn = _register_snapshot,
     start: StartAnalysisFn = start_analysis,
@@ -164,7 +164,7 @@ def run_full_pipeline(
     steps["quality"](["--suite", "critical", "--upload-docs"])
     digest = register_snapshot(settings, dag_run_id=dag_run_id)
     detail: dict[str, Any] = {"snapshot_hash": digest}
-    detail.update(chain_trainings(settings, dag_run_id, start=start, tenants=tenants))
+    detail.update(chain_trainings(settings, dag_run_id, run_key, start=start, tenants=tenants))
     return detail
 
 
@@ -196,7 +196,11 @@ def process_message(
     try:
         if analysis == "full_pipeline":
             detail: dict[str, Any] | None = run_full_pipeline(
-                settings, dag_run_id=run_id, steps=steps, register_snapshot=register_snapshot
+                settings,
+                dag_run_id=run_id,
+                run_key=event.get("run_key", ""),
+                steps=steps,
+                register_snapshot=register_snapshot,
             )
         else:
             step = ANALYSIS_STEPS[analysis]
@@ -268,7 +272,7 @@ def consume_forever(settings: Settings) -> None:
                 ).inc()
 
                 def publish_status(
-                    payload: dict[str, Any], _key: str | None = event.get("update_key")
+                    payload: dict[str, Any], _key: str | None = event.get("run_key")
                 ) -> None:
                     report_status(settings.gateway_url, payload, _key)
 

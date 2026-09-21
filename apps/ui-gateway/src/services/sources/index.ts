@@ -1,4 +1,3 @@
-export { generateSecret, SecretCipher } from './cipher.ts';
 export {
   secretRotationSchema,
   sourceErrorSchema,

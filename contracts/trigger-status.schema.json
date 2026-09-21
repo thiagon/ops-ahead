@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "trigger-status/v1",
   "title": "TriggerStatusEvent",
-  "description": "Body of PATCH /analyses/{id} plus run_id. Trainers send this over HTTP (path id, header X-Update-Key); they no longer publish to trigger.status.",
+  "description": "Body of PATCH /analyses/{id} plus run_id. Trainers send this over HTTP (path id, header X-Run-Key); they no longer publish to trigger.status.",
   "type": "object",
   "oneOf": [
     { "$ref": "#/definitions/running" },

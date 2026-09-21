@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createTestApp } from '../../../helpers/app.ts';
+import { authHeaders, createTestApp } from '../../../helpers/app.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
 
-function lastUpdateKey(): string {
+function lastRunKey(): string {
   const value = publish.mock.calls.at(-1)?.[0]?.value ?? '{}';
-  return JSON.parse(value).update_key as string;
+  return JSON.parse(value).run_key as string;
 }
 
 describe('GET /analyses/:id', () => {
@@ -21,28 +21,33 @@ describe('GET /analyses/:id', () => {
   });
 
   it('answers 404 for an id that was never started', async () => {
-    const res = await app.inject({ method: 'GET', url: '/analyses/never-seen' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/analyses/never-seen',
+      headers: authHeaders,
+    });
 
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'NotFoundError', message: 'analysis not found' });
   });
 
-  it('reflects running after PATCH with the kafka update key', async () => {
+  it('reflects running after PATCH with the kafka run key', async () => {
     const started = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_refresh' },
+      headers: authHeaders,
     });
     const { id } = started.json();
 
     await app.inject({
       method: 'PATCH',
       url: `/analyses/${id}`,
-      headers: { 'x-update-key': lastUpdateKey() },
+      headers: { 'x-run-key': lastRunKey() },
       payload: { status: 'running', started_at: '2026-08-15T12:30:00Z' },
     });
 
-    const res = await app.inject({ method: 'GET', url: `/analyses/${id}` });
+    const res = await app.inject({ method: 'GET', url: `/analyses/${id}`, headers: authHeaders });
 
     expect(res.json()).toEqual({
       id,
@@ -56,15 +61,16 @@ describe('GET /analyses/:id', () => {
   it('reflects a terminal status with its detail, never touching Kubernetes', async () => {
     const started = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_refresh' },
+      headers: authHeaders,
     });
     const { id } = started.json();
 
     await app.inject({
       method: 'PATCH',
       url: `/analyses/${id}`,
-      headers: { 'x-update-key': lastUpdateKey() },
+      headers: { 'x-run-key': lastRunKey() },
       payload: {
         status: 'succeeded',
         started_at: '2026-08-15T12:30:00.000Z',
@@ -73,7 +79,7 @@ describe('GET /analyses/:id', () => {
       },
     });
 
-    const res = await app.inject({ method: 'GET', url: `/analyses/${id}` });
+    const res = await app.inject({ method: 'GET', url: `/analyses/${id}`, headers: authHeaders });
 
     expect(res.json()).toMatchObject({
       status: 'succeeded',
@@ -96,19 +102,20 @@ describe('PATCH /analyses/:id', () => {
   async function startRun() {
     const started = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_refresh' },
+      headers: authHeaders,
     });
-    return { id: started.json().id as string, updateKey: lastUpdateKey() };
+    return { id: started.json().id as string, runKey: lastRunKey() };
   }
 
   it('returns the updated status when the kafka key is presented', async () => {
-    const { id, updateKey } = await startRun();
+    const { id, runKey } = await startRun();
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/analyses/${id}`,
-      headers: { 'x-update-key': updateKey },
+      headers: { 'x-run-key': runKey },
       payload: { status: 'running', started_at: '2026-08-15T12:30:00Z' },
     });
 
@@ -123,12 +130,12 @@ describe('PATCH /analyses/:id', () => {
   });
 
   it('rejects an unknown status with 400', async () => {
-    const { id, updateKey } = await startRun();
+    const { id, runKey } = await startRun();
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/analyses/${id}`,
-      headers: { 'x-update-key': updateKey },
+      headers: { 'x-run-key': runKey },
       payload: { status: 'Running' },
     });
 
@@ -142,6 +149,7 @@ describe('PATCH /analyses/:id', () => {
       method: 'PATCH',
       url: `/analyses/${id}`,
       payload: { status: 'running' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -153,7 +161,7 @@ describe('PATCH /analyses/:id', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: `/analyses/${id}`,
-      headers: { 'x-update-key': 'not-the-key' },
+      headers: { 'x-run-key': 'not-the-key' },
       payload: { status: 'running' },
     });
 

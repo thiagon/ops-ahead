@@ -4,7 +4,7 @@
  * the ClickHouse/model-serving client code — see test/server-only.test.ts.
  */
 
-/** Slug in the URL, name on screen. The numeric id stays on the server. */
+/** Slug in the URL, name on screen. Both are the Authentik group name. */
 export type TenantRef = {
   slug: string;
   name: string;

@@ -1,4 +1,4 @@
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { EventPublisher } from '../../lib/kafka.ts';
 import type { AnalysisRequest } from './schema.ts';
 
 const ANALYSIS_DOMAIN: Record<AnalysisRequest['analysis'], 'ml' | 'data'> = {
@@ -26,15 +26,14 @@ export class AnalysisPublish {
     return this.#topics[ANALYSIS_DOMAIN[analysis]];
   }
 
-  async send(id: string, request: AnalysisRequest, updateKey: string): Promise<void> {
+  async send(id: string, request: AnalysisRequest, runKey: string): Promise<void> {
     // Provenance stays in the gateway's own row: the trigger contracts declare
     // additionalProperties: false, and what started a run is not something the
     // consumer acts on.
-    const { trigger: _trigger, parent_id: _parentId, ...event } = request;
     await this.#publish.publish({
       topic: this.topicFor(request.analysis),
       key: id,
-      value: JSON.stringify({ run_id: id, update_key: updateKey, ...event }),
+      value: JSON.stringify({ run_id: id, run_key: runKey, ...request }),
     });
   }
 }

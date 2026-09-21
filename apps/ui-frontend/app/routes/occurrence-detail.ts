@@ -12,8 +12,8 @@ import type { Route } from './+types/occurrence-detail';
  * The drill-down's per-row data — timeline and similar incidents are only
  * worth fetching for the selected recommendation, not every row in the queue.
  */
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => {
     const { source, externalId } = params;
     const alert = await fetchOpenAlert(source, externalId);
     if (!alert) {

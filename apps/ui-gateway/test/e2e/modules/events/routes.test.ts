@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
-import { createTestApp } from '../../../helpers/app.ts';
+import type { OutboundMessage } from '../../../../src/lib/kafka.ts';
+import { authHeaders, createTestApp } from '../../../helpers/app.ts';
 
 const ROUTE = '/webhook/locaweb/itsm';
 
@@ -119,7 +119,9 @@ describe('POST /webhook/:tenant/:source', () => {
   });
 
   it('documents the version default, and only on the route that takes one', async () => {
-    const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
+    const paths = (
+      await app.inject({ method: 'GET', url: '/docs/json', headers: authHeaders })
+    ).json().paths;
     const pathParams = (path: string) =>
       paths[path].post.parameters.filter((p: { in: string }) => p.in === 'path');
 
@@ -135,14 +137,18 @@ describe('POST /webhook/:tenant/:source', () => {
   });
 
   it('publishes one parameterized ingest route, not one per origin', async () => {
-    const paths = (await app.inject({ method: 'GET', url: '/docs/json' })).json().paths;
+    const paths = (
+      await app.inject({ method: 'GET', url: '/docs/json', headers: authHeaders })
+    ).json().paths;
 
     expect(paths['/webhook/{tenant}/{source}']).toBeDefined();
     expect(paths['/webhook/{tenant}/{source}/{version}']).toBeDefined();
   });
 
   it('documents the envelope published to the bus', async () => {
-    const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
+    const doc = (
+      await app.inject({ method: 'GET', url: '/docs/json', headers: authHeaders })
+    ).json();
 
     expect(doc.components.schemas.EventEnvelope.properties.payload).toBeDefined();
     expect(doc.components.schemas.EventEnvelope.properties.tenant_id).toBeDefined();

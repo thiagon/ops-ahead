@@ -24,6 +24,15 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # infra: Authentik Service (80 → 9000 on the pod) — discovery, token
+    # exchange and introspection. The public issuer host is only for the browser.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
+      ports:
+        - port: 80
+        - port: {{ .Values.networkPolicy.authentikPort }}
     # ml: MLflow API (5000) and ml-model-serving (3000) — the breach score
     # the operator queue reads alongside consumed_ratio.
     - to:

@@ -43,6 +43,8 @@ Vale para namespaces, pods, Applications do ArgoCD, apps de `apps/`, charts de
 O `dev-up.sh` monta os `vault kv put` sozinho: lê todo
 `infra/charts/*/templates/external-secret.yaml`, usa `remoteRef.key` como caminho no Vault
 e `remoteRef.property` como nome da variável, e pega o valor da var de mesmo nome no `.env`.
+O `dev-sync.sh` (e o fast path do `make up`) reexecuta o mesmo seed — `vault kv put`
+substitui o path inteiro, então um campo novo só existe no Vault se isso rodar de novo.
 
 Ao adicionar um serviço que precisa de credencial:
 
@@ -78,7 +80,7 @@ Cada operação deve ser segura para rodar múltiplas vezes:
 1. Criar chart em infra/charts/<nome>/
 2. Criar app em infra/apps/<nome>.yaml
 3. Criar ExternalSecret no chart + var de mesmo nome no .env (se precisar de secret)
-4. make sync  →  ArgoCD sincroniza tudo automaticamente
+4. make sync  →  reescreve o Vault a partir dos ExternalSecrets e o ArgoCD sincroniza o resto
 ```
 
 Nenhum passo edita script.

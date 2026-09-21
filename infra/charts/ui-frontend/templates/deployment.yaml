@@ -65,30 +65,15 @@ spec:
             # native protocol ml-trainer's clickhouse_driver uses (9000).
             - name: CLICKHOUSE_URL
               value: "http://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ .Values.frontend.env.clickhouseHost }}:8123/{{ .Values.frontend.env.clickhouseDatabase }}"
-            # Configuration registry this app owns (ui-postgres). Nothing else
-            # reads or writes it — see apps/ui-frontend/prisma/schema.prisma.
-            - name: UI_POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.frontend.configDatabase.secretName }}
-                  key: POSTGRES_USER
-            - name: UI_POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.frontend.configDatabase.secretName }}
-                  key: POSTGRES_PASSWORD
-            - name: UI_POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.frontend.configDatabase.secretName }}
-                  key: POSTGRES_DB
-            - name: CONFIG_DATABASE_URL
-              value: postgres://$(UI_POSTGRES_USER):$(UI_POSTGRES_PASSWORD)@{{ .Values.frontend.configDatabase.host }}/$(UI_POSTGRES_DB)
             # Where a customer's origin system reaches the gateway from
             # outside the cluster, which is what the integration screen shows
             # them to configure on their side.
             - name: PUBLIC_GATEWAY_URL
               value: {{ .Values.frontend.env.publicGatewayUrl | quote }}
+            # The same gateway from inside the cluster — what the loaders call
+            # to ask who is signed in.
+            - name: GATEWAY_URL
+              value: {{ .Values.frontend.env.gatewayUrl | quote }}
             - name: ML_MODEL_SERVING_URL
               value: {{ .Values.frontend.env.mlModelServingUrl | quote }}
             - name: ML_MODEL_SERVING_TIMEOUT_MS

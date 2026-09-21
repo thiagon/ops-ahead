@@ -39,9 +39,9 @@ describe('analysisRequestSchema', () => {
     'accepts %s without split dates, but never without a tenant',
     analysis => {
       expect(analysisRequestSchema.safeParse({ analysis }).success).toBe(false);
-      expect(
-        analysisRequestSchema.safeParse({ analysis, tenant_id: 'locaweb' }).success,
-      ).toBe(true);
+      expect(analysisRequestSchema.safeParse({ analysis, tenant_id: 'locaweb' }).success).toBe(
+        true,
+      );
     },
   );
 
@@ -89,7 +89,6 @@ describe('analysisRequestSchema', () => {
 
     expect(result.success).toBe(false);
   });
-
 
   it('rejects kpi_projection with a non-integer n_simulations', () => {
     const result = analysisRequestSchema.safeParse({

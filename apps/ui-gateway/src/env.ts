@@ -48,9 +48,55 @@ export const envSchema = z
     HMAC_ENABLED: z.stringbool().default(false),
 
     /**
+     * Encrypts the tokens the browser cookie carries. The gateway keeps no
+     * session row: the cookie is the storage, and this key is what keeps its
+     * contents out of reach of the browser.
+     */
+    SESSION_COOKIE_KEY: z.string().default(''),
+
+    /** Issuer URL of the Authentik realm — OIDC discovery hangs off it. */
+    AUTHENTIK_ISSUER: z.string().default(''),
+    /**
+     * In-cluster origin of that issuer. Server-side fetches (discovery, token,
+     * introspect) go here so the public hostname does not have to resolve
+     * inside the pod. Empty: fetch the issuer as written. The browser still
+     * follows the public authorization endpoint.
+     */
+    AUTHENTIK_INTERNAL_ORIGIN: z.string().default(''),
+    /** Confidential client the browser flow uses. */
+    AUTHENTIK_CLIENT_ID: z.string().default(''),
+    AUTHENTIK_CLIENT_SECRET: z.string().default(''),
+    /** Public client the MCP clients register against; it never gets a secret. */
+    AUTHENTIK_MCP_CLIENT_ID: z.string().default(''),
+    /**
+     * Parent domain of the UI and gateway hosts, so `oa_session` is sent to
+     * both. Empty: host-only (the cookie stays on the gateway).
+     */
+    SESSION_COOKIE_DOMAIN: z.string().default(''),
+    /**
+     * How long an introspection answer is reused. Short: it is what makes a
+     * revoked token stop working, so the window is the delay on a revocation.
+     */
+    INTROSPECTION_CACHE_TTL_MS: z.coerce.number().default(5_000),
+
+    /**
+     * The key the daily CronJob presents. Registered at startup so the clock
+     * and the gateway read one Vault value rather than each holding its own.
+     */
+    SCHEDULER_API_KEY: z.string().default(''),
+
+    /** Where /auth/callback sends the browser once the cookie is set. */
+    FRONTEND_ORIGIN: z.string().default('http://localhost:5173'),
+    /**
+     * Reachable base URL of the gateway itself — the OAuth redirect and the
+     * protected-resource document are absolute.
+     */
+    PUBLIC_URL: z.string().default('http://localhost:3000'),
+
+    /**
      * Decrypts the webhook secrets stored in the sources table
-     * (services/sources/cipher.ts). One key for the whole table: registering
-     * a source is an insert, never a write to the Vault.
+     * (lib/cipher.ts). One key for the whole table: registering a source
+     * is an insert, never a write to the Vault.
      */
     SOURCE_SECRET_KEY: z.string().default(''),
     /**

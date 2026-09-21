@@ -235,12 +235,12 @@ class TestProcessMessage:
 
 
 class TestReportStatus:
-    def test_skips_when_the_event_has_no_update_key(self):
+    def test_skips_when_the_event_has_no_run_key(self):
         from trigger import report_status
 
         report_status("http://gateway", {"run_id": "run-1", "status": "running"}, None)
 
-    def test_patches_the_gateway_with_the_update_key(self, monkeypatch):
+    def test_patches_the_gateway_with_the_run_key(self, monkeypatch):
         from trigger import report_status
 
         seen: dict[str, object] = {}
@@ -272,5 +272,5 @@ class TestReportStatus:
 
         assert seen["full_url"] == "http://gateway.ui.svc.cluster.local/analyses/run-1"
         assert seen["method"] == "PATCH"
-        assert seen["headers"]["X-update-key"] == "the-key"
+        assert seen["headers"]["X-run-key"] == "the-key"
         assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}

@@ -21,8 +21,8 @@ export function meta() {
   return [{ title: 'Entrada · Ops Ahead' }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => ({
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => ({
     integrations: await listIntegrations(),
   }));
 }
@@ -32,7 +32,7 @@ export async function loader({ params }: Route.LoaderArgs) {
  * screen the redirect lands on — via a short-lived flash cookie, never the URL.
  */
 export async function action({ request, params }: Route.ActionArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const source = String(form.get('source') ?? '').trim();
 
@@ -41,7 +41,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       ({ secret } = await createIntegration({
         source,
         intake: form.get('intake') as Intake,
-        envelopeVersion: 'v1',
       }));
     } catch (error) {
       if (error instanceof ConflictError) return { error: error.message };
@@ -118,28 +117,28 @@ export default function Integrations({ loaderData, actionData }: Route.Component
                   <input
                     type="radio"
                     name="intake"
-                    value="monitor"
+                    value="alert"
                     defaultChecked
                     className="sr-only"
                   />
                   <GridIcon className="mt-0.5 h-5 w-5 shrink-0 text-accent-red" />
                   <span>
                     <span className="block font-medium text-sm text-text-light">
-                      {INTAKE_LABEL.monitor}
+                      {INTAKE_LABEL.alert}
                     </span>
                     <span className="mt-0.5 block text-text-dim text-xs">
-                      {INTAKE_HINT.monitor}
+                      {INTAKE_HINT.alert}
                     </span>
                   </span>
                 </label>
                 <label className="flex cursor-pointer gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 transition-colors has-[:focus-visible]:border-signal-blue/60 has-[:checked]:border-signal-blue/50 has-[:checked]:bg-signal-blue/10">
-                  <input type="radio" name="intake" value="alert" className="sr-only" />
+                  <input type="radio" name="intake" value="monitor" className="sr-only" />
                   <PulseIcon className="mt-0.5 h-5 w-5 shrink-0 text-signal-blue" />
                   <span>
                     <span className="block font-medium text-sm text-text-light">
-                      {INTAKE_LABEL.alert}
+                      {INTAKE_LABEL.monitor}
                     </span>
-                    <span className="mt-0.5 block text-text-dim text-xs">{INTAKE_HINT.alert}</span>
+                    <span className="mt-0.5 block text-text-dim text-xs">{INTAKE_HINT.monitor}</span>
                   </span>
                 </label>
               </div>
@@ -186,7 +185,7 @@ export default function Integrations({ loaderData, actionData }: Route.Component
                     to={integrationPath(tenant, integration.source)}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-bg-tile"
                   >
-                    {integration.intake === 'monitor' ? (
+                    {integration.intake === 'alert' ? (
                       <GridIcon className="h-4 w-4 shrink-0 text-accent-red" />
                     ) : (
                       <PulseIcon className="h-4 w-4 shrink-0 text-signal-blue" />

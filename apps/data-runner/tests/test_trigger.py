@@ -130,12 +130,12 @@ class TestProcessMessage:
 
 
 class TestReportStatus:
-    def test_skips_when_the_event_has_no_update_key(self):
+    def test_skips_when_the_event_has_no_run_key(self):
         from trigger import report_status
 
         report_status("http://gateway", {"run_id": "run-1", "status": "running"}, None)
 
-    def test_patches_the_gateway_with_the_update_key(self, monkeypatch):
+    def test_patches_the_gateway_with_the_run_key(self, monkeypatch):
         from trigger import report_status
 
         seen: dict[str, object] = {}
@@ -167,7 +167,7 @@ class TestReportStatus:
 
         assert seen["full_url"] == "http://gateway.ui.svc.cluster.local/analyses/run-1"
         assert seen["method"] == "PATCH"
-        assert seen["headers"]["X-update-key"] == "the-key"
+        assert seen["headers"]["X-run-key"] == "the-key"
         assert seen["body"] == {"status": "running", "started_at": "2026-08-15T12:30:00Z"}
 
 
@@ -185,7 +185,7 @@ class TestChainTrainings:
     def test_nothing_is_chained_when_the_quality_suite_raises(self):
         started: list[dict] = []
 
-        def _start(url, body, *, trigger, parent_id=None):
+        def _start(url, body, *, run_key):
             started.append(body)
             return "id"
 
@@ -198,6 +198,7 @@ class TestChainTrainings:
             run_full_pipeline(
                 self._settings(),
                 "daily-1",
+                "key-1",
                 steps=steps,
                 register_snapshot=lambda *a, **kw: "sha",
                 start=_start,
@@ -211,36 +212,45 @@ class TestChainTrainings:
         say whose model failed."""
         seen: list[tuple] = []
 
-        def _start(url, body, *, trigger, parent_id=None):
-            seen.append((body["analysis"], body["tenant_id"], trigger, parent_id))
+        def _start(url, body, *, run_key):
+            seen.append((body["analysis"], body["tenant_id"], run_key, sorted(body)))
             return f"id-{body['analysis']}-{body['tenant_id']}"
 
         detail = run_full_pipeline(
             self._settings(),
             "daily-1",
+            "key-1",
             steps={"transform": lambda: None, "quality": lambda argv: None},
             register_snapshot=lambda *a, **kw: "sha",
             start=_start,
             tenants=["locaweb", "acme"],
         )
 
+        # The parent's run_key is the whole credential, and neither trigger nor
+        # parent_id rides along: the gateway derives both from it.
+        splits = ["analysis", "holdout_end", "tenant_id", "train_end", "validation_end"]
         assert seen == [
-            ("volume_forecast", "locaweb", "chained", "daily-1"),
-            ("volume_forecast", "acme", "chained", "daily-1"),
-            ("kpi_projection", "locaweb", "chained", "daily-1"),
-            ("kpi_projection", "acme", "chained", "daily-1"),
+            ("volume_forecast", "locaweb", "key-1", splits),
+            ("volume_forecast", "acme", "key-1", splits),
+            ("kpi_projection", "locaweb", "key-1", ["analysis", "tenant_id"]),
+            ("kpi_projection", "acme", "key-1", ["analysis", "tenant_id"]),
         ]
         assert detail["chained"]["volume_forecast:acme"] == "id-volume_forecast-acme"
 
     def test_only_the_trainings_that_evaluate_against_a_hold_out_get_splits(self):
         bodies: dict[str, dict] = {}
 
-        def _start(url, body, *, trigger, parent_id=None):
+        def _start(url, body, *, run_key):
             bodies[body["analysis"]] = body
             return "id"
 
         chain_trainings(
-            self._settings(), "daily-1", start=_start, today=date(2026, 3, 2), tenants=["locaweb"]
+            self._settings(),
+            "daily-1",
+            "key-1",
+            start=_start,
+            today=date(2026, 3, 2),
+            tenants=["locaweb"],
         )
 
         assert bodies["volume_forecast"]["holdout_end"] == "2026-03-01"
@@ -249,7 +259,7 @@ class TestChainTrainings:
         assert "holdout_end" not in bodies["kpi_projection"]
 
     def test_one_training_failing_to_start_leaves_the_others_and_the_snapshot(self):
-        def _start(url, body, *, trigger, parent_id=None):
+        def _start(url, body, *, run_key):
             if body["analysis"] == "volume_forecast":
                 raise RuntimeError("gateway unreachable")
             return "id-kpi"
@@ -257,6 +267,7 @@ class TestChainTrainings:
         detail = run_full_pipeline(
             self._settings(),
             "daily-1",
+            "key-1",
             steps={"transform": lambda: None, "quality": lambda argv: None},
             register_snapshot=lambda *a, **kw: "sha",
             start=_start,
@@ -268,11 +279,11 @@ class TestChainTrainings:
         assert "gateway unreachable" in detail["chain_failed"]["volume_forecast:locaweb"]
 
     def test_chaining_is_off_when_no_analysis_is_configured(self):
-        def _start(url, body, *, trigger, parent_id=None):
+        def _start(url, body, *, run_key):
             raise AssertionError("should not be called")
 
         detail = chain_trainings(
-            Settings(source="itsm"), "daily-1", start=_start, tenants=["locaweb"]
+            Settings(source="itsm"), "daily-1", "key-1", start=_start, tenants=["locaweb"]
         )
 
         assert detail == {"chained": {}, "chain_failed": {}}

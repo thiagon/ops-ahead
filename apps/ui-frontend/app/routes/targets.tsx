@@ -29,8 +29,8 @@ export function meta() {
   return [{ title: 'Metas · Ops Ahead' }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return withTenant(request, params.tenant, async () => {
     const [kpiTargets, revisions] = await Promise.all([
       listKpiTargets(),
       listRevisions(['kpi_target']),
@@ -40,7 +40,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const kpiTargets = parseKpiTargets(form);
     if (typeof kpiTargets === 'string') return { error: kpiTargets };

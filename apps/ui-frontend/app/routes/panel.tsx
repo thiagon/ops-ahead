@@ -57,7 +57,7 @@ export function parsePeriod(value: string | null): number {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(params.tenant, async () => {
+  return withTenant(request, params.tenant, async () => {
     const periodDays = parsePeriod(new URL(request.url).searchParams.get('period'));
 
     const [queue, dailyFeatures, recurringPatterns] = await Promise.all([

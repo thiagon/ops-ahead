@@ -9,6 +9,7 @@ export type SampleField = {
   field: string;
   type: 'string' | 'integer' | 'object';
   path: string | null;
+  labels?: readonly { key: string; path: string }[] | null;
   values: {
     rows: { domainValue: string; origins: { from: string }[] }[];
   } | null;
@@ -43,6 +44,12 @@ export function samplePayload(
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const field of fields) {
+    if (field.labels?.length) {
+      for (const entry of field.labels) {
+        setAtPath(payload, entry.path, entry.key);
+      }
+      continue;
+    }
     if (!field.path) continue;
     setAtPath(payload, field.path, sampleValue(field, now));
   }

@@ -23,13 +23,13 @@ export class AnalysisStore {
     this.#prisma = prisma;
   }
 
-  async enqueue(id: string, updateKeyHash: string, origin: AnalysisOrigin): Promise<void> {
+  async enqueue(id: string, runKeyHash: string, origin: AnalysisOrigin): Promise<void> {
     await this.#prisma.analysis.upsert({
       where: { id },
       create: {
         id,
         status: 'pending',
-        updateKeyHash,
+        runKeyHash,
         analysis: origin.analysis,
         tenantId: origin.tenantId,
         trigger: origin.trigger,
@@ -39,12 +39,23 @@ export class AnalysisStore {
     });
   }
 
-  async findUpdateKeyHash(id: string): Promise<string | undefined> {
+  async findRunKeyHash(id: string): Promise<string | undefined> {
     const row = await this.#prisma.analysis.findUnique({
       where: { id },
-      select: { updateKeyHash: true },
+      select: { runKeyHash: true },
     });
-    return row?.updateKeyHash;
+    return row?.runKeyHash;
+  }
+
+  /** The chained POST presents the key itself, never the parent's id. */
+  async findByRunKeyHash(
+    runKeyHash: string,
+  ): Promise<{ id: string; analysis: string } | undefined> {
+    const row = await this.#prisma.analysis.findUnique({
+      where: { runKeyHash },
+      select: { id: true, analysis: true },
+    });
+    return row ?? undefined;
   }
 
   async recordStatus(status: AnalysisStatus): Promise<void> {

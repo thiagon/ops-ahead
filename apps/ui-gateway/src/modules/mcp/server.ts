@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { FastifyInstance } from 'fastify';
+import { rulesJsonSchema } from '../../services/rules/schema.ts';
 import {
   analysisParamsSchema,
   analysisRequestSchema,
@@ -41,7 +42,9 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
         'Runs a business analysis (volume_forecast, breach_risk, kpi_projection, external_event_detection, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns an id immediately; poll get_analysis_status for progress.',
       inputSchema: analysisRequestSchema,
     },
-    async args => jsonResult(await analyses.start(args)),
+    // An MCP tool call is a person asking, the same as the REST route a
+    // session reaches — the client's own token is what authenticated it.
+    async args => jsonResult(await analyses.start(args, { kind: 'user', tenants: [tenant] })),
   );
 
   server.registerTool(
@@ -51,7 +54,7 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
       description: 'Looks up the status of a previously started analysis by id.',
       inputSchema: analysisParamsSchema,
     },
-    async ({ id }) => jsonResult(await analyses.getStatus(id)),
+    async ({ id }) => jsonResult(await analyses.getStatus(id, { kind: 'user', tenants: [tenant] })),
   );
 
   server.registerTool(
@@ -126,6 +129,16 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
       inputSchema: targetSetSchema,
     },
     async args => jsonResult(await rules.setTargets(tenant, args)),
+  );
+
+  server.registerTool(
+    'get_rules_schema',
+    {
+      title: 'Rules JSON Schema',
+      description:
+        'JSON Schema for mapping, deadline and target documents — the same contracts REST and MCP validate.',
+    },
+    async () => jsonResult(rulesJsonSchema()),
   );
 
   server.registerTool(

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: infra-authentik
+description: Authentik — the identity provider the gateway authenticates people and MCP clients against (ns:infra)
+type: application
+version: 0.1.0
+appVersion: "2026.8.3"
+dependencies:
+  - name: authentik
+    version: "2026.8.3"
+    repository: "https://charts.goauthentik.io"

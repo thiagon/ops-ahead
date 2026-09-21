@@ -31,7 +31,7 @@ Dados → Modelos → Copiloto IA → Interfaces
 | **Modelos** | MLflow tracking + AI Gateway, Postgres, Redis |
 | **Copiloto IA** | Agent LangGraph, Postgres + pgvector |
 | **Interfaces** | Gateway + UI Nuxt |
-| **Plataforma** | ArgoCD, Prometheus, Grafana, Loki + Promtail |
+| **Plataforma** | ArgoCD, Authentik, Prometheus, Grafana, Loki + Promtail |
 
 ---
 
@@ -45,10 +45,11 @@ Dados → Modelos → Copiloto IA → Interfaces
             ns:ui       ns:agent  ns:ml   ns:data    ns:infra
          ┌────────┐   ┌────────┐ ┌──────┐ ┌───────┐ ┌───────┐
          │Gateway │   │ Agent  │ │MLflow│ │Kafka  │ │ArgoCD │
-         │  UI    │   │Postgres│ │Redis │ │MinIO  │ │Prome. │
-         └────────┘   │pgvector│ │Post. │ │Click. │ │Grafana│
-                      └────────┘ └──────┘ │ArgoWF │ │Loki   │
-                                          └───────┘ └───────┘
+         │  UI    │   │Postgres│ │Redis │ │MinIO  │ │Authen.│
+         └────────┘   │pgvector│ │Post. │ │Click. │ │Prome. │
+                      └────────┘ └──────┘ │ArgoWF │ │Grafana│
+                                          └───────┘ │Loki   │
+                                                    └───────┘
 ```
 
 Toda a stack roda em Kubernetes (k3s via k3d), gerenciada via Helm charts por namespace. NetworkPolicy isola os namespaces: `ns:ui` não acessa `ns:data` diretamente.
@@ -94,6 +95,7 @@ infra/
     data-runner/                   # app — ver apps/ acima
     data-strimzi/                  # Strimzi operator
     infra-argocd/                  # ArgoCD
+    infra-authentik/               # Authentik (IdP — pessoas, grupos/tenants, tokens)
     infra-eso/                     # External Secrets Operator
     infra-gitea/                   # Gitea (registry + git)
     infra-keda/                    # KEDA — escala a réplica dos consumers Kafka (ScaledObject) a partir do lag
@@ -177,8 +179,9 @@ Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomín
 | MLflow | http://mlflow.ops-ahead.localtest.me | `MLFLOW_ADMIN_USERNAME` / `MLFLOW_ADMIN_PASSWORD` |
 | Gitea | http://gitea.ops-ahead.localtest.me | `GITEA_ADMIN_USERNAME` / `GITEA_ADMIN_PASSWORD` |
 | Prometheus | http://prometheus.ops-ahead.localtest.me | — |
-| Gateway | http://gateway.ops-ahead.localtest.me | — |
-| UI | http://ui.ops-ahead.localtest.me | — |
+| Authentik | http://auth.ops-ahead.localtest.me | `AUTHENTIK_BOOTSTRAP_EMAIL` / `AUTHENTIK_BOOTSTRAP_PASSWORD` |
+| Gateway | http://gateway.ops-ahead.localtest.me | login via Authentik |
+| UI | http://ui.ops-ahead.localtest.me | login via Authentik |
 
 ---
 
@@ -222,5 +225,5 @@ uv run --package ops-ahead-scripts python scripts/prepare_dataset.py
 |--------|---------|--------|
 | Sprint 1 — Ideação | 2026-04-27 | Concluída |
 | Sprint 2 — Arquitetura + EDA | 2026-05-24 | Concluída |
-| Sprint 3 — MVP | 2026-08-23 | Em andamento |
-| Sprint 4 — Final | 2026-09-08 | Planejada |
+| Sprint 3 — MVP | 2026-08-23 | Concluída |
+| Sprint 4 — Final | 2026-09-21 | Em andamento |

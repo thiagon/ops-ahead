@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
+import type { OutboundMessage } from '../../../../src/lib/kafka.ts';
 import {
   buildEnvelope,
   type EventOrigin,
