@@ -1,0 +1,76 @@
+# Authentik owns people, groups and token revocation; the gateway owns none of
+# those (docs/spec-gateway-auth-v2.md). A group here *is* a tenant — same name,
+# no prefix — so adding a client is creating a group, not editing a chart.
+#
+# Everything the upstream chart reads sits under `authentik:`, its own name as
+# a dependency; its internal `authentik:` block is the nesting that follows.
+
+authentik:
+  authentik:
+    log_level: info
+    # Every value the chart would otherwise template from plaintext comes from
+    # this one secret, seeded from the single Vault path for this app.
+    existingSecret:
+      secretName: authentik-secret
+
+    postgresql:
+      host: config-postgres.ui.svc.cluster.local
+      name: authentik
+      user: admin
+      port: 5432
+
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      hosts:
+        - host: authentik.ops-ahead.localtest.me
+          paths:
+            - path: /
+              pathType: Prefix
+
+  worker:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  # The chart's bundled Postgres and Redis stay off: config-postgres already
+  # holds the authentik database (ui-postgres.extraDatabases), and the cache
+  # lives in that same Postgres so the IdP adds one dependency rather than two.
+  postgresql:
+    enabled: false
+  redis:
+    enabled: false
+
+  # The two OAuth applications the gateway talks to, applied by the worker at
+  # startup. Declarative so a rebuilt cluster comes up with them already there.
+  blueprints:
+    configMaps:
+      - authentik-blueprints
+
+  # Cache in this instance's Postgres rather than a second datastore. Redis of
+  # ml-redis is not reused (docs/spec-gateway-auth-v2.md).
+  global:
+    env:
+      - name: AUTHENTIK_CACHE__CACHE_BACKEND
+        value: django.core.cache.backends.db.DatabaseCache
+      - name: AUTHENTIK_CACHE__LOCATION
+        value: authentik_cache
+
+# Where the gateway sends the browser back after the login. Kept here rather
+# than inside the blueprint so the two stay one edit apart.
+gateway:
+  redirectUri: http://gateway.ops-ahead.localtest.me/auth/callback

@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestApp } from '../../../helpers/app.ts';
+import { authHeaders, createTestApp } from '../../../helpers/app.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
 
-describe('POST /analyses', () => {
+describe('POST /{tenant}/analyses', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -22,7 +22,7 @@ describe('POST /analyses', () => {
   it('accepts a volume_forecast request and answers with an id', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: {
         analysis: 'volume_forecast',
         tenant_id: 'locaweb',
@@ -30,17 +30,18 @@ describe('POST /analyses', () => {
         validation_end: '2025-10-31',
         holdout_end: '2026-01-31',
       },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
     expect(res.json()).toEqual({ id: expect.stringMatching(/^[0-9a-f-]{36}$/) });
-    expect(res.json()).not.toHaveProperty('update_key');
+    expect(res.json()).not.toHaveProperty('run_key');
   });
 
   it('publishes the event, analysis intact, keyed by run_id, to trigger.ml', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: {
         analysis: 'breach_risk',
         tenant_id: 'locaweb',
@@ -48,6 +49,7 @@ describe('POST /analyses', () => {
         validation_end: '2025-03-15',
         holdout_end: '2025-04-09',
       },
+      headers: authHeaders,
     });
 
     expect(publish).toHaveBeenCalledTimes(1);
@@ -59,15 +61,16 @@ describe('POST /analyses', () => {
       analysis: 'breach_risk',
       tenant_id: 'locaweb',
       train_end: '2025-02-15',
-      update_key: expect.any(String),
+      run_key: expect.any(String),
     });
   });
 
   it('accepts a bare kpi_projection request and routes it to trigger.ml', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'kpi_projection', tenant_id: 'locaweb' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(202);
@@ -77,8 +80,9 @@ describe('POST /analyses', () => {
   it('routes data_refresh/data_quality_check to trigger.data', async () => {
     await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_refresh' },
+      headers: authHeaders,
     });
 
     expect(publish.mock.calls[0]?.[0]?.topic).toBe('trigger.data');
@@ -87,8 +91,9 @@ describe('POST /analyses', () => {
   it('rejects volume_forecast missing split dates with 400, never 500', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'volume_forecast', tenant_id: 'locaweb' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -99,8 +104,9 @@ describe('POST /analyses', () => {
   it('rejects an unknown analysis with 400', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'not_a_real_analysis' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -110,8 +116,9 @@ describe('POST /analyses', () => {
   it('rejects a data_source override — removed for SSRF/credential-leak risk', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_refresh', data_source: 'clickhouse://attacker.example/x' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -122,8 +129,9 @@ describe('POST /analyses', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/analyses',
+      url: '/locaweb/analyses',
       payload: { analysis: 'data_quality_check' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(502);

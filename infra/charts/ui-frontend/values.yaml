@@ -21,6 +21,7 @@ frontend:
     clickhouseUser: ops_ahead
     clickhouseDatabase: default
     publicGatewayUrl: http://gateway.ops-ahead.localtest.me
+    gatewayUrl: http://gateway.ui.svc.cluster.local
     mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
     mlModelServingTimeoutMs: "1500"
   # ui-postgres' ExternalSecret, projected into ns:ui by the chart that

@@ -83,7 +83,7 @@ Every track created with `/conductor:new-track` must:
 |--------|-----------------|----------|
 | Sprint 2 — Arquitetura | `2` | 2026-05-24 |
 | Sprint 3 — MVP | `3` | 2026-08-23 |
-| Sprint 4 — Solução Final | `4` | 2026-09-08 |
+| Sprint 4 — Solução Final | `4` | 2026-09-21 |
 
 ### Perguntas obrigatórias ao criar a track
 
@@ -92,8 +92,7 @@ Após gerar a spec e antes de criar os arquivos, perguntar:
 **Sprint de entrega:**
 ```
 Em qual sprint esta track será entregue?
-1. Sprint 3 — MVP (milestone #3, entrega 23/08/2026)
-2. Sprint 4 — Solução Final (milestone #4, entrega 08/09/2026)
+1. Sprint 4 — Solução Final (milestone #4, entrega 21/09/2026)
 ```
 
 Criar o issue com milestone via API (o flag `--milestone` do `gh issue create` usa o título, não o número):

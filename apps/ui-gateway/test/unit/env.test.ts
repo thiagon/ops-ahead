@@ -24,6 +24,15 @@ describe('envSchema', () => {
       GATEWAY_DATABASE_URL: 'postgres://admin:ops-ahead-dev@localhost:5432/gateway',
       HMAC_ENABLED: false,
       SOURCE_SECRET_KEY: '',
+      SESSION_COOKIE_KEY: '',
+      SCHEDULER_API_KEY: '',
+      AUTHENTIK_ISSUER: '',
+      AUTHENTIK_CLIENT_ID: '',
+      AUTHENTIK_CLIENT_SECRET: '',
+      AUTHENTIK_MCP_CLIENT_ID: '',
+      INTROSPECTION_CACHE_TTL_MS: 5_000,
+      FRONTEND_ORIGIN: 'http://localhost:5173',
+      PUBLIC_URL: 'http://localhost:3000',
       SOURCE_CACHE_TTL_MS: 10_000,
     });
   });

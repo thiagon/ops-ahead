@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { OutboundMessage } from '../../../../src/plugins/kafka.ts';
-import { createTestApp, TEST_SECRET as SECRET } from '../../../helpers/app.ts';
+import type { OutboundMessage } from '../../../../src/lib/kafka.ts';
+import { authHeaders, createTestApp, TEST_SECRET as SECRET } from '../../../helpers/app.ts';
 
 const ROUTE = '/webhook/locaweb/itsm';
 
@@ -81,7 +81,7 @@ describe('GET /metrics', () => {
   });
 
   it('stays out of the openapi document', async () => {
-    const res = await app.inject({ method: 'GET', url: '/docs/json' });
+    const res = await app.inject({ method: 'GET', url: '/docs/json', headers: authHeaders });
 
     expect(res.json().paths['/metrics']).toBeUndefined();
   });

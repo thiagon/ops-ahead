@@ -85,6 +85,33 @@ spec:
               value: {{ .Values.gateway.env.kafkaTopicData | quote }}
             - name: HMAC_ENABLED
               value: {{ .Values.gateway.env.hmacEnabled | quote }}
+            - name: AUTHENTIK_ISSUER
+              value: {{ .Values.gateway.env.authentikIssuer | quote }}
+            - name: AUTHENTIK_CLIENT_ID
+              value: {{ .Values.gateway.env.authentikClientId | quote }}
+            - name: AUTHENTIK_MCP_CLIENT_ID
+              value: {{ .Values.gateway.env.authentikMcpClientId | quote }}
+            - name: INTROSPECTION_CACHE_TTL_MS
+              value: {{ .Values.gateway.env.introspectionCacheTtlMs | quote }}
+            - name: FRONTEND_ORIGIN
+              value: {{ .Values.gateway.env.frontendOrigin | quote }}
+            - name: PUBLIC_URL
+              value: {{ .Values.gateway.env.publicUrl | quote }}
+            - name: SESSION_COOKIE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretName }}
+                  key: SESSION_COOKIE_KEY
+            - name: AUTHENTIK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretName }}
+                  key: AUTHENTIK_CLIENT_SECRET
+            - name: SCHEDULER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretName }}
+                  key: SCHEDULER_API_KEY
             - name: UI_POSTGRES_USER
               valueFrom:
                 secretKeyRef:

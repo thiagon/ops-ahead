@@ -5,6 +5,7 @@ image: postgres:16-alpine
 # the chart Job once the StatefulSet accepts connections.
 extraDatabases:
   - gateway
+  - authentik
 
 monitoring:
   enabled: true

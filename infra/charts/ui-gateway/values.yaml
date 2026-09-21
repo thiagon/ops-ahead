@@ -32,6 +32,12 @@ gateway:
     httpsEnabled: "false"
     corsOrigins:
       - http://ui.ops-ahead.localtest.me
+    authentikIssuer: http://authentik.ops-ahead.localtest.me/application/o/gateway-web/
+    authentikClientId: gateway-web
+    authentikMcpClientId: gateway-mcp
+    introspectionCacheTtlMs: "5000"
+    frontendOrigin: http://ui.ops-ahead.localtest.me
+    publicUrl: http://gateway.ops-ahead.localtest.me
   secretName: ui-gateway-secret
   ingress:
     host: gateway.ops-ahead.localtest.me
@@ -47,6 +53,8 @@ networkPolicy:
   kafkaPort: 9092
   # ClickHouse HTTP interface — ui-frontend's gold/silver loaders.
   clickhousePort: 8123
+  # Authentik server — introspection and the token endpoint.
+  authentikPort: 9000
   # ml-model-serving — the breach score ui-frontend's operator queue reads.
   mlModelServingPort: 3000
 

@@ -1,10 +1,10 @@
 {{- if .Values.cron.enabled }}
 # Native CronJob — asks the gateway to start one full_pipeline and exits.
 # It goes through POST /analyses like any other client instead of publishing
-# to Kafka directly, so the daily run gets a row, a status and an update_key:
-# no execution exists that GET /analyses cannot answer for. `trigger` marks it
-# as the clock's, which is what tells it apart from a run someone asked for.
-# The id is minted by the gateway and printed here.
+# to Kafka directly, so the daily run gets a row, a status and a run_key:
+# no execution exists that GET /analyses cannot answer for. The scheduler API
+# key is what marks the run as the clock's — provenance is the credential's to
+# declare, never the body's. The id is minted by the gateway and printed here.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -45,8 +45,14 @@ spec:
                   set -eu
                   curl -sS --fail-with-body -X POST "$GATEWAY_URL/analyses" \
                     -H 'Content-Type: application/json' \
-                    -d '{"analysis":"full_pipeline","trigger":"scheduled"}'
+                    -H "Authorization: Bearer $SCHEDULER_API_KEY" \
+                    -d '{"analysis":"full_pipeline"}'
               env:
                 - name: GATEWAY_URL
                   value: {{ .Values.run.env.gatewayUrl | quote }}
+                - name: SCHEDULER_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.run.secretName }}
+                      key: scheduler-api-key
 {{- end }}

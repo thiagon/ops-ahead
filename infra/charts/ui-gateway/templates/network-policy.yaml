@@ -24,6 +24,21 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+        # Internal ingress — AUTHENTIK_ISSUER is the public host, so
+        # introspection goes through Traefik rather than the pod IP.
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+    # infra: Authentik (9000 on the pod, 80 on the Service) — the gateway
+    # introspects every person token here.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: infra
+      ports:
+        - port: 80
+        - port: {{ .Values.networkPolicy.authentikPort }}
     # ml: MLflow API (5000) and ml-model-serving (3000) — the breach score
     # the operator queue reads alongside consumed_ratio.
     - to:

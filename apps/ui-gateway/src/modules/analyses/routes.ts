@@ -1,6 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import createError from 'http-errors';
 import {
+  type AnalysisRequest,
   analysisAcceptedSchema,
   analysisErrorSchema,
   analysisListQuerySchema,
@@ -9,101 +11,122 @@ import {
   analysisStatusSchema,
   analysisStatusUpdateSchema,
   analysisUpdateHeadersSchema,
+  tenantParamsSchema,
 } from '../../services/analyses/schema.ts';
 
 export function registerAnalysisRoutes(app: FastifyInstance): void {
   const analyses = app.services.analyses;
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
+  /**
+   * A publish that never reached the bus is the caller's to see as 502: the
+   * request was well formed and the gateway simply could not hand it on.
+   */
+  async function accepted(request: FastifyRequest, reply: FastifyReply, body: AnalysisRequest) {
+    try {
+      return reply.status(202).send(await analyses.start(body, request.auth));
+    } catch (err) {
+      if (createError.isHttpError(err)) throw err;
+      request.log.error({ err }, 'failed to publish analysis event');
+      return reply.status(502).send({
+        error: 'PublishFailed',
+        message: 'could not publish the event to the bus',
+      });
+    }
+  }
+
+  typed.post(
+    '/:tenant/analyses',
+    app.auth.tenant({
+      tags: ['analyses'],
+      summary: 'Start a business analysis for a tenant',
+      description:
+        'Business-language entry point — no kubeconfig, Argo, or Kafka knowledge required by the caller. Responds immediately with an id; poll GET /{tenant}/analyses/{id} for status.',
+      params: tenantParamsSchema,
+      body: analysisRequestSchema,
+      response: {
+        202: analysisAcceptedSchema,
+        400: analysisErrorSchema,
+        401: analysisErrorSchema,
+        403: analysisErrorSchema,
+        502: analysisErrorSchema,
+      },
+    }),
+    async (request, reply) => accepted(request, reply, request.body),
+  );
+
   typed.post(
     '/analyses',
-    {
-      schema: {
-        tags: ['analyses'],
-        summary: 'Start a business analysis',
-        description:
-          'Business-language entry point — no kubeconfig, Argo, or Kafka knowledge required by the caller. Responds immediately with an id; poll GET /analyses/{id} for status.',
-        body: analysisRequestSchema,
-        response: {
-          202: analysisAcceptedSchema,
-          400: analysisErrorSchema,
-          502: analysisErrorSchema,
-        },
+    app.auth.schedulerOrRun({
+      tags: ['analyses'],
+      summary: 'Start a scheduled or chained analysis',
+      description:
+        'Authenticated by the scheduler API key or by the parent run key — never by a session. A person starts an analysis through POST /{tenant}/analyses.',
+      body: analysisRequestSchema,
+      response: {
+        202: analysisAcceptedSchema,
+        400: analysisErrorSchema,
+        401: analysisErrorSchema,
+        409: analysisErrorSchema,
+        502: analysisErrorSchema,
       },
-    },
-    async (request, reply) => {
-      try {
-        const result = await analyses.start(request.body);
-        return reply.status(202).send(result);
-      } catch (err) {
-        request.log.error({ err }, 'failed to publish analysis event');
-        return reply.status(502).send({
-          error: 'PublishFailed',
-          message: 'could not publish the event to the bus',
-        });
-      }
-    },
+    }),
+    async (request, reply) => accepted(request, reply, request.body),
   );
 
   typed.get(
-    '/analyses',
-    {
-      schema: {
-        tags: ['analyses'],
-        summary: 'List analyses, most recent first',
-        description:
-          'Filterable by origin and by analysis — what makes a scheduled run distinguishable from one someone asked for, rather than only stored that way.',
-        querystring: analysisListQuerySchema,
-        response: { 200: analysisStatusSchema.array() },
-      },
-    },
+    '/:tenant/analyses',
+    app.auth.tenant({
+      tags: ['analyses'],
+      summary: "List a tenant's analyses, most recent first",
+      params: tenantParamsSchema,
+      querystring: analysisListQuerySchema.omit({ tenant_id: true }),
+      response: { 200: analysisStatusSchema.array(), 401: analysisErrorSchema },
+    }),
     async request =>
       analyses.list({
         trigger: request.query.trigger,
         analysis: request.query.analysis,
-        tenantId: request.query.tenant_id,
+        tenantId: request.params.tenant,
         limit: request.query.limit,
       }),
   );
 
   typed.get(
     '/analyses/:id',
-    {
-      schema: {
-        tags: ['analyses'],
-        summary: 'Look up an analysis status',
-        description:
-          'Reflects the row in the gateway database — never queries Kubernetes. Trainers PATCH this same path when the run changes state.',
-        params: analysisParamsSchema,
-        response: {
-          200: analysisStatusSchema,
-          404: analysisErrorSchema,
-        },
+    app.auth.user({
+      tags: ['analyses'],
+      summary: 'Look up an analysis status',
+      description:
+        'Reflects the row in the gateway database — never queries Kubernetes. Consumers PATCH this same path when the run changes state.',
+      params: analysisParamsSchema,
+      response: {
+        200: analysisStatusSchema,
+        401: analysisErrorSchema,
+        403: analysisErrorSchema,
+        404: analysisErrorSchema,
       },
-    },
-    async request => analyses.getStatus(request.params.id),
+    }),
+    async request => analyses.getStatus(request.params.id, request.auth),
   );
 
   typed.patch(
     '/analyses/:id',
-    {
-      schema: {
-        tags: ['analyses'],
-        summary: 'Update an analysis status',
-        description:
-          'Called by the Kafka consumer that received this run. Requires `X-Update-Key` from that message — the HTTP 202 never includes it.',
-        params: analysisParamsSchema,
-        headers: analysisUpdateHeadersSchema,
-        body: analysisStatusUpdateSchema,
-        response: {
-          200: analysisStatusSchema,
-          400: analysisErrorSchema,
-          401: analysisErrorSchema,
-          409: analysisErrorSchema,
-        },
+    app.auth.run({
+      tags: ['analyses'],
+      summary: 'Update an analysis status',
+      description:
+        'Called by the Kafka consumer that received this run. Requires `X-Run-Key` from that message — the HTTP 202 never includes it.',
+      params: analysisParamsSchema,
+      headers: analysisUpdateHeadersSchema,
+      body: analysisStatusUpdateSchema,
+      response: {
+        200: analysisStatusSchema,
+        400: analysisErrorSchema,
+        401: analysisErrorSchema,
+        409: analysisErrorSchema,
       },
-    },
-    async request =>
-      analyses.update(request.params.id, request.body, request.headers['x-update-key']),
+    }),
+    async request => analyses.update(request.params.id, request.body, request.headers['x-run-key']),
   );
 }

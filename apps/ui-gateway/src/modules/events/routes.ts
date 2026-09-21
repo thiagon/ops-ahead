@@ -50,7 +50,7 @@ export function registerEventRoutes(app: FastifyInstance): void {
         // The origin signs what it posts with its own secret; this is the
         // signed surface for that (tenant, source) pair.
         preParsing: app.verifySignatureFor(resolve),
-        schema: {
+        ...app.auth.hmac({
           tags: ['events'],
           summary: 'Ingest an event from a configured origin',
           description:
@@ -66,7 +66,7 @@ export function registerEventRoutes(app: FastifyInstance): void {
             404: webhookErrorSchema,
             502: webhookErrorSchema,
           },
-        },
+        }),
       },
       async (request, reply) => {
         const origin = await resolve(request);

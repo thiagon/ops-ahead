@@ -1,24 +1,46 @@
-import type { Producer } from 'kafkajs';
+import { Kafka } from 'kafkajs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPublisher } from '../../../src/plugins/kafka.ts';
+import { createPublisher } from '../../../src/lib/kafka.ts';
 
-function fakeProducer() {
-  return {
+const { producer } = vi.hoisted(() => ({
+  producer: {
     connect: vi.fn(async () => undefined),
     disconnect: vi.fn(async () => undefined),
     send: vi.fn(async () => []),
-  };
-}
+  },
+}));
+
+vi.mock('kafkajs', () => ({
+  logLevel: { WARN: 4 },
+  Kafka: vi.fn(function Kafka(this: { producer: () => typeof producer }) {
+    this.producer = () => producer;
+  }),
+}));
 
 describe('createPublisher', () => {
-  let producer: ReturnType<typeof fakeProducer>;
-
   beforeEach(() => {
-    producer = fakeProducer();
+    vi.mocked(Kafka).mockClear();
+    producer.connect.mockReset();
+    producer.disconnect.mockReset();
+    producer.send.mockReset();
+    producer.connect.mockResolvedValue(undefined);
+    producer.disconnect.mockResolvedValue(undefined);
+    producer.send.mockResolvedValue([]);
+  });
+
+  it('builds a Kafka client from clientId and a comma-separated broker list', () => {
+    createPublisher({ clientId: 'ui-gateway', brokers: 'a:9092, b:9092' });
+
+    expect(Kafka).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientId: 'ui-gateway',
+        brokers: ['a:9092', 'b:9092'],
+      }),
+    );
   });
 
   it('sends the message to the topic named on the message, keyed for partition affinity', async () => {
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await publisher.publish({
       topic: 'events.raw.alert',
@@ -34,7 +56,7 @@ describe('createPublisher', () => {
   });
 
   it('routes different messages to different topics on the same producer', async () => {
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
     await publisher.publish({ topic: 'events.raw.monitor', key: 'evt-2', value: '{}' });
@@ -50,7 +72,7 @@ describe('createPublisher', () => {
   });
 
   it('connects once and reuses the connection across publishes', async () => {
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await publisher.connect();
     await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
@@ -61,7 +83,7 @@ describe('createPublisher', () => {
 
   it('connects on the first publish when startup could not reach the broker', async () => {
     producer.connect.mockRejectedValueOnce(new Error('broker down'));
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await expect(publisher.connect()).rejects.toThrow('broker down');
     await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
@@ -72,7 +94,7 @@ describe('createPublisher', () => {
 
   it('surfaces a failed send and reconnects on the next publish', async () => {
     producer.send.mockRejectedValueOnce(new Error('not leader for partition'));
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await expect(
       publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' }),
@@ -83,7 +105,7 @@ describe('createPublisher', () => {
   });
 
   it('leaves a producer that never connected alone on shutdown', async () => {
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await publisher.disconnect();
 
@@ -91,7 +113,7 @@ describe('createPublisher', () => {
   });
 
   it('disconnects a connected producer on shutdown', async () => {
-    const publisher = createPublisher(producer as unknown as Producer);
+    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await publisher.connect();
     await publisher.disconnect();

@@ -1,0 +1,253 @@
+import createError from 'http-errors';
+
+/**
+ * The subset of the OIDC discovery document the gateway spends. Read once and
+ * kept: a realm does not move its endpoints while the process lives.
+ */
+export interface ProviderMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  introspection_endpoint: string;
+  end_session_endpoint?: string;
+  jwks_uri: string;
+}
+
+/** What introspection says about a token that is still live. */
+export interface TokenClaims {
+  sub: string;
+  /** Authentik group names, which are tenant ids verbatim (spec-gateway-auth-v2). */
+  groups: string[];
+  expiresAt?: number;
+}
+
+export interface OidcConfig {
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  introspectionCacheTtlMs: number;
+}
+
+interface CacheEntry {
+  claims: TokenClaims | undefined;
+  readAt: number;
+}
+
+/**
+ * Talks to Authentik for the three things the gateway cannot decide alone:
+ * where to send someone to log in, what a code is worth, and whether a token
+ * is still good.
+ *
+ * Introspection rather than offline JWKS validation is what makes revocation
+ * immediate — the price is one call per request, bounded by a short cache
+ * whose TTL is the delay on revoking someone.
+ */
+export class OidcService {
+  /** What the gateway asks Authentik to put on the token — `groups` is authorization. */
+  static readonly SCOPES = 'openid profile email groups';
+
+  #config: OidcConfig;
+  #metadata?: Promise<ProviderMetadata>;
+  #cache = new Map<string, CacheEntry>();
+
+  constructor(config: OidcConfig) {
+    this.#config = config;
+  }
+
+  get configured(): boolean {
+    return this.#config.issuer !== '' && this.#config.clientId !== '';
+  }
+
+  get scopes(): string {
+    return OidcService.SCOPES;
+  }
+
+  /**
+   * The authorization server an MCP client should register against. Two
+   * Authentik apps share a host; the public one is what Dynamic Client
+   * Registration hits.
+   */
+  authorizationServer(mcpClientId: string): string {
+    const { issuer } = this.#config;
+    if (!issuer) return issuer;
+    const base = this.#trailingSlash(issuer);
+    if (!mcpClientId) return base;
+    return base.replace(/\/application\/o\/[^/]+\/$/, `/application/o/${mcpClientId}/`);
+  }
+
+  async metadata(): Promise<ProviderMetadata> {
+    this.#metadata ??= this.#discover();
+    try {
+      return await this.#metadata;
+    } catch (err) {
+      // A failed discovery must not poison the process: the realm may simply
+      // have been slower to start than the gateway.
+      this.#metadata = undefined;
+      throw err;
+    }
+  }
+
+  /** Where the browser goes to log in, with the PKCE challenge bound to it. */
+  async authorizationUrl(params: {
+    state: string;
+    codeChallenge: string;
+    scope?: string;
+  }): Promise<string> {
+    const { authorization_endpoint } = await this.metadata();
+    const url = new URL(authorization_endpoint);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('client_id', this.#config.clientId);
+    url.searchParams.set('redirect_uri', this.#config.redirectUri);
+    url.searchParams.set('scope', params.scope ?? this.scopes);
+    url.searchParams.set('state', params.state);
+    url.searchParams.set('code_challenge', params.codeChallenge);
+    url.searchParams.set('code_challenge_method', 'S256');
+    return url.toString();
+  }
+
+  async exchangeCode(
+    code: string,
+    codeVerifier: string,
+  ): Promise<{ accessToken: string; refreshToken?: string; expiresIn?: number }> {
+    const { token_endpoint } = await this.metadata();
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: this.#config.redirectUri,
+      client_id: this.#config.clientId,
+      client_secret: this.#config.clientSecret,
+      code_verifier: codeVerifier,
+    });
+    const response = await fetch(token_endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      throw createError.Unauthorized('could not exchange the authorization code');
+    }
+    const payload = (await response.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+    return {
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      expiresIn: payload.expires_in,
+    };
+  }
+
+  /**
+   * Asks Authentik whether this token is live, and for the groups on it.
+   * `undefined` means "not valid" — revoked, expired or never issued here;
+   * the caller does not get to tell those apart.
+   */
+  async introspect(token: string): Promise<TokenClaims | undefined> {
+    const cached = this.#cache.get(token);
+    if (cached && Date.now() - cached.readAt < this.#config.introspectionCacheTtlMs) {
+      return cached.claims;
+    }
+
+    const { introspection_endpoint } = await this.metadata();
+    const response = await fetch(introspection_endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        token,
+        client_id: this.#config.clientId,
+        client_secret: this.#config.clientSecret,
+      }),
+    });
+    if (!response.ok) {
+      throw createError.BadGateway(`token introspection failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as {
+      active: boolean;
+      sub?: string;
+      groups?: unknown;
+      exp?: number;
+    };
+
+    const claims =
+      payload.active && payload.sub
+        ? { sub: payload.sub, groups: this.#toGroups(payload.groups), expiresAt: payload.exp }
+        : undefined;
+
+    this.#cache.set(token, { claims, readAt: Date.now() });
+    this.#sweep();
+    return claims;
+  }
+
+  async revoke(token: string): Promise<void> {
+    const { issuer } = await this.metadata();
+    const url = new URL('application/o/revoke/', this.#trailingSlash(issuer));
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        token,
+        client_id: this.#config.clientId,
+        client_secret: this.#config.clientSecret,
+      }),
+    }).catch(() => undefined);
+    this.#cache.delete(token);
+  }
+
+  /**
+   * Spends the refresh token for a new access token. `undefined` means the
+   * refresh itself is dead — expired or revoked — and the caller is a stranger
+   * again, which is what sends the front back to login.
+   */
+  async refresh(
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken?: string } | undefined> {
+    const { token_endpoint } = await this.metadata();
+    const response = await fetch(token_endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: this.#config.clientId,
+        client_secret: this.#config.clientSecret,
+      }),
+    });
+    if (!response.ok) return undefined;
+    const payload = (await response.json()) as {
+      access_token?: string;
+      refresh_token?: string;
+    };
+    if (!payload.access_token) return undefined;
+    return { accessToken: payload.access_token, refreshToken: payload.refresh_token };
+  }
+
+  async #discover(): Promise<ProviderMetadata> {
+    const url = new URL('.well-known/openid-configuration', this.#trailingSlash(this.#config.issuer));
+    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    if (!response.ok) {
+      throw createError.BadGateway(`OIDC discovery failed with ${response.status}`);
+    }
+    return (await response.json()) as ProviderMetadata;
+  }
+
+  /** Bounded so a burst of distinct tokens cannot grow the map forever. */
+  #sweep(): void {
+    if (this.#cache.size < 1000) return;
+    const cutoff = Date.now() - this.#config.introspectionCacheTtlMs;
+    for (const [token, entry] of this.#cache) {
+      if (entry.readAt < cutoff) this.#cache.delete(token);
+    }
+  }
+
+  #toGroups(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  #trailingSlash(url: string): string {
+    return url.endsWith('/') ? url : `${url}/`;
+  }
+}

@@ -1,6 +1,6 @@
-// Status of an on-demand analysis. The gateway owns this database; trainers
-// PATCH /analyses/{id} with the update key from the Kafka message — only the
-// hash is stored here.
+// Status of an on-demand analysis, plus who the gateway lets in. The gateway
+// owns this database; trainers PATCH /analyses/{id} with the run key from the
+// Kafka message — only the hash is stored here.
 
 generator client {
   provider = "prisma-client"
@@ -19,7 +19,10 @@ enum AnalysisStatus {
 }
 
 /// The client a source, mapping, deadline set or target set belongs to. The
-/// id is the same string the URL carries (domain/ubiquitous-language.md#tenant).
+/// id is the same string the URL carries (domain/ubiquitous-language.md#tenant)
+/// and the same name the Authentik group carries: the group is what says a
+/// tenant exists and who may act for it, so a row here is materialized the
+/// first time one is seen, never authored.
 model Tenant {
   id        String   @id
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
@@ -83,7 +86,7 @@ model Analysis {
   tenantId      String?         @map("tenant_id")
   trigger       AnalysisTrigger @default(manual)
   status        AnalysisStatus  @default(pending)
-  updateKeyHash String          @map("update_key_hash")
+  runKeyHash    String          @unique @map("run_key_hash")
   startedAt     DateTime?       @map("started_at") @db.Timestamptz()
   finishedAt    DateTime?       @map("finished_at") @db.Timestamptz()
   detail        Json?
@@ -100,6 +103,25 @@ model Analysis {
   @@index([tenantId, createdAt])
   @@index([analysis, createdAt])
   @@map("analyses")
+}
+
+/// What the clock authenticates with. Only the hash is stored; the prefix is
+/// there so a log line can name the key without revealing it.
+model ApiKey {
+  id        String     @id @default(uuid())
+  kind      ApiKeyKind
+  prefix    String
+  hash      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  revokedAt DateTime?  @map("revoked_at") @db.Timestamptz()
+
+  @@map("api_keys")
+}
+
+/// One kind, and it is the CronJob's. The consumers authenticate with the run
+/// key of the message they received, so there is no key to issue them.
+enum ApiKeyKind {
+  scheduler
 }
 
 /// A published origin mapping. A later PUT inserts another row. GET lists

@@ -1,15 +1,26 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import createError from 'http-errors';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { EventPublisher } from '../../lib/kafka.ts';
 import { AnalysisPublish } from './publish.ts';
 import type {
   AnalysisRequest,
   AnalysisStatus,
   AnalysisStatusUpdate,
   AnalysisStatusValue,
+  AnalysisTrigger,
 } from './schema.ts';
 import { type AnalysisListFilter, AnalysisStore } from './store.ts';
+
+/**
+ * The credential the plugin already resolved. Trigger and parent are derived
+ * here; a caller never names them.
+ */
+export type AnalysisAuth =
+  | { kind: 'user'; tenants: readonly string[] }
+  | { kind: 'scheduler' }
+  | { kind: 'run'; runKey: string }
+  | { kind: 'none' };
 
 export class AnalysesService {
   #store: AnalysisStore;
@@ -20,38 +31,62 @@ export class AnalysesService {
     this.#publish = new AnalysisPublish(publish, topics);
   }
 
-  async start(request: AnalysisRequest): Promise<{ id: string }> {
+  async start(request: AnalysisRequest, auth: AnalysisAuth): Promise<{ id: string }> {
+    const origin = originOf(auth);
+    if (origin.trigger === 'scheduled' && request.analysis !== 'full_pipeline') {
+      throw createError.BadRequest('the scheduler key only starts a full_pipeline');
+    }
+
+    const parentId =
+      origin.trigger === 'chained' ? await this.#resolveParent(origin.parentRunKey) : undefined;
+
     const id = randomUUID();
-    const updateKey = randomBytes(32).toString('base64url');
-    await this.#store.enqueue(id, hashUpdateKey(updateKey), {
+    const runKey = randomBytes(32).toString('base64url');
+    await this.#store.enqueue(id, hashRunKey(runKey), {
       analysis: request.analysis,
       tenantId: 'tenant_id' in request ? request.tenant_id : undefined,
-      trigger: request.trigger,
-      parentId: request.parent_id,
+      trigger: origin.trigger,
+      parentId,
     });
-    await this.#publish.send(id, request, updateKey);
+    await this.#publish.send(id, request, runKey);
     return { id };
   }
 
-  async update(
-    id: string,
-    patch: AnalysisStatusUpdate,
-    updateKey: string,
-  ): Promise<AnalysisStatus> {
-    const stored = await this.#store.findUpdateKeyHash(id);
-    if (!stored || !matchesStoredHash(updateKey, stored)) {
-      throw createError.Unauthorized('invalid update key');
+  /**
+   * A run key only chains off a full_pipeline: chaining from a training would
+   * let one model's run mint another, which no step of the daily chain does.
+   */
+  async #resolveParent(runKey: string): Promise<string> {
+    const parent = await this.#store.findByRunKeyHash(hashRunKey(runKey));
+    if (!parent) throw createError.Unauthorized('invalid run key');
+    if (parent.analysis !== 'full_pipeline') {
+      throw createError.Conflict('only a full_pipeline run can chain another analysis');
     }
-    const current = await this.#store.getStatus(id);
-    if (!current) throw createError.NotFound('analysis not found');
+    return parent.id;
+  }
+
+  async update(id: string, patch: AnalysisStatusUpdate, runKey: string): Promise<AnalysisStatus> {
+    const stored = await this.#store.findRunKeyHash(id);
+    if (!stored || !matchesStoredHash(runKey, stored)) {
+      throw createError.Unauthorized('invalid run key');
+    }
+    const current = await this.#load(id);
     if (!allowsTransition(current.status, patch.status)) {
       throw createError.Conflict('status cannot move backwards');
     }
     await this.#store.recordStatus({ id, ...patch });
-    return this.getStatus(id);
+    return this.#load(id);
   }
 
-  async getStatus(id: string): Promise<AnalysisStatus> {
+  async getStatus(id: string, auth?: AnalysisAuth): Promise<AnalysisStatus> {
+    const status = await this.#load(id);
+    if (status.tenant_id && auth?.kind === 'user' && !auth.tenants.includes(status.tenant_id)) {
+      throw createError.Forbidden('this caller does not act for that tenant');
+    }
+    return status;
+  }
+
+  async #load(id: string): Promise<AnalysisStatus> {
     const status = await this.#store.getStatus(id);
     if (!status) throw createError.NotFound('analysis not found');
     return status;
@@ -62,7 +97,22 @@ export class AnalysesService {
   }
 }
 
-function hashUpdateKey(key: string): string {
+function originOf(
+  auth: AnalysisAuth,
+): { trigger: Exclude<AnalysisTrigger, 'chained'> } | { trigger: 'chained'; parentRunKey: string } {
+  switch (auth.kind) {
+    case 'user':
+      return { trigger: 'manual' };
+    case 'scheduler':
+      return { trigger: 'scheduled' };
+    case 'run':
+      return { trigger: 'chained', parentRunKey: auth.runKey };
+    default:
+      throw createError.Unauthorized('this endpoint needs a recognized credential');
+  }
+}
+
+function hashRunKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
 }
 
@@ -78,7 +128,7 @@ function allowsTransition(from: AnalysisStatusValue, to: AnalysisStatusValue): b
 }
 
 function matchesStoredHash(key: string, storedHex: string): boolean {
-  const presented = Buffer.from(hashUpdateKey(key), 'hex');
+  const presented = Buffer.from(hashRunKey(key), 'hex');
   const stored = Buffer.from(storedHex, 'hex');
   return presented.length === stored.length && timingSafeEqual(presented, stored);
 }

@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 import type { PrismaClient } from '../../generated/prisma/client.ts';
-import { generateSecret, type SecretCipher } from './cipher.ts';
+import { generateSecret, type SecretCipher } from '../../lib/cipher.ts';
 import { SourceStore } from './store.ts';
 
 export type SourceStatus = 'active' | 'disabled';

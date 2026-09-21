@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp } from '../../../helpers/app.ts';
+import { authHeaders, createTestApp } from '../../../helpers/app.ts';
 
 describe('source routes', () => {
   let app: FastifyInstance;
@@ -15,7 +15,7 @@ describe('source routes', () => {
   });
 
   it("lists a tenant's sources without their secrets", async () => {
-    const res = await app.inject({ method: 'GET', url: '/sources/locaweb' });
+    const res = await app.inject({ method: 'GET', url: '/sources/locaweb', headers: authHeaders });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toContainEqual({
@@ -28,7 +28,11 @@ describe('source routes', () => {
   });
 
   it("never lists another tenant's sources", async () => {
-    const res = await app.inject({ method: 'GET', url: '/sources/outro-tenant' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/sources/outro-tenant',
+      headers: authHeaders,
+    });
 
     expect(res.json()).toEqual([]);
   });
@@ -38,6 +42,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/datadog',
       payload: { intake: 'monitor' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(200);
@@ -52,6 +57,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/opsgenie',
       payload: { intake: 'alert' },
+      headers: authHeaders,
     });
     const { secret } = registered.json();
     const body = JSON.stringify({ ticket_number: 'INC1' });
@@ -74,6 +80,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/datadog',
       payload: { intake: 'webhook' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -84,6 +91,7 @@ describe('source routes', () => {
       method: 'POST',
       url: '/sources/locaweb/itsm/secret',
       payload: {},
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(200);
@@ -101,6 +109,7 @@ describe('source routes', () => {
       method: 'POST',
       url: '/sources/locaweb/zabbix/secret',
       payload: { secret: 'a-secret-long-enough' },
+      headers: authHeaders,
     });
 
     expect(res.json().secret).toBe('a-secret-long-enough');
@@ -111,6 +120,7 @@ describe('source routes', () => {
       method: 'POST',
       url: '/sources/locaweb/nowhere/secret',
       payload: {},
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(404);
@@ -121,6 +131,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/pagerduty',
       payload: { intake: 'alert' },
+      headers: authHeaders,
     });
     const { secret } = registered.json();
 
@@ -128,6 +139,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/pagerduty/status',
       payload: { status: 'disabled' },
+      headers: authHeaders,
     });
     expect(disabled.json().status).toBe('disabled');
 
@@ -151,18 +163,21 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/statuspage',
       payload: { intake: 'alert' },
+      headers: authHeaders,
     });
     const { secret } = registered.json();
     await app.inject({
       method: 'PUT',
       url: '/sources/locaweb/statuspage/status',
       payload: { status: 'disabled' },
+      headers: authHeaders,
     });
 
     await app.inject({
       method: 'PUT',
       url: '/sources/locaweb/statuspage/status',
       payload: { status: 'active' },
+      headers: authHeaders,
     });
 
     const body = JSON.stringify({ ticket_number: 'INC1' });
@@ -184,6 +199,7 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/itsm/status',
       payload: { status: 'paused' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(400);
@@ -194,13 +210,16 @@ describe('source routes', () => {
       method: 'PUT',
       url: '/sources/locaweb/nowhere/status',
       payload: { status: 'disabled' },
+      headers: authHeaders,
     });
 
     expect(res.statusCode).toBe(404);
   });
 
   it('never documents a secret on the listed source', async () => {
-    const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
+    const doc = (
+      await app.inject({ method: 'GET', url: '/docs/json', headers: authHeaders })
+    ).json();
 
     expect(doc.components.schemas.Source.properties).not.toHaveProperty('secret');
   });

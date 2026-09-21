@@ -89,6 +89,10 @@ spec:
             # them to configure on their side.
             - name: PUBLIC_GATEWAY_URL
               value: {{ .Values.frontend.env.publicGatewayUrl | quote }}
+            # The same gateway from inside the cluster — what the loaders call
+            # to ask who is signed in.
+            - name: GATEWAY_URL
+              value: {{ .Values.frontend.env.gatewayUrl | quote }}
             - name: ML_MODEL_SERVING_URL
               value: {{ .Values.frontend.env.mlModelServingUrl | quote }}
             - name: ML_MODEL_SERVING_TIMEOUT_MS

@@ -1,7 +1,6 @@
-import { Form, redirect, useNavigation } from 'react-router';
-import { inputClass } from '~/components/form';
+import { Link, redirect } from 'react-router';
 import { Logo } from '~/components/Logo';
-import { getTenantBySlug } from '~/features/config/repo.server.ts';
+import { loginPath, readIdentity } from '~/features/auth/session.server.ts';
 import { panelPath } from '~/paths';
 import { useSession } from '~/session';
 import type { Route } from './+types/home';
@@ -10,34 +9,24 @@ export function meta() {
   return [{ title: 'Ops Ahead' }];
 }
 
-const SLUG_PATTERN = '^[a-z][a-z0-9_-]*$';
+/**
+ * The entry screen lists what the person may open, rather than asking them to
+ * name it: the tenants come from their Authentik groups, so a slug typed by
+ * hand never reaches a client that is not theirs.
+ */
+export async function loader({ request }: Route.LoaderArgs) {
+  const identity = await readIdentity(request);
+  if (!identity) return { tenants: [], loginUrl: loginPath(request) };
 
-export async function action({ request }: Route.ActionArgs) {
-  const form = await request.formData();
-  const slug = String(form.get('tenant') ?? '')
-    .trim()
-    .toLowerCase();
-
-  if (!slug || !new RegExp(SLUG_PATTERN).test(slug)) {
-    return { error: 'Use só letras minúsculas, números, hífen e underscore.' };
+  // One client and nothing to choose between — go straight in.
+  if (identity.tenants.length === 1) {
+    throw redirect(panelPath(identity.tenants[0] as string));
   }
-
-  const tenant = await getTenantBySlug(slug).catch(error => {
-    console.error(error);
-    return undefined;
-  });
-  if (tenant === undefined) {
-    return { error: 'Não foi possível entrar agora. Tente de novo.' };
-  }
-  if (!tenant) {
-    return { error: 'Cliente não encontrado.' };
-  }
-
-  return redirect(panelPath(tenant.slug));
+  return { tenants: identity.tenants, loginUrl: null };
 }
 
-export default function Home({ actionData }: Route.ComponentProps) {
-  const saving = useNavigation().state === 'submitting';
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { tenants, loginUrl } = loaderData;
   const lastSlug = useSession(state => state.lastSlug);
 
   return (
@@ -51,42 +40,44 @@ export default function Home({ actionData }: Route.ComponentProps) {
           </div>
         </div>
 
-        <h1 className="font-bold text-2xl text-text-light">Entrar no cliente</h1>
-
-        <Form method="post" className="mt-8 flex flex-col gap-4">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <label
-              htmlFor="tenant"
-              className="font-semibold text-[11px] text-text-dim uppercase tracking-wider"
+        {loginUrl ? (
+          <>
+            <h1 className="font-bold text-2xl text-text-light">Entrar</h1>
+            <p className="mt-2 text-sm text-text-dim">
+              A autenticação acontece no provedor de identidade.
+            </p>
+            <a
+              href={loginUrl}
+              className="mt-8 flex h-10 items-center justify-center rounded-lg bg-accent-red px-4 font-semibold text-sm text-text-light transition-opacity hover:opacity-90"
             >
-              Cliente
-            </label>
-            <input
-              id="tenant"
-              name="tenant"
-              required
-              // biome-ignore lint/a11y/noAutofocus: sole field of the entry screen
-              autoFocus
-              autoComplete="off"
-              spellCheck={false}
-              pattern={SLUG_PATTERN}
-              placeholder="locaweb"
-              defaultValue={lastSlug ?? ''}
-              key={lastSlug ?? 'empty'}
-              className={`${inputClass} font-mono`}
-            />
-          </div>
+              Continuar
+            </a>
+          </>
+        ) : (
+          <>
+            <h1 className="font-bold text-2xl text-text-light">Escolher cliente</h1>
+            <p className="mt-2 text-sm text-text-dim">
+              {tenants.length === 0
+                ? 'Sua conta ainda não está em nenhum cliente.'
+                : 'Você opera mais de um.'}
+            </p>
 
-          {actionData?.error && <p className="text-accent-red text-sm">{actionData.error}</p>}
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex h-10 items-center justify-center rounded-lg bg-accent-red px-4 font-semibold text-sm text-text-light transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? 'Entrando…' : 'Entrar'}
-          </button>
-        </Form>
+            <ul className="mt-8 flex flex-col gap-2">
+              {tenants.map(slug => (
+                <li key={slug}>
+                  <Link
+                    to={panelPath(slug)}
+                    className={`flex h-11 items-center rounded-lg border border-white/10 px-4 font-mono text-sm transition-colors hover:border-white/25 ${
+                      slug === lastSlug ? 'text-text-light' : 'text-text-dim'
+                    }`}
+                  >
+                    {slug}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </main>
   );

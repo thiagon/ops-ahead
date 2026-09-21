@@ -5,14 +5,10 @@ const IV_BYTES = 12;
 const KEY_BYTES = 32;
 
 /**
- * Encrypts a source's webhook secret for storage. The signature check needs
- * the secret itself to recompute the digest, so it cannot be hashed the way
- * an analysis update key is — it is encrypted instead, and the key that
- * decrypts it lives in the Vault, never in the database. A dump of the
- * database is inert on its own.
+ * AES-256-GCM over a string. The key is 32 base64 bytes; ciphertext is
+ * `iv.ciphertext.tag` so it fits in one column or one cookie value.
  *
- * GCM authenticates as well as encrypts: a tampered ciphertext fails to
- * decrypt rather than yielding a wrong secret.
+ * Authenticated: a flipped bit fails to decrypt rather than yielding garbage.
  */
 export class SecretCipher {
   #key: Buffer;
@@ -20,12 +16,11 @@ export class SecretCipher {
   constructor(key: string) {
     const parsed = Buffer.from(key, 'base64');
     if (parsed.length !== KEY_BYTES) {
-      throw new Error(`SOURCE_SECRET_KEY must be ${KEY_BYTES} base64-encoded bytes`);
+      throw new Error(`cipher key must be ${KEY_BYTES} base64-encoded bytes`);
     }
     this.#key = parsed;
   }
 
-  /** `iv.ciphertext.tag`, each base64url — one column, no schema to migrate. */
   encrypt(plaintext: string): string {
     const iv = randomBytes(IV_BYTES);
     const cipher = createCipheriv(ALGORITHM, this.#key, iv);
@@ -36,7 +31,7 @@ export class SecretCipher {
   decrypt(stored: string): string {
     const [iv, ciphertext, tag] = stored.split('.').map(part => Buffer.from(part, 'base64url'));
     if (!iv || !ciphertext || !tag) {
-      throw new Error('stored secret is not in the expected iv.ciphertext.tag form');
+      throw new Error('ciphertext is not in the expected iv.ciphertext.tag form');
     }
     const decipher = createDecipheriv(ALGORITHM, this.#key, iv);
     decipher.setAuthTag(tag);
@@ -44,7 +39,28 @@ export class SecretCipher {
   }
 }
 
-/** What a rotation mints when the caller does not bring its own. */
+/** 32 random bytes, base64url — a secret nobody has to invent. */
 export function generateSecret(): string {
   return randomBytes(KEY_BYTES).toString('base64url');
+}
+
+/** Encrypts JSON and opens it again. The payload’s shape is the caller’s. */
+export class SealedJson {
+  #cipher: SecretCipher;
+
+  constructor(key: string) {
+    this.#cipher = new SecretCipher(key);
+  }
+
+  seal(payload: unknown): string {
+    return this.#cipher.encrypt(JSON.stringify(payload));
+  }
+
+  open<T>(value: string): T | undefined {
+    try {
+      return JSON.parse(this.#cipher.decrypt(value)) as T;
+    } catch {
+      return undefined;
+    }
+  }
 }

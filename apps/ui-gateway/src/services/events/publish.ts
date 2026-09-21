@@ -1,4 +1,4 @@
-import type { EventPublisher } from '../../plugins/kafka.ts';
+import type { EventPublisher } from '../../lib/kafka.ts';
 import type { EventEnvelope } from './schema.ts';
 
 export interface EventsTopics {

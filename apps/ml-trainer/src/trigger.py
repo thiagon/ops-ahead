@@ -46,15 +46,15 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
-def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | None) -> None:
-    """PATCH /analyses/{id} with the update_key from the trigger.ml message.
+def report_status(gateway_url: str, payload: dict[str, Any], run_key: str | None) -> None:
+    """PATCH /analyses/{id} with the run_key from the trigger.ml message.
 
     Cron-style events without a key are skipped — they never went through
     POST /analyses, so the gateway has no row to update.
     """
     run_id = payload["run_id"]
-    if not update_key:
-        LOGGER.info("no update_key on event; skipping PATCH /analyses/%s", run_id)
+    if not run_key:
+        LOGGER.info("no run_key on event; skipping PATCH /analyses/%s", run_id)
         return
 
     body = {key: value for key, value in payload.items() if key != "run_id"}
@@ -62,7 +62,7 @@ def report_status(gateway_url: str, payload: dict[str, Any], update_key: str | N
         f"{gateway_url.rstrip('/')}/analyses/{run_id}",
         data=json.dumps(body).encode(),
         method="PATCH",
-        headers={"Content-Type": "application/json", "X-Update-Key": update_key},
+        headers={"Content-Type": "application/json", "X-Run-Key": run_key},
     )
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
@@ -185,7 +185,7 @@ def consume_forever(settings: Settings, trainers: dict[str, Callable[[Settings],
                 ).inc()
 
                 def publish_status(
-                    payload: dict[str, Any], _key: str | None = event.get("update_key")
+                    payload: dict[str, Any], _key: str | None = event.get("run_key")
                 ) -> None:
                     report_status(settings.gateway_url, payload, _key)
 
