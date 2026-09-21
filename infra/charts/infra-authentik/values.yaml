@@ -13,10 +13,9 @@ authentik:
   # values below would silently never reach the pod. Credentials come from
   # `global.env` instead, so both sources coexist.
   authentik:
-    # debug so a blueprint entry that gets skipped says so: the importer logs
-    # "conditions of this entry are not fulfilled" at debug, and an entry that
-    # silently applies nothing is otherwise indistinguishable from success.
-    log_level: debug
+    # A blueprint entry that gets skipped says so only at debug — raise this
+    # when an apply reports success but creates nothing.
+    log_level: info
 
     postgresql:
       host: config-postgres.ui.svc.cluster.local
