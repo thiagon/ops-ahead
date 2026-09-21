@@ -1,6 +1,6 @@
 # Sprint 4 — Solução Final e Critérios de Avaliação
 
-**Data de entrega:** 08/09/2026 (Terça-feira)
+**Data de entrega:** 21/09/2026 (Segunda-feira)
 
 ---
 

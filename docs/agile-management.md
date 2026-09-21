@@ -250,7 +250,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 
 ---
 
-## Sprint 2 — Arquitetura e Desenho `[Em curso — entrega 24/05/2026]`
+## Sprint 2 — Arquitetura e Desenho `[Concluída — 24/05/2026]`
 
 **Objetivo da sprint:** tirar a ideação do papel — arquitetura completa, tecnologia escolhida e justificada, wireframes da UI e plano de implantação K8s.
 
@@ -461,7 +461,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 
 ---
 
-## Sprint 3 — MVP `[Planejada — entrega 23/08/2026]`
+## Sprint 3 — MVP `[Concluída — 23/08/2026]`
 
 **Objetivo macro:** entregar o pipeline rodando, o 1º modelo treinado e a UI mínima end-to-end usando o `incidents.csv` real.
 
@@ -477,7 +477,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 
 ---
 
-## Sprint 4 — Solução Final `[Planejada — entrega 08/09/2026]`
+## Sprint 4 — Solução Final `[Em curso — entrega 21/09/2026]`
 
 **Objetivo macro:** tampar os buracos do MVP, polir a UX, gerar evidência quantitativa pra apresentação e finalizar a documentação.
 
@@ -505,7 +505,7 @@ Fora desses momentos, o chat do time fica aberto pra dúvida e desbloqueio — q
 - `README.md` final com passo a passo de deploy (Helm install)
 - Montar o ZIP final com todo o código-fonte, scripts, dashboards e amostras de dados tratados
 - Slides e apresentação final da Sprint 4 (PPTX no padrão FIAP)
-- Entrega dos 4 artefatos no portal FIAP ON até 08/09
+- Entrega dos 4 artefatos no portal FIAP ON até 21/09
 - Ensaio pra apresentação ao vivo da banca (caso entremos no Top 6)
 
 ---

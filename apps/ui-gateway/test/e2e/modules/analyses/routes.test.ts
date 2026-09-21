@@ -25,7 +25,7 @@ describe('POST /analyses', () => {
       url: '/analyses',
       payload: {
         analysis: 'volume_forecast',
-      tenant_id: 'locaweb',
+        tenant_id: 'locaweb',
         train_end: '2025-09-30',
         validation_end: '2025-10-31',
         holdout_end: '2026-01-31',
@@ -43,7 +43,7 @@ describe('POST /analyses', () => {
       url: '/analyses',
       payload: {
         analysis: 'breach_risk',
-      tenant_id: 'locaweb',
+        tenant_id: 'locaweb',
         train_end: '2025-02-15',
         validation_end: '2025-03-15',
         holdout_end: '2025-04-09',

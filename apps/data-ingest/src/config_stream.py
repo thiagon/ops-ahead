@@ -153,7 +153,7 @@ def load_snapshot_from_store(
     produce. Blocking by design (main.py): a boot that started consuming
     before this finished would translate against an empty or partial
     registry, and translate.py turns that into a dropped event rather than a
-    degraded one (spec-config-producao.md#o-boot-do-data-ingest-é-bloqueante)."""
+    degraded one."""
     snapshot = ConfigSnapshot()
     for object_key, record in store.load_all():
         raw = json.dumps(record).encode("utf-8")

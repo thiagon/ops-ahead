@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parsePeriod } from '../app/routes/painel.tsx';
+import { parsePeriod } from '../app/routes/panel.tsx';
 
-describe('painel period selector', () => {
+describe('panel period selector', () => {
   it('accepts the periods the screen offers', () => {
     expect(parsePeriod('7')).toBe(7);
     expect(parsePeriod('30')).toBe(30);

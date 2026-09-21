@@ -51,14 +51,45 @@ describe('analysisRequestSchema', () => {
       tenant_id: 'locaweb',
       n_simulations: 5000,
       seed: 7,
-      kpi_target_volume_p2: 500,
-      kpi_target_volume_p3: 1200,
-      kpi_target_breaches_p2: 10,
-      kpi_target_breaches_p3: 15,
     });
 
     expect(result.success).toBe(true);
   });
+
+  it('rejects a per-request KPI target override', () => {
+    // The target lives in tenant_kpi_targets, published by PUT
+    // /rules/targets/{tenant}; a band is severities, so _p2/_p3 name nothing.
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'kpi_projection',
+      tenant_id: 'locaweb',
+      kpi_target_breaches_p2: 10,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts recurring_causes with its analysis window', () => {
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'recurring_causes',
+      tenant_id: 'locaweb',
+      window_days: 120,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects recurring_causes carrying split boundaries', () => {
+    // Unsupervised: there is no hold-out to evaluate against, so declaring
+    // one would describe an evaluation that never happens.
+    const result = analysisRequestSchema.safeParse({
+      analysis: 'recurring_causes',
+      tenant_id: 'locaweb',
+      train_end: '2026-06-30',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
 
   it('rejects kpi_projection with a non-integer n_simulations', () => {
     const result = analysisRequestSchema.safeParse({

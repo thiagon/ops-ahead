@@ -23,6 +23,8 @@ def _synthetic_daily(days: int = 240, tenant_id: str = "locaweb") -> pd.DataFram
                 "p1_count": max(total // 12, 0),
                 "p2_count": max(total // 6, 0),
                 "p3_count": max(total // 3, 0),
+                "p4_count": max(total // 8, 0),
+                "p5_count": max(total // 15, 0),
                 "avg_opened_hour": 12.0 + rng.integers(-1, 2),
             }
         )
@@ -49,7 +51,7 @@ def test_train_horizon_produces_metrics_for_all_priority_groups(synthetic_settin
 
     result = train_horizon(daily, long_df, synthetic_settings, horizon=1)
 
-    assert set(result["metrics"]["mape_by_priority_ensemble"].keys()) == {"total", "p1", "p2", "p3"}
+    assert set(result["metrics"]["mape_by_priority_ensemble"].keys()) == {"total", "p1", "p2", "p3", "p4", "p5"}
     assert 0.0 <= result["weight"] <= 1.0
     assert result["metrics"]["mae_ensemble"] >= 0
     assert 0.0 <= result["metrics"]["ci80_coverage"] <= 1.0
@@ -72,7 +74,7 @@ def test_train_and_log_writes_one_row_per_priority_group_and_horizon(synthetic_s
     train_and_log(synthetic_settings, daily)
 
     assert {(row["priority_group"], row["horizon"]) for row in written} == {
-        (group, horizon) for group in ("total", "p1", "p2", "p3") for horizon in (1, 7)
+        (group, horizon) for group in ("total", "p1", "p2", "p3", "p4", "p5") for horizon in (1, 7)
     }
     for row in written:
         assert row["yhat"] >= 0

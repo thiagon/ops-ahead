@@ -176,4 +176,4 @@ Quick reference; `docs/context/data-dictionary.md` is authoritative.
 | Sprint 1 — Ideation | 2026-04-27 |
 | Sprint 2 — Architecture + EDA | 2026-05-24 |
 | Sprint 3 — MVP | 2026-08-23 |
-| Sprint 4 — Final | 2026-09-08 |
+| Sprint 4 — Final | 2026-09-21 |

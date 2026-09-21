@@ -80,13 +80,15 @@ models:
 
   - name: kpi_monthly_state
     columns:
+      - name: tenant_id
+        tests: [not_null]
       - name: month
         tests: [not_null]
       - name: severity
         tests:
           - not_null
           - accepted_values:
-              values: [1, 2, 3]
+              values: [1, 2, 3, 4, 5]
       - name: breach_rate
         # Nullable by design: NULL when the bucket has zero KPI-counted
         # incidents (undefined rate), not the same thing as a 0.0 breach rate.

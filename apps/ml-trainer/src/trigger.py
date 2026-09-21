@@ -18,6 +18,7 @@ ANALYSIS_TRAINERS = {
     "breach_risk": "breach",
     "kpi_projection": "kpi_projection",
     "external_event_detection": "external_event",
+    "recurring_causes": "recurring_causes",
     "drift_monitoring": "drift",
 }
 
@@ -27,6 +28,7 @@ EXPERIMENT_NAMES = {
     "breach": "breach-risk",
     "external_event": "external-event-detection",
     "kpi_projection": "kpi-monthly-projection",
+    "recurring_causes": "recurring-causes",
     "drift": "drift-monitoring",
 }
 

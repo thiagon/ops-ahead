@@ -26,6 +26,8 @@ def _synthetic_daily(days: int = 60) -> pd.DataFrame:
                     "p1_count": max(total // 10, 0),
                     "p2_count": max(total // 5, 0),
                     "p3_count": max(total // 3, 0),
+                    "p4_count": max(total // 8, 0),
+                    "p5_count": max(total // 15, 0),
                     "avg_opened_hour": 12.0,
                 }
             )
@@ -36,7 +38,7 @@ def test_to_long_format_sums_across_sources():
     daily = _synthetic_daily(days=5)
     long_df = to_long_format(daily)
 
-    assert set(long_df["priority_group"]) == {"total", "p1", "p2", "p3"}
+    assert set(long_df["priority_group"]) == {"total", "p1", "p2", "p3", "p4", "p5"}
 
     day0 = pd.Timestamp("2025-01-01")
     expected_total = daily.loc[daily["date"] == day0, "total_incidents"].sum()
@@ -44,6 +46,21 @@ def test_to_long_format_sums_across_sources():
         (long_df["date"] == day0) & (long_df["priority_group"] == "total"), "count"
     ].item()
     assert actual_total == expected_total
+
+
+def test_to_long_format_carries_every_severity_series():
+    # A KPI band is configurable per tenant, so a series has to exist for any
+    # severity a tenant can put in one — not only the KPI-measured 1-3.
+    daily = _synthetic_daily(days=5)
+    long_df = to_long_format(daily)
+
+    day0 = pd.Timestamp("2025-01-01")
+    for group, column in (("p4", "p4_count"), ("p5", "p5_count")):
+        expected = daily.loc[daily["date"] == day0, column].sum()
+        actual = long_df.loc[
+            (long_df["date"] == day0) & (long_df["priority_group"] == group), "count"
+        ].item()
+        assert actual == expected
 
 
 def test_lag_features_do_not_leak_future_values():

@@ -5,6 +5,7 @@ const ANALYSIS_DOMAIN: Record<AnalysisRequest['analysis'], 'ml' | 'data'> = {
   volume_forecast: 'ml',
   entity_forecast: 'ml',
   breach_risk: 'ml',
+  recurring_causes: 'ml',
   kpi_projection: 'ml',
   external_event_detection: 'ml',
   data_refresh: 'data',

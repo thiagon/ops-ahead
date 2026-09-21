@@ -118,10 +118,6 @@ export const kpiProjectionRequestSchema = z
     ...provenance,
     n_simulations: z.number().int().positive().optional(),
     seed: z.number().int().optional(),
-    kpi_target_volume_p2: z.number().int().nonnegative().optional(),
-    kpi_target_volume_p3: z.number().int().nonnegative().optional(),
-    kpi_target_breaches_p2: z.number().int().nonnegative().optional(),
-    kpi_target_breaches_p3: z.number().int().nonnegative().optional(),
   })
   .strict()
   .meta({ id: 'KpiProjectionRequest' });
@@ -135,6 +131,18 @@ export const externalEventDetectionRequestSchema = z
   })
   .strict()
   .meta({ id: 'ExternalEventDetectionRequest' });
+
+export const recurringCausesRequestSchema = z
+  .object({
+    analysis: z.literal('recurring_causes'),
+    ...tenantScoped,
+    ...provenance,
+    // How much history describes an entity's behaviour. Unsupervised, so
+    // there is no hold-out to declare — only the window to group over.
+    window_days: z.number().int().positive().optional(),
+  })
+  .strict()
+  .meta({ id: 'RecurringCausesRequest' });
 
 export const entityForecastRequestSchema = z
   .object({
@@ -175,6 +183,7 @@ export const analysisRequestSchema = z
     breachRiskRequestSchema,
     kpiProjectionRequestSchema,
     externalEventDetectionRequestSchema,
+    recurringCausesRequestSchema,
     dataRefreshRequestSchema,
     dataQualityCheckRequestSchema,
     fullPipelineRequestSchema,

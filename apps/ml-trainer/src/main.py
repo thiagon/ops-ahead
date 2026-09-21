@@ -55,6 +55,9 @@ def _train_external_event(settings: Settings) -> str:
 
 
 def _train_kpi_projection(settings: Settings) -> str:
+    """One projection per tenant, over that tenant's own volume: projecting a
+    tenant's configured band against a series summing every client would put
+    the right band on the wrong number."""
     from kpi_projection.data import fetch_kpi_achievement, fetch_kpi_monthly_state, fetch_kpi_targets
     from kpi_projection.run import run_kpi_projection
     from volume.data import fetch_gold_alert_daily_features
@@ -63,7 +66,41 @@ def _train_kpi_projection(settings: Settings) -> str:
     kpi_state = fetch_kpi_monthly_state(settings)
     achievement = fetch_kpi_achievement(settings)
     targets = fetch_kpi_targets(settings)
-    return run_kpi_projection(settings, daily, kpi_state, achievement, targets)["run_id"]
+
+    tenants = sorted(set(daily["tenant_id"]) & set(targets["tenant_id"]))
+    if settings.tenant_id is not None:
+        if settings.tenant_id not in tenants:
+            raise ValueError(f"tenant {settings.tenant_id!r} has no volume history and configured band")
+        tenants = [settings.tenant_id]
+    if not tenants:
+        raise ValueError("no tenant has both volume history and a configured KPI band")
+
+    run_ids = []
+    for tenant_id in tenants:
+        run_ids.append(
+            run_kpi_projection(
+                settings,
+                daily.loc[daily["tenant_id"] == tenant_id],
+                kpi_state.loc[kpi_state["tenant_id"] == tenant_id],
+                achievement,
+                targets,
+                tenant_id=tenant_id,
+            )["run_id"]
+        )
+    return run_ids[0]
+
+
+def _train_recurring_causes(settings: Settings) -> str:
+    from recurring_causes.data import (
+        dataset_version,
+        fetch_gold_alert_category_entity_breakdown,
+    )
+    from recurring_causes.train import train_and_log
+
+    breakdown = fetch_gold_alert_category_entity_breakdown(
+        settings, settings.recurring_causes_window_days
+    )
+    return train_and_log(settings, breakdown, dataset_version=dataset_version(breakdown))
 
 
 def _run_drift(settings: Settings) -> str:
@@ -113,12 +150,14 @@ TRAINERS = {
     "breach": _train_breach,
     "external_event": _train_external_event,
     "kpi_projection": _train_kpi_projection,
+    "recurring_causes": _train_recurring_causes,
     "drift": _run_drift,
 }
 
 # The supervised forecasts need a hold-out window to evaluate against;
-# kpi_projection always forecasts from "now" forward and external_event trains
-# unsupervised on all available history — neither takes split boundaries.
+# kpi_projection always forecasts from "now" forward, and external_event and
+# recurring_causes train unsupervised on all available history — none of them
+# take split boundaries.
 SPLIT_REQUIRED_DOMAINS = {"volume", "entity_forecast", "breach"}
 
 
@@ -147,7 +186,10 @@ def main() -> None:
         return
 
     if len(sys.argv) != 3 or sys.argv[1] != "train" or sys.argv[2] not in TRAINERS:
-        LOGGER.error("Usage: python -m main train <volume|entity_forecast|breach|external_event|kpi_projection|drift> | consume")
+        LOGGER.error(
+            "Usage: python -m main train "
+            "<volume|entity_forecast|breach|external_event|kpi_projection|recurring_causes|drift> | consume"
+        )
         sys.exit(2)
 
     domain = sys.argv[2]

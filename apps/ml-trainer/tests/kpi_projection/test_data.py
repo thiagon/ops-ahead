@@ -23,14 +23,14 @@ def settings() -> Settings:
     return Settings(clickhouse_url="clickhouse://default:@localhost:9000/default")
 
 
-def test_fetch_kpi_achievement_reads_gold_alert_kpi_achievement_by_kpi_group(monkeypatch, settings):
+def test_fetch_kpi_achievement_reads_gold_alert_kpi_achievement_by_severities(monkeypatch, settings):
     fake = _FakeClient(
         {
             "gold_alert_kpi_achievement": [
-                ("locaweb", 2026, pd.Timestamp("2026-08-01"), "p1_p2", 3, 30),
+                ("locaweb", 2026, pd.Timestamp("2026-08-01"), [1, 2], 3, 30),
             ],
             "tenant_kpi_targets": [
-                ("locaweb", "p1_p2", 30, 100),
+                ("locaweb", [1, 2], 30, 100),
             ],
         }
     )
@@ -40,9 +40,33 @@ def test_fetch_kpi_achievement_reads_gold_alert_kpi_achievement_by_kpi_group(mon
     targets = data.fetch_kpi_targets(settings)
 
     assert any("gold_alert_kpi_achievement" in q for q in fake.executed)
-    assert any("kpi_group" in q for q in fake.executed)
-    assert list(achievement["kpi_group"]) == ["p1_p2"]
-    assert list(targets["kpi_group"]) == ["p1_p2"]
+    assert any("severities" in q for q in fake.executed)
+    assert not any("kpi_group" in q for q in fake.executed)
+    assert list(achievement["severities"]) == [(1, 2)]
+    assert list(targets["severities"]) == [(1, 2)]
+
+
+def test_fetch_normalises_severities_to_a_hashable_band(monkeypatch, settings):
+    # ClickHouse hands Array(UInt8) back as a list, which cannot key a
+    # groupby or a dict; the band is the identity of a projection row.
+    fake = _FakeClient(
+        {
+            "gold_alert_kpi_achievement": [
+                ("locaweb", 2026, pd.Timestamp("2026-08-01"), [1, 2, 4], 3, 30),
+            ],
+            "tenant_kpi_targets": [
+                ("locaweb", [1, 2, 4], 30, 100),
+            ],
+        }
+    )
+    monkeypatch.setattr(data.Client, "from_url", lambda url: fake)
+
+    achievement = data.fetch_kpi_achievement(settings)
+    targets = data.fetch_kpi_targets(settings)
+
+    assert achievement["severities"].iloc[0] == (1, 2, 4)
+    assert targets["severities"].iloc[0] == (1, 2, 4)
+    assert achievement.groupby("severities").size().to_dict() == {(1, 2, 4): 1}
 
 
 def test_fetch_kpi_monthly_state_reads_eligibility_by_month_and_severity(monkeypatch, settings):
@@ -51,7 +75,7 @@ def test_fetch_kpi_monthly_state_reads_eligibility_by_month_and_severity(monkeyp
     fake = _FakeClient(
         {
             "kpi_monthly_state": [
-                (pd.Timestamp("2026-08-01"), 1, "itsm", 10, 9, 1),
+                ("locaweb", pd.Timestamp("2026-08-01"), 1, "itsm", 10, 9, 1),
             ],
         }
     )
@@ -61,6 +85,7 @@ def test_fetch_kpi_monthly_state_reads_eligibility_by_month_and_severity(monkeyp
 
     assert any("kpi_monthly_state" in q for q in fake.executed)
     assert list(kpi_state["severity"]) == [1]
+    assert list(kpi_state["tenant_id"]) == ["locaweb"]
 
 
 def test_fetch_kpi_achievement_never_reads_kpi_monthly_state(monkeypatch, settings):
@@ -86,7 +111,7 @@ class _RecordingClient:
         return []
 
 
-def test_write_kpi_projection_writes_one_row_per_tenant_as_of_date_kpi_group(monkeypatch, settings):
+def test_write_kpi_projection_writes_one_row_per_tenant_as_of_date_severities(monkeypatch, settings):
     fake = _RecordingClient()
     monkeypatch.setattr(data.Client, "from_url", lambda url: fake)
 
@@ -94,7 +119,7 @@ def test_write_kpi_projection_writes_one_row_per_tenant_as_of_date_kpi_group(mon
         {
             "tenant_id": "locaweb",
             "as_of_date": pd.Timestamp("2026-08-21").date(),
-            "kpi_group": "p1_p2",
+            "severities": [1, 2],
             "median_breaches_ytd": 12.0,
             "ci80_lower": 8.0,
             "ci80_upper": 16.0,
@@ -103,7 +128,7 @@ def test_write_kpi_projection_writes_one_row_per_tenant_as_of_date_kpi_group(mon
         {
             "tenant_id": "locaweb",
             "as_of_date": pd.Timestamp("2026-08-21").date(),
-            "kpi_group": "p3",
+            "severities": [3],
             "median_breaches_ytd": 40.0,
             "ci80_lower": 30.0,
             "ci80_upper": 50.0,
@@ -117,6 +142,6 @@ def test_write_kpi_projection_writes_one_row_per_tenant_as_of_date_kpi_group(mon
     assert len(insert_calls) == 1
     _, inserted_rows = insert_calls[0]
     assert len(inserted_rows) == 2
-    assert {row["kpi_group"] for row in inserted_rows} == {"p1_p2", "p3"}
+    assert {tuple(row["severities"]) for row in inserted_rows} == {(1, 2), (3,)}
     assert any("CREATE TABLE" in q for q, _ in fake.executed)
     assert any("gold_kpi_projection" in q for q, _ in fake.executed)

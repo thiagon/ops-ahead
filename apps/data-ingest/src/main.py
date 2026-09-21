@@ -72,8 +72,7 @@ def build_app(settings: Settings) -> tuple[FastStream, KafkaBroker]:
 
     # Blocking, before any subscriber is declared: a consumer that started
     # translating against an empty registry would drop events translate.py
-    # is only missing because the snapshot had not loaded yet
-    # (docs/spec-config-producao.md#o-boot-do-data-ingest-é-bloqueante).
+    # is only missing because the snapshot had not loaded yet.
     snapshot = load_snapshot_from_store(config_store, bindings, dictionaries)
     writer.replace_deadlines(snapshot.deadline_rows)
     writer.replace_kpi_targets(snapshot.target_rows)
