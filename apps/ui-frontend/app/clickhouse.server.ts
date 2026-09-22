@@ -380,14 +380,29 @@ export async function fetchSeverityHistory(
   source: string,
   externalId: string,
 ): Promise<SeverityChangeRow[]> {
-  return await query<SeverityChangeRow>(
-    `select toString(received_at) as received_at, severity_from, severity_to
-     from priority_changes_log
-     where tenant_id = {tenant_id:String}
-       and source = {source:String}
-       and external_id = {external_id:String}
-     order by received_at asc`,
-    { tenant_id: (await currentTenant()).slug, source, external_id: externalId },
+  try {
+    return await query<SeverityChangeRow>(
+      `select toString(received_at) as received_at, severity_from, severity_to
+       from priority_changes_log
+       where tenant_id = {tenant_id:String}
+         and source = {source:String}
+         and external_id = {external_id:String}
+       order by received_at asc`,
+      { tenant_id: (await currentTenant()).slug, source, external_id: externalId },
+    );
+  } catch (error) {
+    // The mart is analytical and can be absent until the first full pipeline
+    // run after a deploy. An occurrence still has enough data to render
+    // without its optional severity history.
+    if (isMissingClickHouseTable(error)) return [];
+    throw error;
+  }
+}
+
+export function isMissingClickHouseTable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Unknown table expression identifier') || message.includes('UNKNOWN_TABLE')
   );
 }
 
