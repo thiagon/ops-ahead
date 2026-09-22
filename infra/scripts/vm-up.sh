@@ -54,6 +54,15 @@ else
   info "registries.yaml already current"
 fi
 
+SYSCTL_DST="/etc/sysctl.d/60-ops-ahead.conf"
+if ! cmp -s "$(dirname "${BASH_SOURCE[0]}")/sysctl.conf" "$SYSCTL_DST" 2>/dev/null; then
+  cp "$(dirname "${BASH_SOURCE[0]}")/sysctl.conf" "$SYSCTL_DST"
+  sysctl -q -p "$SYSCTL_DST"
+  info "sysctl.conf installed → $SYSCTL_DST"
+else
+  info "sysctl.conf already current"
+fi
+
 mkdir -p "$ROOT_DIR/.data"
 
 # Hand off to the shared bootstrap. CLUSTER_EXISTS=skip tells dev-up.sh the node

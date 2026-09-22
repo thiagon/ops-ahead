@@ -1,26 +1,16 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import createError from 'http-errors';
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { EventPublisher } from '../../lib/kafka.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { EventPublisher } from '#lib/kafka.ts';
 import { AnalysisPublish } from './publish.ts';
 import type {
+  AnalysisOrigin,
   AnalysisRequest,
   AnalysisStatus,
   AnalysisStatusUpdate,
   AnalysisStatusValue,
-  AnalysisTrigger,
 } from './schema.ts';
 import { type AnalysisListFilter, AnalysisStore } from './store.ts';
-
-/**
- * The credential the plugin already resolved. Trigger and parent are derived
- * here; a caller never names them.
- */
-export type AnalysisAuth =
-  | { kind: 'user'; tenants: readonly string[] }
-  | { kind: 'scheduler' }
-  | { kind: 'run'; runKey: string }
-  | { kind: 'none' };
 
 export class AnalysesService {
   #store: AnalysisStore;
@@ -31,12 +21,7 @@ export class AnalysesService {
     this.#publish = new AnalysisPublish(publish, topics);
   }
 
-  async start(request: AnalysisRequest, auth: AnalysisAuth): Promise<{ id: string }> {
-    const origin = originOf(auth);
-    if (origin.trigger === 'scheduled' && request.analysis !== 'full_pipeline') {
-      throw createError.BadRequest('the scheduler key only starts a full_pipeline');
-    }
-
+  async start(request: AnalysisRequest, origin: AnalysisOrigin): Promise<{ id: string }> {
     const parentId =
       origin.trigger === 'chained' ? await this.#resolveParent(origin.parentRunKey) : undefined;
 
@@ -48,7 +33,11 @@ export class AnalysesService {
       trigger: origin.trigger,
       parentId,
     });
-    await this.#publish.send(id, request, runKey);
+    try {
+      await this.#publish.send(id, request, runKey);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
     return { id };
   }
 
@@ -78,9 +67,9 @@ export class AnalysesService {
     return this.#load(id);
   }
 
-  async getStatus(id: string, auth?: AnalysisAuth): Promise<AnalysisStatus> {
+  async getStatus(id: string, tenants?: readonly string[]): Promise<AnalysisStatus> {
     const status = await this.#load(id);
-    if (status.tenant_id && auth?.kind === 'user' && !auth.tenants.includes(status.tenant_id)) {
+    if (status.tenant_id && tenants && !tenants.includes(status.tenant_id)) {
       throw createError.Forbidden('this caller does not act for that tenant');
     }
     return status;
@@ -94,21 +83,6 @@ export class AnalysesService {
 
   async list(filter: AnalysisListFilter): Promise<AnalysisStatus[]> {
     return this.#store.list(filter);
-  }
-}
-
-function originOf(
-  auth: AnalysisAuth,
-): { trigger: Exclude<AnalysisTrigger, 'chained'> } | { trigger: 'chained'; parentRunKey: string } {
-  switch (auth.kind) {
-    case 'user':
-      return { trigger: 'manual' };
-    case 'scheduler':
-      return { trigger: 'scheduled' };
-    case 'run':
-      return { trigger: 'chained', parentRunKey: auth.runKey };
-    default:
-      throw createError.Unauthorized('this endpoint needs a recognized credential');
   }
 }
 

@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { SecretCipher } from '../lib/cipher.ts';
+import { SealedJson, SecretCipher } from '#lib/cipher.ts';
 import { AnalysesService } from './analyses/service.ts';
 import { ApiKeysService } from './api-keys/service.ts';
 import { EventsService } from './events/service.ts';
-import { OidcService } from './oidc/service.ts';
 import { RulesService } from './rules/service.ts';
+import { SessionService } from './session/service.ts';
 import { SourcesService } from './sources/service.ts';
 import { TenantsService } from './tenants/service.ts';
 
@@ -16,7 +16,7 @@ declare module 'fastify' {
       events: EventsService;
       sources: SourcesService;
       rules: RulesService;
-      oidc: OidcService;
+      session: SessionService;
       apiKeys: ApiKeysService;
       tenants: TenantsService;
     };
@@ -49,14 +49,17 @@ async function servicesPlugin(fastify: FastifyInstance) {
       },
       fastify.prisma,
     ),
-    oidc: new OidcService({
-      issuer: fastify.env.AUTHENTIK_ISSUER,
-      clientId: fastify.env.AUTHENTIK_CLIENT_ID,
-      clientSecret: fastify.env.AUTHENTIK_CLIENT_SECRET,
-      redirectUri: `${fastify.env.PUBLIC_URL.replace(/\/$/, '')}/auth/callback`,
-      introspectionCacheTtlMs: fastify.env.INTROSPECTION_CACHE_TTL_MS,
-      internalOrigin: fastify.env.AUTHENTIK_INTERNAL_ORIGIN || undefined,
-    }),
+    session: new SessionService(
+      fastify.oidc,
+      fastify.env.SESSION_COOKIE_KEY ? new SealedJson(fastify.env.SESSION_COOKIE_KEY) : undefined,
+      {
+        secure: fastify.env.HTTPS_ENABLED,
+        domain: fastify.env.SESSION_COOKIE_DOMAIN,
+        frontendOrigin: fastify.env.FRONTEND_ORIGIN,
+        publicUrl: fastify.env.PUBLIC_URL,
+      },
+      fastify.log,
+    ),
     apiKeys: new ApiKeysService(fastify.prisma),
     tenants: new TenantsService(fastify.prisma),
   });
@@ -68,5 +71,5 @@ async function servicesPlugin(fastify: FastifyInstance) {
 
 export default fp(servicesPlugin, {
   name: 'services',
-  dependencies: ['env', 'kafka', 'prisma'],
+  dependencies: ['env', 'kafka', 'prisma', 'oidc'],
 });

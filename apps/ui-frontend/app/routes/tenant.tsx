@@ -4,6 +4,7 @@ import { readJson } from '~/client-fetch.ts';
 import { RouteError } from '~/components/RouteError';
 import { Sidebar } from '~/components/Sidebar';
 import { fetchIdentity, loginUrl } from '~/features/auth/gateway.client.ts';
+import { canWrite } from '~/features/auth/role.ts';
 import { useSession } from '~/session';
 import type { Route } from './+types/tenant';
 
@@ -31,7 +32,14 @@ export async function clientLoader({ params, request }: Route.ClientLoaderArgs) 
     openCount = null;
   }
 
-  return { tenant: { slug: tenant, name: tenant }, openCount };
+  const operator = { sub: identity.sub, name: identity.name, email: identity.email };
+  return {
+    tenant: { slug: tenant, name: tenant },
+    operator,
+    openCount,
+    canWrite: canWrite(identity),
+    canSwitchTenant: identity.tenants.length > 1,
+  };
 }
 
 export function HydrateFallback() {
@@ -43,7 +51,7 @@ export function HydrateFallback() {
 }
 
 export default function TenantLayout({ loaderData }: Route.ComponentProps) {
-  const { tenant, openCount } = loaderData;
+  const { tenant, operator, openCount, canSwitchTenant } = loaderData;
   const enter = useSession(state => state.enter);
 
   useEffect(() => {
@@ -52,7 +60,12 @@ export default function TenantLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar tenant={tenant} openCount={openCount} />
+      <Sidebar
+        tenant={tenant}
+        operator={operator}
+        openCount={openCount}
+        canSwitchTenant={canSwitchTenant}
+      />
       <div className="min-w-0 flex-1">
         <Outlet />
       </div>

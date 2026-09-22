@@ -18,7 +18,8 @@
     "declaration": false,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "customConditions": ["source"]
   },
   "include": ["src"]
 }

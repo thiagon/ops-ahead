@@ -1,6 +1,7 @@
 import { redirect } from 'react-router';
 import { getConfig } from '~/config.server.ts';
 import { gatewayFetch } from './gateway.server.ts';
+import { canWrite, type Role } from './role.ts';
 
 /**
  * Who the gateway says is calling, read from its `/auth/me` on every request
@@ -10,8 +11,11 @@ import { gatewayFetch } from './gateway.server.ts';
  */
 export interface Identity {
   sub: string;
+  name?: string;
+  email?: string;
   /** Tenants the person operates — Authentik group names, verbatim. */
   tenants: string[];
+  role?: Role;
 }
 
 /**
@@ -44,6 +48,19 @@ export async function requireTenantAccess(request: Request, tenant: string): Pro
   const identity = await requireIdentity(request);
   if (!identity.tenants.includes(tenant)) {
     throw new Response('Esse cliente não está entre os seus.', { status: 403 });
+  }
+  return identity;
+}
+
+/**
+ * For an action: the tenant has to be theirs and they have to be allowed to
+ * change it. Checked here as well as at the gateway so a viewer's write never
+ * leaves this server.
+ */
+export async function requireOperator(request: Request, tenant: string): Promise<Identity> {
+  const identity = await requireTenantAccess(request, tenant);
+  if (!canWrite(identity)) {
+    throw new Response('Seu acesso a esse cliente é somente leitura.', { status: 403 });
   }
   return identity;
 }

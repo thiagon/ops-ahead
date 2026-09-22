@@ -34,7 +34,8 @@ spec:
           image: {{ .Values.runner.dindImage }}
           securityContext:
             privileged: true
-          command: ["dockerd"]
+          # dockerd does not reap orphans; tini as PID 1 collects exited containerd-shims.
+          command: ["docker-init", "--", "dockerd"]
           args:
             - "--host=tcp://127.0.0.1:2375"
             - "--insecure-registry=gitea.ops-ahead.localtest.me"

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gatewayFetch } from '../app/features/auth/gateway.server.ts';
+import { canWrite } from '../app/features/auth/role.ts';
 import {
   loginPath,
   readIdentity,
+  requireOperator,
   requireTenantAccess,
 } from '../app/features/auth/session.server.ts';
 
@@ -79,6 +81,50 @@ describe('requireTenantAccess', () => {
 
     expect(error).toBeInstanceOf(Response);
     expect(error.status).toBe(403);
+  });
+});
+
+describe('requireOperator', () => {
+  const request = () =>
+    new Request('http://ui.example/locaweb/targets', {
+      method: 'POST',
+      headers: { cookie: 'oa_session=sealed' },
+    });
+
+  it.each([
+    ['viewer', { role: 'viewer' }],
+    ['a caller with no role', {}],
+  ])('is 403 for %s, before anything reaches the gateway', async (_label, claim) => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ sub: 'person', tenants: ['locaweb'], ...claim }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await requireOperator(request(), 'locaweb').catch(err => err);
+
+    expect(error).toBeInstanceOf(Response);
+    expect(error.status).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets an operator through', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ sub: 'person', tenants: ['locaweb'], role: 'operator' })),
+    );
+
+    await expect(requireOperator(request(), 'locaweb')).resolves.toMatchObject({
+      role: 'operator',
+    });
+  });
+});
+
+describe('canWrite', () => {
+  it('writes only on an explicit operator', () => {
+    expect(canWrite({ role: 'operator' })).toBe(true);
+    expect(canWrite({ role: 'viewer' })).toBe(false);
+    expect(canWrite({ role: 'admin' })).toBe(false);
+    expect(canWrite({})).toBe(false);
   });
 });
 

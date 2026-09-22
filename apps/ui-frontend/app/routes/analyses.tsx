@@ -6,6 +6,7 @@ import { RefreshIcon } from '~/components/icons';
 import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { ReadOnlyNotice } from '~/components/ReadOnlyNotice';
 import { RouteError } from '~/components/RouteError';
 import { buildAnalysisRequest } from '~/features/analyses/payload.ts';
 import { analysesRepo } from '~/features/analyses/repo.client.ts';
@@ -23,6 +24,8 @@ import {
   STATUS_LABEL,
   TRIGGER_LABEL,
 } from '~/features/analyses/types.ts';
+import { useCanWrite } from '~/features/auth/role.ts';
+import { requireOperator } from '~/features/auth/session.server.ts';
 import type { Route } from './+types/analyses';
 
 export function meta() {
@@ -40,6 +43,7 @@ export function HydrateFallback() {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+  await requireOperator(request, params.tenant);
   return withTenant(request, params.tenant, async () => {
     const tenant = params.tenant;
     if (!tenant) return { error: 'Tenant ausente.', startedId: null as string | null };
@@ -217,12 +221,12 @@ function AnalysisForm({ error }: { error: string | null | undefined }) {
   );
 }
 
-function RunsTable({ runs }: { runs: AnalysisRun[] }) {
+function RunsTable({ runs, canWrite }: { runs: AnalysisRun[]; canWrite: boolean }) {
   if (runs.length === 0) {
     return (
       <div className="rounded-lg border border-border-base py-8 text-center">
         <p className="text-sm text-text-muted">Nenhuma análise registrada ainda.</p>
-        <p className="mt-1 text-text-dim text-xs">Dispare a primeira acima.</p>
+        {canWrite && <p className="mt-1 text-text-dim text-xs">Dispare a primeira acima.</p>}
       </div>
     );
   }
@@ -262,6 +266,7 @@ function RunsTable({ runs }: { runs: AnalysisRun[] }) {
 export default function Analyses({ loaderData, actionData }: Route.ComponentProps) {
   const { runs } = loaderData;
   const revalidator = useRevalidator();
+  const canWrite = useCanWrite();
   const hasLive = runs.some(run => run.status === 'pending' || run.status === 'running');
 
   useEffect(() => {
@@ -276,7 +281,11 @@ export default function Analyses({ loaderData, actionData }: Route.ComponentProp
     <main className="p-6 sm:p-8">
       <PageHeader
         title="Análises"
-        subtitle="Dispare qualquer análise e acompanhe o status no gateway."
+        subtitle={
+          canWrite
+            ? 'Dispare qualquer análise e acompanhe o status no gateway.'
+            : 'Acompanhe o status das análises no gateway.'
+        }
         action={
           <button
             type="button"
@@ -296,10 +305,14 @@ export default function Analyses({ loaderData, actionData }: Route.ComponentProp
         </p>
       )}
 
-      <AnalysisForm error={actionData?.error} />
+      {canWrite ? (
+        <AnalysisForm error={actionData?.error} />
+      ) : (
+        <ReadOnlyNotice>Seu acesso acompanha as análises, mas não dispara novas.</ReadOnlyNotice>
+      )}
 
       <Panel title="Histórico recente" className="mt-6">
-        <RunsTable runs={runs} />
+        <RunsTable runs={runs} canWrite={canWrite} />
       </Panel>
     </main>
   );

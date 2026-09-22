@@ -105,7 +105,7 @@ describe('POST /webhook/:tenant/:source', () => {
     const res = await app.inject({ method: 'POST', url: ROUTE, payload: itsmEvent });
 
     expect(res.statusCode).toBe(502);
-    expect(res.json()).toMatchObject({ error: 'PublishFailed' });
+    expect(res.json()).toMatchObject({ error: 'BadGatewayError' });
   });
 
   it('rejects a non-object body', async () => {

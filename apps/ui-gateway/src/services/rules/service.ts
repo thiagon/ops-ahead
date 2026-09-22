@@ -1,6 +1,6 @@
 import createError from 'http-errors';
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { EventPublisher } from '../../lib/kafka.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { EventPublisher } from '#lib/kafka.ts';
 import { RulesPublish, type RulesTopics } from './publish.ts';
 import type { DeadlineSet, Mapping, TargetSet } from './schema.ts';
 import { RuleStore, type Stored } from './store.ts';
@@ -31,17 +31,29 @@ export class RulesService {
       throw createError.NotFound('no source is registered under this tenant and name');
     }
     await this.#store.appendMapping(tenant, source, mapping);
-    return this.#publish.publishMapping(tenant, source, mapping);
+    try {
+      return await this.#publish.publishMapping(tenant, source, mapping);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
   }
 
   async setDeadlines(tenant: string, deadlines: DeadlineSet): Promise<RulesAccepted> {
     await this.#store.appendDeadlines(tenant, deadlines);
-    return this.#publish.publishDeadlines(tenant, deadlines);
+    try {
+      return await this.#publish.publishDeadlines(tenant, deadlines);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
   }
 
   async setTargets(tenant: string, targets: TargetSet): Promise<RulesAccepted> {
     await this.#store.appendTargets(tenant, targets);
-    return this.#publish.publishTargets(tenant, targets);
+    try {
+      return await this.#publish.publishTargets(tenant, targets);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
   }
 
   async getMapping(tenant: string, source: string): Promise<Mapping> {

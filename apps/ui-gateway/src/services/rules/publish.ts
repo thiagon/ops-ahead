@@ -1,4 +1,4 @@
-import type { EventPublisher } from '../../lib/kafka.ts';
+import type { EventPublisher } from '#lib/kafka.ts';
 
 export interface RulesTopics {
   mapping: string;

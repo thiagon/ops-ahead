@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { EventPublisher } from '../../lib/kafka.ts';
+import createError from 'http-errors';
+import type { EventPublisher } from '#lib/kafka.ts';
 import { EventsPublish, type EventsTopics } from './publish.ts';
 import { type EventEnvelope, eventEnvelopeSchema, type WebhookAccepted } from './schema.ts';
 
@@ -42,7 +43,11 @@ export class EventsService {
 
   async ingest(origin: EventOrigin, body: Record<string, unknown>): Promise<WebhookAccepted> {
     const envelope = buildEnvelope(origin, body);
-    await this.#publish.send(envelope);
+    try {
+      await this.#publish.send(envelope);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
     return {
       event_id: envelope.event_id,
       tenant_id: envelope.tenant_id,
@@ -55,7 +60,11 @@ export class EventsService {
     bodies: Record<string, unknown>[],
   ): Promise<WebhookAccepted[]> {
     const envelopes = bodies.map(body => buildEnvelope(origin, body));
-    await this.#publish.sendBatch(envelopes);
+    try {
+      await this.#publish.sendBatch(envelopes);
+    } catch {
+      throw createError.BadGateway('could not publish the event to the bus');
+    }
     return envelopes.map(envelope => ({
       event_id: envelope.event_id,
       tenant_id: envelope.tenant_id,

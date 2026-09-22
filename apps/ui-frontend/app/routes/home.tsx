@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Link, redirect } from 'react-router';
 import { Logo } from '~/components/Logo';
 import { RouteError } from '~/components/RouteError';
-import { fetchIdentity, loginUrl } from '~/features/auth/gateway.client.ts';
+import { fetchIdentity, loginUrl, logout } from '~/features/auth/gateway.client.ts';
 import { panelPath } from '~/paths';
 import { useSession } from '~/session';
 import type { Route } from './+types/home';
@@ -39,6 +40,18 @@ export function HydrateFallback() {
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { tenants, loginUrl } = loaderData;
   const lastSlug = useSession(state => state.lastSlug);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const next = await logout();
+      window.location.assign(next ?? '/');
+    } catch {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
@@ -87,6 +100,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 </li>
               ))}
             </ul>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              className="mt-6 text-sm text-text-dim hover:text-text-light disabled:opacity-50"
+            >
+              Sair
+            </button>
           </>
         )}
       </div>

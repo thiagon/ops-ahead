@@ -137,6 +137,6 @@ describe('POST /{tenant}/analyses', () => {
     });
 
     expect(res.statusCode).toBe(502);
-    expect(res.json()).toMatchObject({ error: 'PublishFailed' });
+    expect(res.json()).toMatchObject({ error: 'BadGatewayError' });
   });
 });

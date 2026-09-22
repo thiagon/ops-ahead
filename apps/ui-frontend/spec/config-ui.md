@@ -139,7 +139,8 @@ prazos/metas no ClickHouse no lugar dos seeds).
 
 ### 5.3 Autenticação
 
-O `ui-frontend` não tem login — a sidebar mostra "Sessão anônima". O histórico
+A sidebar mostra o nome do operador lido do `/auth/me` do gateway (claims `name`
+ou `preferred_username` do Authentik) e um avatar DiceBear gerado a partir do `sub`. O histórico
 grava autor `anonymous` até haver IdP.
 
 ### 5.4 HMAC não serve para toda origem

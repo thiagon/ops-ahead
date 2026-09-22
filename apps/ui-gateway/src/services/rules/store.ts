@@ -1,5 +1,5 @@
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { InputJsonValue } from '#generated/prisma/internal/prismaNamespace.ts';
 import { type DeadlineSet, type Mapping, mappingSchema, type TargetSet } from './schema.ts';
 
 /** How many published copies GET /history returns. Older rows stay stored. */

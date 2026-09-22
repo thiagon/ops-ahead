@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { PrismaClient } from '../../generated/prisma/client.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
 
 const PREFIX_LENGTH = 8;
 

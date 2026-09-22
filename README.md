@@ -193,6 +193,7 @@ A stack roda num k3s de nó único. Só três hosts são públicos, em HTTPS atr
 | Serviço | URL | Credenciais |
 |---------|-----|-------------|
 | UI | https://ui.ops-ahead.xyz | login via Authentik |
+| UI (demo, somente leitura) | https://ui.ops-ahead.xyz | `demo` / `ops-ahead-demo` |
 | Gateway | https://gateway.ops-ahead.xyz | login via Authentik |
 | MCP | https://gateway.ops-ahead.xyz/mcp/locaweb | OAuth via Authentik (cliente `gateway-mcp`) |
 | Authentik | https://auth.ops-ahead.xyz | `AUTHENTIK_BOOTSTRAP_EMAIL` / `AUTHENTIK_BOOTSTRAP_PASSWORD` |

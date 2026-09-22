@@ -1,8 +1,8 @@
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { InputJsonValue } from '#generated/prisma/internal/prismaNamespace.ts';
 import { type AnalysisStatus, type AnalysisTrigger, analysisStatusSchema } from './schema.ts';
 
-export interface AnalysisOrigin {
+interface QueuedAnalysis {
   analysis: string;
   tenantId?: string;
   trigger: AnalysisTrigger;
@@ -23,7 +23,7 @@ export class AnalysisStore {
     this.#prisma = prisma;
   }
 
-  async enqueue(id: string, runKeyHash: string, origin: AnalysisOrigin): Promise<void> {
+  async enqueue(id: string, runKeyHash: string, origin: QueuedAnalysis): Promise<void> {
     await this.#prisma.analysis.upsert({
       where: { id },
       create: {

@@ -6,20 +6,39 @@ import type {
 } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import { SealedJson } from '../lib/cipher.ts';
-import { cookieAttributes } from '../lib/cookie.ts';
+import { type Auth, NoAuth, RunAuth, SchedulerAuth, UserAuth } from '#lib/auth.ts';
 
-/**
- * Who is calling, as one of the four credentials resolved it. The route hooks
- * read this; nothing below them parses a header again.
- */
-export type Auth =
-  | { kind: 'user'; sub: string; tenants: string[]; accessToken: string }
-  | { kind: 'scheduler' }
-  | { kind: 'run'; runKey: string }
-  | { kind: 'none' };
+const CSRF_HEADER = 'x-csrf-token';
+const RUN_KEY_HEADER = 'X-Run-Key';
+const HMAC_HEADER = 'X-Signature';
+const SESSION_COOKIE = 'oa_session';
+const WRITER_ROLE = 'operator';
+
+const securitySchemes = {
+  cookieAuth: apiKeyScheme({
+    in: 'cookie',
+    name: SESSION_COOKIE,
+    description: 'Encrypted Authentik tokens. The browser never reads them.',
+  }),
+  bearerAuth: bearerScheme('Access token issued by Authentik — MCP clients, and tests.'),
+  schedulerKey: bearerScheme('The CronJob’s API key.'),
+  runKey: apiKeyScheme({
+    in: 'header',
+    name: RUN_KEY_HEADER,
+    description: 'Credential from the Kafka message for this run — never on HTTP 202.',
+  }),
+  hmac: apiKeyScheme({
+    in: 'header',
+    name: HMAC_HEADER,
+    description: 'HMAC of the webhook body, keyed by that (tenant, source) secret.',
+  }),
+};
+
+type CheckName = 'user' | 'tenant' | 'writer' | 'scheduler' | 'run';
 
 type SecurityRequirement = Record<string, string[]>;
+
+type AuthCheck = preHandlerAsyncHookHandler & { security: SecurityRequirement[] };
 
 type Gate = {
   <S extends object>(
@@ -31,6 +50,73 @@ type Gate = {
   security: SecurityRequirement[];
 };
 
+function check(preHandler: preHandlerAsyncHookHandler, security: SecurityRequirement[]): AuthCheck {
+  return Object.assign(preHandler, { security });
+}
+
+function isCheck(fn: AuthCheck | readonly AuthCheck[]): fn is AuthCheck {
+  return !Array.isArray(fn);
+}
+
+function gate(preHandler: AuthCheck): Gate {
+  const apply = <S extends object>(schema: S) => ({
+    preHandler,
+    schema: { ...schema, security: preHandler.security },
+  });
+  return Object.assign(apply, { security: preHandler.security });
+}
+
+/**
+ * A list passes when any check does. A list inside it passes when every check
+ * does — the same pairing a route's OpenAPI `security` array uses. `and` stops
+ * at the first failure; `or` returns the last one.
+ */
+function compose(
+  functions: ReadonlyArray<AuthCheck | readonly AuthCheck[]>,
+  relation: 'or' | 'and',
+  nested = false,
+): AuthCheck {
+  if (functions.length === 0) throw new Error('Missing auth functions');
+  const parts = functions.map((fn): AuthCheck => {
+    if (isCheck(fn)) return fn;
+    if (nested) throw new TypeError('Nesting sub-arrays is not supported');
+    return compose(fn, relation === 'or' ? 'and' : 'or', true);
+  });
+
+  const security =
+    relation === 'or'
+      ? parts.flatMap(part => part.security)
+      : parts.reduce<SecurityRequirement[]>((acc, part) => {
+          if (part.security.length === 0) return acc;
+          if (acc.length === 0) return part.security;
+          return acc.flatMap(left => part.security.map(right => ({ ...left, ...right })));
+        }, []);
+
+  const preHandler: preHandlerAsyncHookHandler = async function (request, reply) {
+    if (relation === 'and') {
+      for (const part of parts) await part.call(this, request, reply);
+      return;
+    }
+    let error: unknown;
+    for (const part of parts) {
+      try {
+        await part.call(this, request, reply);
+        return;
+      } catch (err) {
+        error = err;
+      }
+    }
+    throw error;
+  };
+
+  return check(preHandler, security);
+}
+
+function documented(security: SecurityRequirement[]) {
+  const apply = <S extends object>(schema: S) => ({ schema: { ...schema, security } });
+  return Object.assign(apply, { security });
+}
+
 declare module 'fastify' {
   interface FastifyInstance {
     /**
@@ -39,15 +125,16 @@ declare module 'fastify' {
      * hook from one place and a scheme from another.
      */
     auth: {
+      (
+        checks: ReadonlyArray<CheckName | readonly CheckName[]>,
+        options?: { relation?: 'or' | 'and' },
+      ): Gate;
       schemes: typeof securitySchemes;
       user: Gate;
       tenant: Gate;
-      schedulerOrRun: Gate;
+      operator: Gate;
       run: Gate;
-      hmac: {
-        <S extends object>(schema: S): { schema: S & { security: SecurityRequirement[] } };
-        security: SecurityRequirement[];
-      };
+      hmac: ReturnType<typeof documented>;
     };
   }
   interface FastifyRequest {
@@ -55,83 +142,13 @@ declare module 'fastify' {
   }
 }
 
-const BEARER = /^Bearer (.+)$/i;
-const SESSION_COOKIE = 'oa_session';
-const CSRF_HEADER = 'x-csrf-token';
-const RUN_KEY_HEADER = 'X-Run-Key';
-const HMAC_HEADER = 'X-Signature';
-
-const securitySchemes = {
-  cookieAuth: {
-    type: 'apiKey' as const,
-    in: 'cookie' as const,
-    name: SESSION_COOKIE,
-    description: 'Encrypted Authentik tokens. The browser never reads them.',
-  },
-  bearerAuth: {
-    type: 'http' as const,
-    scheme: 'bearer' as const,
-    description: 'Access token issued by Authentik — MCP clients, and tests.',
-  },
-  schedulerKey: {
-    type: 'http' as const,
-    scheme: 'bearer' as const,
-    description: 'The CronJob’s API key. Only starts a full_pipeline.',
-  },
-  runKey: {
-    type: 'apiKey' as const,
-    in: 'header' as const,
-    name: RUN_KEY_HEADER,
-    description: 'Credential from the Kafka message for this run — never on HTTP 202.',
-  },
-  hmac: {
-    type: 'apiKey' as const,
-    in: 'header' as const,
-    name: HMAC_HEADER,
-    description: 'HMAC of the webhook body, keyed by that (tenant, source) secret.',
-  },
-};
-
-function gate(preHandler: preHandlerAsyncHookHandler, security: SecurityRequirement[]): Gate {
-  const apply = <S extends object>(schema: S) => ({
-    preHandler,
-    schema: { ...schema, security },
-  });
-  return Object.assign(apply, { security });
-}
-
-function documented(security: SecurityRequirement[]) {
-  const apply = <S extends object>(schema: S) => ({ schema: { ...schema, security } });
-  return Object.assign(apply, { security });
-}
-
-interface SessionPayload {
-  accessToken: string;
-  refreshToken?: string;
-  csrf: string;
-}
-
-function readCookie(request: FastifyRequest, name: string): string | undefined {
-  const header = request.headers.cookie;
-  if (!header) return undefined;
-  for (const part of header.split(';')) {
-    const [key, ...rest] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(rest.join('='));
-  }
-  return undefined;
-}
-
 /**
- * Resolves the caller once per request, in the fixed order the dispatch table
- * declares: run key, then scheduler key, then a person. The first that matches
- * wins and the rest are not consulted — mixing them is what would let one
- * caller borrow another's authority.
+ * Resolves the caller once per request, in a fixed order: run key, then
+ * scheduler key, then a person. The first that matches wins and the rest are
+ * not consulted — mixing them is what would let one caller borrow another's
+ * authority.
  */
 async function authPlugin(fastify: FastifyInstance) {
-  const cookies = fastify.env.SESSION_COOKIE_KEY
-    ? new SealedJson(fastify.env.SESSION_COOKIE_KEY)
-    : undefined;
-
   // Declared without a value so each request owns its own; the onRequest hook
   // below is what sets it.
   fastify.decorateRequest('auth');
@@ -143,135 +160,129 @@ async function authPlugin(fastify: FastifyInstance) {
   async function resolve(request: FastifyRequest, reply: FastifyReply): Promise<Auth> {
     // The boundary plugins can be mounted without the service container (the
     // webhook path does exactly that), and no credential is resolvable then.
-    if (!fastify.hasDecorator('services')) return { kind: 'none' };
+    if (!fastify.hasDecorator('services')) return new NoAuth();
 
     const runKey = request.headers['x-run-key'];
-    if (typeof runKey === 'string' && runKey.length > 0) {
-      return { kind: 'run', runKey };
-    }
+    if (typeof runKey === 'string' && runKey.length > 0) return new RunAuth(runKey);
 
-    const bearer = BEARER.exec(request.headers.authorization ?? '')?.[1];
+    const bearer = readBearer(request.headers.authorization);
     if (bearer) {
-      if (await fastify.services.apiKeys.verify(bearer)) return { kind: 'scheduler' };
-      return await asUser(bearer, request);
+      if (await fastify.services.apiKeys.verify(bearer)) return new SchedulerAuth();
+      return (await fastify.services.session.userFrom(bearer)) ?? new NoAuth();
     }
 
-    const cookie = cookies && readCookie(request, SESSION_COOKIE);
-    if (cookie) {
-      const session = cookies.open<SessionPayload>(cookie);
-      if (session) {
-        assertCsrf(request, session.csrf);
-        return await asCookieUser(session, request, reply);
-      }
-    }
-
-    return { kind: 'none' };
-  }
-
-  async function asUser(token: string, request: FastifyRequest): Promise<Auth> {
-    if (!fastify.services.oidc.configured) return { kind: 'none' };
-    try {
-      const claims = await fastify.services.oidc.introspect(token);
-      if (!claims) return { kind: 'none' };
-      return { kind: 'user', sub: claims.sub, tenants: claims.groups, accessToken: token };
-    } catch (err) {
-      request.log.error({ err }, 'token introspection failed');
-      throw createError.BadGateway('could not verify the token with the identity provider');
-    }
-  }
-
-  /**
-   * The cookie is the storage, so an expired access token is refreshed in
-   * place rather than sending the browser back to login while the refresh
-   * token is still live. A dead refresh is 401 — the front reenters login.
-   */
-  async function asCookieUser(
-    session: SessionPayload,
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<Auth> {
-    const live = await asUser(session.accessToken, request);
-    if (live.kind === 'user') return live;
-    if (!session.refreshToken || !cookies) return { kind: 'none' };
-
-    let tokens: { accessToken: string; refreshToken?: string } | undefined;
-    try {
-      tokens = await fastify.services.oidc.refresh(session.refreshToken);
-    } catch (err) {
-      request.log.error({ err }, 'token refresh failed');
-      throw createError.BadGateway('could not refresh the token with the identity provider');
-    }
-    if (!tokens) return { kind: 'none' };
-
-    const next: SessionPayload = {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? session.refreshToken,
-      csrf: session.csrf,
-    };
-    const attrs = cookieAttributes({
-      secure: fastify.env.HTTPS_ENABLED,
-      domain: fastify.env.SESSION_COOKIE_DOMAIN,
+    const resumed = await fastify.services.session.resume({
+      cookieHeader: request.headers.cookie,
+      method: request.method,
+      csrfHeader:
+        typeof request.headers[CSRF_HEADER] === 'string' ? request.headers[CSRF_HEADER] : undefined,
+      csrfHeaderName: CSRF_HEADER,
     });
-    reply.header('set-cookie', `${SESSION_COOKIE}=${cookies.seal(next)}; HttpOnly; ${attrs}`);
-    return await asUser(tokens.accessToken, request);
+    if (resumed?.setCookie) reply.header('set-cookie', resumed.setCookie);
+    return resumed?.user ?? new NoAuth();
   }
 
-  /**
-   * Only the cookie pays this: a Bearer caller had to read the token to send
-   * it, which a cross-site form cannot do.
-   */
-  function assertCsrf(request: FastifyRequest, expected: string): void {
-    if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-      return;
-    }
-    const presented = request.headers[CSRF_HEADER];
-    if (presented !== expected) {
-      throw createError.Forbidden(`missing or invalid ${CSRF_HEADER} header`);
-    }
-  }
+  const user = check(
+    async request => {
+      if (!(request.auth instanceof UserAuth)) {
+        throw createError.Unauthorized('this endpoint needs a logged-in caller');
+      }
+    },
+    [{ cookieAuth: [] }, { bearerAuth: [] }],
+  );
 
-  const requireUser: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'user') {
-      throw createError.Unauthorized('this endpoint needs a logged-in caller');
-    }
-  };
-
-  const requireTenant: preHandlerAsyncHookHandler = async request => {
-    const auth = request.auth;
-    if (auth.kind !== 'user') {
+  const tenant = check(async request => {
+    if (!(request.auth instanceof UserAuth)) {
       throw createError.Unauthorized('this endpoint needs a logged-in caller');
     }
     const { tenant } = request.params as { tenant?: string };
     if (!tenant) return;
-    if (!auth.tenants.includes(tenant)) {
+    if (!request.auth.tenants.includes(tenant)) {
       throw createError.Forbidden('this caller does not act for that tenant');
     }
     await fastify.services.tenants.ensure(tenant);
-  };
+  }, []);
 
-  const requireSchedulerOrRun: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'scheduler' && request.auth.kind !== 'run') {
-      throw createError.Unauthorized('this endpoint needs a scheduler key or a run key');
+  const writer = check(async request => {
+    if (!(request.auth instanceof UserAuth)) {
+      throw createError.Unauthorized('this endpoint needs a logged-in caller');
     }
-  };
-
-  const requireRun: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'run') {
-      throw createError.Unauthorized('this endpoint needs a run key');
+    if (request.auth.role !== WRITER_ROLE) {
+      throw createError.Forbidden('this caller can read this tenant but not change it');
     }
-  };
+  }, []);
 
-  fastify.decorate('auth', {
-    schemes: securitySchemes,
-    user: gate(requireUser, [{ cookieAuth: [] }, { bearerAuth: [] }]),
-    tenant: gate(requireTenant, [{ cookieAuth: [] }, { bearerAuth: [] }]),
-    schedulerOrRun: gate(requireSchedulerOrRun, [{ schedulerKey: [] }, { runKey: [] }]),
-    run: gate(requireRun, [{ runKey: [] }]),
-    hmac: documented([{ hmac: [] }]),
-  });
+  const scheduler = check(
+    async request => {
+      if (!(request.auth instanceof SchedulerAuth)) {
+        throw createError.Unauthorized('this endpoint needs a scheduler key');
+      }
+    },
+    [{ schedulerKey: [] }],
+  );
+
+  const run = check(
+    async request => {
+      if (!(request.auth instanceof RunAuth)) {
+        throw createError.Unauthorized('this endpoint needs a run key');
+      }
+    },
+    [{ runKey: [] }],
+  );
+
+  const owned = { user, tenant, writer, scheduler, run };
+
+  function allow(
+    names: ReadonlyArray<CheckName | readonly CheckName[]>,
+    options?: { relation?: 'or' | 'and' },
+  ): Gate {
+    const relation = options?.relation ?? 'or';
+    if (relation !== 'or' && relation !== 'and') {
+      throw new Error("The value of options.relation should be one of ['or', 'and']");
+    }
+    const checks = names.map(name =>
+      typeof name === 'string' ? owned[name] : name.map(part => owned[part]),
+    );
+    return gate(compose(checks, relation));
+  }
+
+  fastify.decorate(
+    'auth',
+    Object.assign(allow, {
+      schemes: securitySchemes,
+      user: gate(user),
+      tenant: gate(compose([user, tenant], 'and')),
+      operator: gate(compose([user, tenant, writer], 'and')),
+      run: gate(run),
+      hmac: documented([{ hmac: [] }]),
+    }),
+  );
+}
+
+function apiKeyScheme<I extends 'cookie' | 'header'>(input: {
+  in: I;
+  name: string;
+  description: string;
+}) {
+  return {
+    type: 'apiKey' as const,
+    in: input.in,
+    name: input.name,
+    description: input.description,
+  };
+}
+
+function bearerScheme(description: string) {
+  return { type: 'http' as const, scheme: 'bearer' as const, description };
+}
+
+const BEARER = /^Bearer (.+)$/i;
+
+function readBearer(authorization: string | undefined): string | undefined {
+  return BEARER.exec(authorization ?? '')?.[1];
 }
 
 // `services` is read at request time, not at registration: declaring it as a
 // dependency would force the whole service container into any app that only
 // wants the HTTP boundary plugins.
-export default fp(authPlugin, { name: 'auth', dependencies: ['env'] });
+export default fp(authPlugin, { name: 'auth' });

@@ -27,17 +27,26 @@ export const TEST_TENANTS = ['locaweb', 'outro-tenant'];
  */
 export const TEST_BEARER = 'test-access-token';
 
+/** Same person and tenants as TEST_BEARER, holding the read-only role. */
+export const TEST_VIEWER_BEARER = 'test-viewer-token';
+
 export function stubIntrospection(app: FastifyInstance): void {
-  if (!app.hasDecorator('services')) return;
-  app.services.oidc.introspect = async (token: string) =>
-    token === TEST_BEARER ? { sub: 'test-user', groups: TEST_TENANTS } : undefined;
-  app.services.oidc.revoke = async () => undefined;
-  app.services.oidc.refresh = async () => undefined;
-  Object.defineProperty(app.services.oidc, 'configured', { get: () => true });
+  if (!app.hasDecorator('oidc')) return;
+  const person = { name: 'Test User', email: 'test@example.com', groups: TEST_TENANTS };
+  app.oidc.introspect = async (token: string) => {
+    if (token === TEST_BEARER) return { sub: 'test-user', roleClaim: 'operator', ...person };
+    if (token === TEST_VIEWER_BEARER) return { sub: 'test-viewer', roleClaim: 'viewer', ...person };
+    return undefined;
+  };
+  app.oidc.revoke = async () => undefined;
+  app.oidc.refresh = async () => undefined;
+  Object.defineProperty(app.oidc, 'configured', { get: () => true });
 }
 
 /** What an authenticated caller sends; the MCP client sends the same. */
 export const authHeaders = { authorization: `Bearer ${TEST_BEARER}` };
+
+export const viewerHeaders = { authorization: `Bearer ${TEST_VIEWER_BEARER}` };
 
 /** Cookie + CSRF as the browser would send them after /auth/callback. */
 export function sessionHeaders(

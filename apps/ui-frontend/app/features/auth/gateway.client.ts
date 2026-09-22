@@ -1,9 +1,14 @@
+import type { Role } from './role.ts';
+
 const CSRF_COOKIE = 'oa_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
 export interface Identity {
   sub: string;
+  name?: string;
+  email?: string;
   tenants: string[];
+  role?: Role;
 }
 
 /** `PUBLIC_GATEWAY_URL`, written into the document head by the root layout. */
@@ -59,6 +64,22 @@ export async function gatewayError(response: Response): Promise<Error> {
     // The raw body is the message.
   }
   return new Error(`${response.status} ${response.url}: ${message || response.statusText}`);
+}
+
+/** Clears the gateway cookie and returns where the browser should go to leave the identity provider. */
+export async function logout(): Promise<string | undefined> {
+  const response = await gatewayFetch('/auth/logout', { method: 'POST' });
+  if (response.status === 401) return undefined;
+  if (!response.ok) throw await gatewayError(response);
+  const text = await response.text();
+  if (!text) return undefined;
+  try {
+    const body = JSON.parse(text) as { redirect?: unknown };
+    if (typeof body.redirect === 'string' && body.redirect.startsWith('http')) return body.redirect;
+  } catch {
+    // The cookie is already cleared; a body that is not JSON still logs out.
+  }
+  return undefined;
 }
 
 /** `undefined` is a missing session. Any other failure keeps the response body. */

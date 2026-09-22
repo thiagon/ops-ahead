@@ -31,6 +31,13 @@ data:
         attrs:
           identifiers:
             name: Default - Provider invalidation flow
+      # Owns the user-logout stage the provider invalidation flow binds below.
+      # Without that stage the flow ends the application session and leaves the
+      # person signed in here, so the next login is the same account.
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: Default - Invalidation flow
       - model: authentik_blueprints.metaapplyblueprint
         attrs:
           identifiers:
@@ -59,6 +66,20 @@ data:
               if not group.name.startswith("authentik ")
             ]
 
+      # Only an explicit `operator` writes on the gateway; a person with no
+      # attribute keeps writing, and `viewer` is set per person, below.
+      - id: role-mapping
+        model: authentik_providers_oauth2.scopemapping
+        identifiers:
+          name: "ops-ahead role"
+        attrs:
+          scope_name: groups
+          description: "What this person may change in their tenants"
+          expression: |
+            return {
+              "ops_ahead_role": request.user.attributes.get("ops_ahead_role", "operator")
+            }
+
       - id: gateway-web-provider
         model: authentik_providers_oauth2.oauth2provider
         identifiers:
@@ -73,8 +94,15 @@ data:
             - authorization_code
             - refresh_token
           redirect_uris:
+            {{- range .Values.gateway.redirectUris }}
             - matching_mode: strict
-              url: {{ .Values.gateway.redirectUri | quote }}
+              url: {{ . | quote }}
+            {{- end }}
+            {{- range (.Values.gateway.logoutRedirectUris | default list) }}
+            - matching_mode: strict
+              url: {{ . | quote }}
+              redirect_uri_type: logout
+            {{- end }}
           # The gateway asks the provider whether a token is still live on
           # every request, so it reads what this scope carries.
           property_mappings:
@@ -82,6 +110,7 @@ data:
             - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
             - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
             - !KeyOf tenant-groups-mapping
+            - !KeyOf role-mapping
           authorization_flow:
             !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
           invalidation_flow:
@@ -112,6 +141,7 @@ data:
             - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
             - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
             - !KeyOf tenant-groups-mapping
+            - !KeyOf role-mapping
           authorization_flow:
             !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
           invalidation_flow:
@@ -124,6 +154,21 @@ data:
           name: ops-ahead gateway (MCP)
           provider: !KeyOf gateway-mcp-provider
 
+      # Read-only login for showing the product: sees every screen of locaweb,
+      # and the gateway refuses anything it tries to change.
+      - id: demo-user
+        model: authentik_core.user
+        identifiers:
+          username: demo
+        attrs:
+          name: Demo
+          email: demo@ops-ahead.xyz
+          type: internal
+          is_active: true
+          password: !Env AUTHENTIK_DEMO_PASSWORD
+          attributes:
+            ops_ahead_role: viewer
+
       # Dev tenant: the group *is* the tenant, same name, no prefix. The
       # bootstrap admin is put in it so the first login already operates
       # locaweb — membership lives here, never in a script.
@@ -135,3 +180,28 @@ data:
           name: locaweb
           users:
             - !Find [authentik_core.user, [username, akadmin]]
+            - !KeyOf demo-user
+
+      # The provider invalidation flow is empty by default. This stage is what
+      # ends the authentik session, so a later login can be a different person.
+      # The redirect stage runs after it and sends the browser back to the app.
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          order: 0
+          stage: !Find [authentik_stages_user_logout.userlogoutstage, [name, default-invalidation-logout]]
+          target: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      {{ with index (.Values.gateway.logoutRedirectUris | default list) 0 }}
+      - id: logout-return
+        model: authentik_stages_redirect.redirectstage
+        identifiers:
+          name: ops-ahead logout return
+        attrs:
+          keep_context: false
+          mode: static
+          target_static: {{ . | quote }}
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          order: 10
+          stage: !KeyOf logout-return
+          target: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      {{ end }}

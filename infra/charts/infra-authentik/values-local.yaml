@@ -45,8 +45,16 @@ authentik:
           secretKeyRef:
             name: authentik-secret
             key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      - name: AUTHENTIK_DEMO_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_DEMO_PASSWORD
       - name: AUTHENTIK_HOST
         value: http://auth.ops-ahead.localtest.me
 
 gateway:
-  redirectUri: http://gateway.ops-ahead.localtest.me/auth/callback
+  redirectUris:
+    - http://gateway.ops-ahead.localtest.me/auth/callback
+  logoutRedirectUris:
+    - http://ui.ops-ahead.localtest.me/

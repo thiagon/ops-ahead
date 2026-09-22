@@ -6,7 +6,9 @@ import {
   sessionHeaders,
   TEST_BEARER,
   TEST_TENANTS,
+  viewerHeaders,
 } from '../../helpers/app.ts';
+import { alertMapping } from '../../helpers/mapping.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
 
@@ -98,7 +100,92 @@ describe('tenant in the URL is selection, the claim is authorization', () => {
   it('reports the caller and the tenants their groups carry', async () => {
     const res = await app.inject({ method: 'GET', url: '/auth/me', headers: authHeaders });
 
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: ['locaweb', 'outro-tenant'] });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: ['locaweb', 'outro-tenant'],
+      role: 'operator',
+    });
+  });
+});
+
+describe('a viewer reads a tenant and changes nothing in it', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('reports the read-only role on /auth/me', async () => {
+    const res = await app.inject({ method: 'GET', url: '/auth/me', headers: viewerHeaders });
+
+    expect(res.json()).toMatchObject({ tenants: TEST_TENANTS, role: 'viewer' });
+  });
+
+  it.each([
+    ['/sources/locaweb'],
+    ['/rules/deadlines/locaweb'],
+    ['/rules/targets/locaweb'],
+    ['/rules/mappings/locaweb/itsm'],
+    ['/locaweb/analyses'],
+  ])('reads GET %s', async url => {
+    const res = await app.inject({ method: 'GET', url, headers: viewerHeaders });
+
+    expect(res.statusCode).not.toBe(401);
+    expect(res.statusCode).not.toBe(403);
+  });
+
+  it.each([
+    ['POST', '/locaweb/analyses', { analysis: 'full_pipeline' }],
+    ['PUT', '/sources/locaweb/statuspage', { intake: 'alert' }],
+    ['PUT', '/sources/locaweb/itsm/status', { status: 'disabled' }],
+    ['POST', '/sources/locaweb/itsm/secret', {}],
+    ['PUT', '/rules/mappings/locaweb/itsm', alertMapping],
+    ['PUT', '/rules/deadlines/locaweb', { deadlines: [{ severity: 1, seconds: 14400 }] }],
+    [
+      'PUT',
+      '/rules/targets/locaweb',
+      { targets: [{ severities: [1, 2], max_breaches: 5, achievement_pct: 95 }] },
+    ],
+  ] as const)('refuses %s %s with 403', async (method, url, payload) => {
+    publish.mockClear();
+    const res = await app.inject({ method, url, payload, headers: viewerHeaders });
+
+    expect(res.statusCode).toBe(403);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('lists only the tools that read over MCP', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp/locaweb',
+      payload: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+      headers: { ...viewerHeaders, accept: 'application/json, text/event-stream' },
+    });
+    const data = res.body.split('\n').find(line => line.startsWith('data: '));
+    const names: string[] = JSON.parse(data?.slice('data: '.length) ?? '{}').result.tools.map(
+      (tool: { name: string }) => tool.name,
+    );
+
+    expect(names).toContain('get_targets');
+    for (const write of [
+      'start_analysis',
+      'register_source',
+      'set_source_status',
+      'rotate_source_secret',
+      'set_mapping',
+      'set_deadlines',
+      'set_targets',
+    ]) {
+      expect(names).not.toContain(write);
+    }
   });
 });
 
@@ -150,7 +237,7 @@ describe('provenance comes from the credential, never the body', () => {
     expect(status.json()).toMatchObject({ trigger: 'scheduled' });
   });
 
-  it('refuses the scheduler key on anything but the daily chain', async () => {
+  it('starts whatever analysis the scheduler key asks for', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/analyses',
@@ -158,7 +245,7 @@ describe('provenance comes from the credential, never the body', () => {
       headers: { authorization: `Bearer ${schedulerKey}` },
     });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(202);
   });
 
   it('chains a run off the full_pipeline whose run key it presents', async () => {
@@ -342,7 +429,13 @@ describe('the browser spends a cookie, not a Bearer', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: TEST_TENANTS });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: TEST_TENANTS,
+      role: 'operator',
+    });
   });
 
   it('rejects a state-changing request whose CSRF header does not match', async () => {
@@ -356,14 +449,20 @@ describe('the browser spends a cookie, not a Bearer', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('logout with the matching CSRF header clears the cookie', async () => {
+  it('logout with the matching CSRF header clears the cookie and ends the provider session', async () => {
+    app.oidc.endSessionUrl = async () =>
+      'http://authentik.example/end-session?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173%2F';
     const res = await app.inject({
       method: 'POST',
       url: '/auth/logout',
       headers: sessionHeaders(app),
     });
 
-    expect(res.statusCode).toBe(204);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      redirect:
+        'http://authentik.example/end-session?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173%2F',
+    });
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([
         expect.stringContaining('oa_session='),
@@ -373,7 +472,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
   });
 
   it('refreshes an expired access token in place while the refresh token lives', async () => {
-    app.services.oidc.refresh = async () => ({
+    app.oidc.refresh = async () => ({
       accessToken: TEST_BEARER,
       refreshToken: 'next-refresh',
     });
@@ -385,7 +484,13 @@ describe('the browser spends a cookie, not a Bearer', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: TEST_TENANTS });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: TEST_TENANTS,
+      role: 'operator',
+    });
     expect([res.headers['set-cookie']].flat().join(';')).toContain('oa_session=');
   });
 
@@ -395,4 +500,60 @@ describe('the browser spends a cookie, not a Bearer', () => {
       (await app.inject({ method: 'GET', url: '/docs/', headers: authHeaders })).statusCode,
     ).toBe(200);
   });
+});
+
+describe('login can return to the gateway as well as the front', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    app.oidc.authorizationUrl = async () => 'http://authentik.example/authorize';
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  function flowNext(setCookie: string | string[] | undefined): string {
+    const raw = [setCookie].flat().find(c => c?.startsWith('oa_auth_flow=')) ?? '';
+    const value = raw.slice('oa_auth_flow='.length).split(';')[0] ?? '';
+    return (JSON.parse(decodeURIComponent(value)) as { next: string }).next;
+  }
+
+  async function login(next: string): Promise<string> {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/auth/login?next=${encodeURIComponent(next)}`,
+    });
+    expect(res.statusCode).toBe(302);
+    return flowNext(res.headers['set-cookie']);
+  }
+
+  it('sends a browser without a session from /docs to login and back', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/docs',
+      headers: { accept: 'text/html' },
+    });
+
+    expect(res.statusCode).toBe(302);
+    const location = new URL(String(res.headers.location), app.env.PUBLIC_URL);
+    expect(location.pathname).toBe('/auth/login');
+    expect(location.searchParams.get('next')).toBe(`${app.env.PUBLIC_URL}/docs`);
+  });
+
+  it('reads a bare path as the front’s', async () => {
+    expect(await login('/locaweb/fila')).toBe(`${app.env.FRONTEND_ORIGIN}/locaweb/fila`);
+  });
+
+  it('honors an absolute URL on the gateway’s own origin', async () => {
+    expect(await login(`${app.env.PUBLIC_URL}/docs`)).toBe(`${app.env.PUBLIC_URL}/docs`);
+  });
+
+  it.each(['https://evil.example/docs', '//evil.example/docs'])(
+    'never redirects off the known origins (%s)',
+    async next => {
+      expect(await login(next)).toBe(`${app.env.FRONTEND_ORIGIN}/`);
+    },
+  );
 });

@@ -109,12 +109,22 @@ authentik:
           secretKeyRef:
             name: authentik-secret
             key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      - name: AUTHENTIK_DEMO_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_DEMO_PASSWORD
       # Public hostname so OIDC documents keep browser URLs when the gateway
       # talks to the in-cluster Service rather than the ingress.
       - name: AUTHENTIK_HOST
         value: https://auth.ops-ahead.xyz
 
-# Where the gateway sends the browser back after the login. Kept here rather
-# than inside the blueprint so the two stay one edit apart.
+# Where the gateway may send the browser back after the login — every gateway
+# that shares this realm, each matched exactly. Kept here rather than inside
+# the blueprint so the two stay one edit apart.
 gateway:
-  redirectUri: https://gateway.ops-ahead.xyz/auth/callback
+  redirectUris:
+    - https://gateway.ops-ahead.xyz/auth/callback
+    - http://localhost:3000/auth/callback
+  logoutRedirectUris:
+    - https://ui.ops-ahead.xyz/

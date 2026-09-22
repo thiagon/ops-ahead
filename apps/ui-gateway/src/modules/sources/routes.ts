@@ -10,7 +10,7 @@ import {
   sourceWithSecretSchema,
   statusChangeSchema,
   tenantParamsSchema,
-} from '../../services/sources/schema.ts';
+} from '#services/sources/schema.ts';
 
 /**
  * A source only means anything inside a tenant, so every route carries one
@@ -36,7 +36,7 @@ export function registerSourceRoutes(app: FastifyInstance): void {
 
   typed.put(
     '/sources/:tenant/:source',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['sources'],
       summary: 'Register a source',
       description:
@@ -54,7 +54,7 @@ export function registerSourceRoutes(app: FastifyInstance): void {
 
   typed.put(
     '/sources/:tenant/:source/status',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['sources'],
       summary: 'Turn a source off or back on',
       description:
@@ -75,7 +75,7 @@ export function registerSourceRoutes(app: FastifyInstance): void {
 
   typed.post(
     '/sources/:tenant/:source/secret',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['sources'],
       summary: "Rotate a source's secret",
       description:

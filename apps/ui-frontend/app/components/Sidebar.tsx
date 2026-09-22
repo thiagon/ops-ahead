@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import { createAvatar } from '@dicebear/core';
+import * as shapes from '@dicebear/shapes';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { logout } from '~/features/auth/gateway.client';
 import {
   analysesPath,
   deadlinesPath,
@@ -10,7 +13,7 @@ import {
   targetsPath,
 } from '~/paths';
 import { useSession } from '~/session';
-import type { TenantRef } from '~/types';
+import type { Operator, TenantRef } from '~/types';
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -19,6 +22,7 @@ import {
   CloseIcon,
   GridIcon,
   ListIcon,
+  LogOutIcon,
   MenuIcon,
   PlugIcon,
   PulseIcon,
@@ -248,24 +252,72 @@ function Brand({ tenant, collapsed }: { tenant: TenantRef; collapsed: boolean })
   );
 }
 
-function SessionBlock({ collapsed }: { collapsed: boolean }) {
+function SessionBlock({
+  operator,
+  collapsed,
+  canSwitchTenant,
+}: {
+  operator: Operator;
+  collapsed: boolean;
+  canSwitchTenant: boolean;
+}) {
   const leave = useSession(state => state.leave);
+  const [signingOut, setSigningOut] = useState(false);
+  const displayName = operator.name ?? operator.email ?? 'Operador';
+  const avatar = useMemo(
+    () => createAvatar(shapes, { seed: operator.sub }).toDataUri(),
+    [operator.sub],
+  );
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const next = await logout();
+      leave();
+      window.location.assign(next ?? '/');
+    } catch {
+      setSigningOut(false);
+    }
+  }
+
   return (
-    <div className={`flex items-center gap-3 px-3 ${collapsed ? 'justify-center' : ''}`}>
+    <div className={`flex items-center gap-3 px-3 ${collapsed ? 'flex-col justify-center' : ''}`}>
       <div
-        title={collapsed ? 'Sessão anônima — SSO ainda não integrado' : undefined}
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-tile font-semibold text-text-muted text-xs"
+        title={collapsed ? displayName : operator.email}
+        className="relative h-9 w-9 shrink-0 rounded-full bg-bg-tile"
       >
-        N1
+        <img src={avatar} alt="" className="h-9 w-9 rounded-full" />
         <span className="-right-0.5 -bottom-0.5 absolute h-2.5 w-2.5 rounded-full border-2 border-bg-elevated bg-signal-green" />
       </div>
-      {!collapsed && (
-        <div className="min-w-0">
-          <p className="truncate text-sm text-text-light">Operador N1</p>
-          <p className="truncate text-text-dim text-xs">
-            <Link to="/" onClick={() => leave()} className="hover:text-text-light">
-              Trocar cliente
-            </Link>
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          disabled={signingOut}
+          aria-label="Sair"
+          title="Sair"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-white/[0.04] hover:text-text-light disabled:opacity-50"
+        >
+          <LogOutIcon className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-text-light">{displayName}</p>
+          <p className="flex gap-3 text-text-dim text-xs">
+            {canSwitchTenant && (
+              <Link to="/" onClick={() => leave()} className="hover:text-text-light">
+                Trocar cliente
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              className="hover:text-text-light disabled:opacity-50"
+            >
+              Sair
+            </button>
           </p>
         </div>
       )}
@@ -273,7 +325,17 @@ function SessionBlock({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: number | null }) {
+export function Sidebar({
+  tenant,
+  operator,
+  openCount,
+  canSwitchTenant,
+}: {
+  tenant: TenantRef;
+  operator: Operator;
+  openCount: number | null;
+  canSwitchTenant: boolean;
+}) {
   const collapsed = useSession(state => state.sidebarCollapsed);
   const setCollapsed = useSession(state => state.setSidebarCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -330,7 +392,7 @@ export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: n
           openCount={openCount}
           onNavigate={() => setDrawerOpen(false)}
         />
-        <SessionBlock collapsed={false} />
+        <SessionBlock operator={operator} collapsed={false} canSwitchTenant={canSwitchTenant} />
       </aside>
 
       {/* The nav stays put while a long screen scrolls: the aside is a sticky
@@ -359,7 +421,7 @@ export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: n
           </button>
         </div>
         <NavLinks tenant={tenant.slug} collapsed={collapsed} openCount={openCount} />
-        <SessionBlock collapsed={collapsed} />
+        <SessionBlock operator={operator} collapsed={collapsed} canSwitchTenant={canSwitchTenant} />
       </aside>
     </>
   );

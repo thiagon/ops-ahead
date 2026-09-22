@@ -7,11 +7,18 @@ export const ANALYSIS_STATUSES = ['pending', 'running', 'succeeded', 'failed'] a
  * arrived, never from the body — a caller that could declare its own origin
  * would empty the column of meaning.
  */
-export const ANALYSIS_TRIGGERS = ['manual', 'scheduled', 'chained'] as const;
 
-export const analysisTriggerSchema = z.enum(ANALYSIS_TRIGGERS);
+export const analysisTriggerSchema = z.enum(['manual', 'scheduled', 'chained']);
 
 export type AnalysisTrigger = z.infer<typeof analysisTriggerSchema>;
+
+/**
+ * How this run was asked for. The credential answers it (`Auth.origin`);
+ * the service never sees the credential itself.
+ */
+export type AnalysisOrigin =
+  | { trigger: Exclude<AnalysisTrigger, 'chained'> }
+  | { trigger: 'chained'; parentRunKey: string };
 
 export const analysisStatusValueSchema = z.enum(ANALYSIS_STATUSES);
 

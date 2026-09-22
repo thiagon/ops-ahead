@@ -59,6 +59,28 @@ ganham essa checagem. `POST /analyses` feito por pessoa ou MCP passa a ser
 encadeamento não escolhem tenant na URL: o cron é plataforma; o filho herda o tenant do
 parent, que a tabela `analyses` já carrega em `tenantId`.
 
+### Papel é atributo da pessoa; `viewer` só lê
+
+O grupo diz *quais* clientes a pessoa vê. O que ela pode mudar neles vem do claim
+`ops_ahead_role`, que o scope mapping `ops-ahead role` lê do atributo `ops_ahead_role`
+do usuário no Authentik. Dois valores:
+
+| Papel | Lê | Publica regras, mexe em origens, dispara análise |
+|---|---|---|
+| `operator` | sim | sim |
+| `viewer` | sim | não — 403 |
+
+No Authentik, usuário sem o atributo sai como `operator`, o comportamento de antes. No
+gateway, só `operator` explícito escreve: token sem o claim, ou com um valor
+desconhecido, lê. As rotas de escrita usam `app.auth.operator` no lugar de
+`app.auth.tenant`. No MCP, um `viewer` recebe o servidor sem as tools de escrita.
+
+O front faz a mesma checagem nas `action`s (`requireOperator`) e esconde os controles de
+escrita. O que barra de fato é o gateway, e o front evita que a request chegue até lá.
+
+O usuário `demo` (grupo `locaweb`, `ops_ahead_role: viewer`) existe no blueprint para
+mostrar o produto sem risco. A senha vem de `AUTHENTIK_DEMO_PASSWORD`.
+
 ### Quatro credenciais, nenhum esquema único
 
 Cada caller tem um material. Reusar um no lugar do outro mistura ameaça.

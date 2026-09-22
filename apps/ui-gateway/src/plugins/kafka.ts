@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { createPublisher, type EventPublisher } from '../lib/kafka.ts';
+import { createPublisher, type EventPublisher } from '#lib/kafka.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
