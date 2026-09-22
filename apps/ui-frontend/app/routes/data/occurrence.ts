@@ -1,17 +1,14 @@
 import {
+  fetchBreachContext,
   fetchMilestones,
   fetchOpenAlert,
   fetchSeverityHistory,
-  fetchSimilarIncidents,
 } from '~/clickhouse.server.ts';
-import { buildTimeline } from '~/components/Timeline';
 import { dataResponse } from '~/data-response.server.ts';
-import type { Route } from './+types/occurrence-detail';
+import { predictBreach } from '~/model-serving.server.ts';
+import { buildQueue } from '~/queue.server.ts';
+import type { Route } from './+types/occurrence';
 
-/**
- * The drill-down's per-row data. The panel fetches this URL from the browser
- * so a failure shows up in the network panel with its body.
- */
 export async function loader({ request, params }: Route.LoaderArgs) {
   return dataResponse(request, params.tenant, async () => {
     const { source, externalId } = params;
@@ -24,15 +21,28 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
     }
 
-    const [milestones, severityHistory, similarIncidents] = await Promise.all([
+    const [milestones, severityHistory, context] = await Promise.all([
       fetchMilestones(source, externalId),
       fetchSeverityHistory(source, externalId),
-      fetchSimilarIncidents(alert.owner, alert.severity, externalId),
+      fetchBreachContext(),
     ]);
 
+    const [occurrence] = await buildQueue({
+      query: async () => [alert],
+      score: predictBreach,
+      context,
+    });
+
+    if (!occurrence) {
+      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
+    }
+
     return {
-      timeline: buildTimeline(milestones, severityHistory),
-      similarIncidents,
+      occurrence,
+      entityId: alert.entity_id,
+      acknowledgedAt: alert.acknowledged_at,
+      milestones,
+      severityHistory,
     };
   });
 }

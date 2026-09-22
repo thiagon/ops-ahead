@@ -4,6 +4,13 @@ export default [
   index('routes/home.tsx'),
   route('health', 'routes/health.ts'),
   route('metrics', 'routes/metrics.ts'),
+  route('data/:tenant/open-count', 'routes/data/open-count.ts'),
+  route('data/:tenant/integrations/:source/flash', 'routes/data/secret-flash.ts'),
+  route('data/:tenant/panel', 'routes/data/panel.ts'),
+  route('data/:tenant/manager', 'routes/data/manager.ts'),
+  route('data/:tenant/queue', 'routes/data/queue.ts'),
+  route('data/:tenant/occurrences/:source/:externalId', 'routes/data/occurrence.ts'),
+  route('data/:tenant/occurrences/:source/:externalId/detail', 'routes/data/occurrence-detail.ts'),
   route(':tenant', 'routes/tenant.tsx', [
     index('routes/panel.tsx'),
     route('manager', 'routes/manager.tsx'),

@@ -8,10 +8,6 @@ import { buildTimeline } from '~/components/Timeline';
 import { dataResponse } from '~/data-response.server.ts';
 import type { Route } from './+types/occurrence-detail';
 
-/**
- * The drill-down's per-row data. The panel fetches this URL from the browser
- * so a failure shows up in the network panel with its body.
- */
 export async function loader({ request, params }: Route.LoaderArgs) {
   return dataResponse(request, params.tenant, async () => {
     const { source, externalId } = params;

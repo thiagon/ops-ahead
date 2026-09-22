@@ -95,7 +95,9 @@ export function parseRulesContract(body: unknown): RulesContract {
   }
 
   const fields: RulesContract['fields'] = { alert: [], monitor: [] };
-  for (const variant of variantsOf(asSchema(record.mapping) ?? {})) {
+  const mapping =
+    body && typeof body === 'object' && 'mapping' in body ? asSchema(body.mapping) : null;
+  for (const variant of variantsOf(mapping ?? {})) {
     const intake = intakeOf(variant);
     if (!intake) continue;
     fields[intake] = fieldsFrom(variant);

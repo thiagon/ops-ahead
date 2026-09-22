@@ -1,26 +1,45 @@
 import { useEffect } from 'react';
-import { Link, Outlet } from 'react-router';
-import { fetchOpenAlertCount } from '~/clickhouse.server.ts';
+import { Link, Outlet, redirect } from 'react-router';
+import { readJson } from '~/client-fetch.ts';
 import { RouteError } from '~/components/RouteError';
 import { Sidebar } from '~/components/Sidebar';
-import { requireTenantAccess } from '~/features/auth/session.server.ts';
-import { currentTenant, withTenant } from '~/features/config/repo.server.ts';
+import { fetchIdentity, loginUrl } from '~/features/auth/gateway.client.ts';
 import { useSession } from '~/session';
 import type { Route } from './+types/tenant';
 
 /**
- * Binds the tenant from the URL and wraps the chrome every tenant screen
- * shares. Child loaders still call `withTenant` themselves: nested loaders
- * run in parallel, so they cannot inherit this request's store.
- *
  * Access is the claim's — an unauthorized caller never reaches the slug.
+ * The check runs in the browser, against the gateway, so a refused call
+ * stays visible in the network panel.
  */
-export async function loader({ params, request }: Route.LoaderArgs) {
-  await requireTenantAccess(request, params.tenant);
-  return withTenant(request, params.tenant, async () => ({
-    tenant: await currentTenant(),
-    openCount: await fetchOpenAlertCount().catch(() => null),
-  }));
+export async function clientLoader({ params, request }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+
+  const next = new URL(request.url);
+  const identity = await fetchIdentity();
+  if (!identity) throw redirect(loginUrl(`${next.pathname}${next.search}`));
+  if (!identity.tenants.includes(tenant)) {
+    throw new Response('Esse cliente não está entre os seus.', { status: 403 });
+  }
+
+  let openCount: number | null = null;
+  try {
+    openCount = await readJson<number>(`/data/${encodeURIComponent(tenant)}/open-count`);
+  } catch (error) {
+    console.error(error);
+    openCount = null;
+  }
+
+  return { tenant: { slug: tenant, name: tenant }, openCount };
+}
+
+export function HydrateFallback() {
+  return (
+    <main className="flex min-h-screen items-center justify-center px-6 text-sm text-text-muted">
+      Carregando…
+    </main>
+  );
 }
 
 export default function TenantLayout({ loaderData }: Route.ComponentProps) {

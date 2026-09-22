@@ -5,11 +5,11 @@ import fp from 'fastify-plugin';
 async function corsPlugin(fastify: FastifyInstance) {
   const origins = fastify.env.CORS_ORIGINS;
 
-  // `credentials` and a wildcard origin are mutually exclusive by spec, so a
-  // reflected origin is only offered when no list pins it down.
+  // Reflecting the request origin (not `*`) can carry credentials. The
+  // browser calls the gateway directly and must be allowed to send the cookie.
   await fastify.register(cors, {
     origin: origins.length > 0 ? origins : true,
-    credentials: origins.length > 0,
+    credentials: true,
     allowedHeaders: ['content-type', 'x-csrf-token', 'authorization', 'x-run-key', 'x-signature'],
   });
 }

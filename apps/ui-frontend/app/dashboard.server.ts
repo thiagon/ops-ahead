@@ -78,16 +78,16 @@ export async function buildDashboard(options: BuildDashboardOptions): Promise<Da
   };
 }
 
-/** The dashboard as the route loader builds it, against the real dependencies. */
+/** The dashboard as the screen loads it. A failed read surfaces; it is not dropped. */
 export async function loadDashboard(): Promise<DashboardData> {
   return await buildDashboard({
-    fetchKpiAchievement: () => fetchKpiAchievement().catch(() => []),
-    fetchKpiProjection: () => fetchKpiProjection().catch(() => []),
-    fetchVolumeForecast: () => fetchVolumeForecast().catch(() => []),
-    fetchCategoryTrends: () => fetchCategoryTrends().catch(() => []),
-    fetchGroupLoad: () => fetchGroupLoad().catch(() => []),
-    fetchNoisyEntities: () => fetchNoisyEntities().catch(() => []),
-    fetchEntityForecast: () => fetchEntityForecast().catch(() => []),
-    fetchRecurringCauseGroups: () => fetchRecurringCauseGroups().catch(() => []),
+    fetchKpiAchievement,
+    fetchKpiProjection,
+    fetchVolumeForecast,
+    fetchCategoryTrends,
+    fetchGroupLoad,
+    fetchNoisyEntities,
+    fetchEntityForecast,
+    fetchRecurringCauseGroups,
   });
 }

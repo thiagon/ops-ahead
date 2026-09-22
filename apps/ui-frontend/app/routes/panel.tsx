@@ -1,21 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link, useFetcher, useNavigate, useNavigation, useSearchParams } from 'react-router';
-import type { AlertDailyFeatureRow } from '~/clickhouse.server.ts';
-import { fetchAlertDailyFeatures, fetchRecurringPatterns } from '~/clickhouse.server.ts';
+import { Link, useNavigate, useNavigation, useSearchParams } from 'react-router';
+import type { AlertDailyFeatureRow, RecurringPatternRow } from '~/clickhouse.server.ts';
+import { readJson } from '~/client-fetch.ts';
 import { DrillDown } from '~/components/DrillDown';
 import { CalendarIcon, RefreshIcon } from '~/components/icons';
 import { type Kpi, KpiCard } from '~/components/KpiCard';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RecommendationCard } from '~/components/RecommendationCard';
 import { RouteError } from '~/components/RouteError';
 import type { TimelineEvent } from '~/components/Timeline';
-import { withTenant } from '~/features/config/repo.server.ts';
-import { managerPath, occurrenceDetailPath, queuePath, useTenantSlug } from '~/paths';
-import { loadQueue, type QueueRow } from '~/queue.server.ts';
+import { managerPath, queuePath, useTenantSlug } from '~/paths';
 import { formatRatio } from '~/risk.ts';
+import type { QueueRow, SimilarIncidentRow } from '~/types.ts';
 import type { Route } from './+types/panel';
-import type { loader as detailLoader } from './occurrence-detail';
 
 export function meta() {
   return [{ title: 'Painel N1/N2 · Ops Ahead' }];
@@ -56,20 +55,20 @@ export function parsePeriod(value: string | null): number {
   return PERIODS.includes(days as (typeof PERIODS)[number]) ? days : DEFAULT_PERIOD;
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => {
-    const periodDays = parsePeriod(new URL(request.url).searchParams.get('period'));
+export async function clientLoader({ request, params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+  const period = new URL(request.url).searchParams.get('period') ?? '';
+  return readJson<{
+    rows: QueueRow[];
+    dailyFeatures: AlertDailyFeatureRow[];
+    recurringPatterns: RecurringPatternRow[];
+    periodDays: number;
+  }>(`/data/${encodeURIComponent(tenant)}/panel?period=${encodeURIComponent(period)}`);
+}
 
-    const [queue, dailyFeatures, recurringPatterns] = await Promise.all([
-      loadQueue(),
-      fetchAlertDailyFeatures(periodDays).catch(() => []),
-      fetchRecurringPatterns(periodDays).catch(() => []),
-    ]);
-
-    const rows = [...queue].sort((a, b) => criticality(b) - criticality(a));
-
-    return { rows, dailyFeatures, recurringPatterns, periodDays };
-  });
+export function HydrateFallback() {
+  return <LoadingScreen title="Painel N1/N2" />;
 }
 
 /** One point per day, oldest first — `fetchAlertDailyFeatures` returns newest first. */
@@ -188,17 +187,32 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
   );
   const selected = rows.find(r => `${r.source}/${r.external_id}` === selectedKey) ?? first;
 
-  const detailFetcher = useFetcher<typeof detailLoader>();
-  const detailLoad = detailFetcher.load;
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [similarIncidents, setSimilarIncidents] = useState<SimilarIncidentRow[]>([]);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selected) {
-      detailLoad(occurrenceDetailPath(tenant, selected.source, selected.external_id));
-    }
-  }, [selected, detailLoad, tenant]);
-
-  const timeline: TimelineEvent[] = detailFetcher.data?.timeline ?? [];
-  const similarIncidents = detailFetcher.data?.similarIncidents ?? [];
+    if (!selected) return;
+    const controller = new AbortController();
+    setDetailError(null);
+    const url = `/data/${encodeURIComponent(tenant)}/occurrences/${encodeURIComponent(selected.source)}/${encodeURIComponent(selected.external_id)}/detail`;
+    readJson<{ timeline: TimelineEvent[]; similarIncidents: SimilarIncidentRow[] }>(
+      url,
+      controller.signal,
+    )
+      .then(detail => {
+        setTimeline(detail.timeline);
+        setSimilarIncidents(detail.similarIncidents);
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        setTimeline([]);
+        setSimilarIncidents([]);
+        setDetailError(error instanceof Error ? error.message : String(error));
+        console.error(error);
+      });
+    return () => controller.abort();
+  }, [selected, tenant]);
 
   const kpis = buildKpis(loadedRows, dailyFeatures);
   const navigate = useNavigate();
@@ -310,6 +324,11 @@ export default function Painel({ loaderData }: Route.ComponentProps) {
         </div>
 
         <div>
+          {detailError && (
+            <pre className="mb-4 overflow-x-auto whitespace-pre-wrap rounded-lg border border-border-base bg-bg-tile p-4 font-mono text-text-dim text-xs">
+              {detailError}
+            </pre>
+          )}
           {selected && (
             <DrillDown row={selected} timeline={timeline} similarIncidents={similarIncidents} />
           )}

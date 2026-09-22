@@ -1,6 +1,7 @@
 import { Link, redirect } from 'react-router';
 import { Logo } from '~/components/Logo';
-import { loginPath, readIdentity } from '~/features/auth/session.server.ts';
+import { RouteError } from '~/components/RouteError';
+import { fetchIdentity, loginUrl } from '~/features/auth/gateway.client.ts';
 import { panelPath } from '~/paths';
 import { useSession } from '~/session';
 import type { Route } from './+types/home';
@@ -14,15 +15,25 @@ export function meta() {
  * name it: the tenants come from their Authentik groups, so a slug typed by
  * hand never reaches a client that is not theirs.
  */
-export async function loader({ request }: Route.LoaderArgs) {
-  const identity = await readIdentity(request);
-  if (!identity) return { tenants: [], loginUrl: loginPath(request) };
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
+  const identity = await fetchIdentity();
+  const next = new URL(request.url);
+  if (!identity) return { tenants: [], loginUrl: loginUrl(`${next.pathname}${next.search}`) };
 
   // One client and nothing to choose between — go straight in.
   if (identity.tenants.length === 1) {
-    throw redirect(panelPath(identity.tenants[0] as string));
+    const only = identity.tenants[0];
+    if (only) throw redirect(panelPath(only));
   }
   return { tenants: identity.tenants, loginUrl: null };
+}
+
+export function HydrateFallback() {
+  return (
+    <main className="flex min-h-screen items-center justify-center px-6 text-sm text-text-muted">
+      Carregando…
+    </main>
+  );
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
@@ -81,4 +92,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       </div>
     </main>
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} title="Ops Ahead" service="O gateway" />;
 }

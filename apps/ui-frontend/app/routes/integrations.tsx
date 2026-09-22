@@ -3,15 +3,13 @@ import { Form, Link, redirect, useNavigation } from 'react-router';
 import { Badge } from '~/components/Badge';
 import { Field, GhostButton, inputClass, SubmitButton } from '~/components/form';
 import { ChevronRightIcon, GridIcon, PlusIcon, PulseIcon, SearchIcon } from '~/components/icons';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
-import {
-  ConflictError,
-  createIntegration,
-  listIntegrations,
-  withTenant,
-} from '~/features/config/repo.server.ts';
+import { configRepo } from '~/features/config/repo.client.ts';
+import { createIntegration, withTenant } from '~/features/config/repo.server.ts';
+import { ConflictError } from '~/features/config/repo.ts';
 import { setSecretFlash } from '~/features/config/secret-flash.server.ts';
 import { INTAKE_HINT, INTAKE_LABEL, type Intake } from '~/features/config/types.ts';
 import { integrationPath, useTenantSlug } from '~/paths';
@@ -21,10 +19,14 @@ export function meta() {
   return [{ title: 'Entrada · Ops Ahead' }];
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => ({
-    integrations: await listIntegrations(),
-  }));
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+  return { integrations: await configRepo(tenant).listIntegrations() };
+}
+
+export function HydrateFallback() {
+  return <LoadingScreen title="Entrada" />;
 }
 
 /**
@@ -126,9 +128,7 @@ export default function Integrations({ loaderData, actionData }: Route.Component
                     <span className="block font-medium text-sm text-text-light">
                       {INTAKE_LABEL.alert}
                     </span>
-                    <span className="mt-0.5 block text-text-dim text-xs">
-                      {INTAKE_HINT.alert}
-                    </span>
+                    <span className="mt-0.5 block text-text-dim text-xs">{INTAKE_HINT.alert}</span>
                   </span>
                 </label>
                 <label className="flex cursor-pointer gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 transition-colors has-[:focus-visible]:border-signal-blue/60 has-[:checked]:border-signal-blue/50 has-[:checked]:bg-signal-blue/10">
@@ -138,7 +138,9 @@ export default function Integrations({ loaderData, actionData }: Route.Component
                     <span className="block font-medium text-sm text-text-light">
                       {INTAKE_LABEL.monitor}
                     </span>
-                    <span className="mt-0.5 block text-text-dim text-xs">{INTAKE_HINT.monitor}</span>
+                    <span className="mt-0.5 block text-text-dim text-xs">
+                      {INTAKE_HINT.monitor}
+                    </span>
                   </span>
                 </label>
               </div>

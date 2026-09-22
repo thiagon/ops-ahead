@@ -1,18 +1,11 @@
 import { Link } from 'react-router';
-import {
-  fetchBreachContext,
-  fetchMilestones,
-  fetchOpenAlert,
-  fetchSeverityHistory,
-} from '~/clickhouse.server.ts';
+import { readJson } from '~/client-fetch.ts';
 import { Badge, severityTone } from '~/components/Badge';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
-import { withTenant } from '~/features/config/repo.server.ts';
-import { predictBreach } from '~/model-serving.server.ts';
 import { queuePath, useTenantSlug } from '~/paths';
-import { buildQueue } from '~/queue.server.ts';
 import {
   formatRatio,
   formatRemaining,
@@ -20,45 +13,33 @@ import {
   riskColor,
   SEVERITY_LABEL,
 } from '~/risk.ts';
+import type { MilestoneRow, QueueRow, SeverityChangeRow } from '~/types.ts';
 import type { Route } from './+types/occurrence';
+
+type OccurrenceData = {
+  occurrence: QueueRow;
+  entityId: string | null;
+  acknowledgedAt: string | null;
+  milestones: MilestoneRow[];
+  severityHistory: SeverityChangeRow[];
+};
 
 export function meta({ params }: Route.MetaArgs) {
   return [{ title: `${params.externalId} · Ops Ahead` }];
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => {
-    const { source, externalId } = params;
-    const alert = await fetchOpenAlert(source, externalId);
-    if (!alert) {
-      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
-    }
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const { tenant, source, externalId } = params;
+  if (!tenant || !source || !externalId) {
+    throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
+  }
+  return readJson<OccurrenceData>(
+    `/data/${encodeURIComponent(tenant)}/occurrences/${encodeURIComponent(source)}/${encodeURIComponent(externalId)}`,
+  );
+}
 
-    const [milestones, severityHistory, context] = await Promise.all([
-      fetchMilestones(source, externalId),
-      fetchSeverityHistory(source, externalId),
-      fetchBreachContext().catch(() => ({})),
-    ]);
-
-    // Same fail-open path as the queue, over this one row.
-    const [occurrence] = await buildQueue({
-      query: async () => [alert],
-      score: predictBreach,
-      context,
-    });
-
-    if (!occurrence) {
-      throw new Response('Ocorrência não encontrada entre as abertas', { status: 404 });
-    }
-
-    return {
-      occurrence,
-      entityId: alert.entity_id,
-      acknowledgedAt: alert.acknowledged_at,
-      milestones,
-      severityHistory,
-    };
-  });
+export function HydrateFallback() {
+  return <LoadingScreen title="Ocorrência" />;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

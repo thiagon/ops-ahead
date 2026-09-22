@@ -1,21 +1,28 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { readJson } from '~/client-fetch.ts';
 import { Badge, severityTone } from '~/components/Badge';
 import { SearchIcon } from '~/components/icons';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { RouteError } from '~/components/RouteError';
-import { withTenant } from '~/features/config/repo.server.ts';
 import { occurrencePath, useTenantSlug } from '~/paths';
-import { loadQueue, type QueueRow } from '~/queue.server.ts';
 import { formatRatio, formatRemaining, riskColor, SEVERITY_LABEL } from '~/risk.ts';
+import type { QueueRow } from '~/types.ts';
 import type { Route } from './+types/queue';
 
 export function meta() {
   return [{ title: 'Fila de ocorrências · Ops Ahead' }];
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => ({ rows: await loadQueue() }));
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+  return readJson<{ rows: QueueRow[] }>(`/data/${encodeURIComponent(tenant)}/queue`);
+}
+
+export function HydrateFallback() {
+  return <LoadingScreen title="Fila de ocorrências" />;
 }
 
 function ConsumedBar({ row }: { row: QueueRow }) {

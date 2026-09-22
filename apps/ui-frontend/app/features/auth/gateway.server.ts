@@ -18,9 +18,9 @@ function cookieValue(header: string | null, name: string): string | undefined {
 
 /**
  * Calls the gateway forwarding the browser's cookie, and echoing `oa_csrf`
- * on methods that change state. The cookie is HttpOnly on the gateway, so
- * the only way the front spends it is this server-side hop
- * (docs/spec-gateway-auth-v2.md).
+ * on methods that change state. Screen reads go from the browser
+ * (gateway.client.ts); this hop remains for actions and the ClickHouse
+ * resource routes (docs/spec-gateway-auth-v2.md).
  */
 export async function gatewayFetch(
   request: Request,

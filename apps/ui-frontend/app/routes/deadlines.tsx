@@ -3,19 +3,15 @@ import { Form, useNavigation } from 'react-router';
 import { Badge } from '~/components/Badge';
 import { GhostButton, inputClass, SubmitButton } from '~/components/form';
 import { PlusIcon, TrashIcon } from '~/components/icons';
+import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
 import { dashedAddClass, iconButtonClass, nextDraftId } from '~/features/config/editor-ui.ts';
 import { HistoryPanel, type HistoryRevision } from '~/features/config/HistoryPanel.tsx';
-import {
-  ConflictError,
-  listDeadlines,
-  listRevisions,
-  NotFoundError,
-  replaceDeadlines,
-  withTenant,
-} from '~/features/config/repo.server.ts';
+import { configRepo } from '~/features/config/repo.client.ts';
+import { replaceDeadlines, withTenant } from '~/features/config/repo.server.ts';
+import { ConflictError, NotFoundError } from '~/features/config/repo.ts';
 import {
   type Deadline,
   formatDuration,
@@ -28,14 +24,19 @@ export function meta() {
   return [{ title: 'Prazos · Ops Ahead' }];
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  return withTenant(request, params.tenant, async () => {
-    const [deadlines, revisions] = await Promise.all([
-      listDeadlines(),
-      listRevisions(['deadline']),
-    ]);
-    return { deadlines, revisions };
-  });
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  const tenant = params.tenant;
+  if (!tenant) throw new Response('Tenant ausente', { status: 400 });
+  const repo = configRepo(tenant);
+  const [deadlines, revisions] = await Promise.all([
+    repo.listDeadlines(),
+    repo.listRevisions(['deadline']),
+  ]);
+  return { deadlines, revisions };
+}
+
+export function HydrateFallback() {
+  return <LoadingScreen title="Prazos" />;
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
