@@ -6,18 +6,14 @@ export interface Identity {
   tenants: string[];
 }
 
-/**
- * Public gateway origin, written into the document by the root loader. Reads
- * happen in the browser so a failed response stays in the network panel and
- * on the screen; the session cookie is HttpOnly and goes out with the request.
- */
+/** `PUBLIC_GATEWAY_URL`, written into the document head by the root layout. */
 export function gatewayUrl(): string {
   const content = document
     .querySelector('meta[name="gateway-url"]')
     ?.getAttribute('content')
     ?.trim();
   if (!content) {
-    throw new Error('A URL do gateway não está na página (meta gateway-url).');
+    throw new Error('PUBLIC_GATEWAY_URL não está no HTML.');
   }
   return content.replace(/\/$/, '');
 }

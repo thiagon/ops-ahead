@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from 'react-router';
 import type { Route } from './+types/root';
 import logo from './assets/logo.png';
@@ -17,20 +18,18 @@ export function loader() {
   return { gatewayUrl: getConfig().PUBLIC_GATEWAY_URL };
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ name: 'gateway-url', content: loaderData?.gatewayUrl ?? '' }];
-}
-
 export function links() {
   return [{ rel: 'icon', href: logo, type: 'image/png' }];
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const data = useRouteLoaderData('root') as { gatewayUrl?: string } | undefined;
   return (
     <html lang="pt-BR">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="gateway-url" content={data?.gatewayUrl ?? ''} />
         <Meta />
         <Links />
       </head>

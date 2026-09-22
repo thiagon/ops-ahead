@@ -1,5 +1,9 @@
+let draftSeq = 0;
+
+/** Local row key. `crypto.randomUUID` is missing on plain HTTP, outside a secure context. */
 export function nextDraftId(): string {
-  return crypto.randomUUID();
+  draftSeq += 1;
+  return `draft-${draftSeq}`;
 }
 
 export function iconButtonClass(danger = false): string {
