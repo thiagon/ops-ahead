@@ -39,6 +39,9 @@ consumer:
     clickhouseDatabase: default
     minioEndpoint: http://minio.data.svc.cluster.local:9000
     minioBucket: ops-ahead-lake
+    # Fetch size of the raw and milestone subscribers. The handler writes the
+    # whole fetch and commits the offset after that write; batchMaxSeconds
+    # only bounds how long an incomplete fetch waits.
     batchMaxSize: "1000"
     batchMaxSeconds: "5"
   secretName: data-ingest-secret
