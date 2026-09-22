@@ -22,7 +22,7 @@ describe('GET /metrics', () => {
 
   beforeAll(async () => {
     process.env.HMAC_ENABLED = 'true';
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {

@@ -5,6 +5,8 @@ import {
   addressParamsSchema,
   versionParam,
   webhookAcceptedSchema,
+  webhookBatchAcceptedSchema,
+  webhookBatchBodySchema,
   webhookBodySchema,
   webhookErrorSchema,
   webhookHeadersSchema,
@@ -39,6 +41,71 @@ export function registerEventRoutes(app: FastifyInstance): void {
     }
     return found;
   };
+
+  const BATCH_BODY_LIMIT = 5 * 1024 * 1024;
+
+  for (const [path, params] of [
+    ['/webhook/:tenant/:source/batch', addressParamsSchema],
+    ['/webhook/:tenant/:source/:version/batch', webhookParamsSchema],
+  ] as const) {
+    typed.post(
+      path,
+      {
+        bodyLimit: BATCH_BODY_LIMIT,
+        preParsing: app.verifySignatureFor(resolve),
+        ...app.auth.hmac({
+          tags: ['events'],
+          summary: 'Ingest a batch of events from a configured origin',
+          description:
+            'The body is an array of opaque events. Each one is enveloped and they share one Produce request. See domain/acl/itsm.md.',
+          params,
+          headers: webhookHeadersSchema,
+          body: webhookBatchBodySchema,
+          response: {
+            202: webhookBatchAcceptedSchema,
+            400: webhookErrorSchema,
+            401: webhookErrorSchema,
+            403: webhookErrorSchema,
+            404: webhookErrorSchema,
+            502: webhookErrorSchema,
+          },
+        }),
+      },
+      async (request, reply) => {
+        const origin = await resolve(request);
+        if (!origin) {
+          return reply.status(404).send({
+            error: 'UnknownOrigin',
+            message: 'no integration is configured for this address',
+          });
+        }
+
+        const pinned = (request.params as { version?: string }).version;
+        const bodies = request.body as Record<string, unknown>[];
+        try {
+          const result = await events.ingestBatch(
+            { ...origin, version: versionParam.parse(pinned) },
+            bodies,
+          );
+          request.server.metrics.eventsPublished.inc(
+            { source: origin.source, intake: origin.intake },
+            bodies.length,
+          );
+          return reply.status(202).send(result);
+        } catch (err) {
+          request.server.metrics.publishFailures.inc(
+            { source: origin.source, intake: origin.intake },
+            bodies.length,
+          );
+          request.log.error({ err }, 'failed to publish event batch');
+          return reply.status(502).send({
+            error: 'PublishFailed',
+            message: 'could not publish the event to the bus',
+          });
+        }
+      },
+    );
+  }
 
   for (const [path, params] of [
     ['/webhook/:tenant/:source', addressParamsSchema],

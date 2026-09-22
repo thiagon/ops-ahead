@@ -68,7 +68,10 @@ export const TEST_SECRET_KEY = Buffer.alloc(32, 7).toString('base64');
  */
 export function stubKafka(app: FastifyInstance): void {
   if (app.hasDecorator('kafka')) return;
-  app.decorate('kafka', { publish: async () => undefined });
+  app.decorate('kafka', {
+    publish: async () => undefined,
+    publishBatch: async () => undefined,
+  });
 }
 
 /**

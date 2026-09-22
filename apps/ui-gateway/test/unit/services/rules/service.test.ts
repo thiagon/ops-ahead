@@ -14,7 +14,7 @@ const mapping = alertMapping;
 
 function build() {
   const publish = vi.fn(async (_message: OutboundMessage) => undefined);
-  return { publish, rules: new RulesService({ publish }, topics, memoryPrisma()) };
+  return { publish, rules: new RulesService({ publish, publishBatch: async () => undefined }, topics, memoryPrisma()) };
 }
 
 describe('RulesService.setMapping', () => {

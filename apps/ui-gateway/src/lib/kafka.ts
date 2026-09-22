@@ -8,6 +8,8 @@ export interface OutboundMessage {
 
 export interface EventPublisher {
   publish(message: OutboundMessage): Promise<void>;
+  /** Many messages, one Produce request per topic. `publish` stays one message. */
+  publishBatch(messages: OutboundMessage[]): Promise<void>;
 }
 
 export interface ManagedPublisher extends EventPublisher {
@@ -26,6 +28,9 @@ export interface PublisherOptions {
  * A broker that was down at start, or dropped mid-flight, is reconnected
  * by the next publish instead of leaving a stale producer behind. A
  * rejection means the event did not reach the topic.
+ *
+ * `publish` sends one message. `publishBatch` sends the list in one Produce
+ * request per topic.
  */
 export function createPublisher({ clientId, brokers }: PublisherOptions): ManagedPublisher {
   const kafka = new Kafka({
@@ -46,6 +51,28 @@ export function createPublisher({ clientId, brokers }: PublisherOptions): Manage
     connected = true;
   }
 
+  function groupsOf(messages: OutboundMessage[]): Map<string, OutboundMessage[]> {
+    const groups = new Map<string, OutboundMessage[]>();
+    for (const message of messages) {
+      const group = groups.get(message.topic);
+      if (group) group.push(message);
+      else groups.set(message.topic, [message]);
+    }
+    return groups;
+  }
+
+  async function sendAll(messages: OutboundMessage[]): Promise<void> {
+    await Promise.all(
+      [...groupsOf(messages).entries()].map(([topic, items]) =>
+        producer.send({
+          topic,
+          acks: -1,
+          messages: items.map(({ key, value }) => ({ key, value })),
+        }),
+      ),
+    );
+  }
+
   return {
     connect,
 
@@ -59,6 +86,17 @@ export function createPublisher({ clientId, brokers }: PublisherOptions): Manage
       try {
         await connect();
         await producer.send({ topic, acks: -1, messages: [{ key, value }] });
+      } catch (err) {
+        connected = false;
+        throw err;
+      }
+    },
+
+    async publishBatch(messages) {
+      if (messages.length === 0) return;
+      try {
+        await connect();
+        await sendAll(messages);
       } catch (err) {
         connected = false;
         throw err;

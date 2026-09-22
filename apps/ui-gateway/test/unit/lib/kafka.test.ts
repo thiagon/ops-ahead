@@ -40,9 +40,9 @@ describe('createPublisher', () => {
   });
 
   it('sends the message to the topic named on the message, keyed for partition affinity', async () => {
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await publisher.publish({
+    await client.publish({
       topic: 'events.raw.alert',
       key: 'evt-1',
       value: '{"event_id":"evt-1"}',
@@ -55,11 +55,36 @@ describe('createPublisher', () => {
     });
   });
 
-  it('routes different messages to different topics on the same producer', async () => {
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+  it('sends a batch in one Produce request per topic', async () => {
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
-    await publisher.publish({ topic: 'events.raw.monitor', key: 'evt-2', value: '{}' });
+    await client.publishBatch([
+      { topic: 'events.raw.alert', key: 'evt-1', value: '{"n":1}' },
+      { topic: 'events.raw.alert', key: 'evt-2', value: '{"n":2}' },
+      { topic: 'events.raw.monitor', key: 'evt-3', value: '{"n":3}' },
+    ]);
+
+    expect(producer.send).toHaveBeenCalledTimes(2);
+    expect(producer.send).toHaveBeenCalledWith({
+      topic: 'events.raw.alert',
+      acks: -1,
+      messages: [
+        { key: 'evt-1', value: '{"n":1}' },
+        { key: 'evt-2', value: '{"n":2}' },
+      ],
+    });
+    expect(producer.send).toHaveBeenCalledWith({
+      topic: 'events.raw.monitor',
+      acks: -1,
+      messages: [{ key: 'evt-3', value: '{"n":3}' }],
+    });
+  });
+
+  it('routes different messages to different topics on the same producer', async () => {
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+
+    await client.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
+    await client.publish({ topic: 'events.raw.monitor', key: 'evt-2', value: '{}' });
 
     expect(producer.send).toHaveBeenNthCalledWith(
       1,
@@ -72,21 +97,21 @@ describe('createPublisher', () => {
   });
 
   it('connects once and reuses the connection across publishes', async () => {
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await publisher.connect();
-    await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
-    await publisher.publish({ topic: 'events.raw.alert', key: 'evt-2', value: '{}' });
+    await client.connect();
+    await client.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
+    await client.publish({ topic: 'events.raw.alert', key: 'evt-2', value: '{}' });
 
     expect(producer.connect).toHaveBeenCalledTimes(1);
   });
 
   it('connects on the first publish when startup could not reach the broker', async () => {
     producer.connect.mockRejectedValueOnce(new Error('broker down'));
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await expect(publisher.connect()).rejects.toThrow('broker down');
-    await publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
+    await expect(client.connect()).rejects.toThrow('broker down');
+    await client.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' });
 
     expect(producer.connect).toHaveBeenCalledTimes(2);
     expect(producer.send).toHaveBeenCalledTimes(1);
@@ -94,29 +119,29 @@ describe('createPublisher', () => {
 
   it('surfaces a failed send and reconnects on the next publish', async () => {
     producer.send.mockRejectedValueOnce(new Error('not leader for partition'));
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
     await expect(
-      publisher.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' }),
+      client.publish({ topic: 'events.raw.alert', key: 'evt-1', value: '{}' }),
     ).rejects.toThrow('not leader for partition');
-    await publisher.publish({ topic: 'events.raw.alert', key: 'evt-2', value: '{}' });
+    await client.publish({ topic: 'events.raw.alert', key: 'evt-2', value: '{}' });
 
     expect(producer.connect).toHaveBeenCalledTimes(2);
   });
 
   it('leaves a producer that never connected alone on shutdown', async () => {
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await publisher.disconnect();
+    await client.disconnect();
 
     expect(producer.disconnect).not.toHaveBeenCalled();
   });
 
   it('disconnects a connected producer on shutdown', async () => {
-    const publisher = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
+    const client = createPublisher({ clientId: 'ui-gateway', brokers: 'localhost:9092' });
 
-    await publisher.connect();
-    await publisher.disconnect();
+    await client.connect();
+    await client.disconnect();
 
     expect(producer.disconnect).toHaveBeenCalledTimes(1);
   });

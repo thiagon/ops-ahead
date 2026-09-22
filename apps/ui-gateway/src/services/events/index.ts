@@ -6,6 +6,8 @@ export {
   versionParam,
   type WebhookAccepted,
   webhookAcceptedSchema,
+  webhookBatchAcceptedSchema,
+  webhookBatchBodySchema,
   webhookBodySchema,
   webhookErrorSchema,
   webhookHeadersSchema,

@@ -18,7 +18,7 @@ describe('the boundary is closed by default', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -64,7 +64,7 @@ describe('tenant in the URL is selection, the claim is authorization', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -103,7 +103,7 @@ describe('provenance comes from the credential, never the body', () => {
   let schedulerKey: string;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
     schedulerKey = (await app.services.apiKeys.issue()).key;
   });
 
@@ -217,7 +217,7 @@ describe('MCP authenticates by Bearer, never by cookie', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -261,7 +261,7 @@ describe('the run key still owns the PATCH', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -315,7 +315,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {

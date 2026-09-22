@@ -9,7 +9,7 @@ describe('PUT /rules/mappings/:tenant/:source', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -88,7 +88,7 @@ describe('PUT /rules/deadlines/:tenant', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -145,7 +145,7 @@ describe('PUT /rules/targets/:tenant', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -188,7 +188,7 @@ describe('GET and history', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
@@ -240,7 +240,7 @@ describe('GET /rules/schema', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await createTestApp(instance => instance.decorate('kafka', { publish }));
+    app = await createTestApp(instance => instance.decorate('kafka', { publish, publishBatch: async () => undefined }));
   });
 
   afterAll(async () => {
