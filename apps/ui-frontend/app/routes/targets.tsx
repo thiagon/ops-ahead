@@ -6,7 +6,10 @@ import { PlusIcon, TrashIcon } from '~/components/icons';
 import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { ReadOnlyNotice } from '~/components/ReadOnlyNotice';
 import { RouteError } from '~/components/RouteError';
+import { useCanWrite } from '~/features/auth/role.ts';
+import { requireOperator } from '~/features/auth/session.server.ts';
 import { dashedAddClass, iconButtonClass, nextDraftId } from '~/features/config/editor-ui.ts';
 import { HistoryPanel, type HistoryRevision } from '~/features/config/HistoryPanel.tsx';
 import { configRepo } from '~/features/config/repo.client.ts';
@@ -41,6 +44,7 @@ export function HydrateFallback() {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+  await requireOperator(request, params.tenant);
   return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const kpiTargets = parseKpiTargets(form);
@@ -186,6 +190,7 @@ function MetasEditor({
   error: string | null | undefined;
   onReset: () => void;
 }) {
+  const canWrite = useCanWrite();
   const saving = useNavigation().state === 'submitting';
   const [groups, setGroups] = useState(() => toGroupDrafts(initial));
   const dirty = kpiFingerprint(fromGroups(groups)) !== kpiFingerprint(saved);
@@ -249,112 +254,122 @@ function MetasEditor({
         title="Metas"
         subtitle="Teto anual de violações. Vale para todas as origens."
         action={
-          <>
-            <GhostButton disabled={!dirty || saving} onClick={onReset}>
-              Descartar alterações
-            </GhostButton>
-            <SubmitButton pending={saving} disabled={!dirty}>
-              Publicar alterações
-            </SubmitButton>
-          </>
+          canWrite && (
+            <>
+              <GhostButton disabled={!dirty || saving} onClick={onReset}>
+                Descartar alterações
+              </GhostButton>
+              <SubmitButton pending={saving} disabled={!dirty}>
+                Publicar alterações
+              </SubmitButton>
+            </>
+          )
         }
       />
 
-      {error && (
-        <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
-          {error}
-        </p>
+      {!canWrite && (
+        <ReadOnlyNotice>Seu acesso mostra as metas em vigor, mas não as altera.</ReadOnlyNotice>
       )}
 
-      {groups.map(group => (
-        <Panel
-          key={group.id}
-          title={group.severities.length ? formatKpiGroup(group.severities) : 'Meta'}
-          className="mb-4"
-          action={
-            <GhostButton
-              tone="danger"
-              onClick={() => setGroups(rows => rows.filter(row => row.id !== group.id))}
-            >
-              Remover grupo
-            </GhostButton>
-          }
-        >
-          <p className="mb-3 text-sm text-text-muted">
-            Prioridades que compartilham o teto anual. Cada faixa é um percentual de atingimento.
+      <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+        {error && (
+          <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
+            {error}
           </p>
-          <SeverityChips
-            selected={group.severities}
-            onToggle={severity => toggleSeverity(group.id, severity)}
-          />
-          <div className="flex flex-col gap-2">
-            {group.bands.map(band => (
-              <div
-                key={band.id}
-                className="flex flex-col gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 sm:flex-row sm:items-center"
-              >
-                <input type="hidden" name="severities" value={kpiGroupKey(group.severities)} />
-                <div className="flex w-48 shrink-0 items-center gap-2">
-                  <input
-                    type="number"
-                    name="achievementPct"
-                    min={0}
-                    step={0.01}
-                    value={band.achievementPct}
-                    onChange={event =>
-                      updateBand(group.id, band.id, { achievementPct: Number(event.target.value) })
-                    }
-                    aria-label={`Percentual de atingimento em ${formatKpiGroup(group.severities) || 'este grupo'}`}
-                    className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[96px]`}
-                  />
-                  <Badge tone={achievementTone(band.achievementPct)}>%</Badge>
-                  <span className="text-text-dim text-xs">atingimento</span>
-                </div>
-                <div className="flex flex-1 items-center gap-2">
-                  <span className="shrink-0 text-sm text-text-muted">até</span>
-                  <input
-                    type="number"
-                    name="maxBreaches"
-                    min={0}
-                    value={band.maxBreaches}
-                    onChange={event =>
-                      updateBand(group.id, band.id, { maxBreaches: Number(event.target.value) })
-                    }
-                    aria-label={`Teto de violações para ${band.achievementPct}% em ${formatKpiGroup(group.severities) || 'este grupo'}`}
-                    className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[180px]`}
-                  />
-                  <span className="text-text-dim text-xs">violações no ano</span>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Remover faixa"
-                  onClick={() =>
-                    setGroups(rows =>
-                      rows.map(row =>
-                        row.id === group.id
-                          ? { ...row, bands: row.bands.filter(item => item.id !== band.id) }
-                          : row,
-                      ),
-                    )
-                  }
-                  className={iconButtonClass(true)}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            <button type="button" onClick={() => addBand(group.id)} className={dashedAddClass()}>
-              <PlusIcon className="h-3.5 w-3.5 shrink-0" />
-              Adicionar faixa
-            </button>
-          </div>
-        </Panel>
-      ))}
+        )}
 
-      <button type="button" onClick={addGroup} className={`${dashedAddClass()} mb-2 w-full`}>
-        <PlusIcon className="h-3.5 w-3.5 shrink-0" />
-        Adicionar grupo de meta
-      </button>
+        {groups.map(group => (
+          <Panel
+            key={group.id}
+            title={group.severities.length ? formatKpiGroup(group.severities) : 'Meta'}
+            className="mb-4"
+            action={
+              <GhostButton
+                tone="danger"
+                onClick={() => setGroups(rows => rows.filter(row => row.id !== group.id))}
+              >
+                Remover grupo
+              </GhostButton>
+            }
+          >
+            <p className="mb-3 text-sm text-text-muted">
+              Prioridades que compartilham o teto anual. Cada faixa é um percentual de atingimento.
+            </p>
+            <SeverityChips
+              selected={group.severities}
+              onToggle={severity => toggleSeverity(group.id, severity)}
+            />
+            <div className="flex flex-col gap-2">
+              {group.bands.map(band => (
+                <div
+                  key={band.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 sm:flex-row sm:items-center"
+                >
+                  <input type="hidden" name="severities" value={kpiGroupKey(group.severities)} />
+                  <div className="flex w-48 shrink-0 items-center gap-2">
+                    <input
+                      type="number"
+                      name="achievementPct"
+                      min={0}
+                      step={0.01}
+                      value={band.achievementPct}
+                      onChange={event =>
+                        updateBand(group.id, band.id, {
+                          achievementPct: Number(event.target.value),
+                        })
+                      }
+                      aria-label={`Percentual de atingimento em ${formatKpiGroup(group.severities) || 'este grupo'}`}
+                      className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[96px]`}
+                    />
+                    <Badge tone={achievementTone(band.achievementPct)}>%</Badge>
+                    <span className="text-text-dim text-xs">atingimento</span>
+                  </div>
+                  <div className="flex flex-1 items-center gap-2">
+                    <span className="shrink-0 text-sm text-text-muted">até</span>
+                    <input
+                      type="number"
+                      name="maxBreaches"
+                      min={0}
+                      value={band.maxBreaches}
+                      onChange={event =>
+                        updateBand(group.id, band.id, { maxBreaches: Number(event.target.value) })
+                      }
+                      aria-label={`Teto de violações para ${band.achievementPct}% em ${formatKpiGroup(group.severities) || 'este grupo'}`}
+                      className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[180px]`}
+                    />
+                    <span className="text-text-dim text-xs">violações no ano</span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Remover faixa"
+                    onClick={() =>
+                      setGroups(rows =>
+                        rows.map(row =>
+                          row.id === group.id
+                            ? { ...row, bands: row.bands.filter(item => item.id !== band.id) }
+                            : row,
+                        ),
+                      )
+                    }
+                    className={iconButtonClass(true)}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={() => addBand(group.id)} className={dashedAddClass()}>
+                <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+                Adicionar faixa
+              </button>
+            </div>
+          </Panel>
+        ))}
+
+        <button type="button" onClick={addGroup} className={`${dashedAddClass()} mb-2 w-full`}>
+          <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+          Adicionar grupo de meta
+        </button>
+      </fieldset>
     </Form>
   );
 }

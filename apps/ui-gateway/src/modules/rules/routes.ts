@@ -35,7 +35,7 @@ export function registerRulesRoutes(app: FastifyInstance): void {
 
   typed.put(
     '/rules/mappings/:tenant/:source',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['rules'],
       summary: "Publish one origin's field bindings and value dictionary",
       description:
@@ -95,7 +95,7 @@ export function registerRulesRoutes(app: FastifyInstance): void {
 
   typed.put(
     '/rules/deadlines/:tenant',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['rules'],
       summary: "Publish a tenant's contractual deadlines",
       params: tenantParamsSchema,
@@ -144,7 +144,7 @@ export function registerRulesRoutes(app: FastifyInstance): void {
 
   typed.put(
     '/rules/targets/:tenant',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['rules'],
       summary: "Publish a tenant's KPI achievement targets",
       params: tenantParamsSchema,

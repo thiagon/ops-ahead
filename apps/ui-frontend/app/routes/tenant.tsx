@@ -4,6 +4,7 @@ import { readJson } from '~/client-fetch.ts';
 import { RouteError } from '~/components/RouteError';
 import { Sidebar } from '~/components/Sidebar';
 import { fetchIdentity, loginUrl } from '~/features/auth/gateway.client.ts';
+import { canWrite } from '~/features/auth/role.ts';
 import { useSession } from '~/session';
 import type { Route } from './+types/tenant';
 
@@ -32,7 +33,12 @@ export async function clientLoader({ params, request }: Route.ClientLoaderArgs) 
   }
 
   const operator = { sub: identity.sub, name: identity.name, email: identity.email };
-  return { tenant: { slug: tenant, name: tenant }, operator, openCount };
+  return {
+    tenant: { slug: tenant, name: tenant },
+    operator,
+    openCount,
+    canWrite: canWrite(identity),
+  };
 }
 
 export function HydrateFallback() {

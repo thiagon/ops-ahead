@@ -6,7 +6,9 @@ import {
   sessionHeaders,
   TEST_BEARER,
   TEST_TENANTS,
+  viewerHeaders,
 } from '../../helpers/app.ts';
+import { alertMapping } from '../../helpers/mapping.ts';
 
 const publish = vi.fn(async (_message: { topic: string; key: string; value: string }) => undefined);
 
@@ -103,7 +105,87 @@ describe('tenant in the URL is selection, the claim is authorization', () => {
       name: 'Test User',
       email: 'test@example.com',
       tenants: ['locaweb', 'outro-tenant'],
+      role: 'operator',
     });
+  });
+});
+
+describe('a viewer reads a tenant and changes nothing in it', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp(instance =>
+      instance.decorate('kafka', { publish, publishBatch: async () => undefined }),
+    );
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('reports the read-only role on /auth/me', async () => {
+    const res = await app.inject({ method: 'GET', url: '/auth/me', headers: viewerHeaders });
+
+    expect(res.json()).toMatchObject({ tenants: TEST_TENANTS, role: 'viewer' });
+  });
+
+  it.each([
+    ['/sources/locaweb'],
+    ['/rules/deadlines/locaweb'],
+    ['/rules/targets/locaweb'],
+    ['/rules/mappings/locaweb/itsm'],
+    ['/locaweb/analyses'],
+  ])('reads GET %s', async url => {
+    const res = await app.inject({ method: 'GET', url, headers: viewerHeaders });
+
+    expect(res.statusCode).not.toBe(401);
+    expect(res.statusCode).not.toBe(403);
+  });
+
+  it.each([
+    ['POST', '/locaweb/analyses', { analysis: 'full_pipeline' }],
+    ['PUT', '/sources/locaweb/statuspage', { intake: 'alert' }],
+    ['PUT', '/sources/locaweb/itsm/status', { status: 'disabled' }],
+    ['POST', '/sources/locaweb/itsm/secret', {}],
+    ['PUT', '/rules/mappings/locaweb/itsm', alertMapping],
+    ['PUT', '/rules/deadlines/locaweb', { deadlines: [{ severity: 1, seconds: 14400 }] }],
+    [
+      'PUT',
+      '/rules/targets/locaweb',
+      { targets: [{ severities: [1, 2], max_breaches: 5, achievement_pct: 95 }] },
+    ],
+  ] as const)('refuses %s %s with 403', async (method, url, payload) => {
+    publish.mockClear();
+    const res = await app.inject({ method, url, payload, headers: viewerHeaders });
+
+    expect(res.statusCode).toBe(403);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('lists only the tools that read over MCP', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp/locaweb',
+      payload: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+      headers: { ...viewerHeaders, accept: 'application/json, text/event-stream' },
+    });
+    const data = res.body.split('\n').find(line => line.startsWith('data: '));
+    const names: string[] = JSON.parse(data?.slice('data: '.length) ?? '{}').result.tools.map(
+      (tool: { name: string }) => tool.name,
+    );
+
+    expect(names).toContain('get_targets');
+    for (const write of [
+      'start_analysis',
+      'register_source',
+      'set_source_status',
+      'rotate_source_secret',
+      'set_mapping',
+      'set_deadlines',
+      'set_targets',
+    ]) {
+      expect(names).not.toContain(write);
+    }
   });
 });
 
@@ -352,6 +434,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
       name: 'Test User',
       email: 'test@example.com',
       tenants: TEST_TENANTS,
+      role: 'operator',
     });
   });
 
@@ -400,6 +483,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
       name: 'Test User',
       email: 'test@example.com',
       tenants: TEST_TENANTS,
+      role: 'operator',
     });
     expect([res.headers['set-cookie']].flat().join(';')).toContain('oa_session=');
   });

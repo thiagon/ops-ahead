@@ -22,9 +22,12 @@ import {
 import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { ReadOnlyNotice } from '~/components/ReadOnlyNotice';
 import { RouteError } from '~/components/RouteError';
 import { getConfig } from '~/config.server.ts';
 import { gatewayUrl } from '~/features/auth/gateway.client.ts';
+import { useCanWrite } from '~/features/auth/role.ts';
+import { requireOperator } from '~/features/auth/session.server.ts';
 import { nextDraftId } from '~/features/config/editor-ui.ts';
 import { configRepo } from '~/features/config/repo.client.ts';
 import {
@@ -150,6 +153,7 @@ function ok(partial: Partial<ActionResult> = {}): ActionResult {
  * submitted with a fetcher and answer with the value alone.
  */
 export async function action({ params, request }: Route.ActionArgs) {
+  await requireOperator(request, params.tenant);
   return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const intent = form.get('intent');
@@ -873,7 +877,10 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
   const tenant = useTenantSlug();
   const saving = useNavigation().state === 'submitting';
   const [searchParams] = useSearchParams();
-  const tab = parseIntegrationTab(searchParams.get('tab'));
+  const canWrite = useCanWrite();
+  const requested = parseIntegrationTab(searchParams.get('tab'));
+  // The test tab sends a real webhook, so a viewer never gets to it.
+  const tab = !canWrite && requested === 'test' ? 'basic' : requested;
   const secret = actionData?.secret ?? flashedSecret;
   const missing = fields.filter(row => row.required && !isBound(row)).length;
   const uncovered = fields.reduce((total, row) => {
@@ -896,7 +903,7 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
           </Link>
         }
         action={
-          tab === 'dictionary' ? (
+          canWrite && tab === 'dictionary' ? (
             <SubmitButton pending={saving} form="bindings">
               Publicar
             </SubmitButton>
@@ -908,6 +915,12 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
         <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
           {actionData.error}
         </p>
+      )}
+
+      {!canWrite && (
+        <ReadOnlyNotice>
+          Seu acesso mostra a integração, mas não a altera nem envia testes.
+        </ReadOnlyNotice>
       )}
 
       <nav
@@ -923,32 +936,38 @@ export default function IntegrationDetail({ loaderData, actionData }: Route.Comp
             <Badge tone={missing > 0 ? 'red' : 'amber'}>{missing + uncovered}</Badge>
           )}
         </TabLink>
-        <TabLink to="?tab=test" active={tab === 'test'}>
-          Teste
-        </TabLink>
+        {canWrite && (
+          <TabLink to="?tab=test" active={tab === 'test'}>
+            Teste
+          </TabLink>
+        )}
       </nav>
 
-      <div hidden={tab !== 'basic'} role="tabpanel">
-        <BasicTab
-          source={origin.source}
-          url={url}
-          secret={secret}
-          lifecycle={origin.lifecycle}
-          canActivate={missing === 0 && uncovered === 0}
-        />
-      </div>
-      <div hidden={tab !== 'dictionary'} role="tabpanel">
-        <DictionaryTab
-          fields={fields}
-          missing={missing}
-          uncovered={uncovered}
-          dictionaryVersion={dictionaryVersion}
-          dictionaryStatus={dictionaryStatus}
-        />
-      </div>
-      <div hidden={tab !== 'test'} role="tabpanel">
-        <TestTab fields={fields} sampleBody={sampleBody} secret={secret} />
-      </div>
+      <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+        <div hidden={tab !== 'basic'} role="tabpanel">
+          <BasicTab
+            source={origin.source}
+            url={url}
+            secret={secret}
+            lifecycle={origin.lifecycle}
+            canActivate={missing === 0 && uncovered === 0}
+          />
+        </div>
+        <div hidden={tab !== 'dictionary'} role="tabpanel">
+          <DictionaryTab
+            fields={fields}
+            missing={missing}
+            uncovered={uncovered}
+            dictionaryVersion={dictionaryVersion}
+            dictionaryStatus={dictionaryStatus}
+          />
+        </div>
+      </fieldset>
+      {canWrite && (
+        <div hidden={tab !== 'test'} role="tabpanel">
+          <TestTab fields={fields} sampleBody={sampleBody} secret={secret} />
+        </div>
+      )}
     </main>
   );
 }

@@ -13,6 +13,12 @@ export interface ProviderMetadata {
   jwks_uri: string;
 }
 
+/**
+ * What a person may do inside the tenants they operate. `viewer` reads
+ * everything and changes nothing — no rule, no source, no analysis started.
+ */
+export type Role = 'operator' | 'viewer';
+
 /** What introspection says about a token that is still live. */
 export interface TokenClaims {
   sub: string;
@@ -21,6 +27,7 @@ export interface TokenClaims {
   /** Display name from the `profile` scope, falling back to the username. */
   name?: string;
   email?: string;
+  role: Role;
   expiresAt?: number;
 }
 
@@ -176,6 +183,7 @@ export class OidcService {
       name?: string;
       preferred_username?: string;
       email?: string;
+      ops_ahead_role?: unknown;
       exp?: number;
     };
 
@@ -186,6 +194,7 @@ export class OidcService {
             groups: this.#toGroups(payload.groups),
             name: payload.name || payload.preferred_username || undefined,
             email: payload.email || undefined,
+            role: this.#toRole(payload.ops_ahead_role),
             expiresAt: payload.exp,
           }
         : undefined;
@@ -303,6 +312,14 @@ export class OidcService {
     return value.filter(
       (entry): entry is string => typeof entry === 'string' && !entry.startsWith('authentik '),
     );
+  }
+
+  /**
+   * Only an explicit `operator` writes. A token without the claim — a mapping
+   * that did not apply, a provider that lost it — reads, never the reverse.
+   */
+  #toRole(value: unknown): Role {
+    return value === 'operator' ? 'operator' : 'viewer';
   }
 
   #trailingSlash(url: string): string {

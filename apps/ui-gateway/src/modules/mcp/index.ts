@@ -63,7 +63,7 @@ function registerMcpRoutes(app: FastifyInstance): void {
 
     reply.hijack();
 
-    const server = buildMcpServer(app, request.params.tenant);
+    const server = buildMcpServer(app, request.params.tenant, auth.role);
     const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
     reply.raw.on('close', () => {

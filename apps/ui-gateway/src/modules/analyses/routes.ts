@@ -37,7 +37,7 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
 
   typed.post(
     '/:tenant/analyses',
-    app.auth.tenant({
+    app.auth.operator({
       tags: ['analyses'],
       summary: 'Start a business analysis for a tenant',
       description:

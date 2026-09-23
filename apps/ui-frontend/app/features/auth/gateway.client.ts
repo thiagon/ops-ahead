@@ -1,3 +1,5 @@
+import type { Role } from './role.ts';
+
 const CSRF_COOKIE = 'oa_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
@@ -6,6 +8,7 @@ export interface Identity {
   name?: string;
   email?: string;
   tenants: string[];
+  role?: Role;
 }
 
 /** `PUBLIC_GATEWAY_URL`, written into the document head by the root layout. */

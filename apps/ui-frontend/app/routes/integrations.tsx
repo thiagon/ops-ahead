@@ -7,6 +7,8 @@ import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
 import { RouteError } from '~/components/RouteError';
+import { useCanWrite } from '~/features/auth/role.ts';
+import { requireOperator } from '~/features/auth/session.server.ts';
 import { configRepo } from '~/features/config/repo.client.ts';
 import { createIntegration, withTenant } from '~/features/config/repo.server.ts';
 import { ConflictError } from '~/features/config/repo.ts';
@@ -34,6 +36,7 @@ export function HydrateFallback() {
  * screen the redirect lands on — via a short-lived flash cookie, never the URL.
  */
 export async function action({ request, params }: Route.ActionArgs) {
+  await requireOperator(request, params.tenant);
   return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const source = String(form.get('source') ?? '').trim();
@@ -70,6 +73,7 @@ export default function Integrations({ loaderData, actionData }: Route.Component
   const { integrations } = loaderData;
   const tenant = useTenantSlug();
   const [creating, setCreating] = useState(false);
+  const canWrite = useCanWrite();
   const [query, setQuery] = useState('');
   const saving = useNavigation().state === 'submitting';
   const needle = query.trim().toLowerCase();
@@ -87,14 +91,16 @@ export default function Integrations({ loaderData, actionData }: Route.Component
         title="Entrada"
         subtitle="Os sistemas que enviam eventos para cá."
         action={
-          <GhostButton onClick={() => setCreating(!creating)}>
-            <PlusIcon className="h-4 w-4" />
-            Nova integração
-          </GhostButton>
+          canWrite && (
+            <GhostButton onClick={() => setCreating(!creating)}>
+              <PlusIcon className="h-4 w-4" />
+              Nova integração
+            </GhostButton>
+          )
         }
       />
 
-      {creating && (
+      {canWrite && creating && (
         <Panel className="mb-4">
           <Form method="post" className="flex flex-col gap-5">
             <Field id="source" label="Nome do sistema" hint="O nome da origem, como service_now.">

@@ -8,6 +8,7 @@ import fp from 'fastify-plugin';
 import createError from 'http-errors';
 import { SealedJson } from '../lib/cipher.ts';
 import { cookieAttributes } from '../lib/cookie.ts';
+import type { Role } from '../services/oidc/service.ts';
 
 /**
  * Who is calling, as one of the four credentials resolved it. The route hooks
@@ -20,6 +21,7 @@ export type Auth =
       name?: string;
       email?: string;
       tenants: string[];
+      role: Role;
       accessToken: string;
     }
   | { kind: 'scheduler' }
@@ -49,6 +51,7 @@ declare module 'fastify' {
       schemes: typeof securitySchemes;
       user: Gate;
       tenant: Gate;
+      operator: Gate;
       schedulerOrRun: Gate;
       run: Gate;
       hmac: {
@@ -186,6 +189,7 @@ async function authPlugin(fastify: FastifyInstance) {
         name: claims.name,
         email: claims.email,
         tenants: claims.groups,
+        role: claims.role,
         accessToken: token,
       };
     } catch (err) {
@@ -263,6 +267,13 @@ async function authPlugin(fastify: FastifyInstance) {
     await fastify.services.tenants.ensure(tenant);
   };
 
+  const requireOperator: preHandlerAsyncHookHandler = async function (request, reply) {
+    await requireTenant.call(this, request, reply);
+    if (request.auth.kind === 'user' && request.auth.role !== 'operator') {
+      throw createError.Forbidden('this caller can read this tenant but not change it');
+    }
+  };
+
   const requireSchedulerOrRun: preHandlerAsyncHookHandler = async request => {
     if (request.auth.kind !== 'scheduler' && request.auth.kind !== 'run') {
       throw createError.Unauthorized('this endpoint needs a scheduler key or a run key');
@@ -279,6 +290,7 @@ async function authPlugin(fastify: FastifyInstance) {
     schemes: securitySchemes,
     user: gate(requireUser, [{ cookieAuth: [] }, { bearerAuth: [] }]),
     tenant: gate(requireTenant, [{ cookieAuth: [] }, { bearerAuth: [] }]),
+    operator: gate(requireOperator, [{ cookieAuth: [] }, { bearerAuth: [] }]),
     schedulerOrRun: gate(requireSchedulerOrRun, [{ schedulerKey: [] }, { runKey: [] }]),
     run: gate(requireRun, [{ runKey: [] }]),
     hmac: documented([{ hmac: [] }]),

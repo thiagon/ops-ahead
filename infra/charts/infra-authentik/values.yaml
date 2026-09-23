@@ -109,6 +109,11 @@ authentik:
           secretKeyRef:
             name: authentik-secret
             key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      - name: AUTHENTIK_DEMO_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_DEMO_PASSWORD
       # Public hostname so OIDC documents keep browser URLs when the gateway
       # talks to the in-cluster Service rather than the ingress.
       - name: AUTHENTIK_HOST

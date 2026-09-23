@@ -68,12 +68,38 @@ describe('OidcService', () => {
     await expect(oidc.introspect('tok')).resolves.toEqual({
       sub: 'user',
       groups: ['locaweb'],
+      role: 'viewer',
       expiresAt: undefined,
     });
     await expect(oidc.introspect('tok')).resolves.toMatchObject({ sub: 'user' });
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('introspect'))).toHaveLength(
       1,
     );
+  });
+
+  it.each([
+    ['operator', 'operator'],
+    ['viewer', 'viewer'],
+    ['admin', 'viewer'],
+    [undefined, 'viewer'],
+  ])('reads ops_ahead_role %s as %s', async (claim, role) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        if (String(input).includes('openid-configuration')) {
+          return {
+            ok: true,
+            json: async () => ({ introspection_endpoint: 'http://authentik.example/introspect' }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ active: true, sub: 'user', groups: [], ops_ahead_role: claim }),
+        };
+      }),
+    );
+
+    await expect(service().introspect('tok')).resolves.toMatchObject({ role });
   });
 
   it('treats a failed refresh as a dead session, not an error', async () => {
@@ -174,6 +200,7 @@ describe('OidcService', () => {
     await expect(service().introspect('tok')).resolves.toEqual({
       sub: 'user',
       groups: ['locaweb'],
+      role: 'viewer',
       expiresAt: undefined,
     });
   });

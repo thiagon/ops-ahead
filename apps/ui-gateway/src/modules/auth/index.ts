@@ -177,13 +177,20 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
             name: z.string().optional(),
             email: z.string().optional(),
             tenants: z.array(z.string()),
+            role: z.enum(['operator', 'viewer']),
           })
           .meta({ id: 'AuthIdentity' }),
       },
     }),
     async request => {
       const auth = request.auth as Extract<typeof request.auth, { kind: 'user' }>;
-      return { sub: auth.sub, name: auth.name, email: auth.email, tenants: auth.tenants };
+      return {
+        sub: auth.sub,
+        name: auth.name,
+        email: auth.email,
+        tenants: auth.tenants,
+        role: auth.role,
+      };
     },
   );
 

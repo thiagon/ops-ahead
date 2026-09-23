@@ -6,7 +6,10 @@ import { PlusIcon, TrashIcon } from '~/components/icons';
 import { LoadingScreen } from '~/components/LoadingScreen';
 import { PageHeader } from '~/components/PageHeader';
 import { Panel } from '~/components/Panel';
+import { ReadOnlyNotice } from '~/components/ReadOnlyNotice';
 import { RouteError } from '~/components/RouteError';
+import { useCanWrite } from '~/features/auth/role.ts';
+import { requireOperator } from '~/features/auth/session.server.ts';
 import { dashedAddClass, iconButtonClass, nextDraftId } from '~/features/config/editor-ui.ts';
 import { HistoryPanel, type HistoryRevision } from '~/features/config/HistoryPanel.tsx';
 import { configRepo } from '~/features/config/repo.client.ts';
@@ -40,6 +43,7 @@ export function HydrateFallback() {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+  await requireOperator(request, params.tenant);
   return withTenant(request, params.tenant, async () => {
     const form = await request.formData();
     const deadlines = parseDeadlines(form);
@@ -120,6 +124,7 @@ function PrazosEditor({
   error: string | null | undefined;
   onReset: () => void;
 }) {
+  const canWrite = useCanWrite();
   const saving = useNavigation().state === 'submitting';
   const [deadlines, setDeadlines] = useState(() => toDeadlineDrafts(initial));
   const dirty = deadlineFingerprint(fromDrafts(deadlines)) !== deadlineFingerprint(saved);
@@ -143,84 +148,92 @@ function PrazosEditor({
         title="Prazos"
         subtitle="Tempo máximo de atendimento por prioridade. Vale para todas as origens."
         action={
-          <>
-            <GhostButton disabled={!dirty || saving} onClick={onReset}>
-              Descartar alterações
-            </GhostButton>
-            <SubmitButton pending={saving} disabled={!dirty}>
-              Publicar alterações
-            </SubmitButton>
-          </>
+          canWrite && (
+            <>
+              <GhostButton disabled={!dirty || saving} onClick={onReset}>
+                Descartar alterações
+              </GhostButton>
+              <SubmitButton pending={saving} disabled={!dirty}>
+                Publicar alterações
+              </SubmitButton>
+            </>
+          )
         }
       />
 
-      {error && (
-        <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
-          {error}
-        </p>
+      {!canWrite && (
+        <ReadOnlyNotice>Seu acesso mostra os prazos em vigor, mas não as altera.</ReadOnlyNotice>
       )}
 
-      <Panel>
-        <div className="flex flex-col gap-2">
-          {deadlines.length === 0 && (
-            <p className="text-sm text-text-dim">
-              Nenhum prazo. Adicione as prioridades que o contrato cobre.
-            </p>
-          )}
-          {deadlines.map(deadline => (
-            <div
-              key={deadline.id}
-              className="flex flex-col gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 sm:flex-row sm:items-center"
-            >
-              <select
-                name="severity"
-                value={deadline.severity}
-                onChange={event =>
-                  updateDeadline(deadline.id, { severity: Number(event.target.value) })
-                }
-                aria-label="Prioridade do prazo"
-                className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[220px]`}
+      <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+        {error && (
+          <p className="mb-4 rounded-lg border border-accent-red/40 bg-accent-red/10 px-3 py-2 text-accent-red text-sm">
+            {error}
+          </p>
+        )}
+
+        <Panel>
+          <div className="flex flex-col gap-2">
+            {deadlines.length === 0 && (
+              <p className="text-sm text-text-dim">
+                Nenhum prazo. Adicione as prioridades que o contrato cobre.
+              </p>
+            )}
+            {deadlines.map(deadline => (
+              <div
+                key={deadline.id}
+                className="flex flex-col gap-3 rounded-lg border border-border-base bg-bg-elevated p-3 sm:flex-row sm:items-center"
               >
-                {severityOptions(deadline.severity, usedSeverities).map(severity => (
-                  <option key={severity} value={severity}>
-                    {severityLabel(severity)}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-1 items-center gap-2">
-                <input
-                  type="number"
-                  name="deadlineSeconds"
-                  min={0}
-                  step={1}
-                  value={deadline.deadlineSeconds}
+                <select
+                  name="severity"
+                  value={deadline.severity}
                   onChange={event =>
-                    updateDeadline(deadline.id, { deadlineSeconds: Number(event.target.value) })
+                    updateDeadline(deadline.id, { severity: Number(event.target.value) })
                   }
-                  aria-label={`Prazo em segundos para ${severityLabel(deadline.severity)}`}
-                  className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[180px]`}
-                />
-                <span className="text-text-dim text-xs">segundos</span>
+                  aria-label="Prioridade do prazo"
+                  className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[220px]`}
+                >
+                  {severityOptions(deadline.severity, usedSeverities).map(severity => (
+                    <option key={severity} value={severity}>
+                      {severityLabel(severity)}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-1 items-center gap-2">
+                  <input
+                    type="number"
+                    name="deadlineSeconds"
+                    min={0}
+                    step={1}
+                    value={deadline.deadlineSeconds}
+                    onChange={event =>
+                      updateDeadline(deadline.id, { deadlineSeconds: Number(event.target.value) })
+                    }
+                    aria-label={`Prazo em segundos para ${severityLabel(deadline.severity)}`}
+                    className={`${inputClass} border-transparent bg-bg-tile sm:max-w-[180px]`}
+                  />
+                  <span className="text-text-dim text-xs">segundos</span>
+                </div>
+                <Badge tone="neutral">{formatDuration(deadline.deadlineSeconds)}</Badge>
+                <button
+                  type="button"
+                  aria-label={`Remover prazo ${severityLabel(deadline.severity)}`}
+                  onClick={() => setDeadlines(rows => rows.filter(row => row.id !== deadline.id))}
+                  className={iconButtonClass(true)}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
-              <Badge tone="neutral">{formatDuration(deadline.deadlineSeconds)}</Badge>
-              <button
-                type="button"
-                aria-label={`Remover prazo ${severityLabel(deadline.severity)}`}
-                onClick={() => setDeadlines(rows => rows.filter(row => row.id !== deadline.id))}
-                className={iconButtonClass(true)}
-              >
-                <TrashIcon className="h-4 w-4" />
+            ))}
+            {canAddDeadline && (
+              <button type="button" onClick={addDeadline} className={dashedAddClass()}>
+                <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+                Adicionar prazo
               </button>
-            </div>
-          ))}
-          {canAddDeadline && (
-            <button type="button" onClick={addDeadline} className={dashedAddClass()}>
-              <PlusIcon className="h-3.5 w-3.5 shrink-0" />
-              Adicionar prazo
-            </button>
-          )}
-        </div>
-      </Panel>
+            )}
+          </div>
+        </Panel>
+      </fieldset>
     </Form>
   );
 }

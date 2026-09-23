@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { FastifyInstance } from 'fastify';
+import type { Role } from '../../services/oidc/service.ts';
 import { rulesJsonSchema } from '../../services/rules/schema.ts';
 import {
   analysisParamsSchema,
@@ -25,28 +26,17 @@ function jsonResult(value: unknown) {
  * `tenant` is closed over from `/mcp/:tenant`. Tools never take it as an
  * argument, so one connection operates one tenant
  * (domain/ubiquitous-language.md#tenant).
+ *
+ * A `viewer` gets a server without the tools that change anything: a tool
+ * the client never lists is one it cannot be talked into calling.
  */
-export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer {
+export function buildMcpServer(app: FastifyInstance, tenant: string, role: Role): McpServer {
   const server = new McpServer({
     name: app.env.SERVICE_NAME,
     version: app.env.SERVICE_VERSION,
   });
 
   const { analyses, sources, rules } = app.services;
-
-  server.registerTool(
-    'start_analysis',
-    {
-      title: 'Start analysis',
-      description:
-        'Runs a business analysis (volume_forecast, breach_risk, kpi_projection, external_event_detection, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns an id immediately; poll get_analysis_status for progress.',
-      inputSchema: analysisRequestSchema,
-    },
-    // An MCP tool call is a person asking, the same as the REST route a
-    // session reaches — the client's own token is what authenticated it.
-    async args => jsonResult(await analyses.start(args, { kind: 'user', tenants: [tenant] })),
-  );
-
   server.registerTool(
     'get_analysis_status',
     {
@@ -64,71 +54,6 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
       description: "List this tenant's registered sources. Secrets are never included.",
     },
     async () => jsonResult(await sources.listByTenant(tenant)),
-  );
-
-  server.registerTool(
-    'register_source',
-    {
-      title: 'Register source',
-      description:
-        'Register a source under this tenant. Answers with the signing secret this once and never again.',
-      inputSchema: registerSourceInputSchema,
-    },
-    async ({ source, intake, secret }) =>
-      jsonResult(await sources.register(tenant, source, intake, secret)),
-  );
-
-  server.registerTool(
-    'set_source_status',
-    {
-      title: 'Set source status',
-      description:
-        'Turn a source off or back on. A disabled source keeps its configuration and its secret; its webhooks answer 403 until it is enabled again.',
-      inputSchema: setSourceStatusInputSchema,
-    },
-    async ({ source, status }) => jsonResult(await sources.setStatus(tenant, source, status)),
-  );
-
-  server.registerTool(
-    'rotate_source_secret',
-    {
-      title: 'Rotate source secret',
-      description:
-        "Rotate a source's secret. The previous one stops being accepted; the new value is answered this once and never again.",
-      inputSchema: rotateSourceSecretInputSchema,
-    },
-    async ({ source, secret }) => jsonResult(await sources.rotate(tenant, source, secret)),
-  );
-
-  server.registerTool(
-    'set_mapping',
-    {
-      title: 'Set origin mapping',
-      description:
-        "Publish one origin's field bindings and value dictionary. Bindings and dictionary are one record: a translated value means nothing without the field it was read from.",
-      inputSchema: setMappingInputSchema,
-    },
-    async ({ source, ...mapping }) => jsonResult(await rules.setMapping(tenant, source, mapping)),
-  );
-
-  server.registerTool(
-    'set_deadlines',
-    {
-      title: 'Set deadlines',
-      description: "Publish this tenant's contractual deadlines per severity.",
-      inputSchema: deadlineSetSchema,
-    },
-    async args => jsonResult(await rules.setDeadlines(tenant, args)),
-  );
-
-  server.registerTool(
-    'set_targets',
-    {
-      title: 'Set KPI targets',
-      description: "Publish this tenant's KPI achievement targets.",
-      inputSchema: targetSetSchema,
-    },
-    async args => jsonResult(await rules.setTargets(tenant, args)),
   );
 
   server.registerTool(
@@ -198,6 +123,86 @@ export function buildMcpServer(app: FastifyInstance, tenant: string): McpServer 
         'The last ten published target documents, newest first. Republish one by calling set_targets with its body.',
     },
     async () => jsonResult(await rules.listTargetHistory(tenant)),
+  );
+
+  if (role !== 'operator') return server;
+
+  server.registerTool(
+    'start_analysis',
+    {
+      title: 'Start analysis',
+      description:
+        'Runs a business analysis (volume_forecast, breach_risk, kpi_projection, external_event_detection, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns an id immediately; poll get_analysis_status for progress.',
+      inputSchema: analysisRequestSchema,
+    },
+    // An MCP tool call is a person asking, the same as the REST route a
+    // session reaches — the client's own token is what authenticated it.
+    async args => jsonResult(await analyses.start(args, { kind: 'user', tenants: [tenant] })),
+  );
+
+  server.registerTool(
+    'register_source',
+    {
+      title: 'Register source',
+      description:
+        'Register a source under this tenant. Answers with the signing secret this once and never again.',
+      inputSchema: registerSourceInputSchema,
+    },
+    async ({ source, intake, secret }) =>
+      jsonResult(await sources.register(tenant, source, intake, secret)),
+  );
+
+  server.registerTool(
+    'set_source_status',
+    {
+      title: 'Set source status',
+      description:
+        'Turn a source off or back on. A disabled source keeps its configuration and its secret; its webhooks answer 403 until it is enabled again.',
+      inputSchema: setSourceStatusInputSchema,
+    },
+    async ({ source, status }) => jsonResult(await sources.setStatus(tenant, source, status)),
+  );
+
+  server.registerTool(
+    'rotate_source_secret',
+    {
+      title: 'Rotate source secret',
+      description:
+        "Rotate a source's secret. The previous one stops being accepted; the new value is answered this once and never again.",
+      inputSchema: rotateSourceSecretInputSchema,
+    },
+    async ({ source, secret }) => jsonResult(await sources.rotate(tenant, source, secret)),
+  );
+
+  server.registerTool(
+    'set_mapping',
+    {
+      title: 'Set origin mapping',
+      description:
+        "Publish one origin's field bindings and value dictionary. Bindings and dictionary are one record: a translated value means nothing without the field it was read from.",
+      inputSchema: setMappingInputSchema,
+    },
+    async ({ source, ...mapping }) => jsonResult(await rules.setMapping(tenant, source, mapping)),
+  );
+
+  server.registerTool(
+    'set_deadlines',
+    {
+      title: 'Set deadlines',
+      description: "Publish this tenant's contractual deadlines per severity.",
+      inputSchema: deadlineSetSchema,
+    },
+    async args => jsonResult(await rules.setDeadlines(tenant, args)),
+  );
+
+  server.registerTool(
+    'set_targets',
+    {
+      title: 'Set KPI targets',
+      description: "Publish this tenant's KPI achievement targets.",
+      inputSchema: targetSetSchema,
+    },
+    async args => jsonResult(await rules.setTargets(tenant, args)),
   );
 
   return server;
