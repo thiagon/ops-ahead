@@ -30,7 +30,9 @@ export const TEST_BEARER = 'test-access-token';
 export function stubIntrospection(app: FastifyInstance): void {
   if (!app.hasDecorator('services')) return;
   app.services.oidc.introspect = async (token: string) =>
-    token === TEST_BEARER ? { sub: 'test-user', groups: TEST_TENANTS } : undefined;
+    token === TEST_BEARER
+      ? { sub: 'test-user', name: 'Test User', email: 'test@example.com', groups: TEST_TENANTS }
+      : undefined;
   app.services.oidc.revoke = async () => undefined;
   app.services.oidc.refresh = async () => undefined;
   Object.defineProperty(app.services.oidc, 'configured', { get: () => true });

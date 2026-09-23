@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { createAvatar } from '@dicebear/core';
+import * as shapes from '@dicebear/shapes';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import {
   analysesPath,
@@ -10,7 +12,7 @@ import {
   targetsPath,
 } from '~/paths';
 import { useSession } from '~/session';
-import type { TenantRef } from '~/types';
+import type { Operator, TenantRef } from '~/types';
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -248,20 +250,25 @@ function Brand({ tenant, collapsed }: { tenant: TenantRef; collapsed: boolean })
   );
 }
 
-function SessionBlock({ collapsed }: { collapsed: boolean }) {
+function SessionBlock({ operator, collapsed }: { operator: Operator; collapsed: boolean }) {
   const leave = useSession(state => state.leave);
+  const displayName = operator.name ?? operator.email ?? 'Operador';
+  const avatar = useMemo(
+    () => createAvatar(shapes, { seed: operator.sub }).toDataUri(),
+    [operator.sub],
+  );
   return (
     <div className={`flex items-center gap-3 px-3 ${collapsed ? 'justify-center' : ''}`}>
       <div
-        title={collapsed ? 'Sessão anônima — SSO ainda não integrado' : undefined}
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-tile font-semibold text-text-muted text-xs"
+        title={collapsed ? displayName : operator.email}
+        className="relative h-9 w-9 shrink-0 rounded-full bg-bg-tile"
       >
-        N1
+        <img src={avatar} alt="" className="h-9 w-9 rounded-full" />
         <span className="-right-0.5 -bottom-0.5 absolute h-2.5 w-2.5 rounded-full border-2 border-bg-elevated bg-signal-green" />
       </div>
       {!collapsed && (
         <div className="min-w-0">
-          <p className="truncate text-sm text-text-light">Operador N1</p>
+          <p className="truncate text-sm text-text-light">{displayName}</p>
           <p className="truncate text-text-dim text-xs">
             <Link to="/" onClick={() => leave()} className="hover:text-text-light">
               Trocar cliente
@@ -273,7 +280,15 @@ function SessionBlock({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: number | null }) {
+export function Sidebar({
+  tenant,
+  operator,
+  openCount,
+}: {
+  tenant: TenantRef;
+  operator: Operator;
+  openCount: number | null;
+}) {
   const collapsed = useSession(state => state.sidebarCollapsed);
   const setCollapsed = useSession(state => state.setSidebarCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -330,7 +345,7 @@ export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: n
           openCount={openCount}
           onNavigate={() => setDrawerOpen(false)}
         />
-        <SessionBlock collapsed={false} />
+        <SessionBlock operator={operator} collapsed={false} />
       </aside>
 
       {/* The nav stays put while a long screen scrolls: the aside is a sticky
@@ -359,7 +374,7 @@ export function Sidebar({ tenant, openCount }: { tenant: TenantRef; openCount: n
           </button>
         </div>
         <NavLinks tenant={tenant.slug} collapsed={collapsed} openCount={openCount} />
-        <SessionBlock collapsed={collapsed} />
+        <SessionBlock operator={operator} collapsed={collapsed} />
       </aside>
     </>
   );

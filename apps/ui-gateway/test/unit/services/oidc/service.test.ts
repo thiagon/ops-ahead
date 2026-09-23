@@ -177,4 +177,28 @@ describe('OidcService', () => {
       expiresAt: undefined,
     });
   });
+  it('names the caller from the profile scope, falling back to the username', async () => {
+    const answer = (claims: Record<string, unknown>) =>
+      vi.fn(async (input: string | URL) => {
+        if (String(input).includes('openid-configuration')) {
+          return {
+            ok: true,
+            json: async () => ({ introspection_endpoint: 'http://authentik.example/introspect' }),
+          };
+        }
+        return { ok: true, json: async () => ({ active: true, sub: 'user', ...claims }) };
+      });
+
+    vi.stubGlobal(
+      'fetch',
+      answer({ name: 'Ana Souza', preferred_username: 'ana', email: 'a@x.io' }),
+    );
+    await expect(service().introspect('tok')).resolves.toMatchObject({
+      name: 'Ana Souza',
+      email: 'a@x.io',
+    });
+
+    vi.stubGlobal('fetch', answer({ name: '', preferred_username: 'ana' }));
+    await expect(service().introspect('tok')).resolves.toMatchObject({ name: 'ana' });
+  });
 });

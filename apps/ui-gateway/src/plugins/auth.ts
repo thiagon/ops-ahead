@@ -14,7 +14,14 @@ import { cookieAttributes } from '../lib/cookie.ts';
  * read this; nothing below them parses a header again.
  */
 export type Auth =
-  | { kind: 'user'; sub: string; tenants: string[]; accessToken: string }
+  | {
+      kind: 'user';
+      sub: string;
+      name?: string;
+      email?: string;
+      tenants: string[];
+      accessToken: string;
+    }
   | { kind: 'scheduler' }
   | { kind: 'run'; runKey: string }
   | { kind: 'none' };
@@ -173,7 +180,14 @@ async function authPlugin(fastify: FastifyInstance) {
     try {
       const claims = await fastify.services.oidc.introspect(token);
       if (!claims) return { kind: 'none' };
-      return { kind: 'user', sub: claims.sub, tenants: claims.groups, accessToken: token };
+      return {
+        kind: 'user',
+        sub: claims.sub,
+        name: claims.name,
+        email: claims.email,
+        tenants: claims.groups,
+        accessToken: token,
+      };
     } catch (err) {
       request.log.error({ err }, 'token introspection failed');
       throw createError.BadGateway('could not verify the token with the identity provider');

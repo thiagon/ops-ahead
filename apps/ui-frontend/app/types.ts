@@ -10,6 +10,13 @@ export type TenantRef = {
   name: string;
 };
 
+/** The logged-in person as Authentik names them; `sub` is the stable key. */
+export type Operator = {
+  sub: string;
+  name?: string;
+  email?: string;
+};
+
 export interface ShapContribution {
   feature: string;
   shap_value: number;

@@ -73,8 +73,10 @@ data:
             - authorization_code
             - refresh_token
           redirect_uris:
+            {{- range .Values.gateway.redirectUris }}
             - matching_mode: strict
-              url: {{ .Values.gateway.redirectUri | quote }}
+              url: {{ . | quote }}
+            {{- end }}
           # The gateway asks the provider whether a token is still live on
           # every request, so it reads what this scope carries.
           property_mappings:

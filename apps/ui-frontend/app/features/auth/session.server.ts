@@ -10,6 +10,8 @@ import { gatewayFetch } from './gateway.server.ts';
  */
 export interface Identity {
   sub: string;
+  name?: string;
+  email?: string;
   /** Tenants the person operates — Authentik group names, verbatim. */
   tenants: string[];
 }

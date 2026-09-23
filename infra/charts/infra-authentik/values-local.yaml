@@ -49,4 +49,5 @@ authentik:
         value: http://auth.ops-ahead.localtest.me
 
 gateway:
-  redirectUri: http://gateway.ops-ahead.localtest.me/auth/callback
+  redirectUris:
+    - http://gateway.ops-ahead.localtest.me/auth/callback

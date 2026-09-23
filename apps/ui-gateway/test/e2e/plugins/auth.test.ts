@@ -98,7 +98,12 @@ describe('tenant in the URL is selection, the claim is authorization', () => {
   it('reports the caller and the tenants their groups carry', async () => {
     const res = await app.inject({ method: 'GET', url: '/auth/me', headers: authHeaders });
 
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: ['locaweb', 'outro-tenant'] });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: ['locaweb', 'outro-tenant'],
+    });
   });
 });
 
@@ -342,7 +347,12 @@ describe('the browser spends a cookie, not a Bearer', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: TEST_TENANTS });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: TEST_TENANTS,
+    });
   });
 
   it('rejects a state-changing request whose CSRF header does not match', async () => {
@@ -385,7 +395,12 @@ describe('the browser spends a cookie, not a Bearer', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ sub: 'test-user', tenants: TEST_TENANTS });
+    expect(res.json()).toEqual({
+      sub: 'test-user',
+      name: 'Test User',
+      email: 'test@example.com',
+      tenants: TEST_TENANTS,
+    });
     expect([res.headers['set-cookie']].flat().join(';')).toContain('oa_session=');
   });
 
@@ -395,4 +410,60 @@ describe('the browser spends a cookie, not a Bearer', () => {
       (await app.inject({ method: 'GET', url: '/docs/', headers: authHeaders })).statusCode,
     ).toBe(200);
   });
+});
+
+describe('login can return to the gateway as well as the front', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    app.services.oidc.authorizationUrl = async () => 'http://authentik.example/authorize';
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  function flowNext(setCookie: string | string[] | undefined): string {
+    const raw = [setCookie].flat().find(c => c?.startsWith('oa_auth_flow=')) ?? '';
+    const value = raw.slice('oa_auth_flow='.length).split(';')[0] ?? '';
+    return (JSON.parse(decodeURIComponent(value)) as { next: string }).next;
+  }
+
+  async function login(next: string): Promise<string> {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/auth/login?next=${encodeURIComponent(next)}`,
+    });
+    expect(res.statusCode).toBe(302);
+    return flowNext(res.headers['set-cookie']);
+  }
+
+  it('sends a browser without a session from /docs to login and back', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/docs',
+      headers: { accept: 'text/html' },
+    });
+
+    expect(res.statusCode).toBe(302);
+    const location = new URL(String(res.headers.location), app.env.PUBLIC_URL);
+    expect(location.pathname).toBe('/auth/login');
+    expect(location.searchParams.get('next')).toBe(`${app.env.PUBLIC_URL}/docs`);
+  });
+
+  it('reads a bare path as the front’s', async () => {
+    expect(await login('/locaweb/fila')).toBe(`${app.env.FRONTEND_ORIGIN}/locaweb/fila`);
+  });
+
+  it('honors an absolute URL on the gateway’s own origin', async () => {
+    expect(await login(`${app.env.PUBLIC_URL}/docs`)).toBe(`${app.env.PUBLIC_URL}/docs`);
+  });
+
+  it.each(['https://evil.example/docs', '//evil.example/docs'])(
+    'never redirects off the known origins (%s)',
+    async next => {
+      expect(await login(next)).toBe(`${app.env.FRONTEND_ORIGIN}/`);
+    },
+  );
 });

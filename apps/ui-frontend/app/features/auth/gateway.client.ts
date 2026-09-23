@@ -3,6 +3,8 @@ const CSRF_HEADER = 'x-csrf-token';
 
 export interface Identity {
   sub: string;
+  name?: string;
+  email?: string;
   tenants: string[];
 }
 

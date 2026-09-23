@@ -62,6 +62,12 @@ async function swaggerPlugin(fastify: FastifyInstance) {
         // /docs is behind a session: a probe and a webhook have no cookie,
         // and the reference is not a public surface.
         if (request.auth?.kind !== 'user') {
+          // A browser is sent to log in and back; anything else gets the 401.
+          if (request.headers.accept?.includes('text/html')) {
+            const back = `${fastify.env.PUBLIC_URL.replace(/\/$/, '')}${request.url}`;
+            reply.redirect(`/auth/login?next=${encodeURIComponent(back)}`, 302);
+            return;
+          }
           done(createError.Unauthorized('this endpoint needs a logged-in caller'));
           return;
         }

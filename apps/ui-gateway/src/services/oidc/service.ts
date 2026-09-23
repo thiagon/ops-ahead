@@ -18,6 +18,9 @@ export interface TokenClaims {
   sub: string;
   /** Authentik group names, which are tenant ids verbatim (spec-gateway-auth-v2). */
   groups: string[];
+  /** Display name from the `profile` scope, falling back to the username. */
+  name?: string;
+  email?: string;
   expiresAt?: number;
 }
 
@@ -170,12 +173,21 @@ export class OidcService {
       active: boolean;
       sub?: string;
       groups?: unknown;
+      name?: string;
+      preferred_username?: string;
+      email?: string;
       exp?: number;
     };
 
     const claims =
       payload.active && payload.sub
-        ? { sub: payload.sub, groups: this.#toGroups(payload.groups), expiresAt: payload.exp }
+        ? {
+            sub: payload.sub,
+            groups: this.#toGroups(payload.groups),
+            name: payload.name || payload.preferred_username || undefined,
+            email: payload.email || undefined,
+            expiresAt: payload.exp,
+          }
         : undefined;
 
     this.#cache.set(token, { claims, readAt: Date.now() });

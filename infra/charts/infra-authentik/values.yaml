@@ -114,7 +114,10 @@ authentik:
       - name: AUTHENTIK_HOST
         value: https://auth.ops-ahead.xyz
 
-# Where the gateway sends the browser back after the login. Kept here rather
-# than inside the blueprint so the two stay one edit apart.
+# Where the gateway may send the browser back after the login — every gateway
+# that shares this realm, each matched exactly. Kept here rather than inside
+# the blueprint so the two stay one edit apart.
 gateway:
-  redirectUri: https://gateway.ops-ahead.xyz/auth/callback
+  redirectUris:
+    - https://gateway.ops-ahead.xyz/auth/callback
+    - http://localhost:3000/auth/callback

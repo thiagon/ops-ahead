@@ -17,6 +17,26 @@ const FLOW_MAX_AGE_SECONDS = 600;
 const SESSION_COOKIE = 'oa_session';
 const CSRF_COOKIE = 'oa_csrf';
 
+/**
+ * Where the callback sends the browser. A bare path is the front's; an
+ * absolute URL is honored only on the front's or the gateway's own origin,
+ * so this endpoint never becomes an open redirect.
+ */
+function resolveNext(next: string | undefined, frontend: string, gateway: string): string {
+  const home = new URL(frontend);
+  if (!next) return home.toString();
+  if (next.startsWith('/') && !next.startsWith('//')) return new URL(next, home).toString();
+  try {
+    const target = new URL(next);
+    if (target.origin === home.origin || target.origin === new URL(gateway).origin) {
+      return target.toString();
+    }
+  } catch {
+    // Not a URL: fall through to the front's home.
+  }
+  return home.toString();
+}
+
 function base64url(bytes: Buffer): string {
   return bytes.toString('base64url');
 }
@@ -59,9 +79,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
         codeChallenge: challengeFor(verifier),
       });
 
-      // Only a path is carried back, never a full URL: an absolute `next`
-      // would make this endpoint an open redirect.
-      const next = request.query.next?.startsWith('/') ? request.query.next : undefined;
+      const next = resolveNext(request.query.next, app.env.FRONTEND_ORIGIN, app.env.PUBLIC_URL);
 
       return reply
         .header(
@@ -95,7 +113,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
       const flow = JSON.parse(decodeURIComponent(raw)) as {
         verifier: string;
         state: string;
-        next?: string;
+        next: string;
       };
       if (flow.state !== request.query.state) {
         throw createError.BadRequest('state does not match the one this flow started with');
@@ -117,7 +135,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
           // in the header, which is what a cross-site caller cannot do.
           `${CSRF_COOKIE}=${csrf}; ${cookieAttributes(cookieOpts)}`,
         ])
-        .redirect(`${app.env.FRONTEND_ORIGIN.replace(/\/$/, '')}${flow.next ?? '/'}`, 302);
+        .redirect(flow.next, 302);
     },
   );
 
@@ -154,13 +172,18 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
         'Read from the token at Authentik, not from a table here — the gateway keeps no record of a person.',
       response: {
         200: z
-          .object({ sub: z.string(), tenants: z.array(z.string()) })
+          .object({
+            sub: z.string(),
+            name: z.string().optional(),
+            email: z.string().optional(),
+            tenants: z.array(z.string()),
+          })
           .meta({ id: 'AuthIdentity' }),
       },
     }),
     async request => {
       const auth = request.auth as Extract<typeof request.auth, { kind: 'user' }>;
-      return { sub: auth.sub, tenants: auth.tenants };
+      return { sub: auth.sub, name: auth.name, email: auth.email, tenants: auth.tenants };
     },
   );
 
