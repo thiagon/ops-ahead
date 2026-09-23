@@ -31,6 +31,13 @@ data:
         attrs:
           identifiers:
             name: Default - Provider invalidation flow
+      # Owns the user-logout stage the provider invalidation flow binds below.
+      # Without that stage the flow ends the application session and leaves the
+      # person signed in here, so the next login is the same account.
+      - model: authentik_blueprints.metaapplyblueprint
+        attrs:
+          identifiers:
+            name: Default - Invalidation flow
       - model: authentik_blueprints.metaapplyblueprint
         attrs:
           identifiers:
@@ -90,6 +97,11 @@ data:
             {{- range .Values.gateway.redirectUris }}
             - matching_mode: strict
               url: {{ . | quote }}
+            {{- end }}
+            {{- range (.Values.gateway.logoutRedirectUris | default list) }}
+            - matching_mode: strict
+              url: {{ . | quote }}
+              redirect_uri_type: logout
             {{- end }}
           # The gateway asks the provider whether a token is still live on
           # every request, so it reads what this scope carries.
@@ -169,3 +181,11 @@ data:
           users:
             - !Find [authentik_core.user, [username, akadmin]]
             - !KeyOf demo-user
+
+      # The provider invalidation flow is empty by default. This stage is what
+      # ends the authentik session, so a later login can be a different person.
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          order: 0
+          stage: !Find [authentik_stages_user_logout.userlogoutstage, [name, default-invalidation-logout]]
+          target: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]

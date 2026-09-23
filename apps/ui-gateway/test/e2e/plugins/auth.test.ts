@@ -449,14 +449,15 @@ describe('the browser spends a cookie, not a Bearer', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('logout with the matching CSRF header clears the cookie', async () => {
+  it('logout with the matching CSRF header clears the cookie and stays in the app', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/auth/logout',
       headers: sessionHeaders(app),
     });
 
-    expect(res.statusCode).toBe(204);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ redirect: null });
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([
         expect.stringContaining('oa_session='),

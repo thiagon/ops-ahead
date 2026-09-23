@@ -273,9 +273,9 @@ function SessionBlock({
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await logout();
+      const next = await logout();
       leave();
-      window.location.assign('/');
+      window.location.assign(next ?? '/');
     } catch {
       setSigningOut(false);
     }

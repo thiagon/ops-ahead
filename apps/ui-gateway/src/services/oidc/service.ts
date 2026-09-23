@@ -115,13 +115,22 @@ export class OidcService {
     url.searchParams.set('state', params.state);
     url.searchParams.set('code_challenge', params.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
+    // An existing provider session must not skip the login form: logout only
+    // clears the gateway cookie, and the next sign-in has to be able to be
+    // someone else.
+    url.searchParams.set('prompt', 'login');
     return url.toString();
   }
 
   async exchangeCode(
     code: string,
     codeVerifier: string,
-  ): Promise<{ accessToken: string; refreshToken?: string; expiresIn?: number }> {
+  ): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    idToken?: string;
+    expiresIn?: number;
+  }> {
     const { token_endpoint } = await this.metadata();
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -142,11 +151,13 @@ export class OidcService {
     const payload = (await response.json()) as {
       access_token: string;
       refresh_token?: string;
+      id_token?: string;
       expires_in?: number;
     };
     return {
       accessToken: payload.access_token,
       refreshToken: payload.refresh_token,
+      idToken: payload.id_token,
       expiresIn: payload.expires_in,
     };
   }
@@ -226,7 +237,7 @@ export class OidcService {
    */
   async refresh(
     refreshToken: string,
-  ): Promise<{ accessToken: string; refreshToken?: string } | undefined> {
+  ): Promise<{ accessToken: string; refreshToken?: string; idToken?: string } | undefined> {
     const { token_endpoint } = await this.metadata();
     const response = await fetch(this.#serverUrl(token_endpoint), {
       method: 'POST',
@@ -242,9 +253,14 @@ export class OidcService {
     const payload = (await response.json()) as {
       access_token?: string;
       refresh_token?: string;
+      id_token?: string;
     };
     if (!payload.access_token) return undefined;
-    return { accessToken: payload.access_token, refreshToken: payload.refresh_token };
+    return {
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      idToken: payload.id_token,
+    };
   }
 
   async #discover(): Promise<ProviderMetadata> {

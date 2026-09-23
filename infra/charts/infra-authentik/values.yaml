@@ -126,3 +126,5 @@ gateway:
   redirectUris:
     - https://gateway.ops-ahead.xyz/auth/callback
     - http://localhost:3000/auth/callback
+  logoutRedirectUris:
+    - https://ui.ops-ahead.xyz/

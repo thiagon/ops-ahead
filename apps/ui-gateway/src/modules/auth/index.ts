@@ -124,6 +124,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
       const sealed = cookies.seal({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
+        idToken: tokens.idToken,
         csrf,
       });
 
@@ -144,9 +145,9 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
     {
       schema: {
         tags: ['auth'],
-        summary: 'Revoke the token at Authentik and clear the cookie',
+        summary: 'Revoke the token and clear the cookie',
         security: app.auth.user.security,
-        response: { 204: z.null() },
+        response: { 200: z.object({ redirect: z.string().nullable() }) },
       },
     },
     async (request, reply) => {
@@ -158,8 +159,8 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
           `${SESSION_COOKIE}=; HttpOnly; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: 0 })}`,
           `${CSRF_COOKIE}=; ${cookieAttributes({ ...cookieOpts, maxAgeSeconds: 0 })}`,
         ])
-        .status(204)
-        .send(null);
+        .status(200)
+        .send({ redirect: null });
     },
   );
 

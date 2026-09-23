@@ -56,3 +56,5 @@ authentik:
 gateway:
   redirectUris:
     - http://gateway.ops-ahead.localtest.me/auth/callback
+  logoutRedirectUris:
+    - http://ui.ops-ahead.localtest.me/

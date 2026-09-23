@@ -46,8 +46,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await logout();
-      window.location.assign('/');
+      const next = await logout();
+      window.location.assign(next ?? '/');
     } catch {
       setSigningOut(false);
     }

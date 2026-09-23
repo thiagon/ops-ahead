@@ -45,6 +45,7 @@ describe('OidcService', () => {
     const url = await oidc.authorizationUrl({ state: 's', codeChallenge: 'c' });
 
     expect(new URL(url).searchParams.get('scope')).toBe(oidc.scopes);
+    expect(new URL(url).searchParams.get('prompt')).toBe('login');
     expect(oidc.scopes.split(' ')).toContain('groups');
   });
 

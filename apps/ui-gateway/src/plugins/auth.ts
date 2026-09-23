@@ -118,6 +118,7 @@ function documented(security: SecurityRequirement[]) {
 interface SessionPayload {
   accessToken: string;
   refreshToken?: string;
+  idToken?: string;
   csrf: string;
 }
 
@@ -212,7 +213,7 @@ async function authPlugin(fastify: FastifyInstance) {
     if (live.kind === 'user') return live;
     if (!session.refreshToken || !cookies) return { kind: 'none' };
 
-    let tokens: { accessToken: string; refreshToken?: string } | undefined;
+    let tokens: { accessToken: string; refreshToken?: string; idToken?: string } | undefined;
     try {
       tokens = await fastify.services.oidc.refresh(session.refreshToken);
     } catch (err) {
@@ -224,6 +225,7 @@ async function authPlugin(fastify: FastifyInstance) {
     const next: SessionPayload = {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken ?? session.refreshToken,
+      idToken: tokens.idToken ?? session.idToken,
       csrf: session.csrf,
     };
     const attrs = cookieAttributes({
