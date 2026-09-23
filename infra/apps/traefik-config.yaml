@@ -24,3 +24,9 @@ spec:
       - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=1h"
       - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=1h"
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=3m"
+    # Origin cert from Cloudflare (VM) or a local self-signed stand-in (k3d).
+    # Secret lives in kube-system and is never committed — see runbook-tls-vm-hetzner.
+    tlsStore:
+      default:
+        defaultCertificate:
+          secretName: cloudflare-origin

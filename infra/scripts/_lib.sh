@@ -34,21 +34,86 @@ wipe_data_dir() {
 # fields dropped from a manifest (e.g. a removed valueFiles entry), which the
 # root-app's server-side apply cannot once that field is co-owned by this manager.
 # repoURL is rewritten to Gitea here, so root-app's ignoreDifferences never fights
-# it. namespaces/project/ingresses are plain K8s resources synced by root-app, not
-# Applications — skipped. Requires GITEA_ADMIN_USERNAME in the environment.
+# it. Production hosts live with the app image (apps/<app>/chart/values-prod.yaml).
+# values-dev.yaml only carries the CI image tag. On k3d, values-local.yaml is
+# appended. namespaces/project/ingresses are plain K8s resources synced by
+# root-app, not Applications — skipped.
+# Requires GITEA_ADMIN_USERNAME in the environment.
+is_k3d_cluster() {
+  local node
+  node=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  [[ "$node" == k3d-* ]]
+}
+
+# Traefik's defaultCertificate points at cloudflare-origin. On the VM that secret
+# is the Cloudflare Origin Cert (created by hand). On k3d a self-signed stand-in
+# keeps Traefik happy for gitea-tls / unused *.xyz routers.
+ensure_origin_tls_secret() {
+  if kubectl -n kube-system get secret cloudflare-origin >/dev/null 2>&1; then
+    return 0
+  fi
+  if is_k3d_cluster; then
+    local tmp
+    tmp=$(mktemp -d)
+    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+      -keyout "$tmp/tls.key" -out "$tmp/tls.crt" \
+      -subj "/CN=ops-ahead.localtest.me" >/dev/null 2>&1
+    kubectl -n kube-system create secret tls cloudflare-origin \
+      --cert="$tmp/tls.crt" --key="$tmp/tls.key" >/dev/null
+    rm -rf "$tmp"
+    info "cloudflare-origin: self-signed stand-in for k3d"
+  else
+    warn "secret cloudflare-origin missing in kube-system — create the Cloudflare Origin Cert before Full (strict)"
+  fi
+}
+
+# Resolve the local overlay path for an Application name, or empty if none.
+_local_overlay_for() {
+  local name="$1"
+  if [ -f "$ROOT_DIR/apps/$name/chart/values-local.yaml" ]; then
+    printf '%s' "\$values/apps/$name/chart/values-local.yaml"
+  elif [ -f "$ROOT_DIR/infra/charts/$name/values-local.yaml" ]; then
+    printf '%s' "values-local.yaml"
+  fi
+}
+
 reconcile_child_apps() {
   local github_repo="https://github.com/thiagon/ops-ahead"
   local gitea_repo="http://infra-gitea-http.infra.svc.cluster.local:3000/${GITEA_ADMIN_USERNAME}/ops-ahead"
   local sed_repo="s#${github_repo}#${gitea_repo}#g"
-  local app_yaml name
+  local app_yaml name tmp use_local=0 overlay
+
+  if [ -n "${VM_MODE:-}" ]; then
+    use_local=0
+  elif is_k3d_cluster; then
+    use_local=1
+  fi
+
+  ensure_origin_tls_secret
+
   for app_yaml in "$ROOT_DIR"/infra/apps/*.yaml; do
     name="$(basename "$app_yaml" .yaml)"
     [[ "$name" =~ ^(namespaces|project|ingresses)$ ]] && continue
+    tmp=$(mktemp)
     if grep -q "$github_repo" "$app_yaml"; then
-      sed "$sed_repo" "$app_yaml" | kubectl apply -f - > /dev/null 2>&1 && info "reconciled $name"
+      sed "$sed_repo" "$app_yaml" > "$tmp"
     else
-      kubectl apply -f "$app_yaml" > /dev/null 2>&1 && info "reconciled $name (external chart)"
+      cp "$app_yaml" "$tmp"
     fi
+    overlay="$(_local_overlay_for "$name")"
+    if [ "$use_local" -eq 1 ] && [ -n "$overlay" ]; then
+      # Append last so local hosts win over values-prod. `unique` keeps inject idempotent.
+      yq -i \
+        "(.spec.source.helm.valueFiles) |= ((. // []) + [\"${overlay}\"] | unique) |
+         (.spec.sources[] | select(.helm.valueFiles != null) | .helm.valueFiles) |= (. + [\"${overlay}\"] | unique)" \
+        "$tmp" 2>/dev/null || true
+    else
+      # Drop any previously injected local overlay (app path or chart-relative).
+      yq -i 'del(.spec.source.helm.valueFiles[] | select(test("values-local\\.yaml$")))' "$tmp" 2>/dev/null || true
+      yq -i 'del(.spec.sources[].helm.valueFiles[] | select(test("values-local\\.yaml$")))' "$tmp" 2>/dev/null || true
+    fi
+    kubectl apply -f "$tmp" > /dev/null 2>&1 && info "reconciled $name"
+    rm -f "$tmp"
   done
 }
 

@@ -1,5 +1,5 @@
-# Keyed by the app's own name so the write-back rule (<app>.image.tag) is the
-# same for every app.
+# Chart defaults — image repo, resources. App env + public hosts live in
+# apps/ui-frontend/chart/ (values-prod / values-local / values-dev).
 ui-frontend:
   image:
     repository: gitea.ops-ahead.localtest.me/ops-ahead/ui-frontend
@@ -16,17 +16,7 @@ frontend:
     limits:
       cpu: 500m
       memory: 512Mi
-  env:
-    clickhouseHost: clickhouse.data.svc.cluster.local
-    clickhouseUser: ops_ahead
-    clickhouseDatabase: default
-    publicGatewayUrl: http://gateway.204-168-208-210.sslip.io
-    gatewayUrl: http://gateway.ui.svc.cluster.local
-    mlModelServingUrl: http://ml-model-serving.ml.svc.cluster.local:3000
-    mlModelServingTimeoutMs: "1500"
   secretName: ui-frontend-secret
-  ingress:
-    host: ui.204-168-208-210.sslip.io
 
 monitoring:
   enabled: true

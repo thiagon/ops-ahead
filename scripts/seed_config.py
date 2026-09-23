@@ -14,7 +14,7 @@ here reaches MinIO or ClickHouse directly — verification is a separate step
 that reads the ClickHouse tables data-ingest wrote to.
 
     GATEWAY_TOKEN=... python scripts/seed_config.py \\
-      --gateway-url http://gateway.204-168-208-210.sslip.io
+      --gateway-url https://gateway.ops-ahead.xyz
 """
 
 import argparse
@@ -128,7 +128,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--gateway-url",
-        default="http://gateway.204-168-208-210.sslip.io",
+        default="https://gateway.ops-ahead.xyz",
     )
     parser.add_argument("--secret", help="Leave it out to have the gateway mint one")
     parser.add_argument(

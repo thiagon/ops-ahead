@@ -27,6 +27,12 @@ up:
 down:
 	bash infra/scripts/dev-down.sh
 
+# SSH tunnel to the Hetzner VM: *.ops-ahead.localtest.me → Traefik on the VM.
+# Needs OPS_AHEAD_VM_HOST in .env. Stop k3d first if it holds :80/:443.
+.PHONY: tunnel
+tunnel:
+	bash infra/scripts/vm-tunnel.sh
+
 # Delete the cluster and wipe persisted state (.data/). Destructive.
 .PHONY: destroy
 destroy:

@@ -1,0 +1,52 @@
+# k3d overlay — injected by reconcile_child_apps on local clusters only.
+# Production defaults live in values.yaml (ops-ahead.xyz).
+#
+# `global.env` is a list: Helm replaces the whole array, so AUTHENTIK_HOST and
+# the secret refs travel together. Do not drop entries when editing.
+# Annotations: set entrypoints to web and clear tls — Helm map-merges annotations,
+# so router.tls from values.yaml would otherwise stick.
+authentik:
+  server:
+    ingress:
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: web
+        traefik.ingress.kubernetes.io/router.tls: null
+      hosts:
+        - auth.ops-ahead.localtest.me
+      tls: []
+  global:
+    env:
+      - name: AUTHENTIK_CACHE__CACHE_BACKEND
+        value: django.core.cache.backends.db.DatabaseCache
+      - name: AUTHENTIK_CACHE__LOCATION
+        value: authentik_cache
+      - name: AUTHENTIK_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_SECRET_KEY
+      - name: AUTHENTIK_POSTGRESQL__PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_POSTGRESQL__PASSWORD
+      - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_BOOTSTRAP_PASSWORD
+      - name: AUTHENTIK_BOOTSTRAP_EMAIL
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_BOOTSTRAP_EMAIL
+      - name: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secret
+            key: AUTHENTIK_GATEWAY_WEB_CLIENT_SECRET
+      - name: AUTHENTIK_HOST
+        value: http://auth.ops-ahead.localtest.me
+
+gateway:
+  redirectUri: http://gateway.ops-ahead.localtest.me/auth/callback

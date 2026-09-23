@@ -1,0 +1,16 @@
+# Local k3d — overrides public URLs from values-prod.yaml.
+gateway:
+  env:
+    appEnv: dev
+    logLevel: debug
+    httpsEnabled: "false"
+    corsOrigins:
+      - http://ui.ops-ahead.localtest.me
+    authentikIssuer: http://auth.ops-ahead.localtest.me/application/o/gateway-web/
+    frontendOrigin: http://ui.ops-ahead.localtest.me
+    publicUrl: http://gateway.ops-ahead.localtest.me
+    sessionCookieDomain: ops-ahead.localtest.me
+  ingress:
+    host: gateway.ops-ahead.localtest.me
+    entrypoint: web
+    tls: false

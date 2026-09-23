@@ -35,12 +35,18 @@ authentik:
     ingress:
       enabled: true
       ingressClassName: traefik
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: "true"
       # Flat list of hostnames, not the host/paths pairs other charts take:
       # this one quotes each entry straight into `spec.rules[].host`, so a map
       # here reaches the API server serialized as the hostname. `paths` and
       # `pathType` are siblings of this key, left at the chart's defaults.
       hosts:
-        - auth.204-168-208-210.sslip.io
+        - auth.ops-ahead.xyz
+      tls:
+        - hosts:
+            - auth.ops-ahead.xyz
 
   worker:
     replicas: 1
@@ -106,9 +112,9 @@ authentik:
       # Public hostname so OIDC documents keep browser URLs when the gateway
       # talks to the in-cluster Service rather than the ingress.
       - name: AUTHENTIK_HOST
-        value: http://auth.204-168-208-210.sslip.io
+        value: https://auth.ops-ahead.xyz
 
 # Where the gateway sends the browser back after the login. Kept here rather
 # than inside the blueprint so the two stay one edit apart.
 gateway:
-  redirectUri: http://gateway.204-168-208-210.sslip.io/auth/callback
+  redirectUri: https://gateway.ops-ahead.xyz/auth/callback
