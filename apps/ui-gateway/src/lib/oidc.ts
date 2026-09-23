@@ -13,21 +13,16 @@ export interface ProviderMetadata {
   jwks_uri: string;
 }
 
-/**
- * What a person may do inside the tenants they operate. `viewer` reads
- * everything and changes nothing — no rule, no source, no analysis started.
- */
-export type Role = 'operator' | 'viewer';
-
 /** What introspection says about a token that is still live. */
 export interface TokenClaims {
   sub: string;
-  /** Authentik group names, which are tenant ids verbatim (spec-gateway-auth-v2). */
+  /** Group names as the provider sent them. */
   groups: string[];
   /** Display name from the `profile` scope, falling back to the username. */
   name?: string;
   email?: string;
-  role: Role;
+  /** The `ops_ahead_role` claim, verbatim. */
+  roleClaim?: string;
   expiresAt?: number;
 }
 
@@ -55,8 +50,8 @@ interface CacheEntry {
  * immediate — the price is one call per request, bounded by a short cache
  * whose TTL is the delay on revoking someone.
  */
-export class OidcService {
-  /** What the gateway asks Authentik to put on the token — `groups` is authorization. */
+export class OidcClient {
+  /** Scopes this client requests so the token carries profile, email and groups. */
   static readonly SCOPES = 'openid profile email groups';
 
   #config: OidcConfig;
@@ -72,7 +67,7 @@ export class OidcService {
   }
 
   get scopes(): string {
-    return OidcService.SCOPES;
+    return OidcClient.SCOPES;
   }
 
   /**
@@ -115,10 +110,6 @@ export class OidcService {
     url.searchParams.set('state', params.state);
     url.searchParams.set('code_challenge', params.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
-    // An existing provider session must not skip the login form: logout only
-    // clears the gateway cookie, and the next sign-in has to be able to be
-    // someone else.
-    url.searchParams.set('prompt', 'login');
     return url.toString();
   }
 
@@ -202,10 +193,11 @@ export class OidcService {
       payload.active && payload.sub
         ? {
             sub: payload.sub,
-            groups: this.#toGroups(payload.groups),
+            groups: this.#toStrings(payload.groups),
             name: payload.name || payload.preferred_username || undefined,
             email: payload.email || undefined,
-            role: this.#toRole(payload.ops_ahead_role),
+            roleClaim:
+              typeof payload.ops_ahead_role === 'string' ? payload.ops_ahead_role : undefined,
             expiresAt: payload.exp,
           }
         : undefined;
@@ -228,6 +220,26 @@ export class OidcService {
       }),
     }).catch(() => undefined);
     this.#cache.delete(token);
+  }
+
+  /**
+   * Where the browser goes to end the provider session and come back.
+   * The return URL is only attached with an id token: the provider rejects
+   * it otherwise. The invalidation flow still sends the browser home.
+   */
+  async endSessionUrl(params: {
+    idToken?: string;
+    postLogoutRedirectUri: string;
+  }): Promise<string | undefined> {
+    const { end_session_endpoint } = await this.metadata();
+    if (!end_session_endpoint) return undefined;
+    const url = new URL(end_session_endpoint);
+    url.searchParams.set('client_id', this.#config.clientId);
+    if (params.idToken) {
+      url.searchParams.set('id_token_hint', params.idToken);
+      url.searchParams.set('post_logout_redirect_uri', params.postLogoutRedirectUri);
+    }
+    return url.toString();
   }
 
   /**
@@ -322,20 +334,9 @@ export class OidcService {
     }
   }
 
-  #toGroups(value: unknown): string[] {
+  #toStrings(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
-    // Authentik's own groups (`authentik Admins`, …) are not tenants.
-    return value.filter(
-      (entry): entry is string => typeof entry === 'string' && !entry.startsWith('authentik '),
-    );
-  }
-
-  /**
-   * Only an explicit `operator` writes. A token without the claim — a mapping
-   * that did not apply, a provider that lost it — reads, never the reverse.
-   */
-  #toRole(value: unknown): Role {
-    return value === 'operator' ? 'operator' : 'viewer';
+    return value.filter((entry): entry is string => typeof entry === 'string');
   }
 
   #trailingSlash(url: string): string {

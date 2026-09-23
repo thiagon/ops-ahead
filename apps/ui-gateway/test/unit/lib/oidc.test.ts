@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OidcService } from '../../../../src/services/oidc/service.ts';
+import { OidcClient } from '../../../src/lib/oidc.ts';
 
-function service(
+function client(
   issuer = 'http://authentik.example/application/o/gateway-web/',
   internalOrigin?: string,
-): OidcService {
-  return new OidcService({
+): OidcClient {
+  return new OidcClient({
     issuer,
     clientId: 'gateway-web',
     clientSecret: 'secret',
@@ -15,24 +15,24 @@ function service(
   });
 }
 
-describe('OidcService', () => {
+describe('OidcClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   it('points MCP clients at the public Authentik app', () => {
-    expect(service().authorizationServer('gateway-mcp')).toBe(
+    expect(client().authorizationServer('gateway-mcp')).toBe(
       'http://authentik.example/application/o/gateway-mcp/',
     );
   });
 
   it('leaves an issuer it cannot rewrite alone', () => {
-    expect(service('http://authentik.example/').authorizationServer('gateway-mcp')).toBe(
+    expect(client('http://authentik.example/').authorizationServer('gateway-mcp')).toBe(
       'http://authentik.example/',
     );
   });
 
-  it('asks for the groups scope — that claim is authorization', async () => {
+  it('requests the scopes the token is issued with', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -41,12 +41,37 @@ describe('OidcService', () => {
       })),
     );
 
-    const oidc = service();
+    const oidc = client();
     const url = await oidc.authorizationUrl({ state: 's', codeChallenge: 'c' });
 
     expect(new URL(url).searchParams.get('scope')).toBe(oidc.scopes);
-    expect(new URL(url).searchParams.get('prompt')).toBe('login');
     expect(oidc.scopes.split(' ')).toContain('groups');
+  });
+
+  it('returns to the app from end-session only when it can send the id token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ end_session_endpoint: 'http://authentik.example/end-session' }),
+      })),
+    );
+
+    const oidc = client();
+    const hinted = new URL(
+      (await oidc.endSessionUrl({
+        idToken: 'id-token',
+        postLogoutRedirectUri: 'http://ui.example/',
+      })) ?? '',
+    );
+    expect(hinted.searchParams.get('id_token_hint')).toBe('id-token');
+    expect(hinted.searchParams.get('post_logout_redirect_uri')).toBe('http://ui.example/');
+
+    const plain = new URL(
+      (await oidc.endSessionUrl({ postLogoutRedirectUri: 'http://ui.example/' })) ?? '',
+    );
+    expect(plain.origin + plain.pathname).toBe('http://authentik.example/end-session');
+    expect(plain.searchParams.has('post_logout_redirect_uri')).toBe(false);
   });
 
   it('reuses an introspection answer inside the cache window', async () => {
@@ -65,11 +90,13 @@ describe('OidcService', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const oidc = service();
+    const oidc = client();
     await expect(oidc.introspect('tok')).resolves.toEqual({
       sub: 'user',
       groups: ['locaweb'],
-      role: 'viewer',
+      name: undefined,
+      email: undefined,
+      roleClaim: undefined,
       expiresAt: undefined,
     });
     await expect(oidc.introspect('tok')).resolves.toMatchObject({ sub: 'user' });
@@ -78,12 +105,7 @@ describe('OidcService', () => {
     );
   });
 
-  it.each([
-    ['operator', 'operator'],
-    ['viewer', 'viewer'],
-    ['admin', 'viewer'],
-    [undefined, 'viewer'],
-  ])('reads ops_ahead_role %s as %s', async (claim, role) => {
+  it('returns the provider claims without deciding what they mean', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string | URL) => {
@@ -95,12 +117,20 @@ describe('OidcService', () => {
         }
         return {
           ok: true,
-          json: async () => ({ active: true, sub: 'user', groups: [], ops_ahead_role: claim }),
+          json: async () => ({
+            active: true,
+            sub: 'user',
+            groups: ['authentik Admins', 'locaweb'],
+            ops_ahead_role: 'admin',
+          }),
         };
       }),
     );
 
-    await expect(service().introspect('tok')).resolves.toMatchObject({ role });
+    await expect(client().introspect('tok')).resolves.toMatchObject({
+      groups: ['authentik Admins', 'locaweb'],
+      roleClaim: 'admin',
+    });
   });
 
   it('treats a failed refresh as a dead session, not an error', async () => {
@@ -118,7 +148,7 @@ describe('OidcService', () => {
       }),
     );
 
-    await expect(service().refresh('stale')).resolves.toBeUndefined();
+    await expect(client().refresh('stale')).resolves.toBeUndefined();
   });
 
   it('fetches discovery through the in-cluster origin and keeps the public authorize URL', async () => {
@@ -138,7 +168,7 @@ describe('OidcService', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const oidc = service(
+    const oidc = client(
       'http://authentik.example/application/o/gateway-web/',
       'http://authentik.internal',
     );
@@ -169,42 +199,13 @@ describe('OidcService', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const oidc = service(
+    const oidc = client(
       'http://authentik.example/application/o/gateway-web/',
       'http://authentik.internal',
     );
     await expect(oidc.introspect('tok')).resolves.toMatchObject({ sub: 'user' });
   });
 
-  it('drops Authentik’s own groups — they are not tenants', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL) => {
-        const url = String(input);
-        if (url.includes('openid-configuration')) {
-          return {
-            ok: true,
-            json: async () => ({ introspection_endpoint: 'http://authentik.example/introspect' }),
-          };
-        }
-        return {
-          ok: true,
-          json: async () => ({
-            active: true,
-            sub: 'user',
-            groups: ['authentik Admins', 'locaweb'],
-          }),
-        };
-      }),
-    );
-
-    await expect(service().introspect('tok')).resolves.toEqual({
-      sub: 'user',
-      groups: ['locaweb'],
-      role: 'viewer',
-      expiresAt: undefined,
-    });
-  });
   it('names the caller from the profile scope, falling back to the username', async () => {
     const answer = (claims: Record<string, unknown>) =>
       vi.fn(async (input: string | URL) => {
@@ -221,12 +222,12 @@ describe('OidcService', () => {
       'fetch',
       answer({ name: 'Ana Souza', preferred_username: 'ana', email: 'a@x.io' }),
     );
-    await expect(service().introspect('tok')).resolves.toMatchObject({
+    await expect(client().introspect('tok')).resolves.toMatchObject({
       name: 'Ana Souza',
       email: 'a@x.io',
     });
 
     vi.stubGlobal('fetch', answer({ name: '', preferred_username: 'ana' }));
-    await expect(service().introspect('tok')).resolves.toMatchObject({ name: 'ana' });
+    await expect(client().introspect('tok')).resolves.toMatchObject({ name: 'ana' });
   });
 });

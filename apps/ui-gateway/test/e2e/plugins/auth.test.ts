@@ -449,7 +449,9 @@ describe('the browser spends a cookie, not a Bearer', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('logout with the matching CSRF header clears the cookie and stays in the app', async () => {
+  it('logout with the matching CSRF header clears the cookie and ends the provider session', async () => {
+    app.oidc.endSessionUrl = async () =>
+      'http://authentik.example/end-session?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173%2F';
     const res = await app.inject({
       method: 'POST',
       url: '/auth/logout',
@@ -457,7 +459,10 @@ describe('the browser spends a cookie, not a Bearer', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ redirect: null });
+    expect(res.json()).toEqual({
+      redirect:
+        'http://authentik.example/end-session?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173%2F',
+    });
     expect(res.headers['set-cookie']).toEqual(
       expect.arrayContaining([
         expect.stringContaining('oa_session='),
@@ -467,7 +472,7 @@ describe('the browser spends a cookie, not a Bearer', () => {
   });
 
   it('refreshes an expired access token in place while the refresh token lives', async () => {
-    app.services.oidc.refresh = async () => ({
+    app.oidc.refresh = async () => ({
       accessToken: TEST_BEARER,
       refreshToken: 'next-refresh',
     });
@@ -502,7 +507,7 @@ describe('login can return to the gateway as well as the front', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    app.services.oidc.authorizationUrl = async () => 'http://authentik.example/authorize';
+    app.oidc.authorizationUrl = async () => 'http://authentik.example/authorize';
   });
 
   afterAll(async () => {

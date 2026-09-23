@@ -184,8 +184,24 @@ data:
 
       # The provider invalidation flow is empty by default. This stage is what
       # ends the authentik session, so a later login can be a different person.
+      # The redirect stage runs after it and sends the browser back to the app.
       - model: authentik_flows.flowstagebinding
         identifiers:
           order: 0
           stage: !Find [authentik_stages_user_logout.userlogoutstage, [name, default-invalidation-logout]]
           target: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      {{ with index (.Values.gateway.logoutRedirectUris | default list) 0 }}
+      - id: logout-return
+        model: authentik_stages_redirect.redirectstage
+        identifiers:
+          name: ops-ahead logout return
+        attrs:
+          keep_context: false
+          mode: static
+          target_static: {{ . | quote }}
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          order: 10
+          stage: !KeyOf logout-return
+          target: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      {{ end }}

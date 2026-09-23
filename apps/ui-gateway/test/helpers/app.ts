@@ -31,16 +31,16 @@ export const TEST_BEARER = 'test-access-token';
 export const TEST_VIEWER_BEARER = 'test-viewer-token';
 
 export function stubIntrospection(app: FastifyInstance): void {
-  if (!app.hasDecorator('services')) return;
+  if (!app.hasDecorator('oidc')) return;
   const person = { name: 'Test User', email: 'test@example.com', groups: TEST_TENANTS };
-  app.services.oidc.introspect = async (token: string) => {
-    if (token === TEST_BEARER) return { sub: 'test-user', role: 'operator', ...person };
-    if (token === TEST_VIEWER_BEARER) return { sub: 'test-viewer', role: 'viewer', ...person };
+  app.oidc.introspect = async (token: string) => {
+    if (token === TEST_BEARER) return { sub: 'test-user', roleClaim: 'operator', ...person };
+    if (token === TEST_VIEWER_BEARER) return { sub: 'test-viewer', roleClaim: 'viewer', ...person };
     return undefined;
   };
-  app.services.oidc.revoke = async () => undefined;
-  app.services.oidc.refresh = async () => undefined;
-  Object.defineProperty(app.services.oidc, 'configured', { get: () => true });
+  app.oidc.revoke = async () => undefined;
+  app.oidc.refresh = async () => undefined;
+  Object.defineProperty(app.oidc, 'configured', { get: () => true });
 }
 
 /** What an authenticated caller sends; the MCP client sends the same. */
