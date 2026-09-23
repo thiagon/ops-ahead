@@ -185,6 +185,37 @@ Após `make up`, todos os serviços ficam acessíveis via porta 80. Os subdomín
 
 ---
 
+## Produção (VM Hetzner)
+
+A stack roda num k3s de nó único. Só três hosts são públicos, em HTTPS atrás da Cloudflare
+(Full strict, TLS ≥ 1.2):
+
+| Serviço | URL | Credenciais |
+|---------|-----|-------------|
+| UI | https://ui.ops-ahead.xyz | login via Authentik |
+| Gateway | https://gateway.ops-ahead.xyz | login via Authentik |
+| MCP | https://gateway.ops-ahead.xyz/mcp/locaweb | OAuth via Authentik (cliente `gateway-mcp`) |
+| Authentik | https://auth.ops-ahead.xyz | `AUTHENTIK_BOOTSTRAP_EMAIL` / `AUTHENTIK_BOOTSTRAP_PASSWORD` |
+
+As ferramentas internas (Vault, ArgoCD, Grafana, MinIO, MLflow, Gitea, Prometheus) não têm
+DNS público. Elas usam as mesmas URLs `*.ops-ahead.localtest.me` da tabela acima, acessíveis
+do laptop por um túnel SSH:
+
+```bash
+# .env: OPS_AHEAD_VM_HOST=<ipv4 da VM>
+make down    # se o k3d local estiver ocupando :80/:443
+make tunnel  # Ctrl-C fecha
+```
+
+O Traefik termina o TLS com o Origin Certificate da Cloudflare, que não entra no git. Numa VM
+nova, crie o secret antes de ligar o Full (strict):
+
+```bash
+kubectl -n kube-system create secret tls cloudflare-origin --cert=origin.pem --key=origin.key
+```
+
+---
+
 ## Desenvolvimento Python
 
 Monorepo gerenciado com `uv`. Um único `uv.lock` na raiz cobre todos os workspaces.
