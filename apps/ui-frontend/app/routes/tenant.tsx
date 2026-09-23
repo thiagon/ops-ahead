@@ -38,6 +38,7 @@ export async function clientLoader({ params, request }: Route.ClientLoaderArgs) 
     operator,
     openCount,
     canWrite: canWrite(identity),
+    canSwitchTenant: identity.tenants.length > 1,
   };
 }
 
@@ -50,7 +51,7 @@ export function HydrateFallback() {
 }
 
 export default function TenantLayout({ loaderData }: Route.ComponentProps) {
-  const { tenant, operator, openCount } = loaderData;
+  const { tenant, operator, openCount, canSwitchTenant } = loaderData;
   const enter = useSession(state => state.enter);
 
   useEffect(() => {
@@ -59,7 +60,12 @@ export default function TenantLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar tenant={tenant} operator={operator} openCount={openCount} />
+      <Sidebar
+        tenant={tenant}
+        operator={operator}
+        openCount={openCount}
+        canSwitchTenant={canSwitchTenant}
+      />
       <div className="min-w-0 flex-1">
         <Outlet />
       </div>

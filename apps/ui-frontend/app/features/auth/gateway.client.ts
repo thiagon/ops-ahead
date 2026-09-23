@@ -66,6 +66,13 @@ export async function gatewayError(response: Response): Promise<Error> {
   return new Error(`${response.status} ${response.url}: ${message || response.statusText}`);
 }
 
+/** Clears the gateway session cookie. A missing session is already logged out. */
+export async function logout(): Promise<void> {
+  const response = await gatewayFetch('/auth/logout', { method: 'POST' });
+  if (response.status === 401 || response.ok) return;
+  throw await gatewayError(response);
+}
+
 /** `undefined` is a missing session. Any other failure keeps the response body. */
 export async function fetchIdentity(): Promise<Identity | undefined> {
   const response = await gatewayFetch('/auth/me');
