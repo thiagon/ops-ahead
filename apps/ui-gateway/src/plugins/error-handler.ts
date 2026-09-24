@@ -24,7 +24,8 @@ async function errorHandlerPlugin(fastify: FastifyInstance) {
       return sendHttpError(reply, createError.InternalServerError('internal error'));
     }
 
-    if (createError.isHttpError(error) && error.expose) {
+    if (createError.isHttpError(error)) {
+      if (!error.expose) request.log.error({ err: error }, error.message);
       return sendHttpError(reply, error);
     }
 

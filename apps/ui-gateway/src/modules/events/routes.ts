@@ -82,26 +82,17 @@ export function registerEventRoutes(app: FastifyInstance): void {
 
         const pinned = (request.params as { version?: string }).version;
         const bodies = request.body as Record<string, unknown>[];
+        const labels = { source: origin.source, intake: origin.intake };
         try {
           const result = await events.ingestBatch(
             { ...origin, version: versionParam.parse(pinned) },
             bodies,
           );
-          request.server.metrics.eventsPublished.inc(
-            { source: origin.source, intake: origin.intake },
-            bodies.length,
-          );
+          request.server.metrics.eventsPublished.inc(labels, bodies.length);
           return reply.status(202).send(result);
         } catch (err) {
-          request.server.metrics.publishFailures.inc(
-            { source: origin.source, intake: origin.intake },
-            bodies.length,
-          );
-          request.log.error({ err }, 'failed to publish event batch');
-          return reply.status(502).send({
-            error: 'PublishFailed',
-            message: 'could not publish the event to the bus',
-          });
+          request.server.metrics.publishFailures.inc(labels, bodies.length);
+          throw err;
         }
       },
     );
@@ -146,27 +137,18 @@ export function registerEventRoutes(app: FastifyInstance): void {
 
         // Absent on the shorter route, where the schema's default fills in.
         const pinned = (request.params as { version?: string }).version;
+        const labels = { source: origin.source, intake: origin.intake };
         try {
           const result = await events.ingest(
             { ...origin, version: versionParam.parse(pinned) },
             request.body,
           );
-          request.server.metrics.eventsPublished.inc({
-            source: origin.source,
-            intake: origin.intake,
-          });
+          request.server.metrics.eventsPublished.inc(labels);
           // 202, not 201: the bus owns the event now, the gateway holds nothing.
           return reply.status(202).send(result);
         } catch (err) {
-          request.server.metrics.publishFailures.inc({
-            source: origin.source,
-            intake: origin.intake,
-          });
-          request.log.error({ err }, 'failed to publish event envelope');
-          return reply.status(502).send({
-            error: 'PublishFailed',
-            message: 'could not publish the event to the bus',
-          });
+          request.server.metrics.publishFailures.inc(labels);
+          throw err;
         }
       },
     );

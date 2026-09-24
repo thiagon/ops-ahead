@@ -6,7 +6,16 @@ import type {
 } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import { type Auth, apiKeyScheme, bearerScheme, readBearer } from '../lib/auth.ts';
+import {
+  type Auth,
+  apiKeyScheme,
+  bearerScheme,
+  NoAuth,
+  RunAuth,
+  readBearer,
+  SchedulerAuth,
+  UserAuth,
+} from '../lib/auth.ts';
 import { SealedJson } from '../lib/cipher.ts';
 import { cookieAttributes, readCookie } from '../lib/cookie.ts';
 
@@ -23,7 +32,7 @@ const securitySchemes = {
     description: 'Encrypted Authentik tokens. The browser never reads them.',
   }),
   bearerAuth: bearerScheme('Access token issued by Authentik — MCP clients, and tests.'),
-  schedulerKey: bearerScheme('The CronJob’s API key. Only starts a full_pipeline.'),
+  schedulerKey: bearerScheme('The CronJob’s API key.'),
   runKey: apiKeyScheme({
     in: 'header',
     name: RUN_KEY_HEADER,
@@ -116,16 +125,16 @@ async function authPlugin(fastify: FastifyInstance) {
   async function resolve(request: FastifyRequest, reply: FastifyReply): Promise<Auth> {
     // The boundary plugins can be mounted without the service container (the
     // webhook path does exactly that), and no credential is resolvable then.
-    if (!fastify.hasDecorator('services')) return { kind: 'none' };
+    if (!fastify.hasDecorator('services')) return new NoAuth();
 
     const runKey = request.headers['x-run-key'];
     if (typeof runKey === 'string' && runKey.length > 0) {
-      return { kind: 'run', runKey };
+      return new RunAuth(runKey);
     }
 
     const bearer = readBearer(request.headers.authorization);
     if (bearer) {
-      if (await fastify.services.apiKeys.verify(bearer)) return { kind: 'scheduler' };
+      if (await fastify.services.apiKeys.verify(bearer)) return new SchedulerAuth();
       return await asUser(bearer, request);
     }
 
@@ -138,14 +147,14 @@ async function authPlugin(fastify: FastifyInstance) {
       }
     }
 
-    return { kind: 'none' };
+    return new NoAuth();
   }
 
-  async function asUser(token: string, request: FastifyRequest): Promise<Auth> {
+  async function asUser(token: string, request: FastifyRequest): Promise<UserAuth | NoAuth> {
     try {
       const identity = await fastify.services.session.identify(token);
-      if (!identity) return { kind: 'none' };
-      return { kind: 'user', ...identity, accessToken: token };
+      if (!identity) return new NoAuth();
+      return UserAuth.from({ ...identity, accessToken: token });
     } catch (err) {
       request.log.error({ err }, 'token introspection failed');
       throw createError.BadGateway('could not verify the token with the identity provider');
@@ -163,8 +172,8 @@ async function authPlugin(fastify: FastifyInstance) {
     reply: FastifyReply,
   ): Promise<Auth> {
     const live = await asUser(session.accessToken, request);
-    if (live.kind === 'user') return { ...live, idToken: session.idToken };
-    if (!session.refreshToken || !cookies) return { kind: 'none' };
+    if (live instanceof UserAuth) return live.withIdToken(session.idToken);
+    if (!session.refreshToken || !cookies) return new NoAuth();
 
     let tokens: { accessToken: string; refreshToken?: string; idToken?: string } | undefined;
     try {
@@ -173,7 +182,7 @@ async function authPlugin(fastify: FastifyInstance) {
       request.log.error({ err }, 'token refresh failed');
       throw createError.BadGateway('could not refresh the token with the identity provider');
     }
-    if (!tokens) return { kind: 'none' };
+    if (!tokens) return new NoAuth();
 
     const next: SealedSession = {
       accessToken: tokens.accessToken,
@@ -183,8 +192,8 @@ async function authPlugin(fastify: FastifyInstance) {
     };
     reply.header('set-cookie', `${SESSION_COOKIE}=${cookies.seal(next)}; HttpOnly; ${attributes}`);
     const refreshed = await asUser(tokens.accessToken, request);
-    if (refreshed.kind !== 'user') return refreshed;
-    return { ...refreshed, idToken: next.idToken };
+    if (!(refreshed instanceof UserAuth)) return refreshed;
+    return refreshed.withIdToken(next.idToken ?? session.idToken);
   }
 
   /**

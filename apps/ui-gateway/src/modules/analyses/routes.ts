@@ -1,8 +1,6 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import createError from 'http-errors';
 import {
-  type AnalysisRequest,
   analysisAcceptedSchema,
   analysisErrorSchema,
   analysisListQuerySchema,
@@ -17,23 +15,6 @@ import {
 export function registerAnalysisRoutes(app: FastifyInstance): void {
   const analyses = app.services.analyses;
   const typed = app.withTypeProvider<ZodTypeProvider>();
-
-  /**
-   * A publish that never reached the bus is the caller's to see as 502: the
-   * request was well formed and the gateway simply could not hand it on.
-   */
-  async function accepted(request: FastifyRequest, reply: FastifyReply, body: AnalysisRequest) {
-    try {
-      return reply.status(202).send(await analyses.start(body, request.auth));
-    } catch (err) {
-      if (createError.isHttpError(err)) throw err;
-      request.log.error({ err }, 'failed to publish analysis event');
-      return reply.status(502).send({
-        error: 'PublishFailed',
-        message: 'could not publish the event to the bus',
-      });
-    }
-  }
 
   typed.post(
     '/:tenant/analyses',
@@ -52,7 +33,8 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
         502: analysisErrorSchema,
       },
     }),
-    async (request, reply) => accepted(request, reply, request.body),
+    async (request, reply) =>
+      reply.status(202).send(await analyses.start(request.body, request.auth.origin())),
   );
 
   typed.post(
@@ -71,7 +53,8 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
         502: analysisErrorSchema,
       },
     }),
-    async (request, reply) => accepted(request, reply, request.body),
+    async (request, reply) =>
+      reply.status(202).send(await analyses.start(request.body, request.auth.origin())),
   );
 
   typed.get(
@@ -107,7 +90,11 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
         404: analysisErrorSchema,
       },
     }),
-    async request => analyses.getStatus(request.params.id, request.auth),
+    async request =>
+      analyses.getStatus(
+        request.params.id,
+        request.auth.kind === 'user' ? request.auth.tenants : undefined,
+      ),
   );
 
   typed.patch(

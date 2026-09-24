@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import createError from 'http-errors';
 import { z } from 'zod';
 import {
   deadlineHistorySchema,
@@ -51,17 +50,7 @@ export function registerRulesRoutes(app: FastifyInstance): void {
     }),
     async (request, reply) => {
       const { tenant, source } = request.params;
-      try {
-        const result = await rules.setMapping(tenant, source, request.body);
-        return reply.status(202).send(result);
-      } catch (err) {
-        if (createError.isHttpError(err)) throw err;
-        request.log.error({ err }, 'failed to publish mapping rule');
-        return reply.status(502).send({
-          error: 'PublishFailed',
-          message: 'could not publish the event to the bus',
-        });
-      }
+      return reply.status(202).send(await rules.setMapping(tenant, source, request.body));
     },
   );
 
@@ -106,18 +95,8 @@ export function registerRulesRoutes(app: FastifyInstance): void {
         502: rulesErrorSchema,
       },
     }),
-    async (request, reply) => {
-      try {
-        const result = await rules.setDeadlines(request.params.tenant, request.body);
-        return reply.status(202).send(result);
-      } catch (err) {
-        request.log.error({ err }, 'failed to publish deadline rule');
-        return reply.status(502).send({
-          error: 'PublishFailed',
-          message: 'could not publish the event to the bus',
-        });
-      }
-    },
+    async (request, reply) =>
+      reply.status(202).send(await rules.setDeadlines(request.params.tenant, request.body)),
   );
 
   typed.get(
@@ -155,18 +134,8 @@ export function registerRulesRoutes(app: FastifyInstance): void {
         502: rulesErrorSchema,
       },
     }),
-    async (request, reply) => {
-      try {
-        const result = await rules.setTargets(request.params.tenant, request.body);
-        return reply.status(202).send(result);
-      } catch (err) {
-        request.log.error({ err }, 'failed to publish KPI target rule');
-        return reply.status(502).send({
-          error: 'PublishFailed',
-          message: 'could not publish the event to the bus',
-        });
-      }
-    },
+    async (request, reply) =>
+      reply.status(202).send(await rules.setTargets(request.params.tenant, request.body)),
   );
 
   typed.get(

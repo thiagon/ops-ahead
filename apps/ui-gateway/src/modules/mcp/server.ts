@@ -44,7 +44,7 @@ export function buildMcpServer(app: FastifyInstance, tenant: string, role: Role)
       description: 'Looks up the status of a previously started analysis by id.',
       inputSchema: analysisParamsSchema,
     },
-    async ({ id }) => jsonResult(await analyses.getStatus(id, { kind: 'user', tenants: [tenant] })),
+    async ({ id }) => jsonResult(await analyses.getStatus(id, [tenant])),
   );
 
   server.registerTool(
@@ -135,9 +135,7 @@ export function buildMcpServer(app: FastifyInstance, tenant: string, role: Role)
         'Runs a business analysis (volume_forecast, breach_risk, kpi_projection, external_event_detection, data_refresh, data_quality_check) without needing kubeconfig, Argo, or Kafka knowledge. Returns an id immediately; poll get_analysis_status for progress.',
       inputSchema: analysisRequestSchema,
     },
-    // An MCP tool call is a person asking, the same as the REST route a
-    // session reaches — the client's own token is what authenticated it.
-    async args => jsonResult(await analyses.start(args, { kind: 'user', tenants: [tenant] })),
+    async args => jsonResult(await analyses.start(args, { trigger: 'manual' })),
   );
 
   server.registerTool(

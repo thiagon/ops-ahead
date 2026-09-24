@@ -237,7 +237,7 @@ describe('provenance comes from the credential, never the body', () => {
     expect(status.json()).toMatchObject({ trigger: 'scheduled' });
   });
 
-  it('refuses the scheduler key on anything but the daily chain', async () => {
+  it('starts whatever analysis the scheduler key asks for', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/analyses',
@@ -245,7 +245,7 @@ describe('provenance comes from the credential, never the body', () => {
       headers: { authorization: `Bearer ${schedulerKey}` },
     });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(202);
   });
 
   it('chains a run off the full_pipeline whose run key it presents', async () => {
