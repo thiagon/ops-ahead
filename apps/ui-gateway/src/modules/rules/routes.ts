@@ -14,7 +14,7 @@ import {
   targetHistorySchema,
   targetSetSchema,
   tenantParamsSchema,
-} from '../../services/rules/schema.ts';
+} from '#services/rules/schema.ts';
 
 export function registerRulesRoutes(app: FastifyInstance): void {
   const rules = app.services.rules;

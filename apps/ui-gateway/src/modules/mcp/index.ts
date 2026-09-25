@@ -2,7 +2,7 @@ import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { UserAuth } from '../../lib/auth.ts';
+import { UserAuth } from '#lib/auth.ts';
 import { tenantParamsSchema } from './schema.ts';
 import { buildMcpServer } from './server.ts';
 

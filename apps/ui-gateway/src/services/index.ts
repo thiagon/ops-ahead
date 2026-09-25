@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { SealedJson, SecretCipher } from '../lib/cipher.ts';
+import { SealedJson, SecretCipher } from '#lib/cipher.ts';
 import { AnalysesService } from './analyses/service.ts';
 import { ApiKeysService } from './api-keys/service.ts';
 import { EventsService } from './events/service.ts';

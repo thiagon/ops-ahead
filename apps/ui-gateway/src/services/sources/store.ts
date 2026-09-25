@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../generated/prisma/client.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
 
 export interface SourceRow {
   tenantId: string;

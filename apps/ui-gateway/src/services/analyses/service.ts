@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import createError from 'http-errors';
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { EventPublisher } from '../../lib/kafka.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { EventPublisher } from '#lib/kafka.ts';
 import { AnalysisPublish } from './publish.ts';
 import type {
   AnalysisOrigin,

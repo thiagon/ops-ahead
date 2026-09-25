@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../generated/prisma/client.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
 
 /**
  * The Authentik group is what says a tenant exists and who may act for it

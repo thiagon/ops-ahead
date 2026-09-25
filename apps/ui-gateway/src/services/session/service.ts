@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 import createError from 'http-errors';
-import { type Auth, type AuthIdentity, UserAuth } from '../../lib/auth.ts';
-import type { SealedJson } from '../../lib/cipher.ts';
-import { cookieAttributes, readCookie } from '../../lib/cookie.ts';
-import type { OidcClient } from '../../lib/oidc.ts';
+import { type Auth, type AuthIdentity, UserAuth } from '#lib/auth.ts';
+import type { SealedJson } from '#lib/cipher.ts';
+import { cookieAttributes, readCookie } from '#lib/cookie.ts';
+import type { OidcClient } from '#lib/oidc.ts';
 
 const FLOW_COOKIE = 'oa_auth_flow';
 const FLOW_MAX_AGE_SECONDS = 600;

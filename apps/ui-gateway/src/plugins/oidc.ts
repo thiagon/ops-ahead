@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { OidcClient } from '../lib/oidc.ts';
+import { OidcClient } from '#lib/oidc.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {

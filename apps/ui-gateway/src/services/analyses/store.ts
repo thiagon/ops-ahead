@@ -1,5 +1,5 @@
-import type { PrismaClient } from '../../generated/prisma/client.ts';
-import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.ts';
+import type { PrismaClient } from '#generated/prisma/client.ts';
+import type { InputJsonValue } from '#generated/prisma/internal/prismaNamespace.ts';
 import { type AnalysisStatus, type AnalysisTrigger, analysisStatusSchema } from './schema.ts';
 
 interface QueuedAnalysis {

@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { FastifyInstance } from 'fastify';
-import type { Role } from '../../lib/auth.ts';
-import { rulesJsonSchema } from '../../services/rules/schema.ts';
+import type { Role } from '#lib/auth.ts';
+import { rulesJsonSchema } from '#services/rules/schema.ts';
 import {
   analysisParamsSchema,
   analysisRequestSchema,

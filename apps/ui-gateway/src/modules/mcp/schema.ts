@@ -1,18 +1,18 @@
 import { z } from 'zod';
-import { analysisParamsSchema, analysisRequestSchema } from '../../services/analyses/schema.ts';
+import { analysisParamsSchema, analysisRequestSchema } from '#services/analyses/schema.ts';
 import {
   alertMappingSchema,
   deadlineSetSchema,
   monitorMappingSchema,
   originParamsSchema,
   targetSetSchema,
-} from '../../services/rules/schema.ts';
+} from '#services/rules/schema.ts';
 import {
   secretRotationSchema,
   sourceParamsSchema,
   sourceRegistrationSchema,
   statusChangeSchema,
-} from '../../services/sources/schema.ts';
+} from '#services/sources/schema.ts';
 
 export { analysisParamsSchema, analysisRequestSchema, deadlineSetSchema, targetSetSchema };
 

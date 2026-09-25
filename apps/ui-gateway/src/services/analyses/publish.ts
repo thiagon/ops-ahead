@@ -1,4 +1,4 @@
-import type { EventPublisher } from '../../lib/kafka.ts';
+import type { EventPublisher } from '#lib/kafka.ts';
 import type { AnalysisRequest } from './schema.ts';
 
 const ANALYSIS_DOMAIN: Record<AnalysisRequest['analysis'], 'ml' | 'data'> = {

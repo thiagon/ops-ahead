@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { authIdentitySchema } from '../../lib/auth.ts';
+import { authIdentitySchema } from '#lib/auth.ts';
 
 export function registerAuthRoutes(app: FastifyInstance): void {
   const session = app.services.session;

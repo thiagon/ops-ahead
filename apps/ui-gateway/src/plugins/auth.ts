@@ -6,7 +6,7 @@ import type {
 } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import { type Auth, NoAuth, RunAuth, SchedulerAuth, UserAuth } from '../lib/auth.ts';
+import { type Auth, NoAuth, RunAuth, SchedulerAuth, UserAuth } from '#lib/auth.ts';
 
 const CSRF_HEADER = 'x-csrf-token';
 const RUN_KEY_HEADER = 'X-Run-Key';

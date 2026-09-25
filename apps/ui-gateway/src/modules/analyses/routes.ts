@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { UserAuth } from '../../lib/auth.ts';
+import { UserAuth } from '#lib/auth.ts';
 import {
   analysisAcceptedSchema,
   analysisErrorSchema,
@@ -11,7 +11,7 @@ import {
   analysisStatusUpdateSchema,
   analysisUpdateHeadersSchema,
   tenantParamsSchema,
-} from '../../services/analyses/schema.ts';
+} from '#services/analyses/schema.ts';
 
 export function registerAnalysisRoutes(app: FastifyInstance): void {
   const analyses = app.services.analyses;

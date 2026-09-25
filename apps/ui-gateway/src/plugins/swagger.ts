@@ -8,7 +8,7 @@ import {
   createJsonSchemaTransformObject,
 } from 'fastify-type-provider-zod';
 import createError from 'http-errors';
-import { UserAuth } from '../lib/auth.ts';
+import { UserAuth } from '#lib/auth.ts';
 
 /** z.codec is the HTTP Date bridge; OpenAPI only has the wire type (ISO-8601). */
 const zodToJsonConfig = {

@@ -10,7 +10,7 @@ import {
   sourceWithSecretSchema,
   statusChangeSchema,
   tenantParamsSchema,
-} from '../../services/sources/schema.ts';
+} from '#services/sources/schema.ts';
 
 /**
  * A source only means anything inside a tenant, so every route carries one

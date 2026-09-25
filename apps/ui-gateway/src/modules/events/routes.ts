@@ -11,7 +11,7 @@ import {
   webhookErrorSchema,
   webhookHeadersSchema,
   webhookParamsSchema,
-} from '../../services/events/schema.ts';
+} from '#services/events/schema.ts';
 
 type WebhookRequest = FastifyRequest<{ Params: { tenant: string; source: string } }>;
 

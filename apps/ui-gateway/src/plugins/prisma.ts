@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import { PrismaClient } from '../generated/prisma/client.ts';
+import { PrismaClient } from '#generated/prisma/client.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
