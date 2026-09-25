@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { UserAuth } from '../../lib/auth.ts';
 import {
   analysisAcceptedSchema,
   analysisErrorSchema,
@@ -18,7 +19,7 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
 
   typed.post(
     '/:tenant/analyses',
-    app.auth.operator({
+    app.auth(['user', 'tenant', 'writer'], { relation: 'and' })({
       tags: ['analyses'],
       summary: 'Start a business analysis for a tenant',
       description:
@@ -39,7 +40,7 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
 
   typed.post(
     '/analyses',
-    app.auth.schedulerOrRun({
+    app.auth(['scheduler', 'run'])({
       tags: ['analyses'],
       summary: 'Start a scheduled or chained analysis',
       description:
@@ -93,7 +94,7 @@ export function registerAnalysisRoutes(app: FastifyInstance): void {
     async request =>
       analyses.getStatus(
         request.params.id,
-        request.auth.kind === 'user' ? request.auth.tenants : undefined,
+        request.auth instanceof UserAuth ? request.auth.tenants : undefined,
       ),
   );
 

@@ -8,6 +8,7 @@ import {
   createJsonSchemaTransformObject,
 } from 'fastify-type-provider-zod';
 import createError from 'http-errors';
+import { UserAuth } from '../lib/auth.ts';
 
 /** z.codec is the HTTP Date bridge; OpenAPI only has the wire type (ISO-8601). */
 const zodToJsonConfig = {
@@ -61,7 +62,7 @@ async function swaggerPlugin(fastify: FastifyInstance) {
       onRequest(request, reply, done) {
         // /docs is behind a session: a probe and a webhook have no cookie,
         // and the reference is not a public surface.
-        if (request.auth?.kind !== 'user') {
+        if (!(request.auth instanceof UserAuth)) {
           // A browser is sent to log in and back; anything else gets the 401.
           if (request.headers.accept?.includes('text/html')) {
             const back = `${fastify.env.PUBLIC_URL.replace(/\/$/, '')}${request.url}`;

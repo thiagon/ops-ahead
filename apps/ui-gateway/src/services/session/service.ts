@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 import createError from 'http-errors';
-import type { AuthIdentity } from '../../lib/auth.ts';
+import { type Auth, type AuthIdentity, UserAuth } from '../../lib/auth.ts';
 import type { SealedJson } from '../../lib/cipher.ts';
 import { cookieAttributes, readCookie } from '../../lib/cookie.ts';
 import type { OidcClient } from '../../lib/oidc.ts';
@@ -22,6 +22,13 @@ interface FlowCookie {
   verifier: string;
   state: string;
   next: string;
+}
+
+interface SealedSession {
+  accessToken: string;
+  refreshToken?: string;
+  idToken?: string;
+  csrf: string;
 }
 
 /**
@@ -60,6 +67,73 @@ export class SessionService {
       email: claims.email,
       tenants: claims.groups.filter(group => !group.startsWith('authentik ')),
       role: claims.roleClaim === 'operator' ? 'operator' : 'viewer',
+    };
+  }
+
+  /** The person this access token is, or `undefined` when the provider rejects it. */
+  async userFrom(accessToken: string, idToken?: string): Promise<UserAuth | undefined> {
+    let identity: AuthIdentity | undefined;
+    try {
+      identity = await this.identify(accessToken);
+    } catch (err) {
+      this.#log.error({ err }, 'token introspection failed');
+      throw createError.BadGateway('could not verify the token with the identity provider');
+    }
+    if (!identity) return undefined;
+    return new UserAuth({ ...identity, accessToken, idToken });
+  }
+
+  /**
+   * The cookie is the storage, so an expired access token is refreshed in
+   * place rather than sending the browser back to login while the refresh
+   * token is still live. A dead refresh is a stranger again. `setCookie` is
+   * the rewritten session, present only when a refresh issued new tokens.
+   */
+  async resume(input: {
+    cookieHeader: string | undefined;
+    method: string;
+    csrfHeader: string | undefined;
+    csrfHeaderName: string;
+  }): Promise<{ user?: UserAuth; setCookie?: string } | undefined> {
+    if (!this.#cookies) return undefined;
+    const raw = readCookie(input.cookieHeader, SESSION_COOKIE);
+    if (!raw) return undefined;
+    const stored = this.#cookies.open<SealedSession>(raw);
+    if (!stored) return undefined;
+
+    // Only the cookie pays this: a Bearer caller had to read the token to send
+    // it, which a cross-site form cannot do.
+    if (
+      input.method !== 'GET' &&
+      input.method !== 'HEAD' &&
+      input.method !== 'OPTIONS' &&
+      input.csrfHeader !== stored.csrf
+    ) {
+      throw createError.Forbidden(`missing or invalid ${input.csrfHeaderName} header`);
+    }
+
+    const live = await this.userFrom(stored.accessToken, stored.idToken);
+    if (live) return { user: live };
+    if (!stored.refreshToken) return {};
+
+    let tokens: { accessToken: string; refreshToken?: string; idToken?: string } | undefined;
+    try {
+      tokens = await this.#oidc.refresh(stored.refreshToken);
+    } catch (err) {
+      this.#log.error({ err }, 'token refresh failed');
+      throw createError.BadGateway('could not refresh the token with the identity provider');
+    }
+    if (!tokens) return {};
+
+    const next: SealedSession = {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken ?? stored.refreshToken,
+      idToken: tokens.idToken ?? stored.idToken,
+      csrf: stored.csrf,
+    };
+    return {
+      user: await this.userFrom(next.accessToken, next.idToken),
+      setCookie: `${SESSION_COOKIE}=${this.#cookies.seal(next)}; HttpOnly; ${this.#attrs()}`,
     };
   }
 
@@ -121,7 +195,7 @@ export class SessionService {
       refreshToken: tokens.refreshToken,
       idToken: tokens.idToken,
       csrf,
-    });
+    } satisfies SealedSession);
 
     return {
       cookies: [
@@ -135,13 +209,9 @@ export class SessionService {
     };
   }
 
-  async end(auth: {
-    kind: string;
-    accessToken?: string;
-    idToken?: string;
-  }): Promise<{ cookies: string[]; redirect: string | null }> {
+  async end(auth: Auth): Promise<{ cookies: string[]; redirect: string | null }> {
     let redirect: string | undefined;
-    if (auth.kind === 'user' && auth.accessToken) {
+    if (auth instanceof UserAuth) {
       await this.#oidc.revoke(auth.accessToken);
       try {
         redirect = await this.#oidc.endSessionUrl({

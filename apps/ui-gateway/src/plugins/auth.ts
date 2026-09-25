@@ -6,23 +6,12 @@ import type {
 } from 'fastify';
 import fp from 'fastify-plugin';
 import createError from 'http-errors';
-import {
-  type Auth,
-  apiKeyScheme,
-  bearerScheme,
-  NoAuth,
-  RunAuth,
-  readBearer,
-  SchedulerAuth,
-  UserAuth,
-} from '../lib/auth.ts';
-import { SealedJson } from '../lib/cipher.ts';
-import { cookieAttributes, readCookie } from '../lib/cookie.ts';
+import { type Auth, NoAuth, RunAuth, SchedulerAuth, UserAuth } from '../lib/auth.ts';
 
-const SESSION_COOKIE = 'oa_session';
 const CSRF_HEADER = 'x-csrf-token';
 const RUN_KEY_HEADER = 'X-Run-Key';
 const HMAC_HEADER = 'X-Signature';
+const SESSION_COOKIE = 'oa_session';
 const WRITER_ROLE = 'operator';
 
 const securitySchemes = {
@@ -45,7 +34,11 @@ const securitySchemes = {
   }),
 };
 
+type CheckName = 'user' | 'tenant' | 'writer' | 'scheduler' | 'run';
+
 type SecurityRequirement = Record<string, string[]>;
+
+type AuthCheck = preHandlerAsyncHookHandler & { security: SecurityRequirement[] };
 
 type Gate = {
   <S extends object>(
@@ -57,24 +50,71 @@ type Gate = {
   security: SecurityRequirement[];
 };
 
-function gate(preHandler: preHandlerAsyncHookHandler, security: SecurityRequirement[]): Gate {
+function check(preHandler: preHandlerAsyncHookHandler, security: SecurityRequirement[]): AuthCheck {
+  return Object.assign(preHandler, { security });
+}
+
+function isCheck(fn: AuthCheck | readonly AuthCheck[]): fn is AuthCheck {
+  return !Array.isArray(fn);
+}
+
+function gate(preHandler: AuthCheck): Gate {
   const apply = <S extends object>(schema: S) => ({
     preHandler,
-    schema: { ...schema, security },
+    schema: { ...schema, security: preHandler.security },
   });
-  return Object.assign(apply, { security });
+  return Object.assign(apply, { security: preHandler.security });
+}
+
+/**
+ * A list passes when any check does. A list inside it passes when every check
+ * does — the same pairing a route's OpenAPI `security` array uses. `and` stops
+ * at the first failure; `or` returns the last one.
+ */
+function compose(
+  functions: ReadonlyArray<AuthCheck | readonly AuthCheck[]>,
+  relation: 'or' | 'and',
+  nested = false,
+): AuthCheck {
+  if (functions.length === 0) throw new Error('Missing auth functions');
+  const parts = functions.map((fn): AuthCheck => {
+    if (isCheck(fn)) return fn;
+    if (nested) throw new TypeError('Nesting sub-arrays is not supported');
+    return compose(fn, relation === 'or' ? 'and' : 'or', true);
+  });
+
+  const security =
+    relation === 'or'
+      ? parts.flatMap(part => part.security)
+      : parts.reduce<SecurityRequirement[]>((acc, part) => {
+          if (part.security.length === 0) return acc;
+          if (acc.length === 0) return part.security;
+          return acc.flatMap(left => part.security.map(right => ({ ...left, ...right })));
+        }, []);
+
+  const preHandler: preHandlerAsyncHookHandler = async function (request, reply) {
+    if (relation === 'and') {
+      for (const part of parts) await part.call(this, request, reply);
+      return;
+    }
+    let error: unknown;
+    for (const part of parts) {
+      try {
+        await part.call(this, request, reply);
+        return;
+      } catch (err) {
+        error = err;
+      }
+    }
+    throw error;
+  };
+
+  return check(preHandler, security);
 }
 
 function documented(security: SecurityRequirement[]) {
   const apply = <S extends object>(schema: S) => ({ schema: { ...schema, security } });
   return Object.assign(apply, { security });
-}
-
-interface SealedSession {
-  accessToken: string;
-  refreshToken?: string;
-  idToken?: string;
-  csrf: string;
 }
 
 declare module 'fastify' {
@@ -85,11 +125,14 @@ declare module 'fastify' {
      * hook from one place and a scheme from another.
      */
     auth: {
+      (
+        checks: ReadonlyArray<CheckName | readonly CheckName[]>,
+        options?: { relation?: 'or' | 'and' },
+      ): Gate;
       schemes: typeof securitySchemes;
       user: Gate;
       tenant: Gate;
       operator: Gate;
-      schedulerOrRun: Gate;
       run: Gate;
       hmac: ReturnType<typeof documented>;
     };
@@ -106,14 +149,6 @@ declare module 'fastify' {
  * authority.
  */
 async function authPlugin(fastify: FastifyInstance) {
-  const cookies = fastify.env.SESSION_COOKIE_KEY
-    ? new SealedJson(fastify.env.SESSION_COOKIE_KEY)
-    : undefined;
-  const attributes = cookieAttributes({
-    secure: fastify.env.HTTPS_ENABLED,
-    domain: fastify.env.SESSION_COOKIE_DOMAIN,
-  });
-
   // Declared without a value so each request owns its own; the onRequest hook
   // below is what sets it.
   fastify.decorateRequest('auth');
@@ -128,137 +163,126 @@ async function authPlugin(fastify: FastifyInstance) {
     if (!fastify.hasDecorator('services')) return new NoAuth();
 
     const runKey = request.headers['x-run-key'];
-    if (typeof runKey === 'string' && runKey.length > 0) {
-      return new RunAuth(runKey);
-    }
+    if (typeof runKey === 'string' && runKey.length > 0) return new RunAuth(runKey);
 
     const bearer = readBearer(request.headers.authorization);
     if (bearer) {
       if (await fastify.services.apiKeys.verify(bearer)) return new SchedulerAuth();
-      return await asUser(bearer, request);
+      return (await fastify.services.session.userFrom(bearer)) ?? new NoAuth();
     }
 
-    const cookie = cookies && readCookie(request.headers.cookie, SESSION_COOKIE);
-    if (cookie) {
-      const session = cookies.open<SealedSession>(cookie);
-      if (session) {
-        assertCsrf(request, session.csrf);
-        return await asCookieUser(session, request, reply);
+    const resumed = await fastify.services.session.resume({
+      cookieHeader: request.headers.cookie,
+      method: request.method,
+      csrfHeader:
+        typeof request.headers[CSRF_HEADER] === 'string' ? request.headers[CSRF_HEADER] : undefined,
+      csrfHeaderName: CSRF_HEADER,
+    });
+    if (resumed?.setCookie) reply.header('set-cookie', resumed.setCookie);
+    return resumed?.user ?? new NoAuth();
+  }
+
+  const user = check(
+    async request => {
+      if (!(request.auth instanceof UserAuth)) {
+        throw createError.Unauthorized('this endpoint needs a logged-in caller');
       }
-    }
+    },
+    [{ cookieAuth: [] }, { bearerAuth: [] }],
+  );
 
-    return new NoAuth();
-  }
-
-  async function asUser(token: string, request: FastifyRequest): Promise<UserAuth | NoAuth> {
-    try {
-      const identity = await fastify.services.session.identify(token);
-      if (!identity) return new NoAuth();
-      return UserAuth.from({ ...identity, accessToken: token });
-    } catch (err) {
-      request.log.error({ err }, 'token introspection failed');
-      throw createError.BadGateway('could not verify the token with the identity provider');
-    }
-  }
-
-  /**
-   * The cookie is the storage, so an expired access token is refreshed in
-   * place rather than sending the browser back to login while the refresh
-   * token is still live. A dead refresh is a stranger again.
-   */
-  async function asCookieUser(
-    session: SealedSession,
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<Auth> {
-    const live = await asUser(session.accessToken, request);
-    if (live instanceof UserAuth) return live.withIdToken(session.idToken);
-    if (!session.refreshToken || !cookies) return new NoAuth();
-
-    let tokens: { accessToken: string; refreshToken?: string; idToken?: string } | undefined;
-    try {
-      tokens = await fastify.oidc.refresh(session.refreshToken);
-    } catch (err) {
-      request.log.error({ err }, 'token refresh failed');
-      throw createError.BadGateway('could not refresh the token with the identity provider');
-    }
-    if (!tokens) return new NoAuth();
-
-    const next: SealedSession = {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? session.refreshToken,
-      idToken: tokens.idToken ?? session.idToken,
-      csrf: session.csrf,
-    };
-    reply.header('set-cookie', `${SESSION_COOKIE}=${cookies.seal(next)}; HttpOnly; ${attributes}`);
-    const refreshed = await asUser(tokens.accessToken, request);
-    if (!(refreshed instanceof UserAuth)) return refreshed;
-    return refreshed.withIdToken(next.idToken ?? session.idToken);
-  }
-
-  /**
-   * Only the cookie pays this: a Bearer caller had to read the token to send
-   * it, which a cross-site form cannot do.
-   */
-  function assertCsrf(request: FastifyRequest, expected: string): void {
-    if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-      return;
-    }
-    if (request.headers[CSRF_HEADER] !== expected) {
-      throw createError.Forbidden(`missing or invalid ${CSRF_HEADER} header`);
-    }
-  }
-
-  const requireUser: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'user') {
-      throw createError.Unauthorized('this endpoint needs a logged-in caller');
-    }
-  };
-
-  const requireTenant: preHandlerAsyncHookHandler = async request => {
-    const auth = request.auth;
-    if (auth.kind !== 'user') {
+  const tenant = check(async request => {
+    if (!(request.auth instanceof UserAuth)) {
       throw createError.Unauthorized('this endpoint needs a logged-in caller');
     }
     const { tenant } = request.params as { tenant?: string };
     if (!tenant) return;
-    if (!auth.tenants.includes(tenant)) {
+    if (!request.auth.tenants.includes(tenant)) {
       throw createError.Forbidden('this caller does not act for that tenant');
     }
     await fastify.services.tenants.ensure(tenant);
-  };
+  }, []);
 
-  const requireOperator: preHandlerAsyncHookHandler = async function (request, reply) {
-    await requireTenant.call(this, request, reply);
-    if (request.auth.kind === 'user' && request.auth.role !== WRITER_ROLE) {
+  const writer = check(async request => {
+    if (!(request.auth instanceof UserAuth)) {
+      throw createError.Unauthorized('this endpoint needs a logged-in caller');
+    }
+    if (request.auth.role !== WRITER_ROLE) {
       throw createError.Forbidden('this caller can read this tenant but not change it');
     }
-  };
+  }, []);
 
-  const requireSchedulerOrRun: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'scheduler' && request.auth.kind !== 'run') {
-      throw createError.Unauthorized('this endpoint needs a scheduler key or a run key');
+  const scheduler = check(
+    async request => {
+      if (!(request.auth instanceof SchedulerAuth)) {
+        throw createError.Unauthorized('this endpoint needs a scheduler key');
+      }
+    },
+    [{ schedulerKey: [] }],
+  );
+
+  const run = check(
+    async request => {
+      if (!(request.auth instanceof RunAuth)) {
+        throw createError.Unauthorized('this endpoint needs a run key');
+      }
+    },
+    [{ runKey: [] }],
+  );
+
+  const owned = { user, tenant, writer, scheduler, run };
+
+  function allow(
+    names: ReadonlyArray<CheckName | readonly CheckName[]>,
+    options?: { relation?: 'or' | 'and' },
+  ): Gate {
+    const relation = options?.relation ?? 'or';
+    if (relation !== 'or' && relation !== 'and') {
+      throw new Error("The value of options.relation should be one of ['or', 'and']");
     }
-  };
+    const checks = names.map(name =>
+      typeof name === 'string' ? owned[name] : name.map(part => owned[part]),
+    );
+    return gate(compose(checks, relation));
+  }
 
-  const requireRun: preHandlerAsyncHookHandler = async request => {
-    if (request.auth.kind !== 'run') {
-      throw createError.Unauthorized('this endpoint needs a run key');
-    }
-  };
+  fastify.decorate(
+    'auth',
+    Object.assign(allow, {
+      schemes: securitySchemes,
+      user: gate(user),
+      tenant: gate(compose([user, tenant], 'and')),
+      operator: gate(compose([user, tenant, writer], 'and')),
+      run: gate(run),
+      hmac: documented([{ hmac: [] }]),
+    }),
+  );
+}
 
-  fastify.decorate('auth', {
-    schemes: securitySchemes,
-    user: gate(requireUser, [{ cookieAuth: [] }, { bearerAuth: [] }]),
-    tenant: gate(requireTenant, [{ cookieAuth: [] }, { bearerAuth: [] }]),
-    operator: gate(requireOperator, [{ cookieAuth: [] }, { bearerAuth: [] }]),
-    schedulerOrRun: gate(requireSchedulerOrRun, [{ schedulerKey: [] }, { runKey: [] }]),
-    run: gate(requireRun, [{ runKey: [] }]),
-    hmac: documented([{ hmac: [] }]),
-  });
+function apiKeyScheme<I extends 'cookie' | 'header'>(input: {
+  in: I;
+  name: string;
+  description: string;
+}) {
+  return {
+    type: 'apiKey' as const,
+    in: input.in,
+    name: input.name,
+    description: input.description,
+  };
+}
+
+function bearerScheme(description: string) {
+  return { type: 'http' as const, scheme: 'bearer' as const, description };
+}
+
+const BEARER = /^Bearer (.+)$/i;
+
+function readBearer(authorization: string | undefined): string | undefined {
+  return BEARER.exec(authorization ?? '')?.[1];
 }
 
 // `services` is read at request time, not at registration: declaring it as a
 // dependency would force the whole service container into any app that only
 // wants the HTTP boundary plugins.
-export default fp(authPlugin, { name: 'auth', dependencies: ['env'] });
+export default fp(authPlugin, { name: 'auth' });

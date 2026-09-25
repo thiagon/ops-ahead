@@ -2,6 +2,7 @@ import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { UserAuth } from '../../lib/auth.ts';
 import { tenantParamsSchema } from './schema.ts';
 import { buildMcpServer } from './server.ts';
 
@@ -51,7 +52,7 @@ function registerMcpRoutes(app: FastifyInstance): void {
 
   typed.post('/mcp/:tenant', mcpParams, async (request, reply) => {
     const auth = request.auth;
-    if (auth.kind !== 'user') return unauthorized(reply);
+    if (!(auth instanceof UserAuth)) return unauthorized(reply);
     if (!auth.tenants.includes(request.params.tenant)) {
       return reply.status(403).send({
         jsonrpc: '2.0',
